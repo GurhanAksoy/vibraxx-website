@@ -9,10 +9,10 @@
   --muted:#9aa0aa;
   --accent:#7c5cff;
 
-  /* brand gradient stops */
-  --v1:#00E5FF;
-  --v2:#7C5CFF;
-  --v3:#FF2BD6;
+  /* VibraXX palette */
+  --v1:#00E5FF;  /* cyan */
+  --v2:#7C5CFF;  /* violet */
+  --v3:#FF2BD6;  /* magenta */
 }
 
 /* ---- Base ---- */
@@ -23,21 +23,21 @@ html,body{
   -moz-osx-font-smoothing:grayscale;
 }
 
-/* Container merkezleme */
+img{ display:block; max-width:100%; height:auto; }
+
+/* Container & sections */
 .container{ max-width:1140px; margin-inline:auto; padding-inline:1rem; }
-
-/* Hafif neon arka plan (istersen section’a gradient class’ı ekle) */
-.gradient{
-  background:
-    radial-gradient(1200px 600px at 10% -10%, rgba(124,92,255,.25), transparent 40%),
-    radial-gradient(1000px 500px at 90% 10%, rgba(0,200,255,.18), transparent 40%);
-}
-
-/* Bölümler */
 .section{ padding-block:4rem; }
 @media (min-width:768px){ .section{ padding-block:6rem; } }
 
-/* ---- Typography: AI izi yok ---- */
+/* Soft background glow */
+.gradient{
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(124,92,255,.22), transparent 40%),
+    radial-gradient(1000px 500px at 90% 10%, rgba(0,200,255,.16), transparent 40%);
+}
+
+/* Typography hygiene (no weird line breaks / hyphens) */
 h1,h2,h3,h4,h5,h6,p,li,button,a,small,span{
   hyphens:none;
   word-break:keep-all;
@@ -50,72 +50,64 @@ p,li { text-wrap:pretty; }
 .prose-narrow{ max-width:68ch; }
 .nowrap{ white-space:nowrap; }
 
-/* Görseller güvenli */
-img{ display:block; max-width:100%; height:auto; }
+/* ---- Neon Title (unified for Home/Studio/Announcements/FAQ) ---- */
+.neon-title{
+  font-weight:800;
+  background:linear-gradient(90deg, var(--v2) 0%, var(--v1) 50%, var(--v3) 100%);
+  background-size:200% 100%;
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+  text-shadow:
+    0 0 2px rgba(255,255,255,.25),
+    0 0 14px rgba(124,92,255,.35);
+  animation:neonShift 12s ease-in-out infinite;
+}
+@keyframes neonShift{
+  0%,100%{ background-position:0% 50% }
+  50%    { background-position:100% 50% }
+}
 
-/* =========================================
-   NEON TEXT (statik, keskin)
-   Kullanım: className="neon-text"
-   Animasyon istersen: "neon-text neon-animate"
-   ========================================= */
+/* Optional rainbow letter style (not used by default) */
 .neon-text{
   background:linear-gradient(90deg,#7C5CFF,#00E5FF,#00FFA3,#FFD166,#FF2BD6);
   -webkit-background-clip:text;
   background-clip:text;
   color:transparent;
   letter-spacing:-0.01em;
-  /* hafif, net parıltı */
-  filter:
-    drop-shadow(0 0 .18rem rgba(124,92,255,.35))
-    drop-shadow(0 0 .55rem rgba(0,229,255,.18));
 }
 
-/* Opsiyonel: akıcı arka plan kaydırma (shimmer yok) */
-.neon-animate{ background-size:200% 100%; animation:neonShift 7s linear infinite; }
-@keyframes neonShift{ 0%{background-position:0% 0} 100%{background-position:200% 0} }
-
-@media (prefers-reduced-motion:reduce){
-  .neon-animate{ animation:none; }
-}
-
-/* =========================================
-   NAVBAR & CTA BUTONLARI (pill)
-   ========================================= */
+/* ---- Buttons (primary/secondary) ---- */
 @layer components{
   .nav-btn{
     @apply inline-flex items-center justify-center rounded-full px-5 py-3 text-sm md:text-base font-semibold transition;
     line-height:1;
     min-height:44px;
-    border:1px solid rgba(255,255,255,.22);
+    border:1px solid rgba(255,255,255,.18);
     background:rgba(255,255,255,.07);
-    color:rgba(255,255,255,.85);
+    color:rgba(255,255,255,.92);
     backdrop-filter:saturate(130%) blur(2px);
   }
   .nav-btn:hover{
     color:#fff;
-    border-color:rgba(255,255,255,.38);
+    border-color:rgba(255,255,255,.28);
     background:rgba(255,255,255,.1);
     transform:translateY(-1px);
   }
   .nav-btn:active{ transform:translateY(0); }
-  .nav-btn:disabled{ opacity:.5; cursor:not-allowed; }
 
   .nav-btn--primary{
-    color:#0b0b0f; font-weight:700; border-color:transparent;
+    color:#0b0b0f;
+    border-color:transparent;
     background:linear-gradient(135deg,var(--v1) 0%, var(--v2) 50%, var(--v3) 100%);
     box-shadow:0 0 16px rgba(124,92,255,.35);
   }
-  .nav-btn--primary:hover{ filter:brightness(1.06); box-shadow:0 0 22px rgba(124,92,255,.5); }
-
-  /* Sayfa içi buton alias’ları — aynı görünüm */
-  .btn{ @apply inline-flex items-center justify-center rounded-xl font-semibold transition; padding:.8rem 1.1rem; }
-  .btn:active{ transform:translateY(1px) scale(.99); }
-  .btn-gradient{ background:linear-gradient(135deg,var(--v1),var(--v2),var(--v3)); color:#0b0b0f; box-shadow:0 10px 35px rgba(139,93,255,.20); }
-  .btn-gradient:hover{ filter:brightness(1.05); }
-  .btn-outline{ border:1px solid rgba(255,255,255,.22); color:#fff; background:transparent; }
-  .btn-outline:hover{ background:rgba(255,255,255,.08); }
+  .nav-btn--primary:hover{
+    filter:brightness(1.06);
+    box-shadow:0 0 22px rgba(124,92,255,.5);
+  }
 }
 
-/* ---- Kart hover canlılığı ---- */
+/* Cards */
 .card{ @apply rounded-2xl p-6 border border-white/10 bg-white/5 transition-transform; }
 .card:hover{ transform:translateY(-2px); box-shadow:0 10px 24px rgba(0,0,0,.25); }

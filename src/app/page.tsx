@@ -1,4 +1,6 @@
 "use client";
+
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
@@ -9,7 +11,10 @@ const plans = [
   { key: "pro",     name: "Pro Pack",     price: 49.99, videos: 50, watermark: false, priceId: "price_pro_xxx" },
 ];
 
+// Paddle init guard
 let paddleInited = false;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function openCheckout(priceId: string) {
   // @ts-ignore
   if (typeof window !== "undefined" && window.Paddle && process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN) {
@@ -35,24 +40,27 @@ function openCheckout(priceId: string) {
 
 export default function Home() {
   return (
-    <>
+    <div>
       <Navbar />
 
       {/* HERO */}
-      <section className="section container text-center">
-        <div className="mx-auto max-w-3xl prose-narrow">
+      <section className="section container">
+        <div className="mx-auto max-w-3xl text-center prose-narrow">
           <h1 className="neon-title leading-tight tracking-tight"
-              style={{ fontSize: "clamp(2.4rem, 6vw, 4.2rem)" }}>
+              style={{ fontSize: "clamp(2.2rem, 5.5vw, 3.6rem)" }}>
             Create Stunning Videos in Seconds
           </h1>
-
           <p className="mt-4 text-base sm:text-lg text-white/70 leading-relaxed">
             Turn your text into crisp <span className="nowrap">1080p</span> clips. No credits. Clear pricing. Instant results.
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a href="/studio" className="nav-btn nav-btn--primary w-full sm:w-auto">Launch Studio</a>
-            <a href="#pricing" className="nav-btn w-full sm:w-auto">View Pricing</a>
+            <Link href="/studio" className="nav-btn nav-btn--primary w-full sm:w-auto text-center">
+              Launch Studio
+            </Link>
+            <a href="#pricing" className="nav-btn w-full sm:w-auto text-center">
+              View Pricing
+            </a>
           </div>
         </div>
       </section>
@@ -79,7 +87,7 @@ export default function Home() {
       {/* PRICING */}
       <section id="pricing" className="section container">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl md:text-4xl font-bold">Pricing Plans</h2>
+          <h2 className="neon-title" style={{fontSize:"clamp(1.8rem, 4vw, 2.4rem)"}}>Pricing Plans</h2>
           <p className="text-white/70 mt-2">Clear packages. Fair prices. No surprises.</p>
         </div>
 
@@ -107,6 +115,6 @@ export default function Home() {
       </section>
 
       <Footer />
-    </>
+    </div>
   );
 }
