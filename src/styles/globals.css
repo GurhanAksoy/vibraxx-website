@@ -2,53 +2,56 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --bg: #0b0b0f;
-  --fg: #e7e7ec;
-  --muted: #9aa0aa;
-  --accent: #7c5cff;
+/* ---- Theme Tokens ---- */
+:root{
+  --bg:#0b0b0f;
+  --fg:#e7e7ec;
+  --muted:#9aa0aa;
+  --accent:#7c5cff;
 }
 
-html, body {
-  background: var(--bg);
-  color: var(--fg);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* ---- Base ---- */
+html,body{
+  background:var(--bg);
+  color:var(--fg);
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
 }
 
-.gradient {
-  background: radial-gradient(1200px 600px at 10% -10%, rgba(124,92,255,0.25), transparent 40%),
-              radial-gradient(1000px 500px at 90% 10%, rgba(0,200,255,0.18), transparent 40%);
+/* Sayfa genişliği + merkezleme */
+.container{
+  max-width:1140px;
+  margin-inline:auto;
+  padding-inline:1rem;
 }
 
-.container { max-width: 1140px; } /* istersen tailwind max-w-screen-xl de kullanabilirsin */
-
-/* Dengeli başlık satır kırımı */
-.balance { text-wrap: balance; }
-
-/* Fiyat ve kısa etiketlerde kırılmayı engelle */
-.nowrap { white-space: nowrap; }
+/* Arka plan ışıması (hafif) */
+.gradient{
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(124,92,255,.25), transparent 40%),
+    radial-gradient(1000px 500px at 90% 10%, rgba(0,200,255,.18), transparent 40%);
+}
 
 /* Bölümler arası tutarlı boşluk */
-.section { padding-top: 4rem; padding-bottom: 4rem; }
-@media (min-width: 768px) { .section { padding-top: 6rem; padding-bottom: 6rem; } }
+.section{padding-block:4rem;}
+@media (min-width:768px){.section{padding-block:6rem;}}
 
-/* No AI-ish hyphenation / weird breaks */
-h1,h2,h3,h4,h5,h6,p,li,button,a,small,span {
-  hyphens: none;              
-  word-break: keep-all;       
-  overflow-wrap: anywhere;    /* mobilde güvenli */
-  letter-spacing: normal;     
-  text-rendering: optimizeLegibility;
+/* ---- Typography: “AI izi” olmasın ---- */
+h1,h2,h3,h4,h5,h6,p,li,button,a,small,span{
+  hyphens:none;             /* kelime bölme kapalı */
+  word-break:keep-all;      /* kelimeyi ortadan bölme */
+  overflow-wrap:normal;     /* istemsiz kırma yok */
+  letter-spacing:normal;
+  text-rendering:optimizeLegibility;
 }
+h1,h2{ text-wrap:balance; } /* başlıklarda dengeli kırılım */
+p,li { text-wrap:pretty; }  /* doğal satır akışı */
 
-/* Daha stabil satır akışı */
-h1,h2 { text-wrap: balance; } 
-p,li  { text-wrap: pretty; }
+/* Okunur satır uzunluğu (yakl. 68 karakter) */
+.prose-narrow{ max-width:68ch; }
 
-/* Okunur satır uzunluğu */
-.prose-narrow { max-width: 68ch; }
+/* Kısa terimler/kombinasyonlar asla kırılmasın */
+.nowrap{ white-space:nowrap; }
 
-/* Responsive font scaling örneği */
-h1 { font-size: clamp(2.25rem, 4vw, 3.75rem); }
-p  { font-size: clamp(1rem, 1.25vw, 1.125rem); }
+/* Görseller güvenli dursun */
+img{ display:block; max-width:100%; height:auto; }

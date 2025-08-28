@@ -9,14 +9,21 @@ const plans = [
   { key: "pro",     name: "Pro Pack",     price: 49.99, videos: 50, watermark: false, priceId: "price_pro_xxx" },
 ];
 
+// Paddle'ı tekrar tekrar init etmemek için basit bayrak
+let paddleInited = false;
+
 function openCheckout(priceId: string) {
   // @ts-ignore
-  if (window.Paddle && process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN) {
+  if (typeof window !== "undefined" && window.Paddle && process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN) {
     // @ts-ignore
-    window.Paddle.Initialize({
-      token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN,
-      environment: process.env.NEXT_PUBLIC_PADDLE_ENV || "production",
-    });
+    if (!paddleInited) {
+      // @ts-ignore
+      window.Paddle.Initialize({
+        token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN,
+        environment: process.env.NEXT_PUBLIC_PADDLE_ENV || "production",
+      });
+      paddleInited = true;
+    }
     // @ts-ignore
     window.Paddle.Checkout.open({
       items: [{ priceId }],
@@ -40,8 +47,8 @@ export default function Home() {
             Create Stunning Videos in Seconds
           </h1>
           <p className="mt-4 text-base sm:text-lg text-white/70 leading-relaxed">
-            Transform your text into high-quality <span className="nowrap">1080p</span> videos.
-            No hidden fees, no confusing credits — clear pricing and instant results.
+            Transform your text into high quality <span className="nowrap">1080p</span> videos.
+            No hidden fees or confusing credits. Clear pricing and instant results.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
             <a
@@ -66,7 +73,7 @@ export default function Home() {
           {[
             { title: "Seamless Workflow",  desc: "From idea to video in three simple steps." },
             { title: "Transparent Pricing", desc: "You know exactly how many videos you get." },
-            { title: "Instant Delivery",   desc: "Your video is ready in seconds — ready to share." },
+            { title: "Instant Delivery",   desc: "Your video is ready in seconds. Ready to share." },
             { title: "Flexible Options",   desc: "Choose with or without watermark, as needed." },
             { title: "Trusted Platform",   desc: "Clear Terms, Privacy, and DMCA compliance." },
             { title: "Global Ready",       desc: "Built to scale worldwide." },
@@ -102,6 +109,7 @@ export default function Home() {
               </div>
               <button
                 onClick={() => openCheckout(p.priceId)}
+                type="button"
                 className="mt-6 px-4 py-3 rounded-xl bg-white text-black font-semibold hover:opacity-90"
               >
                 Buy Now
