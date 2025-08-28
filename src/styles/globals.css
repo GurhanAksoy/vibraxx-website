@@ -3,55 +3,58 @@
 @tailwind utilities;
 
 /* ---- Theme Tokens ---- */
-:root{
-  --bg:#0b0b0f;
-  --fg:#e7e7ec;
-  --muted:#9aa0aa;
-  --accent:#7c5cff;
+:root {
+  --bg: #0b0b0f;
+  --fg: #e7e7ec;
+  --muted: #9aa0aa;
+  --accent: #7c5cff;
 }
 
 /* ---- Base ---- */
-html,body{
-  background:var(--bg);
-  color:var(--fg);
-  -webkit-font-smoothing:antialiased;
-  -moz-osx-font-smoothing:grayscale;
+html, body {
+  background: var(--bg);
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Sayfa genişliği + merkezleme */
-.container{
-  max-width:1140px;
-  margin-inline:auto;
-  padding-inline:1rem;
+.container {
+  max-width: 1140px;
+  margin-inline: auto;
+  padding-inline: 1rem;
 }
 
-/* Arka plan ışıması (hafif) */
-.gradient{
+/* Arka plan ışıması (hafif neon efekt) */
+.gradient {
   background:
     radial-gradient(1200px 600px at 10% -10%, rgba(124,92,255,.25), transparent 40%),
     radial-gradient(1000px 500px at 90% 10%, rgba(0,200,255,.18), transparent 40%);
 }
 
 /* Bölümler arası tutarlı boşluk */
-.section{padding-block:4rem;}
-@media (min-width:768px){.section{padding-block:6rem;}}
-
-/* ---- Typography: “AI izi” olmasın ---- */
-h1,h2,h3,h4,h5,h6,p,li,button,a,small,span{
-  hyphens:none;             /* kelime bölme kapalı */
-  word-break:keep-all;      /* kelimeyi ortadan bölme */
-  overflow-wrap:normal;     /* istemsiz kırma yok */
-  letter-spacing:normal;
-  text-rendering:optimizeLegibility;
+.section { padding-block: 4rem; }
+@media (min-width: 768px) {
+  .section { padding-block: 6rem; }
 }
-h1,h2{ text-wrap:balance; } /* başlıklarda dengeli kırılım */
-p,li { text-wrap:pretty; }  /* doğal satır akışı */
 
-/* Okunur satır uzunluğu (yakl. 68 karakter) */
-.prose-narrow{ max-width:68ch; }
+/* ---- Typography: Yapay kırılma olmasın ---- */
+h1, h2, h3, h4, h5, h6,
+p, li, button, a, small, span {
+  hyphens: none;              /* kelime bölme kapalı */
+  word-break: keep-all;       /* kelimeyi ortadan bölme */
+  overflow-wrap: normal;      /* gereksiz kırma yok */
+  letter-spacing: normal;
+  text-rendering: optimizeLegibility;
+}
+h1, h2 { text-wrap: balance; }  /* başlıklarda dengeli kırılım */
+p, li  { text-wrap: pretty; }   /* doğal satır akışı */
+
+/* Okunur satır uzunluğu */
+.prose-narrow { max-width: 68ch; }
 
 /* Kısa terimler/kombinasyonlar asla kırılmasın */
-.nowrap{ white-space:nowrap; }
+.nowrap { white-space: nowrap; }
 
-/* Görseller güvenli dursun */
-img{ display:block; max-width:100%; height:auto; }
+/* Görseller */
+img { display: block; max-width: 100%; height: auto; }
