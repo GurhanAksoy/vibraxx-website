@@ -9,7 +9,17 @@ const plans = [
   { key: "pro",     name: "Pro Pack",     price: 49.99, videos: 50, watermark: false, priceId: "price_pro_xxx" },
 ];
 
-// paddle init flag
+// Feature kartlarına farklı neon renkleri
+const features = [
+  { title: "Flexible Options",   desc: "Choose with or without watermark, as needed.", neon: "#00E5FF" },
+  { title: "Seamless Workflow",  desc: "From idea to video in three simple steps.",     neon: "#7C5CFF" },
+  { title: "Trusted Platform",   desc: "Clear Terms, Privacy, and DMCA compliance.",    neon: "#FF2BD6" },
+  { title: "Transparent Pricing",desc: "You know exactly how many videos you get.",     neon: "#00FFA3" },
+  { title: "Global Ready",       desc: "Built to scale worldwide.",                      neon: "#FFD166" },
+  { title: "Instant Delivery",   desc: "Your video is ready in seconds. Ready to share.", neon: "#9AE6FF" },
+];
+
+// Paddle double-init koruması
 let paddleInited = false;
 function openCheckout(priceId: string) {
   // @ts-ignore
@@ -42,37 +52,32 @@ export default function Home() {
       {/* HERO */}
       <section className="section container">
         <div className="mx-auto max-w-3xl text-center prose-narrow">
-          {/* %15 küçük */}
-          <h1 className="neon-title leading-tight tracking-tight" style={{ fontSize:"clamp(1.9rem,5vw,3.05rem)" }}>
+          <h1 className="neon-title text-5xl md:text-6xl font-extrabold leading-tight md:leading-[1.1] tracking-tight">
             Create Stunning Videos in Seconds
           </h1>
 
           <p className="mt-4 text-base sm:text-lg text-white/70 leading-relaxed">
-            Turn your text into crisp <span className="nowrap">1080p</span> clips.
-            No credits. Clear pricing. Instant results.
+            Turn your text into crisp <span className="nowrap">1080p</span> clips. No credits. Clear pricing. Instant results.
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a href="/studio" className="nav-btn nav-btn--primary w-full sm:w-auto text-center">Launch Studio</a>
-            <a href="#pricing" className="nav-btn w-full sm:w-auto text-center">View Pricing</a>
+            <a href="/studio" className="nav-btn nav-btn--primary">Launch Studio</a>
+            <a href="#pricing" className="btn-outline">View Pricing</a>
           </div>
         </div>
       </section>
 
-      {/* FEATURES – sade cam kartlar */}
+      {/* FEATURES */}
       <section id="features" className="section container">
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            { title: "Seamless Workflow",  desc: "From idea to video in three simple steps." },
-            { title: "Transparent Pricing", desc: "You know exactly how many videos you get." },
-            { title: "Instant Delivery",   desc: "Your video is ready in seconds. Ready to share." },
-            { title: "Flexible Options",   desc: "Choose with or without watermark, as needed." },
-            { title: "Trusted Platform",   desc: "Clear Terms, Privacy, and DMCA compliance." },
-            { title: "Global Ready",       desc: "Built to scale worldwide." },
-          ].map((f) => (
-            <div key={f.title} className="feature-card">
-              <h3 className="feature-title">{f.title}</h3>
-              <p className="feature-desc mt-2">{f.desc}</p>
+          {features.map((f) => (
+            <div
+              key={f.title}
+              className="card neon-border neon-border--soft"
+              style={{ ["--neon" as any]: f.neon }}
+            >
+              <h3 className="text-lg font-semibold">{f.title}</h3>
+              <p className="text-white/70 mt-2 text-sm leading-relaxed">{f.desc}</p>
             </div>
           ))}
         </div>
@@ -81,13 +86,17 @@ export default function Home() {
       {/* PRICING */}
       <section id="pricing" className="section container">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="neon-title" style={{ fontSize:"clamp(1.6rem,3.4vw,2.25rem)" }}>Pricing Plans</h2>
+          <h2 className="text-3xl md:text-4xl font-bold">Pricing Plans</h2>
           <p className="text-white/70 mt-2">Clear packages. Fair prices. No surprises.</p>
         </div>
 
         <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {plans.map((p) => (
-            <div key={p.key} className="card flex flex-col justify-between">
+          {plans.map((p, i) => (
+            <div
+              key={p.key}
+              className="rounded-2xl p-6 border border-white/10 bg-white/5 flex flex-col justify-between neon-border"
+              style={{ ["--neon" as any]: i % 2 ? "var(--v2)" : "var(--v1)" }}
+            >
               <div>
                 <h3 className="text-xl font-semibold">{p.name}</h3>
                 <p className="mt-2 text-3xl md:text-4xl font-extrabold nowrap">${p.price}</p>

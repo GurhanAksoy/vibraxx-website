@@ -9,9 +9,12 @@
   --muted:#9aa0aa;
   --accent:#7c5cff;
 
-  --v1:#00E5FF; 
-  --v2:#7C5CFF; 
-  --v3:#FF2BD6;
+  /* VibraXX palette */
+  --v1:#00E5FF;   /* aqua */
+  --v2:#7C5CFF;   /* violet */
+  --v3:#FF2BD6;   /* pink */
+  --v4:#00FFA3;   /* mint */
+  --v5:#FFD166;   /* amber */
 }
 
 /* ---- Base ---- */
@@ -22,85 +25,105 @@ html,body{
   -moz-osx-font-smoothing:grayscale;
 }
 
+img{ display:block; max-width:100%; height:auto; }
+
+/* Container merkezleme */
 .container{ max-width:1140px; margin-inline:auto; padding-inline:1rem; }
 
-/* hafif neon arka plan */
+/* Hafif neon arka plan */
 .gradient{
   background:
-    radial-gradient(1200px 600px at 10% -10%, rgba(124,92,255,.22), transparent 40%),
-    radial-gradient(1000px 500px at 90% 10%, rgba(0,200,255,.16), transparent 40%);
+    radial-gradient(1200px 600px at 10% -10%, rgba(124,92,255,.25), transparent 40%),
+    radial-gradient(1000px 500px at 90% 10%, rgba(0,200,255,.18), transparent 40%);
 }
 
-/* sections */
+/* Bölümler */
 .section{ padding-block:4rem; }
 @media (min-width:768px){ .section{ padding-block:6rem; } }
 
-/* Typography – AI izi yok */
+/* ---- Typography: AI izi yok ---- */
 h1,h2,h3,h4,h5,h6,p,li,button,a,small,span{
-  hyphens:none; word-break:keep-all; overflow-wrap:normal;
-  letter-spacing:normal; text-rendering:optimizeLegibility;
+  hyphens:none;
+  word-break:keep-all;
+  overflow-wrap:normal;
+  letter-spacing:normal;
+  text-rendering:optimizeLegibility;
 }
 h1,h2{ text-wrap:balance; }
 p,li { text-wrap:pretty; }
 .prose-narrow{ max-width:68ch; }
 .nowrap{ white-space:nowrap; }
-img{ display:block; max-width:100%; height:auto; }
 
-/* ---- Neon titles (ANA BAŞLIKLAR) ---- */
-/* önceki hızdan daha akıcı ama hızlı: ~7.8s */
+/* ---- Neon gradient METİN ---- */
+.neon-text{
+  background:linear-gradient(90deg,#7C5CFF,#00E5FF,#00FFA3,#FFD166,#FF2BD6);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  letter-spacing:-0.01em;
+}
+
+/* Büyük başlık (Announcements/Studio/Faq) için animasyonlu varyant */
 .neon-title{
   font-weight:800;
-  background:linear-gradient(90deg, var(--v2) 0%, var(--v1) 50%, var(--v3) 100%);
+  background:linear-gradient(90deg,var(--v1) 0%, var(--v2) 50%, var(--v3) 100%);
   background-size:200% 100%;
   -webkit-background-clip:text; background-clip:text; color:transparent;
-  text-shadow:0 0 2px rgba(255,255,255,.22), 0 0 14px rgba(124,92,255,.32);
-  animation:neonShift 7.8s ease-in-out infinite;
+  text-shadow:0 0 12px rgba(124,92,255,.45), 0 0 24px rgba(66,232,255,.20);
+  animation:neonShift 4.8s ease-in-out infinite; /* %20 daha hızlı */
 }
-@keyframes neonShift{
-  0%,100%{ background-position:0% 50%; }
-  50%     { background-position:100% 50%; }
-}
+@keyframes neonShift{ 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
 
-/* ---- Navbar pill butonları ---- */
+/* ==== Navbar & Buttons ==== */
 @layer components{
   .nav-btn{
     @apply inline-flex items-center justify-center rounded-full px-5 py-3 text-sm md:text-base font-semibold transition;
     line-height:1; min-height:44px;
-    border:1px solid rgba(255,255,255,.18);
-    background:rgba(255,255,255,.06);
-    color:rgba(255,255,255,.9);
+    border:1px solid rgba(255,255,255,.22);
+    background:rgba(255,255,255,.07);
+    color:rgba(255,255,255,.85);
     backdrop-filter:saturate(130%) blur(2px);
   }
   .nav-btn:hover{
-    color:#fff; border-color:rgba(255,255,255,.28);
-    transform:translateY(-1px); transition:all .22s ease;
+    color:#fff; border-color:rgba(255,255,255,.35);
+    background:rgba(255,255,255,.12); transform:translateY(-1px);
   }
   .nav-btn--primary{
-    color:#0b0b0f; font-weight:700; border-color:transparent;
     background:linear-gradient(135deg,var(--v1) 0%, var(--v2) 50%, var(--v3) 100%);
+    color:#0b0b0f; border-color:transparent;
     box-shadow:0 0 16px rgba(124,92,255,.35);
   }
   .nav-btn--primary:hover{ filter:brightness(1.06); box-shadow:0 0 22px rgba(124,92,255,.5); }
+
+  /* Sekonder butonlar için neon-outline */
+  .btn-outline{
+    position:relative; border:1px solid rgba(255,255,255,.18);
+    background:rgba(255,255,255,.05); color:#fff;
+    border-radius:0.9rem; padding:0.75rem 1.1rem; font-weight:600;
+    transition:transform .18s ease, box-shadow .18s ease;
+  }
+  .btn-outline::before{
+    content:""; position:absolute; inset:0; border-radius:inherit; padding:1px;
+    background:linear-gradient(90deg,var(--v1),var(--v2),var(--v3));
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none;
+    opacity:.55;
+  }
+  .btn-outline:hover{ transform:translateY(-1px); box-shadow:0 0 12px rgba(124,92,255,.35); }
 }
 
-/* ---- FEATURE CARDS (sade cam görünüm) ---- */
-/* renkli degrade/ikon YOK */
-.feature-card{
-  border-radius:1rem;
-  padding:1.25rem;
-  background:rgba(255,255,255,0.045);
-  border:1px solid rgba(255,255,255,0.08);
-  backdrop-filter:blur(6px) saturate(120%);
-  transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease;
-}
-.feature-card:hover{
-  transform:translateY(-2px);
-  border-color:rgba(255,255,255,0.16);
-  box-shadow:0 10px 24px rgba(0,0,0,.28);
-}
-.feature-title{ font-weight:700; font-size:1.05rem; letter-spacing:-0.01em; }
-.feature-desc { color:rgba(255,255,255,.74); line-height:1.55; font-size:.95rem; }
-
-/* ---- Pricing kartları ---- */
+/* ---- Kart ---- */
 .card{ @apply rounded-2xl p-6 border border-white/10 bg-white/5 transition-transform; }
 .card:hover{ transform:translateY(-2px); box-shadow:0 10px 24px rgba(0,0,0,.25); }
+
+/* İncecik neon çerçeve (tek renk) */
+.neon-border{ position:relative; }
+.neon-border::before{
+  content:""; position:absolute; inset:0; border-radius:inherit; padding:1px;
+  background:linear-gradient(90deg, var(--neon, var(--v1)), rgba(255,255,255,.25));
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none;
+  opacity:.85;
+  box-shadow:0 0 14px color-mix(in oklab, var(--neon, var(--v1)) 60%, transparent);
+}
+
+/* Duyuru/frequently kartları için daha nazik çizgi */
+.neon-border--soft::before{ opacity:.55; box-shadow:0 0 10px rgba(124,92,255,.25); }
