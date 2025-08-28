@@ -42,10 +42,8 @@ export default function Home() {
       {/* HERO */}
       <section className="section container">
         <div className="mx-auto max-w-3xl text-center prose-narrow">
-          <h1
-            className="neon-title leading-tight tracking-tight"
-            style={{ fontSize: "clamp(1.9rem, 5vw, 3.05rem)" }} /* %15 daha küçük */
-          >
+          {/* %15 küçük */}
+          <h1 className="neon-title leading-tight tracking-tight" style={{ fontSize:"clamp(1.9rem,5vw,3.05rem)" }}>
             Create Stunning Videos in Seconds
           </h1>
 
@@ -61,22 +59,19 @@ export default function Home() {
         </div>
       </section>
 
-      {/* FEATURES */}
+      {/* FEATURES – sade cam kartlar */}
       <section id="features" className="section container">
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {[
-            { title: "Seamless Workflow",  desc: "From idea to video in three simple steps.", icon: "⚡" },
-            { title: "Transparent Pricing", desc: "You know exactly how many videos you get.", icon: "💳" },
-            { title: "Instant Delivery",   desc: "Your video is ready in seconds. Ready to share.", icon: "🚀" },
-            { title: "Flexible Options",   desc: "Choose with or without watermark, as needed.", icon: "🧩" },
-            { title: "Trusted Platform",   desc: "Clear Terms, Privacy, and DMCA compliance.", icon: "✅" },
-            { title: "Global Ready",       desc: "Built to scale worldwide.", icon: "🌍" },
+            { title: "Seamless Workflow",  desc: "From idea to video in three simple steps." },
+            { title: "Transparent Pricing", desc: "You know exactly how many videos you get." },
+            { title: "Instant Delivery",   desc: "Your video is ready in seconds. Ready to share." },
+            { title: "Flexible Options",   desc: "Choose with or without watermark, as needed." },
+            { title: "Trusted Platform",   desc: "Clear Terms, Privacy, and DMCA compliance." },
+            { title: "Global Ready",       desc: "Built to scale worldwide." },
           ].map((f) => (
             <div key={f.title} className="feature-card">
-              <div className="flex items-center gap-3">
-                <span className="feature-chip text-black/90 text-lg">{f.icon}</span>
-                <h3 className="feature-title">{f.title}</h3>
-              </div>
+              <h3 className="feature-title">{f.title}</h3>
               <p className="feature-desc mt-2">{f.desc}</p>
             </div>
           ))}
@@ -86,7 +81,7 @@ export default function Home() {
       {/* PRICING */}
       <section id="pricing" className="section container">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="neon-title" style={{ fontSize: "clamp(1.6rem, 3.4vw, 2.25rem)" }}>Pricing Plans</h2>
+          <h2 className="neon-title" style={{ fontSize:"clamp(1.6rem,3.4vw,2.25rem)" }}>Pricing Plans</h2>
           <p className="text-white/70 mt-2">Clear packages. Fair prices. No surprises.</p>
         </div>
 
