@@ -3,10 +3,10 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
 const plans = [
-  { key: "trial", name: "Trial Pack", price: 2.99, videos: 1, watermark: true, priceId: "price_trial_xxx" },
-  { key: "starter", name: "Starter Pack", price: 9.99, videos: 5, watermark: true, priceId: "price_starter_xxx" },
+  { key: "trial",   name: "Trial Pack",   price: 2.99, videos: 1,  watermark: true,  priceId: "price_trial_xxx" },
+  { key: "starter", name: "Starter Pack", price: 9.99, videos: 5,  watermark: true,  priceId: "price_starter_xxx" },
   { key: "creator", name: "Creator Pack", price: 19.99, videos: 15, watermark: false, priceId: "price_creator_xxx" },
-  { key: "pro", name: "Pro Pack", price: 49.99, videos: 50, watermark: false, priceId: "price_pro_xxx" },
+  { key: "pro",     name: "Pro Pack",     price: 49.99, videos: 50, watermark: false, priceId: "price_pro_xxx" },
 ];
 
 function openCheckout(priceId: string) {
@@ -24,7 +24,7 @@ function openCheckout(priceId: string) {
       cancelUrl: "/checkout/cancel",
     });
   } else {
-    alert("Ödeme henüz aktif değil. Lütfen kısa süre sonra tekrar deneyin.");
+    alert("Checkout will be available shortly. Please try again in a moment.");
   }
 }
 
@@ -32,56 +32,65 @@ export default function Home() {
   return (
     <div>
       <Navbar />
-      <section className="container py-16 md:py-24">
-        <div className="max-w-3xl">
-          <h1 className="text-4xl md:text-6xl font-extrabold leading-tight tracking-tight">
-            Metinden Videoya. <span className="text-white/70">Hızlı, net, dürüst.</span>
+
+      {/* HERO */}
+      <section className="section container">
+        <div className="mx-auto max-w-3xl text-center">
+          <h1 className="balance text-4xl sm:text-5xl md:text-6xl font-extrabold leading-tight tracking-tight">
+            Create Stunning Videos in Seconds
           </h1>
-          <p className="mt-4 text-lg text-white/70">
-            Luma kalitesiyle 10 saniyede 1080p videolar. Filigranlı/filigransız net seçenekler,
-            coin yok, sürpriz yok.
+          <p className="mt-4 text-base sm:text-lg text-white/70">
+            Transform your text into high-quality <span className="nowrap">1080p</span> videos.
+            No hidden fees, no confusing credits — clear pricing and instant results.
           </p>
-          <div className="mt-8 flex gap-3">
-            <a href="#pricing" className="px-5 py-3 rounded-xl bg-white text-black font-semibold">Fiyatları Gör</a>
-            <a href="#features" className="px-5 py-3 rounded-xl border border-white/20 text-white">Özellikler</a>
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <a href="#pricing" className="px-5 py-3 rounded-xl bg-white text-black font-semibold w-full sm:w-auto text-center">View Pricing</a>
+            <a href="#features" className="px-5 py-3 rounded-xl border border-white/20 text-white w-full sm:w-auto text-center">Features</a>
           </div>
         </div>
       </section>
 
-      <section id="features" className="container py-10">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* FEATURES */}
+      <section id="features" className="section container">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {[
-            { title: "Kolay Akış", desc: "Prompt → video → indir/paylaş. 3 adım." },
-            { title: "Dürüst Fiyat", desc: "Kaç video aldıysan o kadar üretim hakkı." },
-            { title: "Hızlı Teslim", desc: "Global CDN ile anında indirme." },
-            { title: "Filigran Seçimi", desc: "Filigranlı/filigransız net paketler." },
-            { title: "Güven", desc: "ToS, Gizlilik, DMCA tam uyum." },
-            { title: "Global", desc: "Çin/Rusya alt alanları için hazır mimari." },
+            { title: "Seamless Workflow",  desc: "From idea to video in three simple steps." },
+            { title: "Transparent Pricing", desc: "You know exactly how many videos you get." },
+            { title: "Instant Delivery",   desc: "Your video is ready in seconds — ready to share." },
+            { title: "Flexible Options",   desc: "Choose with or without watermark as needed." },
+            { title: "Trusted Platform",   desc: "Clear Terms, Privacy and DMCA compliance." },
+            { title: "Global Ready",       desc: "Built to scale worldwide." },
           ].map((f) => (
             <div key={f.title} className="rounded-2xl p-6 border border-white/10 bg-white/5">
-              <h3 className="text-xl font-semibold">{f.title}</h3>
-              <p className="text-white/70 mt-2">{f.desc}</p>
+              <h3 className="text-lg font-semibold">{f.title}</h3>
+              <p className="text-white/70 mt-2 text-sm leading-relaxed">{f.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <section id="pricing" className="container py-16">
-        <h2 className="text-3xl font-bold">Fiyatlandırma</h2>
-        <p className="text-white/70 mt-2">Net paket · net fiyat · coin yok.</p>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 mt-8">
+      {/* PRICING */}
+      <section id="pricing" className="section container">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-3xl md:text-4xl font-bold">Pricing Plans</h2>
+          <p className="text-white/70 mt-2">Clear packages. Fair prices. No surprises.</p>
+        </div>
+
+        <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {plans.map((p) => (
             <div key={p.key} className="rounded-2xl p-6 border border-white/10 bg-white/5 flex flex-col">
               <div>
                 <h3 className="text-xl font-semibold">{p.name}</h3>
-                <p className="mt-2 text-3xl font-extrabold">${p.price}</p>
-                <p className="mt-1 text-sm text-white/70">{p.videos} video · 1080p · 10 sn {p.watermark ? "· filigranlı" : "· filigransız"}</p>
+                <p className="mt-2 text-3xl md:text-4xl font-extrabold nowrap">${p.price}</p>
+                <p className="mt-1 text-sm text-white/70">
+                  {p.videos} videos · 1080p · 10s {p.watermark ? "· watermark" : "· no watermark"}
+                </p>
               </div>
               <button
                 onClick={() => openCheckout(p.priceId)}
                 className="mt-6 px-4 py-3 rounded-xl bg-white text-black font-semibold hover:opacity-90"
               >
-                Satın Al
+                Buy Now
               </button>
             </div>
           ))}
