@@ -2,80 +2,92 @@
 @tailwind components;
 @tailwind utilities;
 
-/* === Colors & base === */
-:root {
-  --bg: #0b0b0f;
-  --fg: #e7e7ec;
+/* ---- Theme ---- */
+:root{
+  --bg:#0b0b0f;
+  --fg:#e7e7ec;
+  --muted:#9aa0aa;
+  --accent:#7c5cff;
 }
 
-html, body {
-  background: var(--bg);
-  color: var(--fg);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* ---- Base ---- */
+html,body{
+  background:var(--bg);
+  color:var(--fg);
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
 }
 
-.container{ max-width: 1140px; }
-.section{ padding: 4rem 0; }
-@media (min-width:768px){ .section{ padding: 6rem 0; } }
+/* Container merkezleme */
+.container{ max-width:1140px; margin-inline:auto; padding-inline:1rem; }
 
-.balance{ text-wrap: balance; }
-.nowrap{ white-space: nowrap; }
-.prose-narrow{ max-width: 68ch; }
-
-h1,h2{ text-wrap: balance; }
-p,li { text-wrap: pretty; }
-h1{ font-size: clamp(2.25rem,4vw,3.75rem); }
-p { font-size: clamp(1rem,1.25vw,1.125rem); }
-
-/* === Cards === */
-.card{
-  @apply rounded-2xl p-6 border border-white/10 bg-white/5;
+/* Hafif neon arka plan */
+.gradient{
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(124,92,255,.25), transparent 40%),
+    radial-gradient(1000px 500px at 90% 10%, rgba(0,200,255,.18), transparent 40%);
 }
 
-/* === Buttons (consistent) === */
-.nav-btn{
-  @apply inline-flex items-center justify-center px-4 py-2 rounded-xl
-         border border-white/15 text-white/90 backdrop-blur
-         transition-all duration-200
-         hover:border-white/25 hover:text-white
-         active:scale-[0.98]
-         focus:outline-none focus:ring-2 focus:ring-white/30;
-  background: rgba(255,255,255,0.06);
+/* Bölümler */
+.section{ padding-block:4rem; }
+@media (min-width:768px){ .section{ padding-block:6rem; } }
+
+/* ---- Typography: AI izi yok ---- */
+h1,h2,h3,h4,h5,h6,p,li,button,a,small,span{
+  hyphens:none;
+  word-break:keep-all;
+  overflow-wrap:normal;
+  letter-spacing:normal;
+  text-rendering:optimizeLegibility;
 }
-.nav-btn:disabled{
-  @apply opacity-50 cursor-not-allowed;
+h1,h2{ text-wrap:balance; }
+p,li { text-wrap:pretty; }
+.prose-narrow{ max-width:68ch; }
+.nowrap{ white-space:nowrap; }
+
+/* Görseller güvenli */
+img{ display:block; max-width:100%; height:auto; }
+
+/* ---- Neon gradient METİN (keskin) ---- */
+.neon-text{
+  background:linear-gradient(90deg,#7C5CFF,#00E5FF,#00FFA3,#FFD166,#FF2BD6);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+  letter-spacing:-0.01em;
 }
 
-.nav-btn--primary{
-  background: linear-gradient(135deg,#00E5FF 0%, #7C5CFF 50%, #FF2BD6 100%);
-  box-shadow: 0 0 18px rgba(124,92,255,.35);
-  border-color: transparent;
-  color: #0b0b0f;
-  font-weight: 700;
-}
-.nav-btn--primary:hover{
-  filter: brightness(1.05);
-  box-shadow: 0 0 22px rgba(124,92,255,.5);
-}
-.nav-btn--primary:active{
-  transform: translateY(1px);
+/* ---- Navbar BUTONLARI (pill) ---- */
+@layer components{
+  .nav-btn{
+    @apply inline-flex items-center justify-center rounded-full px-5 py-3 text-sm md:text-base font-semibold transition;
+    line-height:1;
+    min-height:44px;
+    border:1px solid rgba(255,255,255,.22);
+    background:rgba(255,255,255,.07);
+    color:rgba(255,255,255,.85);
+  }
+  .nav-btn:hover{
+    color:#fff;
+    border-color:rgba(255,255,255,.38);
+    background:rgba(255,255,255,.1);
+    transform:scale(1.05);
+    transition:all 0.25s ease;
+  }
+
+  .nav-btn--primary{
+    background:linear-gradient(90deg,#7C5CFF,#00E5FF,#FF2BD6);
+    color:#0b0b0f;
+    border-color:transparent;
+    box-shadow:0 0 18px rgba(124,92,255,.35);
+  }
+  .nav-btn--primary:hover{
+    filter:brightness(1.08);
+    transform:scale(1.07);
+    box-shadow:0 0 25px rgba(124,92,255,.5);
+  }
 }
 
-/* === Neon heading for Studio === */
-.neon-title{
-  @apply text-4xl md:text-5xl font-extrabold leading-tight tracking-tight;
-  background: linear-gradient(90deg,#42e8ff 0%, #8f6bff 50%, #ff3bdc 100%);
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  text-shadow:
-    0 0 18px rgba(124,92,255,.55),
-    0 0 30px rgba(66,232,255,.25);
-  animation: neonShift 6s ease-in-out infinite;
-}
-@keyframes neonShift{
-  0%,100%{ background-position: 0% 50%; }
-  50%    { background-position: 100% 50%; }
-}
+/* ---- Kart hover canlılığı ---- */
+.card{ @apply rounded-2xl p-6 border border-white/10 bg-white/5 transition-transform; }
+.card:hover{ transform:translateY(-2px); box-shadow:0 10px 24px rgba(0,0,0,.25); }
