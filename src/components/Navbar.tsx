@@ -1,7 +1,7 @@
 export default function Navbar() {
   return (
     <header className="sticky top-0 z-40 backdrop-blur border-b border-white/10">
-      <div className="container flex items-center justify-between py-3 md:py-4">
+      <div className="container flex items-center justify-between py-2 md:py-3">
         {/* Logo */}
         <a href="/" className="flex items-center">
           <img
@@ -12,10 +12,10 @@ export default function Navbar() {
         </a>
 
         {/* Menü */}
-        <nav className="text-base md:text-lg text-white/70 flex gap-8">
-          <a href="#features" className="hover:text-white transition-colors">Features</a>
-          <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
-          <a href="mailto:team@vibraxx.com" className="hover:text-white transition-colors">Contact</a>
+        <nav className="text-sm md:text-base flex gap-6">
+          <a href="#features" className="nav-link">Features</a>
+          <a href="#pricing" className="nav-link">Pricing</a>
+          <a href="mailto:team@vibraxx.com" className="nav-link">Contact</a>
         </nav>
       </div>
     </header>

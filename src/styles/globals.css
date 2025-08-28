@@ -58,3 +58,48 @@ p, li  { text-wrap: pretty; }   /* doğal satır akışı */
 
 /* Görseller */
 img { display: block; max-width: 100%; height: auto; }
+/* ---- Navbar hover underline (neon) ---- */
+@layer components {
+  .nav-link{
+    @apply relative inline-block text-white/70 transition-colors;
+  }
+  .nav-link:hover{ @apply text-white; }
+  .nav-link::after{
+    content:"";
+    position:absolute; left:0; bottom:-6px;
+    width:0; height:2px;
+    background: linear-gradient(90deg,#7c5cff,#00e0ff,#ff2bd6);
+    box-shadow: 0 0 10px rgba(124,92,255,.6);
+    transition: width .25s ease;
+    border-radius: 9999px;
+  }
+  .nav-link:hover::after{ width:100%; }
+}
+
+/* ---- Neon yazı (tek kelime/harf) ---- */
+.neon-letter{
+  color: var(--c);
+  text-shadow:
+    0 0 6px color-mix(in srgb, var(--c) 60%, transparent),
+    0 0 14px color-mix(in srgb, var(--c) 40%, transparent);
+  animation: neon-pulse 2.2s ease-in-out infinite alternate;
+}
+@keyframes neon-pulse{
+  from{ filter:brightness(1); }
+  to  { filter:brightness(1.35); }
+}
+
+/* ---- Neon gradient buton ---- */
+.btn-neon{
+  background: linear-gradient(90deg,#7c5cff,#00e0ff,#ff2bd6);
+  color:#0b0b0f;
+  box-shadow: 0 0 18px rgba(124,92,255,.35);
+}
+.btn-neon:hover{ filter:brightness(1.05); }
+
+/* ---- Kart hover canlılık ---- */
+.card{
+  @apply rounded-2xl p-6 border border-white/10 bg-white/5 transition-transform;
+}
+.card:hover{ transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.25); }
+

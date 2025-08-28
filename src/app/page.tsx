@@ -44,8 +44,17 @@ export default function Home() {
       <section className="section container">
         <div className="mx-auto max-w-3xl text-center prose-narrow">
           <h1 className="balance text-5xl md:text-6xl font-extrabold leading-tight md:leading-[1.1] tracking-tight">
-            Create Stunning Videos in Seconds
-          </h1>
+  <span className="inline-block">
+    <span className="neon-letter" style={{["--c" as any]:"#00E5FF"}}>C</span>
+    <span className="neon-letter" style={{["--c" as any]:"#7C5CFF"}}>r</span>
+    <span className="neon-letter" style={{["--c" as any]:"#FF2BD6"}}>e</span>
+    <span className="neon-letter" style={{["--c" as any]:"#00FFA3"}}>a</span>
+    <span className="neon-letter" style={{["--c" as any]:"#FFD166"}}>t</span>
+    <span className="neon-letter" style={{["--c" as any]:"#FF7EB3"}}>e</span>
+  </span>{" "}
+  Stunning Videos in Seconds
+</h1>
+
           <p className="mt-4 text-base sm:text-lg text-white/70 leading-relaxed">
             Transform your text into high quality <span className="nowrap">1080p</span> videos.
             No hidden fees or confusing credits. Clear pricing and instant results.
