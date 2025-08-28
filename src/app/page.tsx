@@ -35,17 +35,27 @@ export default function Home() {
 
       {/* HERO */}
       <section className="section container">
-        <div className="mx-auto max-w-3xl text-center">
-          <h1 className="balance text-4xl sm:text-5xl md:text-6xl font-extrabold leading-tight tracking-tight">
+        <div className="mx-auto max-w-3xl text-center prose-narrow">
+          <h1 className="balance text-5xl md:text-6xl font-extrabold leading-tight md:leading-[1.1] tracking-tight">
             Create Stunning Videos in Seconds
           </h1>
-          <p className="mt-4 text-base sm:text-lg text-white/70">
+          <p className="mt-4 text-base sm:text-lg text-white/70 leading-relaxed">
             Transform your text into high-quality <span className="nowrap">1080p</span> videos.
             No hidden fees, no confusing credits — clear pricing and instant results.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a href="#pricing" className="px-5 py-3 rounded-xl bg-white text-black font-semibold w-full sm:w-auto text-center">View Pricing</a>
-            <a href="#features" className="px-5 py-3 rounded-xl border border-white/20 text-white w-full sm:w-auto text-center">Features</a>
+            <a
+              href="#pricing"
+              className="px-5 py-3 rounded-xl bg-white text-black font-semibold w-full sm:w-auto text-center"
+            >
+              View Pricing
+            </a>
+            <a
+              href="#features"
+              className="px-5 py-3 rounded-xl border border-white/20 text-white w-full sm:w-auto text-center"
+            >
+              Features
+            </a>
           </div>
         </div>
       </section>
@@ -57,8 +67,8 @@ export default function Home() {
             { title: "Seamless Workflow",  desc: "From idea to video in three simple steps." },
             { title: "Transparent Pricing", desc: "You know exactly how many videos you get." },
             { title: "Instant Delivery",   desc: "Your video is ready in seconds — ready to share." },
-            { title: "Flexible Options",   desc: "Choose with or without watermark as needed." },
-            { title: "Trusted Platform",   desc: "Clear Terms, Privacy and DMCA compliance." },
+            { title: "Flexible Options",   desc: "Choose with or without watermark, as needed." },
+            { title: "Trusted Platform",   desc: "Clear Terms, Privacy, and DMCA compliance." },
             { title: "Global Ready",       desc: "Built to scale worldwide." },
           ].map((f) => (
             <div key={f.title} className="rounded-2xl p-6 border border-white/10 bg-white/5">
@@ -78,12 +88,16 @@ export default function Home() {
 
         <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {plans.map((p) => (
-            <div key={p.key} className="rounded-2xl p-6 border border-white/10 bg-white/5 flex flex-col">
+            <div
+              key={p.key}
+              className="rounded-2xl p-6 border border-white/10 bg-white/5 flex flex-col justify-between"
+            >
               <div>
                 <h3 className="text-xl font-semibold">{p.name}</h3>
                 <p className="mt-2 text-3xl md:text-4xl font-extrabold nowrap">${p.price}</p>
                 <p className="mt-1 text-sm text-white/70">
-                  {p.videos} videos · 1080p · 10s {p.watermark ? "· watermark" : "· no watermark"}
+                  {p.videos} videos · <span className="nowrap">1080p</span> · <span className="nowrap">10&nbsp;s</span>
+                  {p.watermark ? " · watermark" : " · no watermark"}
                 </p>
               </div>
               <button

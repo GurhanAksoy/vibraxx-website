@@ -12,18 +12,18 @@
 html, body {
   background: var(--bg);
   color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .gradient {
   background: radial-gradient(1200px 600px at 10% -10%, rgba(124,92,255,0.25), transparent 40%),
               radial-gradient(1000px 500px at 90% 10%, rgba(0,200,255,0.18), transparent 40%);
 }
-/* mevcut içerik üstte kalsın */
 
-html, body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-.container { max-width: 1140px; }
+.container { max-width: 1140px; } /* istersen tailwind max-w-screen-xl de kullanabilirsin */
 
-/* Dengeli başlık satır kırımı (daha profesyonel görünüm) */
+/* Dengeli başlık satır kırımı */
 .balance { text-wrap: balance; }
 
 /* Fiyat ve kısa etiketlerde kırılmayı engelle */
@@ -32,3 +32,23 @@ html, body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grays
 /* Bölümler arası tutarlı boşluk */
 .section { padding-top: 4rem; padding-bottom: 4rem; }
 @media (min-width: 768px) { .section { padding-top: 6rem; padding-bottom: 6rem; } }
+
+/* No AI-ish hyphenation / weird breaks */
+h1,h2,h3,h4,h5,h6,p,li,button,a,small,span {
+  hyphens: none;              
+  word-break: keep-all;       
+  overflow-wrap: anywhere;    /* mobilde güvenli */
+  letter-spacing: normal;     
+  text-rendering: optimizeLegibility;
+}
+
+/* Daha stabil satır akışı */
+h1,h2 { text-wrap: balance; } 
+p,li  { text-wrap: pretty; }
+
+/* Okunur satır uzunluğu */
+.prose-narrow { max-width: 68ch; }
+
+/* Responsive font scaling örneği */
+h1 { font-size: clamp(2.25rem, 4vw, 3.75rem); }
+p  { font-size: clamp(1rem, 1.25vw, 1.125rem); }
