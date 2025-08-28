@@ -1,22 +1,36 @@
+"use client";
+import Image from "next/image";
+import Link from "next/link";
+
+const pill = "rounded-full px-4 py-2 text-sm font-medium bg-gradient-to-r from-sky-400 to-fuchsia-500 text-black shadow-[0_0_12px_rgba(124,92,255,0.35)] hover:scale-[1.02] active:scale-95 transition";
+const linkBtn = "rounded-full px-3 py-1.5 text-sm text-white/80 hover:text-white hover:bg-white/5 border border-white/10 transition";
+
 export default function Navbar() {
   return (
-    <header className="sticky top-0 z-40 backdrop-blur border-b border-white/10">
-      <div className="container flex items-center justify-between py-2 md:py-3">
-        {/* Logo */}
-        <a href="/" className="flex items-center">
-          <img
+    <header className="sticky top-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-black/40 bg-black/20 border-b border-white/10">
+      <nav className="container mx-auto flex items-center justify-between py-3">
+        <Link href="/" className="flex items-center gap-2">
+          <Image
             src="/logo.png"
             alt="VibraXX Logo"
-            className="h-8 md:h-10 lg:h-12 w-auto drop-shadow-[0_0_12px_rgba(124,92,255,0.45)]"
+            width={112}
+            height={32}
+            className="h-8 w-auto"
+            priority
           />
-        </a>
+        </Link>
 
-        {/* Menü: Contact yok, Announcements = buton, Studio = primary */}
-        <nav className="flex items-center gap-3 md:gap-4">
-          <a href="/announcements" className="nav-btn">Announcements</a>
-          <a href="/studio" className="nav-btn nav-btn--primary">Launch Studio</a>
-        </nav>
-      </div>
+        <div className="hidden sm:flex items-center gap-2">
+          <Link href="/announcements" className={linkBtn}>Announcements</Link>
+          <Link href="/faq" className={linkBtn}>FAQ</Link>
+          <Link href="/studio" className={pill}>Launch Studio</Link>
+        </div>
+
+        {/* mobile */}
+        <div className="sm:hidden">
+          <Link href="/studio" className={pill}>Launch Studio</Link>
+        </div>
+      </nav>
     </header>
   );
 }
