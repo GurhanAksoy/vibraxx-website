@@ -3,13 +3,13 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
 const plans = [
-  { key: "trial",   name: "Trial Pack",   price: 2.99, videos: 1,  watermark: true,  priceId: "price_trial_xxx" },
-  { key: "starter", name: "Starter Pack", price: 9.99, videos: 5,  watermark: true,  priceId: "price_starter_xxx" },
+  { key: "trial",   name: "Trial Pack",   price: 2.99,  videos: 1,  watermark: true,  priceId: "price_trial_xxx" },
+  { key: "starter", name: "Starter Pack", price: 9.99,  videos: 5,  watermark: true,  priceId: "price_starter_xxx" },
   { key: "creator", name: "Creator Pack", price: 19.99, videos: 15, watermark: false, priceId: "price_creator_xxx" },
   { key: "pro",     name: "Pro Pack",     price: 49.99, videos: 50, watermark: false, priceId: "price_pro_xxx" },
 ];
 
-// Paddle init guard
+// avoid re-init Paddle
 let paddleInited = false;
 function openCheckout(priceId: string) {
   // @ts-ignore
@@ -42,16 +42,9 @@ export default function Home() {
       {/* HERO */}
       <section className="section container">
         <div className="mx-auto max-w-3xl text-center prose-narrow">
-          <h1 className="balance text-5xl md:text-6xl font-extrabold leading-tight md:leading-[1.1] tracking-tight">
-            <span className="inline-block">
-              <span className="neon-letter" style={{["--c" as any]:"#00E5FF"}}>C</span>
-              <span className="neon-letter" style={{["--c" as any]:"#7C5CFF"}}>r</span>
-              <span className="neon-letter" style={{["--c" as any]:"#FF2BD6"}}>e</span>
-              <span className="neon-letter" style={{["--c" as any]:"#00FFA3"}}>a</span>
-              <span className="neon-letter" style={{["--c" as any]:"#FFD166"}}>t</span>
-              <span className="neon-letter" style={{["--c" as any]:"#FF7EB3"}}>e</span>
-            </span>{" "}
-            Stunning Videos in Seconds
+          {/* FULL neon gradient heading */}
+          <h1 className="balance font-extrabold leading-tight md:leading-[1.1] tracking-tight neon-text shimmer">
+            Create Stunning Videos in Seconds
           </h1>
 
           <p className="mt-4 text-base sm:text-lg text-white/70 leading-relaxed">
@@ -60,18 +53,8 @@ export default function Home() {
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a
-              href="/studio"
-              className="rounded-full px-5 py-3 text-sm font-semibold bg-gradient-to-r from-sky-400 to-fuchsia-500 text-black shadow-[0_0_12px_rgba(124,92,255,0.35)] hover:scale-[1.02] active:scale-95 transition w-full sm:w-auto text-center"
-            >
-              Launch Studio
-            </a>
-            <a
-              href="#pricing"
-              className="rounded-full px-5 py-3 text-sm font-semibold border border-white/15 text-white hover:bg-white/5 transition w-full sm:w-auto text-center"
-            >
-              View Pricing
-            </a>
+            <a href="/studio" className="btn btn-gradient w-full sm:w-auto text-center">Launch Studio</a>
+            <a href="#pricing" className="btn btn-outline w-full sm:w-auto text-center">View Pricing</a>
           </div>
         </div>
       </section>
@@ -87,7 +70,7 @@ export default function Home() {
             { title: "Trusted Platform",   desc: "Clear Terms, Privacy, and DMCA compliance." },
             { title: "Global Ready",       desc: "Built to scale worldwide." },
           ].map((f) => (
-            <div key={f.title} className="rounded-2xl p-6 border border-white/10 bg-white/5">
+            <div key={f.title} className="card">
               <h3 className="text-lg font-semibold">{f.title}</h3>
               <p className="text-white/70 mt-2 text-sm leading-relaxed">{f.desc}</p>
             </div>
@@ -104,7 +87,7 @@ export default function Home() {
 
         <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {plans.map((p) => (
-            <div key={p.key} className="rounded-2xl p-6 border border-white/10 bg-white/5 flex flex-col justify-between">
+            <div key={p.key} className="card flex flex-col justify-between">
               <div>
                 <h3 className="text-xl font-semibold">{p.name}</h3>
                 <p className="mt-2 text-3xl md:text-4xl font-extrabold nowrap">${p.price}</p>
@@ -116,7 +99,7 @@ export default function Home() {
               <button
                 onClick={() => openCheckout(p.priceId)}
                 type="button"
-                className="mt-6 rounded-full px-5 py-3 text-sm font-semibold bg-gradient-to-r from-sky-400 to-fuchsia-500 text-black shadow-[0_0_12px_rgba(124,92,255,0.35)] hover:scale-[1.02] active:scale-95 transition"
+                className="btn btn-gradient mt-6"
               >
                 Buy Now
               </button>
