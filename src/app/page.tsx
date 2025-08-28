@@ -9,7 +9,7 @@ const plans = [
   { key: "pro",     name: "Pro Pack",     price: 49.99, videos: 50, watermark: false, priceId: "price_pro_xxx" },
 ];
 
-// Paddle'ı tekrar tekrar init etmemek için basit bayrak
+// Paddle init flag
 let paddleInited = false;
 
 function openCheckout(priceId: string) {
@@ -55,13 +55,13 @@ export default function Home() {
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
             <a
               href="#pricing"
-              className="px-5 py-3 rounded-xl btn-neon font-semibold w-full sm:w-auto text-center"
+              className="nav-btn nav-btn--primary w-full sm:w-auto text-center"
             >
               View Pricing
             </a>
             <a
               href="#features"
-              className="px-5 py-3 rounded-xl border border-white/20 text-white/90 hover:border-white/40 w-full sm:w-auto text-center"
+              className="nav-btn w-full sm:w-auto text-center"
             >
               Features
             </a>
@@ -106,11 +106,10 @@ export default function Home() {
                   {p.watermark ? " · watermark" : " · no watermark"}
                 </p>
               </div>
-
               <button
                 onClick={() => openCheckout(p.priceId)}
                 type="button"
-                className="mt-6 px-4 py-3 rounded-xl btn-neon font-semibold"
+                className="nav-btn nav-btn--primary mt-6"
               >
                 Buy Now
               </button>

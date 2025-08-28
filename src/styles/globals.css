@@ -54,19 +54,26 @@ img{ display:block; max-width:100%; height:auto; }
   -webkit-background-clip:text;
   background-clip:text;
   color:transparent;
-  filter:drop-shadow(0 0 4px rgba(124,92,255,.25)); /* hafif parıltı, pus yok */
+  letter-spacing:-0.01em;
 }
 
 /* ---- Navbar BUTONLARI (pill) ---- */
 @layer components{
   .nav-btn{
-    @apply inline-flex items-center justify-center rounded-full px-4 py-2 text-sm md:text-base transition;
-    border:1px solid rgba(255,255,255,.18);
-    color:rgba(255,255,255,.75);
-    background:rgba(255,255,255,.05);
-    backdrop-filter:blur(6px);
+    @apply inline-flex items-center justify-center rounded-full px-5 py-3 text-sm md:text-base font-semibold transition;
+    line-height:1;
+    min-height:44px;
+    border:1px solid rgba(255,255,255,.22);
+    background:rgba(255,255,255,.07);
+    color:rgba(255,255,255,.85);
   }
-  .nav-btn:hover{ color:#fff; border-color:rgba(255,255,255,.35); }
+  .nav-btn:hover{
+    color:#fff;
+    border-color:rgba(255,255,255,.38);
+    background:rgba(255,255,255,.1);
+    transform:scale(1.05);
+    transition:all 0.25s ease;
+  }
 
   .nav-btn--primary{
     background:linear-gradient(90deg,#7C5CFF,#00E5FF,#FF2BD6);
@@ -74,7 +81,11 @@ img{ display:block; max-width:100%; height:auto; }
     border-color:transparent;
     box-shadow:0 0 18px rgba(124,92,255,.35);
   }
-  .nav-btn--primary:hover{ filter:brightness(1.05); }
+  .nav-btn--primary:hover{
+    filter:brightness(1.08);
+    transform:scale(1.07);
+    box-shadow:0 0 25px rgba(124,92,255,.5);
+  }
 }
 
 /* ---- Kart hover canlılığı ---- */
