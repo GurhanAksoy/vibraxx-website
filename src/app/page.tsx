@@ -44,31 +44,24 @@ export default function Home() {
       <section className="section container">
         <div className="mx-auto max-w-3xl text-center prose-narrow">
           <h1 className="balance text-5xl md:text-6xl font-extrabold leading-tight md:leading-[1.1] tracking-tight">
-  <span className="inline-block">
-    <span className="neon-letter" style={{["--c" as any]:"#00E5FF"}}>C</span>
-    <span className="neon-letter" style={{["--c" as any]:"#7C5CFF"}}>r</span>
-    <span className="neon-letter" style={{["--c" as any]:"#FF2BD6"}}>e</span>
-    <span className="neon-letter" style={{["--c" as any]:"#00FFA3"}}>a</span>
-    <span className="neon-letter" style={{["--c" as any]:"#FFD166"}}>t</span>
-    <span className="neon-letter" style={{["--c" as any]:"#FF7EB3"}}>e</span>
-  </span>{" "}
-  Stunning Videos in Seconds
-</h1>
+            <span className="neon-text">Create</span> Stunning Videos in Seconds
+          </h1>
 
           <p className="mt-4 text-base sm:text-lg text-white/70 leading-relaxed">
             Transform your text into high quality <span className="nowrap">1080p</span> videos.
             No hidden fees or confusing credits. Clear pricing and instant results.
           </p>
+
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
             <a
               href="#pricing"
-              className="px-5 py-3 rounded-xl bg-white text-black font-semibold w-full sm:w-auto text-center"
+              className="px-5 py-3 rounded-xl btn-neon font-semibold w-full sm:w-auto text-center"
             >
               View Pricing
             </a>
             <a
               href="#features"
-              className="px-5 py-3 rounded-xl border border-white/20 text-white w-full sm:w-auto text-center"
+              className="px-5 py-3 rounded-xl border border-white/20 text-white/90 hover:border-white/40 w-full sm:w-auto text-center"
             >
               Features
             </a>
@@ -87,7 +80,7 @@ export default function Home() {
             { title: "Trusted Platform",   desc: "Clear Terms, Privacy, and DMCA compliance." },
             { title: "Global Ready",       desc: "Built to scale worldwide." },
           ].map((f) => (
-            <div key={f.title} className="rounded-2xl p-6 border border-white/10 bg-white/5">
+            <div key={f.title} className="card">
               <h3 className="text-lg font-semibold">{f.title}</h3>
               <p className="text-white/70 mt-2 text-sm leading-relaxed">{f.desc}</p>
             </div>
@@ -104,10 +97,7 @@ export default function Home() {
 
         <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {plans.map((p) => (
-            <div
-              key={p.key}
-              className="rounded-2xl p-6 border border-white/10 bg-white/5 flex flex-col justify-between"
-            >
+            <div key={p.key} className="card flex flex-col justify-between">
               <div>
                 <h3 className="text-xl font-semibold">{p.name}</h3>
                 <p className="mt-2 text-3xl md:text-4xl font-extrabold nowrap">${p.price}</p>
@@ -116,10 +106,11 @@ export default function Home() {
                   {p.watermark ? " · watermark" : " · no watermark"}
                 </p>
               </div>
+
               <button
                 onClick={() => openCheckout(p.priceId)}
                 type="button"
-                className="mt-6 px-4 py-3 rounded-xl bg-white text-black font-semibold hover:opacity-90"
+                className="mt-6 px-4 py-3 rounded-xl btn-neon font-semibold"
               >
                 Buy Now
               </button>

@@ -2,104 +2,81 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ---- Theme Tokens ---- */
-:root {
-  --bg: #0b0b0f;
-  --fg: #e7e7ec;
-  --muted: #9aa0aa;
-  --accent: #7c5cff;
+/* ---- Theme ---- */
+:root{
+  --bg:#0b0b0f;
+  --fg:#e7e7ec;
+  --muted:#9aa0aa;
+  --accent:#7c5cff;
 }
 
 /* ---- Base ---- */
-html, body {
-  background: var(--bg);
-  color: var(--fg);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+html,body{
+  background:var(--bg);
+  color:var(--fg);
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
 }
 
-/* Sayfa genişliği + merkezleme */
-.container {
-  max-width: 1140px;
-  margin-inline: auto;
-  padding-inline: 1rem;
-}
+/* Container merkezleme */
+.container{ max-width:1140px; margin-inline:auto; padding-inline:1rem; }
 
-/* Arka plan ışıması (hafif neon efekt) */
-.gradient {
+/* Hafif neon arka plan */
+.gradient{
   background:
     radial-gradient(1200px 600px at 10% -10%, rgba(124,92,255,.25), transparent 40%),
     radial-gradient(1000px 500px at 90% 10%, rgba(0,200,255,.18), transparent 40%);
 }
 
-/* Bölümler arası tutarlı boşluk */
-.section { padding-block: 4rem; }
-@media (min-width: 768px) {
-  .section { padding-block: 6rem; }
+/* Bölümler */
+.section{ padding-block:4rem; }
+@media (min-width:768px){ .section{ padding-block:6rem; } }
+
+/* ---- Typography: AI izi yok ---- */
+h1,h2,h3,h4,h5,h6,p,li,button,a,small,span{
+  hyphens:none;
+  word-break:keep-all;
+  overflow-wrap:normal;
+  letter-spacing:normal;
+  text-rendering:optimizeLegibility;
+}
+h1,h2{ text-wrap:balance; }
+p,li { text-wrap:pretty; }
+.prose-narrow{ max-width:68ch; }
+.nowrap{ white-space:nowrap; }
+
+/* Görseller güvenli */
+img{ display:block; max-width:100%; height:auto; }
+
+/* ---- Neon gradient METİN (keskin) ---- */
+.neon-text{
+  background:linear-gradient(90deg,#7C5CFF,#00E5FF,#00FFA3,#FFD166,#FF2BD6);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+  filter:drop-shadow(0 0 4px rgba(124,92,255,.25)); /* hafif parıltı, pus yok */
 }
 
-/* ---- Typography: Yapay kırılma olmasın ---- */
-h1, h2, h3, h4, h5, h6,
-p, li, button, a, small, span {
-  hyphens: none;              /* kelime bölme kapalı */
-  word-break: keep-all;       /* kelimeyi ortadan bölme */
-  overflow-wrap: normal;      /* gereksiz kırma yok */
-  letter-spacing: normal;
-  text-rendering: optimizeLegibility;
-}
-h1, h2 { text-wrap: balance; }  /* başlıklarda dengeli kırılım */
-p, li  { text-wrap: pretty; }   /* doğal satır akışı */
-
-/* Okunur satır uzunluğu */
-.prose-narrow { max-width: 68ch; }
-
-/* Kısa terimler/kombinasyonlar asla kırılmasın */
-.nowrap { white-space: nowrap; }
-
-/* Görseller */
-img { display: block; max-width: 100%; height: auto; }
-/* ---- Navbar hover underline (neon) ---- */
-@layer components {
-  .nav-link{
-    @apply relative inline-block text-white/70 transition-colors;
+/* ---- Navbar BUTONLARI (pill) ---- */
+@layer components{
+  .nav-btn{
+    @apply inline-flex items-center justify-center rounded-full px-4 py-2 text-sm md:text-base transition;
+    border:1px solid rgba(255,255,255,.18);
+    color:rgba(255,255,255,.75);
+    background:rgba(255,255,255,.05);
+    backdrop-filter:blur(6px);
   }
-  .nav-link:hover{ @apply text-white; }
-  .nav-link::after{
-    content:"";
-    position:absolute; left:0; bottom:-6px;
-    width:0; height:2px;
-    background: linear-gradient(90deg,#7c5cff,#00e0ff,#ff2bd6);
-    box-shadow: 0 0 10px rgba(124,92,255,.6);
-    transition: width .25s ease;
-    border-radius: 9999px;
+  .nav-btn:hover{ color:#fff; border-color:rgba(255,255,255,.35); }
+
+  .nav-btn--primary{
+    background:linear-gradient(90deg,#7C5CFF,#00E5FF,#FF2BD6);
+    color:#0b0b0f;
+    border-color:transparent;
+    box-shadow:0 0 18px rgba(124,92,255,.35);
   }
-  .nav-link:hover::after{ width:100%; }
+  .nav-btn--primary:hover{ filter:brightness(1.05); }
 }
 
-/* ---- Neon yazı (tek kelime/harf) ---- */
-.neon-letter{
-  color: var(--c);
-  text-shadow:
-    0 0 6px color-mix(in srgb, var(--c) 60%, transparent),
-    0 0 14px color-mix(in srgb, var(--c) 40%, transparent);
-  animation: neon-pulse 2.2s ease-in-out infinite alternate;
-}
-@keyframes neon-pulse{
-  from{ filter:brightness(1); }
-  to  { filter:brightness(1.35); }
-}
-
-/* ---- Neon gradient buton ---- */
-.btn-neon{
-  background: linear-gradient(90deg,#7c5cff,#00e0ff,#ff2bd6);
-  color:#0b0b0f;
-  box-shadow: 0 0 18px rgba(124,92,255,.35);
-}
-.btn-neon:hover{ filter:brightness(1.05); }
-
-/* ---- Kart hover canlılık ---- */
-.card{
-  @apply rounded-2xl p-6 border border-white/10 bg-white/5 transition-transform;
-}
-.card:hover{ transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.25); }
-
+/* ---- Kart hover canlılığı ---- */
+.card{ @apply rounded-2xl p-6 border border-white/10 bg-white/5 transition-transform; }
+.card:hover{ transform:translateY(-2px); box-shadow:0 10px 24px rgba(0,0,0,.25); }
