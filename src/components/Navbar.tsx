@@ -7,7 +7,7 @@ export default function Navbar() {
           <img
             src="/logo.png"
             alt="VibraXX Logo"
-            className="h-14 md:h-16 lg:h-20 w-auto drop-shadow-[0_0_16px_rgba(124,92,255,0.45)]"
+            className="h-8 md:h-10 lg:h-12 w-auto drop-shadow-[0_0_12px_rgba(124,92,255,0.45)]"
           />
         </a>
 
