@@ -9,9 +9,8 @@ const plans = [
   { key: "pro",     name: "Pro Pack",     price: 49.99, videos: 50, watermark: false, priceId: "price_pro_xxx" },
 ];
 
-// Paddle init flag
+// Paddle init flag (opsiyonel)
 let paddleInited = false;
-
 function openCheckout(priceId: string) {
   // @ts-ignore
   if (typeof window !== "undefined" && window.Paddle && process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN) {
@@ -31,7 +30,8 @@ function openCheckout(priceId: string) {
       cancelUrl: "/checkout/cancel",
     });
   } else {
-    alert("Checkout will be available shortly. Please try again in a moment.");
+    // şimdilik demo
+    window.location.href = "#pricing";
   }
 }
 
@@ -46,25 +46,14 @@ export default function Home() {
           <h1 className="balance text-5xl md:text-6xl font-extrabold leading-tight md:leading-[1.1] tracking-tight">
             <span className="neon-text">Create</span> Stunning Videos in Seconds
           </h1>
-
           <p className="mt-4 text-base sm:text-lg text-white/70 leading-relaxed">
             Transform your text into high quality <span className="nowrap">1080p</span> videos.
             No hidden fees or confusing credits. Clear pricing and instant results.
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a
-              href="#pricing"
-              className="nav-btn nav-btn--primary w-full sm:w-auto text-center"
-            >
-              View Pricing
-            </a>
-            <a
-              href="#features"
-              className="nav-btn w-full sm:w-auto text-center"
-            >
-              Features
-            </a>
+            <a href="/studio"  className="nav-btn nav-btn--primary w-full sm:w-auto text-center">Launch Studio</a>
+            <a href="#pricing" className="nav-btn w-full sm:w-auto text-center">View Pricing</a>
           </div>
         </div>
       </section>

@@ -11,11 +11,11 @@ export default function Navbar() {
           />
         </a>
 
-        {/* Menü: pill butonlar */}
-        <nav className="flex items-center gap-3 md:gap-4">
-          <a href="#features" className="nav-btn">Features</a>
-          <a href="#pricing"  className="nav-btn nav-btn--primary">Pricing</a>
-          <a href="mailto:team@vibraxx.com" className="nav-btn">Contact</a>
+        {/* Menü (sade) */}
+        <nav className="flex items-center gap-6 text-sm md:text-base">
+          <a href="/announcements" className="nav-link">Announcements</a>
+          <a href="mailto:team@vibraxx.com" className="nav-link">Contact</a>
+          <a href="/studio" className="nav-btn nav-btn--primary">Launch Studio</a>
         </nav>
       </div>
     </header>
