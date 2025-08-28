@@ -54,61 +54,28 @@ p,li { text-wrap:pretty; }
 img{ display:block; max-width:100%; height:auto; }
 
 /* =========================================
-   NEON TEXT (keskin & animasyonlu)
-   Kullanım: className="neon-text shimmer"
+   NEON TEXT (statik, keskin)
+   Kullanım: className="neon-text"
+   Animasyon istersen: "neon-text neon-animate"
    ========================================= */
 .neon-text{
-  background:linear-gradient(90deg,
-    #00E5FF 0%,
-    #7C5CFF 20%,
-    #FF2BD6 40%,
-    #00FFA3 60%,
-    #FFD166 80%,
-    #7C5CFF 100%);
-  background-size:200% 100%;
+  background:linear-gradient(90deg,#7C5CFF,#00E5FF,#00FFA3,#FFD166,#FF2BD6);
   -webkit-background-clip:text;
   background-clip:text;
   color:transparent;
   letter-spacing:-0.01em;
-
-  /* yumuşak, net parıltı (blur değil) */
+  /* hafif, net parıltı */
   filter:
     drop-shadow(0 0 .18rem rgba(124,92,255,.35))
     drop-shadow(0 0 .55rem rgba(0,229,255,.18));
-  animation:neonShift 7s linear infinite;
 }
 
-/* opsiyonel: üstten geçen hafif parlama */
-.neon-text.shimmer{ position:relative; isolate:isolate; }
-.neon-text.shimmer::after{
-  content:"";
-  position:absolute; inset:0;
-  background:linear-gradient(120deg,
-    transparent 30%,
-    rgba(255,255,255,.25) 50%,
-    transparent 70%);
-  background-size:200% 100%;
-  mix-blend-mode:overlay;
-  animation:shine 3.5s ease-in-out infinite;
-  pointer-events:none;
-}
-
+/* Opsiyonel: akıcı arka plan kaydırma (shimmer yok) */
+.neon-animate{ background-size:200% 100%; animation:neonShift 7s linear infinite; }
 @keyframes neonShift{ 0%{background-position:0% 0} 100%{background-position:200% 0} }
-@keyframes shine{ 0%{background-position:-100% 0} 100%{background-position:200% 0} }
 
 @media (prefers-reduced-motion:reduce){
-  .neon-text{ animation:none; }
-  .neon-text.shimmer::after{ animation:none; }
-}
-
-/* Büyük başlık alternatifi (istersen kullan) */
-.neon-title{
-  font-weight:800;
-  background:linear-gradient(90deg,var(--v1) 0%, var(--v2) 50%, var(--v3) 100%);
-  background-size:200% 100%;
-  -webkit-background-clip:text; background-clip:text; color:transparent;
-  text-shadow:0 0 12px rgba(124,92,255,.45), 0 0 24px rgba(66,232,255,.20);
-  animation:neonShift 6s ease-in-out infinite;
+  .neon-animate{ animation:none; }
 }
 
 /* =========================================
@@ -140,7 +107,7 @@ img{ display:block; max-width:100%; height:auto; }
   }
   .nav-btn--primary:hover{ filter:brightness(1.06); box-shadow:0 0 22px rgba(124,92,255,.5); }
 
-  /* Sayfa içi butonlar için alias – görünüm aynı */
+  /* Sayfa içi buton alias’ları — aynı görünüm */
   .btn{ @apply inline-flex items-center justify-center rounded-xl font-semibold transition; padding:.8rem 1.1rem; }
   .btn:active{ transform:translateY(1px) scale(.99); }
   .btn-gradient{ background:linear-gradient(135deg,var(--v1),var(--v2),var(--v3)); color:#0b0b0f; box-shadow:0 10px 35px rgba(139,93,255,.20); }

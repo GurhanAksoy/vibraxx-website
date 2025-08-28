@@ -1,5 +1,4 @@
 "use client";
-
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
@@ -36,23 +35,24 @@ function openCheckout(priceId: string) {
 
 export default function Home() {
   return (
-    <div>
+    <>
       <Navbar />
 
       {/* HERO */}
-      <section className="section container">
-        <div className="mx-auto max-w-4xl text-center prose-narrow">
-          <h1 className="neon-text shimmer font-extrabold leading-[1.06] tracking-tight text-5xl sm:text-6xl lg:text-7xl">
+      <section className="section container text-center">
+        <div className="mx-auto max-w-3xl prose-narrow">
+          <h1 className="neon-title leading-tight tracking-tight"
+              style={{ fontSize: "clamp(2.4rem, 6vw, 4.2rem)" }}>
             Create Stunning Videos in Seconds
           </h1>
 
-          <p className="mt-4 text-base sm:text-lg text-white/70">
+          <p className="mt-4 text-base sm:text-lg text-white/70 leading-relaxed">
             Turn your text into crisp <span className="nowrap">1080p</span> clips. No credits. Clear pricing. Instant results.
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a href="/studio" className="btn btn-gradient w-full sm:w-auto">Launch Studio</a>
-            <a href="#pricing" className="btn btn-outline w-full sm:w-auto">View Pricing</a>
+            <a href="/studio" className="nav-btn nav-btn--primary w-full sm:w-auto">Launch Studio</a>
+            <a href="#pricing" className="nav-btn w-full sm:w-auto">View Pricing</a>
           </div>
         </div>
       </section>
@@ -63,9 +63,9 @@ export default function Home() {
           {[
             { title: "Seamless Workflow",  desc: "From idea to video in three simple steps." },
             { title: "Transparent Pricing", desc: "You know exactly how many videos you get." },
-            { title: "Instant Delivery",   desc: "Your video is ready in seconds — ready to share." },
-            { title: "Flexible Options",   desc: "Choose with or without watermark as needed." },
-            { title: "Trusted Platform",   desc: "Clear Terms, Privacy and DMCA compliance." },
+            { title: "Instant Delivery",   desc: "Your video is ready in seconds. Ready to share." },
+            { title: "Flexible Options",   desc: "Choose with or without watermark, as needed." },
+            { title: "Trusted Platform",   desc: "Clear Terms, Privacy, and DMCA compliance." },
             { title: "Global Ready",       desc: "Built to scale worldwide." },
           ].map((f) => (
             <div key={f.title} className="card">
@@ -97,7 +97,7 @@ export default function Home() {
               <button
                 onClick={() => openCheckout(p.priceId)}
                 type="button"
-                className="btn btn-gradient mt-6"
+                className="mt-6 nav-btn nav-btn--primary"
               >
                 Buy Now
               </button>
@@ -107,6 +107,6 @@ export default function Home() {
       </section>
 
       <Footer />
-    </div>
+    </>
   );
 }
