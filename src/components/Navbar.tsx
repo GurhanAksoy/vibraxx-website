@@ -11,9 +11,9 @@ export default function Navbar() {
           />
         </a>
 
-        {/* Menü (sade) */}
-        <nav className="flex items-center gap-6 text-sm md:text-base">
-          <a href="/announcements" className="nav-link">Announcements</a>
+        {/* Menü */}
+        <nav className="flex items-center gap-3 md:gap-4">
+          <a href="/announcements" className="nav-btn">Announcements</a>
           <a href="/studio" className="nav-btn nav-btn--primary">Launch Studio</a>
         </nav>
       </div>
