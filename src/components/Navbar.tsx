@@ -15,10 +15,10 @@ export default function Navbar() {
           <Image
             src="/logo.png"
             alt="VibraXX Logo"
-            width={128}
-            height={40}
+            width={153}   // eskiden 128 idi %20 büyütüldü
+            height={44}
             priority
-            className="h-9 w-auto"
+            className="h-11 w-auto" // eskiden h-9 idi
           />
         </Link>
 

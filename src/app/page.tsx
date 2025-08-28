@@ -47,9 +47,10 @@ export default function Home() {
       <section className="section container">
         <div className="mx-auto max-w-3xl text-center prose-narrow">
           <h1 className="neon-title leading-tight tracking-tight"
-              style={{ fontSize: "clamp(2.2rem, 5.5vw, 3.6rem)" }}>
-            Create Stunning Videos in Seconds
-          </h1>
+    style={{ fontSize: "clamp(1.9rem, 5vw, 3.05rem)" }}>
+  Create Stunning Videos in Seconds
+</h1>
+
           <p className="mt-4 text-base sm:text-lg text-white/70 leading-relaxed">
             Turn your text into crisp <span className="nowrap">1080p</span> clips. No credits. Clear pricing. Instant results.
           </p>

@@ -61,9 +61,8 @@ p,li { text-wrap:pretty; }
   text-shadow:
     0 0 2px rgba(255,255,255,.25),
     0 0 14px rgba(124,92,255,.35);
-  animation:neonShift 12s ease-in-out infinite;
-}
-@keyframes neonShift{
+  animation:neonShift 9.5s ease-in-out infinite; /* hızlandırıldı */
+}@keyframes neonShift{
   0%,100%{ background-position:0% 50% }
   50%    { background-position:100% 50% }
 }
