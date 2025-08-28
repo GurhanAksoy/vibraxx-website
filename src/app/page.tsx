@@ -9,7 +9,7 @@ const plans = [
   { key: "pro",     name: "Pro Pack",     price: 49.99, videos: 50, watermark: false, priceId: "price_pro_xxx" },
 ];
 
-// Paddle init flag (opsiyonel)
+// Paddle init flag (demo)
 let paddleInited = false;
 function openCheckout(priceId: string) {
   // @ts-ignore
@@ -30,8 +30,7 @@ function openCheckout(priceId: string) {
       cancelUrl: "/checkout/cancel",
     });
   } else {
-    // şimdilik demo
-    window.location.href = "#pricing";
+    window.location.href = "#pricing"; // şimdilik demo yönlendirme
   }
 }
 
@@ -91,8 +90,8 @@ export default function Home() {
                 <h3 className="text-xl font-semibold">{p.name}</h3>
                 <p className="mt-2 text-3xl md:text-4xl font-extrabold nowrap">${p.price}</p>
                 <p className="mt-1 text-sm text-white/70">
-                  {p.videos} videos · <span className="nowrap">1080p</span> · <span className="nowrap">10&nbsp;s</span>
-                  {p.watermark ? " · watermark" : " · no watermark"}
+                  {p.videos} videos · <span className="nowrap">1080p</span> · <span className="nowrap">10s</span> ·{" "}
+                  <span className="nowrap">{p.watermark ? "watermark" : "no watermark"}</span>
                 </p>
               </div>
               <button

@@ -14,7 +14,6 @@ export default function Navbar() {
         {/* Menü (sade) */}
         <nav className="flex items-center gap-6 text-sm md:text-base">
           <a href="/announcements" className="nav-link">Announcements</a>
-          <a href="mailto:team@vibraxx.com" className="nav-link">Contact</a>
           <a href="/studio" className="nav-btn nav-btn--primary">Launch Studio</a>
         </nav>
       </div>

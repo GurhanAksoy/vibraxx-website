@@ -14,11 +14,10 @@ export default function Studio() {
     setStatus("queue");
     setVideoUrl(null);
 
-    // DEMO: Sahte akış (queue → rendering → ready)
+    // DEMO: queue → rendering → ready
     setTimeout(() => setStatus("rendering"), 900);
     setTimeout(() => {
       setStatus("ready");
-      // placeholder preview (ileride API'den dönen MP4 url)
       setVideoUrl("https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4");
     }, 3600);
   }
@@ -43,8 +42,16 @@ export default function Studio() {
 
       <section className="section container">
         <div className="mx-auto max-w-5xl">
-          <h1 className="text-3xl md:text-4xl font-bold text-center">Studio</h1>
-          <p className="text-white/70 text-center mt-2">Enter your prompt, generate, preview, download or share.</p>
+          {/* Neon degrade başlık */}
+          <h1 className="text-4xl md:text-5xl font-extrabold leading-tight tracking-tight
+                         bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500
+                         bg-clip-text text-transparent
+                         drop-shadow-[0_0_12px_rgba(124,92,255,0.6)] text-center">
+            Studio
+          </h1>
+          <p className="text-white/70 text-center mt-2">
+            Enter your prompt, generate, preview, download or share.
+          </p>
 
           <div className="mt-8 grid gap-6 lg:grid-cols-2">
             {/* LEFT: Controls */}
@@ -88,7 +95,10 @@ export default function Studio() {
             <div className="card flex flex-col justify-between">
               <div>
                 <h3 className="text-lg font-semibold">Preview</h3>
-                <p className="text-white/70 text-sm mt-1">1080p · 10s · {watermark ? "watermark" : "no watermark"}</p>
+                <p className="text-white/70 text-sm mt-1">
+                  <span className="nowrap">1080p</span> · <span className="nowrap">10s</span> ·{" "}
+                  <span className="nowrap">{watermark ? "watermark" : "no watermark"}</span>
+                </p>
               </div>
 
               <div className="mt-4 aspect-video w-full rounded-xl bg-black/40 border border-white/10 flex items-center justify-center overflow-hidden">
