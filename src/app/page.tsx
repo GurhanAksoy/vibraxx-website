@@ -1,15 +1,15 @@
 "use client";
+
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
 const plans = [
-  { key: "trial",   name: "Trial Pack",   price: 2.99,  videos: 1,  watermark: true,  priceId: "price_trial_xxx" },
-  { key: "starter", name: "Starter Pack", price: 9.99,  videos: 5,  watermark: true,  priceId: "price_starter_xxx" },
+  { key: "trial",   name: "Trial Pack",   price: 2.99, videos: 1,  watermark: true,  priceId: "price_trial_xxx" },
+  { key: "starter", name: "Starter Pack", price: 9.99, videos: 5,  watermark: true,  priceId: "price_starter_xxx" },
   { key: "creator", name: "Creator Pack", price: 19.99, videos: 15, watermark: false, priceId: "price_creator_xxx" },
   { key: "pro",     name: "Pro Pack",     price: 49.99, videos: 50, watermark: false, priceId: "price_pro_xxx" },
 ];
 
-// avoid re-init Paddle
 let paddleInited = false;
 function openCheckout(priceId: string) {
   // @ts-ignore
@@ -41,20 +41,18 @@ export default function Home() {
 
       {/* HERO */}
       <section className="section container">
-        <div className="mx-auto max-w-3xl text-center prose-narrow">
-          {/* FULL neon gradient heading */}
-          <h1 className="balance font-extrabold leading-tight md:leading-[1.1] tracking-tight neon-text shimmer">
+        <div className="mx-auto max-w-4xl text-center prose-narrow">
+          <h1 className="neon-text shimmer font-extrabold leading-[1.06] tracking-tight text-5xl sm:text-6xl lg:text-7xl">
             Create Stunning Videos in Seconds
           </h1>
 
-          <p className="mt-4 text-base sm:text-lg text-white/70 leading-relaxed">
-            Transform your text into high quality <span className="nowrap">1080p</span> videos.
-            No hidden fees or confusing credits. Clear pricing and instant results.
+          <p className="mt-4 text-base sm:text-lg text-white/70">
+            Turn your text into crisp <span className="nowrap">1080p</span> clips. No credits. Clear pricing. Instant results.
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a href="/studio" className="btn btn-gradient w-full sm:w-auto text-center">Launch Studio</a>
-            <a href="#pricing" className="btn btn-outline w-full sm:w-auto text-center">View Pricing</a>
+            <a href="/studio" className="btn btn-gradient w-full sm:w-auto">Launch Studio</a>
+            <a href="#pricing" className="btn btn-outline w-full sm:w-auto">View Pricing</a>
           </div>
         </div>
       </section>
@@ -65,9 +63,9 @@ export default function Home() {
           {[
             { title: "Seamless Workflow",  desc: "From idea to video in three simple steps." },
             { title: "Transparent Pricing", desc: "You know exactly how many videos you get." },
-            { title: "Instant Delivery",   desc: "Your video is ready in seconds. Ready to share." },
-            { title: "Flexible Options",   desc: "Choose with or without watermark, as needed." },
-            { title: "Trusted Platform",   desc: "Clear Terms, Privacy, and DMCA compliance." },
+            { title: "Instant Delivery",   desc: "Your video is ready in seconds — ready to share." },
+            { title: "Flexible Options",   desc: "Choose with or without watermark as needed." },
+            { title: "Trusted Platform",   desc: "Clear Terms, Privacy and DMCA compliance." },
             { title: "Global Ready",       desc: "Built to scale worldwide." },
           ].map((f) => (
             <div key={f.title} className="card">
