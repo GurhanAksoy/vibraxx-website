@@ -1,71 +1,64 @@
-"use client";
-
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { useState } from "react";
+
+export const metadata = { title: "Studio — VibraXX" };
+
+function NeonLetters({ text }: { text: string }) {
+  return (
+    <span aria-label={text}>
+      {text.split("").map((ch, i) => (
+        <span key={i} className="neon-letter">{ch}</span>
+      ))}
+    </span>
+  );
+}
 
 export default function StudioPage() {
-  const [prompt, setPrompt] = useState("");
-  const [withWatermark, setWithWatermark] = useState(true);
-
   return (
     <>
       <Navbar />
-      <section className="section container">
-        <header className="mx-auto max-w-3xl text-center prose-narrow">
-          <h1 className="neon-title leading-tight" style={{fontSize:"clamp(2rem, 5vw, 3rem)"}}>
-            Studio
+      <main className="container section">
+        <div className="mx-auto max-w-3xl text-center">
+          <h1 className="text-5xl md:text-6xl font-extrabold leading-tight tracking-tight">
+            <NeonLetters text="Studio" />
           </h1>
           <p className="mt-3 text-white/70">
             Enter your prompt, generate, preview, download or share.
           </p>
-        </header>
+        </div>
 
-        <div className="mt-10 grid gap-6 lg:grid-cols-2">
-          {/* Left: prompt */}
-          <div className="card">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Prompt</h3>
-              <label className="flex items-center gap-2 text-white/80 text-sm">
-                <input
-                  type="checkbox"
-                  checked={withWatermark}
-                  onChange={(e) => setWithWatermark(e.target.checked)}
-                />
-                Include watermark
-              </label>
-            </div>
-
+        {/* Basit demo-yapı: solda prompt, sağda preview */}
+        <div className="mt-10 grid gap-6 md:grid-cols-2">
+          {/* Prompt card */}
+          <div className="card neon-border neon-border--soft" style={{ ["--neon" as any]:"var(--v2)" }}>
+            <div className="text-sm font-semibold mb-3">Prompt</div>
+            <label className="flex items-center gap-2 mb-3 text-sm text-white/80">
+              <input type="checkbox" className="accent-cyan-400" defaultChecked /> Include watermark
+            </label>
             <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
+              rows={6}
               placeholder="Describe the scene you want (max ~300 chars)…"
-              className="mt-4 w-full h-40 bg-black/30 border border-white/10 rounded-xl p-3 outline-none"
+              className="w-full rounded-xl bg-black/30 border border-white/10 p-3 outline-none focus:border-white/20"
             />
-
-            <button className="mt-4 nav-btn nav-btn--primary" type="button">
-              Generate Video
-            </button>
+            <div className="mt-4 flex gap-3">
+              <button className="nav-btn nav-btn--primary">Generate Video</button>
+            </div>
           </div>
 
-          {/* Right: preview */}
-          <div className="card flex flex-col">
-            <h3 className="font-semibold">Preview</h3>
-            <p className="mt-1 text-sm text-white/60">
-              1080p · 10s · {withWatermark ? "watermark" : "no watermark"}
-            </p>
-
-            <div className="mt-4 aspect-video w-full bg-black/30 border border-white/10 rounded-xl grid place-items-center">
-              <p className="text-white/50">Your video will appear here after generation.</p>
+          {/* Preview card */}
+          <div className="card neon-border neon-border--soft" style={{ ["--neon" as any]:"var(--v1)" }}>
+            <div className="text-sm font-semibold mb-3">Preview</div>
+            <div className="text-xs text-white/60 mb-3">1080p · 10s · watermark</div>
+            <div className="h-48 rounded-xl border border-white/10 bg-black/20 flex items-center justify-center text-white/40">
+              Your video will appear here after generation.
             </div>
-
-            <div className="mt-4 flex gap-2">
-              <button className="nav-btn" type="button">Download</button>
-              <button className="nav-btn" type="button">Share</button>
+            <div className="mt-4 flex gap-3">
+              <button className="btn-outline">Download</button>
+              <button className="btn-outline">Share</button>
             </div>
           </div>
         </div>
-      </section>
+      </main>
       <Footer />
     </>
   );

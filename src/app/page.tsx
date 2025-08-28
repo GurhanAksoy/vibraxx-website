@@ -9,7 +9,6 @@ const plans = [
   { key: "pro",     name: "Pro Pack",     price: 49.99, videos: 50, watermark: false, priceId: "price_pro_xxx" },
 ];
 
-// Feature kartlarına farklı neon renkleri
 const features = [
   { title: "Flexible Options",   desc: "Choose with or without watermark, as needed.", neon: "#00E5FF" },
   { title: "Seamless Workflow",  desc: "From idea to video in three simple steps.",     neon: "#7C5CFF" },
@@ -19,7 +18,6 @@ const features = [
   { title: "Instant Delivery",   desc: "Your video is ready in seconds. Ready to share.", neon: "#9AE6FF" },
 ];
 
-// Paddle double-init koruması
 let paddleInited = false;
 function openCheckout(priceId: string) {
   // @ts-ignore
@@ -52,8 +50,12 @@ export default function Home() {
       {/* HERO */}
       <section className="section container">
         <div className="mx-auto max-w-3xl text-center prose-narrow">
-          <h1 className="neon-title text-5xl md:text-6xl font-extrabold leading-tight md:leading-[1.1] tracking-tight">
-            Create Stunning Videos in Seconds
+          <h1 className="text-5xl md:text-6xl font-extrabold leading-tight md:leading-[1.1] tracking-tight">
+            <span className="neon-word-1">Create</span>{" "}
+            <span className="neon-word-2">Stunning</span>{" "}
+            <span className="neon-word-3">Videos</span>{" "}
+            <span className="neon-word-1">in</span>{" "}
+            <span className="neon-word-2">Seconds</span>
           </h1>
 
           <p className="mt-4 text-base sm:text-lg text-white/70 leading-relaxed">
@@ -86,7 +88,7 @@ export default function Home() {
       {/* PRICING */}
       <section id="pricing" className="section container">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl md:text-4xl font-bold">Pricing Plans</h2>
+          <h2 className="neon-title text-3xl md:text-4xl font-extrabold">Pricing Plans</h2>
           <p className="text-white/70 mt-2">Clear packages. Fair prices. No surprises.</p>
         </div>
 
