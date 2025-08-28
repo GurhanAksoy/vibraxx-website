@@ -13,13 +13,12 @@ export default function Studio() {
     if (!prompt.trim()) return alert("Please enter a short prompt.");
     setStatus("queue");
     setVideoUrl(null);
-
     // DEMO: queue → rendering → ready
-    setTimeout(() => setStatus("rendering"), 900);
+    setTimeout(() => setStatus("rendering"), 800);
     setTimeout(() => {
       setStatus("ready");
       setVideoUrl("https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4");
-    }, 3600);
+    }, 3400);
   }
 
   function handleDownload(){
@@ -42,13 +41,8 @@ export default function Studio() {
 
       <section className="section container">
         <div className="mx-auto max-w-5xl">
-          {/* Neon degrade başlık */}
-          <h1 className="text-4xl md:text-5xl font-extrabold leading-tight tracking-tight
-                         bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500
-                         bg-clip-text text-transparent
-                         drop-shadow-[0_0_12px_rgba(124,92,255,0.6)] text-center">
-            Studio
-          </h1>
+          {/* Canlı neon degrade başlık */}
+          <h1 className="neon-title text-center">Studio</h1>
           <p className="text-white/70 text-center mt-2">
             Enter your prompt, generate, preview, download or share.
           </p>
@@ -73,15 +67,11 @@ export default function Studio() {
                   />
                   Include watermark
                 </label>
-                <button
-                  onClick={handleGenerate}
-                  className="nav-btn nav-btn--primary"
-                >
+                <button onClick={handleGenerate} className="nav-btn nav-btn--primary">
                   Generate Video
                 </button>
               </div>
 
-              {/* Status */}
               <div className="mt-4 text-sm text-white/70">
                 {status === "idle" && <span>Ready.</span>}
                 {status === "queue" && <span>Queued…</span>}
@@ -116,7 +106,6 @@ export default function Studio() {
             </div>
           </div>
 
-          {/* Credits (dummy) */}
           <div className="mt-8 text-center text-sm text-white/60">
             Credits: <span className="nowrap">14 / 20</span> (demo)
           </div>

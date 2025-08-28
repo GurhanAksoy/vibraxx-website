@@ -91,3 +91,40 @@ img{ display:block; max-width:100%; height:auto; }
 /* ---- Kart hover canlılığı ---- */
 .card{ @apply rounded-2xl p-6 border border-white/10 bg-white/5 transition-transform; }
 .card:hover{ transform:translateY(-2px); box-shadow:0 10px 24px rgba(0,0,0,.25); }
+/* ==== VibraXX UI – additive, safe overrides (append only) ==== */
+:root{ --v1:#00E5FF; --v2:#7C5CFF; --v3:#FF2BD6; }
+
+.nav-btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  padding:.7rem 1.1rem; border-radius:.9rem;
+  border:1px solid rgba(255,255,255,.15);
+  color:#fff; background:rgba(255,255,255,.06);
+  transition:all .2s ease; backdrop-filter:saturate(130%) blur(2px);
+}
+.nav-btn:hover{ border-color:rgba(255,255,255,.25); transform:translateY(-1px); }
+.nav-btn:active{ transform:translateY(0); }
+.nav-btn:disabled{ opacity:.5; cursor:not-allowed; }
+
+.nav-btn--primary{
+  color:#0b0b0f; font-weight:700; border-color:transparent;
+  background:linear-gradient(135deg,var(--v1) 0%, var(--v2) 50%, var(--v3) 100%);
+  box-shadow:0 0 16px rgba(124,92,255,.35);
+}
+.nav-btn--primary:hover{ filter:brightness(1.06); box-shadow:0 0 22px rgba(124,92,255,.5); }
+
+.neon-text{
+  background:linear-gradient(90deg,#7C5CFF,#00E5FF,#00FFA3,#FFD166,#FF2BD6);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  letter-spacing:-0.01em;
+}
+
+.neon-title{
+  font-weight:800;
+  background:linear-gradient(90deg,var(--v1) 0%, var(--v2) 50%, var(--v3) 100%);
+  background-size:200% 100%;
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  text-shadow:0 0 12px rgba(124,92,255,.45), 0 0 24px rgba(66,232,255,.20);
+  animation:neonShift 6s ease-in-out infinite;
+}
+@keyframes neonShift{ 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+

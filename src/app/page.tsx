@@ -30,7 +30,7 @@ function openCheckout(priceId: string) {
       cancelUrl: "/checkout/cancel",
     });
   } else {
-    window.location.href = "#pricing"; // şimdilik demo yönlendirme
+    window.location.href = "#pricing"; // demo yönlendirme
   }
 }
 
