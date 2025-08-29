@@ -1,16 +1,20 @@
-import "@/styles/globals.css";
-import type { Metadata } from "next";
+// src/app/layout.tsx
+import "./globals.css";
+import Nav from "@/components/Nav";        // senin dosya yolun
+import Footer from "@/components/Footer";  // senin dosya yolun
 
-export const metadata: Metadata = {
-  title: "VibraXX — Text to Video",
-  description: "Generate 1080p short videos from text with clear pricing and instant results.",
+export const metadata = {
+  title: "VibraXX",
+  description: "Create stunning videos in seconds",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>
-        <div className="gradient min-h-screen">{children}</div>
+      <body className="min-h-screen bg-neutral-950 text-white">
+        <Nav />
+        <main className="container mx-auto px-4 py-8">{children}</main>
+        <Footer />
       </body>
     </html>
   );

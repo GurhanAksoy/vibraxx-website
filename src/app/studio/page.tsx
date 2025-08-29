@@ -1,216 +1,121 @@
+// src/app/studio/page.tsx
 "use client";
-
-import { useEffect, useRef, useState } from "react";
-
-type Provider = "luma" | "runway" | "auto";
+import { useState } from "react";
 
 export default function StudioPage() {
   const [prompt, setPrompt] = useState("");
-  const [provider, setProvider] = useState<Provider>("auto"); // varsayılan auto
+  const [provider, setProvider] = useState<"runway" | "luma" | "auto">("auto");
   const [taskId, setTaskId] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [status, setStatus] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
-  const pollTimer = useRef<NodeJS.Timeout | null>(null);
-
-  // ---- Status Poller (sadece gerçek providerlarda) ----
-  useEffect(() => {
-    if (!taskId) return;
-    if (provider === "auto") return; // generate dönüşünde gerçek provider'ı set ediyoruz
-    if (provider === "luma" || provider === "runway") {
-      startPolling(taskId, provider);
-    }
-    // cleanup
-    return () => clearTimer();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taskId, provider]);
-
-  function clearTimer() {
-    if (pollTimer.current) {
-      clearInterval(pollTimer.current);
-      pollTimer.current = null;
-    }
-  }
-
-  function startPolling(id: string, p: Provider) {
-    async function check() {
-      try {
-        const q = new URLSearchParams({ id, provider: p });
-        const r = await fetch(`/api/status?${q.toString()}`, { cache: "no-store" });
-        const data = await r.json();
-        const stat = (data.status || data.state || data.phase || "")
-          .toString()
-          .toUpperCase();
-
-        setStatus(stat);
-
-        if (stat.includes("SUCCEED") || stat.includes("COMPLETE")) {
-          // URL çıkarma
-          let url: string | undefined;
-
-          if (Array.isArray(data.output) && data.output.length) {
-            url =
-              data.output[0]?.uri ||
-              data.output[0]?.url ||
-              data.output[0]?.asset_url;
-          }
-          if (!url && Array.isArray(data.assets) && data.assets.length) {
-            url = data.assets[0]?.url || data.assets[0]?.uri;
-          }
-          if (!url && typeof data.result === "object") {
-            url =
-              data.result?.video_url ||
-              data.result?.url ||
-              data.result?.uri ||
-              data.result?.asset_url;
-          }
-
-          if (url) {
-            setVideoUrl(url);
-            clearTimer();
-          }
-        } else if (stat.includes("FAIL")) {
-          setErr("Generation failed.");
-          clearTimer();
-        }
-      } catch (e: any) {
-        setErr(e?.message || "Status check failed");
-        clearTimer();
-      }
-    }
-
-    clearTimer();
-    check();
-    pollTimer.current = setInterval(check, 2500);
-  }
-
-  async function onGenerate() {
+  async function generate() {
+    setLoading(true);
+    setStatus(null);
     try {
-      setErr(null);
-      setVideoUrl(null);
-      setTaskId(null);
-      setStatus(null);
-      setIsLoading(true);
-
-      if (!prompt.trim()) {
-        setErr("Please enter a prompt.");
-        setIsLoading(false);
-        return;
-      }
-
-      // İstek at
       const r = await fetch("/api/video/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ prompt, provider }), // seçilen provider ile
+        body: JSON.stringify({ prompt, provider }),
       });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.error || "Failed");
 
-      if (!r.ok) {
-        const t = await r.text();
-        throw new Error(`Generate failed: ${r.status} ${t}`);
-      }
-      const data = await r.json(); // { id, provider, demoUrl? }
-
-      // DEMO_MODE kısa devre: direkt player'a demo videosunu yükle
-      if (data?.provider === "demo" && data?.demoUrl) {
-        setProvider("auto"); // poll yok
-        setTaskId(data.id);
-        setStatus("DEMO_READY");
-        setVideoUrl(data.demoUrl);
-        return;
-      }
-
-      // Gerçek provider döndüyse polling'i ona göre başlat
-      if (!data?.id) throw new Error("No task id returned");
-      if (!data?.provider) throw new Error("No provider returned");
-
-      setProvider(data.provider as Provider);
       setTaskId(data.id);
+
+      // basit poller
+      let done = false;
+      while (!done) {
+        await new Promise((res) => setTimeout(res, 2500));
+        const q = new URLSearchParams({ id: data.id, provider });
+        const s = await fetch("/api/status?" + q.toString());
+        const js = await s.json();
+        setStatus(js);
+
+        if (js?.status === "succeeded" || js?.status === "failed" || js?.status === "aborted") {
+          done = true;
+        }
+      }
     } catch (e: any) {
-      setErr(e?.message || "Generate failed");
+      setStatus({ error: e?.message || "error" });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   }
 
-  return (
-    <main className="container section">
-      <div className="max-w-3xl mx-auto">
-        {/* Başlık – sade ve keskin */}
-        <h1 className="text-4xl md:text-5xl font-extrabold neon-title">
-          Studio
-        </h1>
-        <p className="mt-3 text-white/70">
-          Enter a prompt, choose provider (or Auto), then generate. Demo mode returns a sample instantly.
-        </p>
+  const videoUrl =
+    status?.output?.[0]?.asset_url ||
+    status?.result?.video?.url || // luma success şeması
+    null;
 
-        {/* Prompt */}
-        <div className="mt-6">
-          <label className="block text-sm mb-2">Prompt</label>
+  return (
+    <div className="max-w-6xl mx-auto">
+      <h1 className="text-5xl font-extrabold text-center mb-8">Studio</h1>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* SOL: Prompt */}
+        <div className="rounded-2xl bg-neutral-900 p-5 border border-neutral-800">
+          <label className="block text-sm text-neutral-300 mb-2">Prompt</label>
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            rows={4}
-            placeholder="A dynamic neon intro with cyberpunk city, rain reflections, bold title 'Taviz Yok'"
-            className="w-full rounded-xl bg-white/5 border border-white/10 p-4 outline-none focus:border-white/25"
+            placeholder="Describe the scene (max ~300 chars)…"
+            maxLength={300}
+            className="w-full h-40 rounded-xl bg-neutral-800/60 border border-neutral-700 px-3 py-2 outline-none"
           />
-        </div>
-
-        {/* Provider seçimi + Generate */}
-        <div className="mt-4 flex flex-col sm:flex-row gap-3 sm:items-center">
-          <div className="flex items-center gap-2">
-            <label className="text-sm">Provider</label>
-            <select
-              value={provider}
-              onChange={(e) => setProvider(e.target.value as Provider)}
-              className="rounded-lg bg-white/5 border border-white/10 p-2 outline-none focus:border-white/25"
+          <div className="flex items-center justify-between mt-4 gap-3">
+            <div className="flex gap-2">
+              <select
+                value={provider}
+                onChange={(e) => setProvider(e.target.value as any)}
+                className="bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2"
+              >
+                <option value="auto">Auto</option>
+                <option value="runway">Runway</option>
+                <option value="luma">Luma</option>
+              </select>
+            </div>
+            <button
+              onClick={generate}
+              disabled={loading || !prompt.trim()}
+              className="rounded-xl px-4 py-2 bg-gradient-to-r from-fuchsia-500 to-cyan-400 disabled:opacity-50"
             >
-              <option value="auto">Auto</option>
-              <option value="luma">Luma</option>
-              <option value="runway">Runway</option>
-            </select>
+              {loading ? "Generating…" : "Generate Video"}
+            </button>
           </div>
 
-          <button
-            onClick={onGenerate}
-            disabled={isLoading}
-            className="sm:ml-auto nav-btn nav-btn--primary"
-          >
-            {isLoading ? "Generating..." : "Generate Video"}
-          </button>
-        </div>
-
-        {/* Durum / Hata */}
-        <div className="mt-4">
-          {status && (
-            <div className="text-sm text-white/70">
-              Status: <span className="text-white">{status}</span>
-            </div>
+          {taskId && (
+            <p className="text-xs text-neutral-400 mt-3">
+              Task ID: <span className="font-mono">{taskId}</span>
+            </p>
           )}
-          {err && <div className="text-sm text-red-400 mt-2">Error: {err}</div>}
         </div>
 
-        {/* Video çıktı */}
-        {videoUrl && (
-          <div className="mt-6">
-            <div className="rounded-2xl overflow-hidden border border-white/10 bg-black">
+        {/* SAĞ: Önizleme */}
+        <div className="rounded-2xl bg-neutral-900 p-5 border border-neutral-800">
+          <div className="text-sm text-neutral-300 mb-2">Preview</div>
+          <div className="aspect-video w-full rounded-xl bg-neutral-800/60 border border-neutral-700 flex items-center justify-center overflow-hidden">
+            {videoUrl ? (
               <video
-                key={videoUrl}
                 src={videoUrl}
                 controls
-                className="w-full max-w-3xl mx-auto"
-                style={{ display: "block" }}
+                className="w-full h-full object-contain"
               />
-            </div>
-            <div className="mt-3 text-sm text-white/70 flex gap-2">
-              <a href={videoUrl} download className="nav-btn">Download</a>
-              <a href={videoUrl} target="_blank" className="nav-btn">Open</a>
-            </div>
+            ) : (
+              <span className="text-neutral-500 text-sm">
+                Your video will appear here after generation.
+              </span>
+            )}
           </div>
-        )}
+
+          {/* Basit status debug */}
+          {status && (
+            <pre className="mt-4 text-xs whitespace-pre-wrap break-words bg-black/30 p-3 rounded-lg border border-neutral-800">
+{JSON.stringify(status, null, 2)}
+            </pre>
+          )}
+        </div>
       </div>
-    </main>
+    </div>
   );
 }
