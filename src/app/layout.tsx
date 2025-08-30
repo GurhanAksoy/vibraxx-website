@@ -1,20 +1,16 @@
-// src/app/layout.tsx
-import "../styles/globals.css";               // globals.css artık styles klasöründe
-import Navbar from "@/components/Navbar";      // dosya adı Navbar.tsx ise
-import Footer from "@/components/Footer";
+import "@/styles/globals.css";
+import type { Metadata } from "next";
 
-export const metadata = {
-  title: "VibraXX",
-  description: "Create stunning videos in seconds",
+export const metadata: Metadata = {
+  title: "VibraXX — Text to Video",
+  description: "Generate 1080p short videos from text with clear pricing and instant results.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-neutral-950 text-white">
-        <Navbar />
-        <main className="container mx-auto px-4 py-8">{children}</main>
-        <Footer />
+      <body>
+        <div className="gradient min-h-screen">{children}</div>
       </body>
     </html>
   );

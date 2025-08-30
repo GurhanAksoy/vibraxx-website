@@ -1,121 +1,65 @@
-// src/app/studio/page.tsx
-"use client";
-import { useState } from "react";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+
+export const metadata = { title: "Studio — VibraXX" };
+
+function NeonLetters({ text }: { text: string }) {
+  return (
+    <span aria-label={text}>
+      {text.split("").map((ch, i) => (
+        <span key={i} className="neon-letter">{ch}</span>
+      ))}
+    </span>
+  );
+}
 
 export default function StudioPage() {
-  const [prompt, setPrompt] = useState("");
-  const [provider, setProvider] = useState<"runway" | "luma" | "auto">("auto");
-  const [taskId, setTaskId] = useState<string | null>(null);
-  const [status, setStatus] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-
-  async function generate() {
-    setLoading(true);
-    setStatus(null);
-    try {
-      const r = await fetch("/api/video/generate", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ prompt, provider }),
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data?.error || "Failed");
-
-      setTaskId(data.id);
-
-      // basit poller
-      let done = false;
-      while (!done) {
-        await new Promise((res) => setTimeout(res, 2500));
-        const q = new URLSearchParams({ id: data.id, provider });
-        const s = await fetch("/api/status?" + q.toString());
-        const js = await s.json();
-        setStatus(js);
-
-        if (js?.status === "succeeded" || js?.status === "failed" || js?.status === "aborted") {
-          done = true;
-        }
-      }
-    } catch (e: any) {
-      setStatus({ error: e?.message || "error" });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const videoUrl =
-    status?.output?.[0]?.asset_url ||
-    status?.result?.video?.url || // luma success şeması
-    null;
-
   return (
-    <div className="max-w-6xl mx-auto">
-      <h1 className="text-5xl font-extrabold text-center mb-8">Studio</h1>
+    <>
+      <Navbar />
+      <main className="container section">
+        <div className="mx-auto max-w-3xl text-center">
+          <h1 className="text-5xl md:text-6xl font-extrabold leading-tight tracking-tight">
+            <NeonLetters text="Studio" />
+          </h1>
+          <p className="mt-3 text-white/70">
+            Enter your prompt, generate, preview, download or share.
+          </p>
+        </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* SOL: Prompt */}
-        <div className="rounded-2xl bg-neutral-900 p-5 border border-neutral-800">
-          <label className="block text-sm text-neutral-300 mb-2">Prompt</label>
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Describe the scene (max ~300 chars)…"
-            maxLength={300}
-            className="w-full h-40 rounded-xl bg-neutral-800/60 border border-neutral-700 px-3 py-2 outline-none"
-          />
-          <div className="flex items-center justify-between mt-4 gap-3">
-            <div className="flex gap-2">
-              <select
-                value={provider}
-                onChange={(e) => setProvider(e.target.value as any)}
-                className="bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2"
-              >
-                <option value="auto">Auto</option>
-                <option value="runway">Runway</option>
-                <option value="luma">Luma</option>
-              </select>
+        {/* Basit demo-yapı: solda prompt, sağda preview */}
+        <div className="mt-10 grid gap-6 md:grid-cols-2">
+          {/* Prompt card */}
+          <div className="card neon-border neon-border--soft" style={{ ["--neon" as any]:"var(--v2)" }}>
+            <div className="text-sm font-semibold mb-3">Prompt</div>
+            <label className="flex items-center gap-2 mb-3 text-sm text-white/80">
+              <input type="checkbox" className="accent-cyan-400" defaultChecked /> Include watermark
+            </label>
+            <textarea
+              rows={6}
+              placeholder="Describe the scene you want (max ~300 chars)…"
+              className="w-full rounded-xl bg-black/30 border border-white/10 p-3 outline-none focus:border-white/20"
+            />
+            <div className="mt-4 flex gap-3">
+              <button className="nav-btn nav-btn--primary">Generate Video</button>
             </div>
-            <button
-              onClick={generate}
-              disabled={loading || !prompt.trim()}
-              className="rounded-xl px-4 py-2 bg-gradient-to-r from-fuchsia-500 to-cyan-400 disabled:opacity-50"
-            >
-              {loading ? "Generating…" : "Generate Video"}
-            </button>
           </div>
 
-          {taskId && (
-            <p className="text-xs text-neutral-400 mt-3">
-              Task ID: <span className="font-mono">{taskId}</span>
-            </p>
-          )}
-        </div>
-
-        {/* SAĞ: Önizleme */}
-        <div className="rounded-2xl bg-neutral-900 p-5 border border-neutral-800">
-          <div className="text-sm text-neutral-300 mb-2">Preview</div>
-          <div className="aspect-video w-full rounded-xl bg-neutral-800/60 border border-neutral-700 flex items-center justify-center overflow-hidden">
-            {videoUrl ? (
-              <video
-                src={videoUrl}
-                controls
-                className="w-full h-full object-contain"
-              />
-            ) : (
-              <span className="text-neutral-500 text-sm">
-                Your video will appear here after generation.
-              </span>
-            )}
+          {/* Preview card */}
+          <div className="card neon-border neon-border--soft" style={{ ["--neon" as any]:"var(--v1)" }}>
+            <div className="text-sm font-semibold mb-3">Preview</div>
+            <div className="text-xs text-white/60 mb-3">1080p · 10s · watermark</div>
+            <div className="h-48 rounded-xl border border-white/10 bg-black/20 flex items-center justify-center text-white/40">
+              Your video will appear here after generation.
+            </div>
+            <div className="mt-4 flex gap-3">
+              <button className="btn-outline">Download</button>
+              <button className="btn-outline">Share</button>
+            </div>
           </div>
-
-          {/* Basit status debug */}
-          {status && (
-            <pre className="mt-4 text-xs whitespace-pre-wrap break-words bg-black/30 p-3 rounded-lg border border-neutral-800">
-{JSON.stringify(status, null, 2)}
-            </pre>
-          )}
         </div>
-      </div>
-    </div>
+      </main>
+      <Footer />
+    </>
   );
 }
