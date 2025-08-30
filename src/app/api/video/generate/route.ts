@@ -1,5 +1,5 @@
 // src/app/api/video/generate/route.ts
-import { startGeneration, type Provider } from "@/lib/providers";
+import { startGeneration, type Provider } from "../../../../lib/providers";
 
 export async function POST(req: Request) {
   try {

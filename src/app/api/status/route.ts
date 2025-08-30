@@ -1,5 +1,5 @@
 // src/app/api/video/status/route.ts
-import { getStatus, type Provider } from "@/lib/providers";
+import { getStatus, type Provider } from "../../../lib/providers";
 
 export async function GET(req: Request) {
   try {
