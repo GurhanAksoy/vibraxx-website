@@ -1,13 +1,22 @@
 export default function Terms() {
   return (
     <div className="container py-16 prose prose-invert">
-      <h1>Şartlar ve Koşullar</h1>
-      <p>Bu sayfa VibraXX kullanım şartlarının özet taslağıdır. Nihai metin yakında güncellenecektir.</p>
+      <h1>Terms and Conditions</h1>
+      <p>This page is a draft summary of VibraXX usage terms. The final text will be updated soon.</p>
       <ul>
-        <li>Paketler net video hakkı içerir.</li>
-        <li>İade prosedürü Paddle üzerinden yürütülür.</li>
-        <li>Yasaklı içeriklere izin verilmez (yasal & etik sınırlar).</li>
+        <li>Packages include a fixed number of video credits.</li>
+        <li>Refunds are processed through Paddle.</li>
+        <li>Prohibited content is not allowed (within legal & ethical boundaries).</li>
       </ul>
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
