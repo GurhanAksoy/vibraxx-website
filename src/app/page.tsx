@@ -6,10 +6,10 @@ export default function Home() {
           VibraXX
         </h1>
         <p className="mt-4 text-lg text-white/70">
-          We will be at your service soon. ... 
+          We will be at your service soon. 
         </p>
         <p className="mt-2 text-sm text-white/50">
-          For your questions <a href="mailto:team@vibraxx.com" className="underline">team@vibraxx.com</a>
+          For your questions    <a href=" mailto:team@vibraxx.com" className="underline">team@vibraxx.com</a>
         </p>
       </div>
     </main>
