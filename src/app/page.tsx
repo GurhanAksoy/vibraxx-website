@@ -3,10 +3,10 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
 const plans = [
-  { key: "trial",   name: "Trial Pack",   price: 0,00, videos: 1,  watermark: true,  priceId: "price_trial_xxx" },
-  { key: "starter", name: "Starter Pack", price: 0,00, videos: 5,  watermark: true,  priceId: "price_starter_xxx" },
-  { key: "creator", name: "Creator Pack", price: 0,00, videos: 15, watermark: false, priceId: "price_creator_xxx" },
-  { key: "pro",     name: "Pro Pack",     price: 0,00, videos: 50, watermark: false, priceId: "price_pro_xxx" },
+  { key: "trial",   name: "Trial Pack",   price: 0.00, videos: 1,  watermark: true,  priceId: "price_trial_xxx" },
+  { key: "starter", name: "Starter Pack", price: 0.00, videos: 5,  watermark: true,  priceId: "price_starter_xxx" },
+  { key: "creator", name: "Creator Pack", price: 0.00, videos: 15, watermark: false, priceId: "price_creator_xxx" },
+  { key: "pro",     name: "Pro Pack",     price: 0.00, videos: 50, watermark: false, priceId: "price_pro_xxx" },
 ];
 
 const features = [
