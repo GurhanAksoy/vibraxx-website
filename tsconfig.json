@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "es5",
+    "target": "ES2020",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": false,
     "skipLibCheck": true,
@@ -12,11 +12,8 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    }
+    "baseUrl": "src"               // <-- "@/..." kökü burası
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+  "include": ["next-env.d.ts", "src/**/*"],
   "exclude": ["node_modules"]
 }
