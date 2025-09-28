@@ -1,7 +1,8 @@
-﻿"use client";
-import {useEffect,useMemo,useRef,useState} from "react";
-const SNAPSHOT_URL = process.env.NEXT_PUBLIC_SNAPSHOT_URL || "http://127.0.0.1:8787/snapshot";
+"use client";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { PositionSizer, TradeChecklist } from "./RiskWidgets";
 
+const SNAPSHOT_URL = process.env.NEXT_PUBLIC_SNAPSHOT_URL || "http://127.0.0.1:8787/snapshot";
 const c={green:"#16a34a",red:"#dc2626",gray:"#6b7280",border:"#e5e7eb",sub:"#9ca3af",text:"#111827",bg:"#fafafa"};
 
 const safeGet = (k, fallback) => (typeof window!=="undefined" ? window.localStorage.getItem(k) ?? fallback : fallback);
@@ -29,7 +30,7 @@ export default function Page(){
   const [data,setData]=useState({updatedAt:0,items:[]});
   const [loading,setLoading]=useState(false);
 
-  // SSR güvenli başlangıç değerleri
+  // SSR güvenli başlangıç
   const [threshold,setThreshold]=useState(70);
   const [dir,setDir]=useState("all");
   const [q,setQ]=useState("");
@@ -46,14 +47,12 @@ export default function Page(){
     setSound(safeGet("sound","0")==="1");
   },[]);
 
-  // snapshot yükleme
   async function load(){
     try{ setLoading(true); const r=await fetch(SNAPSHOT_URL,{cache:"no-store"}); const j=await r.json(); setData(j); }
     catch{} finally{ setLoading(false); }
   }
   useEffect(()=>{ load(); const id=setInterval(load,intervalMs); return ()=>clearInterval(id); },[intervalMs]);
 
-  // ayarları sakla
   useEffect(()=>{ safeSet("th", String(threshold)); },[threshold]);
   useEffect(()=>{ safeSet("dir", dir); },[dir]);
   useEffect(()=>{ safeSet("sortBy", sortBy); },[sortBy]);
@@ -71,7 +70,6 @@ export default function Page(){
     return arr.slice().sort((a,b)=> key(b)-key(a) || (b.score-a.score));
   },[data,dir,q,sortBy]);
 
-  // sesli uyarı
   const beep=useBeep(); const hotRef=useRef(new Set());
   useEffect(()=>{
     if(!sound) return;
@@ -96,6 +94,7 @@ export default function Page(){
         </div>
       </header>
 
+      {/* Filtreler */}
       <section style={{display:"grid",gridTemplateColumns:"repeat(6,minmax(0,1fr))",gap:12,marginBottom:16}}>
         <div style={{gridColumn:"span 2"}}>
           <label style={{fontSize:12,color:c.sub}}>Arama</label>
@@ -129,6 +128,7 @@ export default function Page(){
         </div>
       </section>
 
+      {/* KPI’lar */}
       <section style={{display:"flex",gap:12,marginBottom:12}}>
         <div style={{flex:1,background:"#fff",border:"1px solid "+c.border,borderRadius:12,padding:12}}>
           <div style={{fontSize:12,color:c.sub}}>Takip Edilen Coin</div>
@@ -140,6 +140,13 @@ export default function Page(){
         </div>
       </section>
 
+      {/* Risk widget'ları */}
+      <section style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+        <PositionSizer/>
+        <TradeChecklist/>
+      </section>
+
+      {/* Tablo */}
       <section style={{background:"#fff",border:"1px solid "+c.border,borderRadius:12,overflow:"hidden"}}>
         <table style={{width:"100%",borderCollapse:"collapse"}}>
           <thead>
