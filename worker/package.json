@@ -1,0 +1,9 @@
+﻿{
+  "name": "shortage-longage-worker",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "engines": { "node": ">=18" },
+  "scripts": { "start": "node index.mjs" },
+  "dependencies": {}
+}
