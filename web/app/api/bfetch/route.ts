@@ -48,3 +48,4 @@ export async function GET(req: Request) {
     return cors(NextResponse.json({ error: msg }, { status: 500 }));
   }
 }
+
