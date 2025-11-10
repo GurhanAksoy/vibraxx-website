@@ -8,46 +8,33 @@ export default function AuthCallbackPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const handleOAuthCallback = async () => {
-      // URL'deki query parametrelerini almak
-      const params = new URLSearchParams(window.location.search);
-
-      const code = params.get("code");  // 'code' parametresini almak
-      const error = params.get("error"); // 'error' parametresini almak
+    const handleCallback = async () => {
+      // Supabase OAuth yönlendirmesini tamamla
+      const { data, error } = await supabase.auth.getSession();
 
       if (error) {
-        console.error("OAuth Error:", error);
-        router.replace("/"); // Hata varsa ana sayfaya yönlendir
+        console.error("Auth error:", error);
+        router.replace("/?error=auth_failed");
         return;
       }
 
-      if (code) {
-        try {
-          // Google OAuth kodunu Supabase'e gönderip token almak
-          const { data, error } = await supabase.auth.signInWithOAuth({
-            provider: "google",  // Google sağlayıcısını belirtiyoruz
-            // redirectTo parametresini Google Console'da yapılandırmalısınız
-            // Burada bu parametreye gerek yok, callback URI'yi Supabase Console'dan ayarlıyoruz
-          });
-
-          if (error) {
-            console.error("OAuth Error:", error.message);
-            router.replace("/"); // Hata durumunda ana sayfaya yönlendir
-            return;
-          }
-
-          if (data) {
-            console.log("Google OAuth success:", data);
-            router.replace("/"); // Giriş başarılı ise yönlendir
-          }
-        } catch (err) {
-          console.error("Error during OAuth callback:", err);
+      if (data.session) {
+        console.log("✅ Giriş başarılı:", data.session.user);
+        router.replace("/"); // veya "/dashboard" nereye yönlendirmek istiyorsan
+      } else {
+        console.log(⚠️ Henüz session yok, tekrar deneyelim...");
+        // Supabase URL'de hash token varsa yakala
+        await supabase.auth.getSessionFromUrl({ storeSession: true });
+        const { data: newData } = await supabase.auth.getSession();
+        if (newData.session) {
           router.replace("/");
+        } else {
+          router.replace("/?error=session_missing");
         }
       }
     };
 
-    handleOAuthCallback();
+    handleCallback();
   }, [router]);
 
   return (
