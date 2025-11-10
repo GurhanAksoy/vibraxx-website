@@ -9,12 +9,15 @@ export default function AuthCallbackPage() {
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
-      // Google'dan gelen kodu almak
-      const { code, error } = new URLSearchParams(window.location.search);
-      
+      // URL'deki query parametrelerini almak
+      const params = new URLSearchParams(window.location.search);
+
+      const code = params.get("code");  // 'code' parametresini almak
+      const error = params.get("error"); // 'error' parametresini almak
+
       if (error) {
         console.error("OAuth Error:", error);
-        router.replace("/");
+        router.replace("/"); // Hata varsa ana sayfaya yönlendir
         return;
       }
 
@@ -29,7 +32,7 @@ export default function AuthCallbackPage() {
 
           if (error) {
             console.error("OAuth Error:", error.message);
-            router.replace("/");
+            router.replace("/"); // Hata durumunda ana sayfaya yönlendir
             return;
           }
 
