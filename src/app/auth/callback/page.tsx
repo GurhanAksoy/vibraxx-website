@@ -25,9 +25,9 @@ export default function AuthCallbackPage() {
         try {
           // Google OAuth kodunu Supabase'e gönderip token almak
           const { data, error } = await supabase.auth.signInWithOAuth({
-            provider: "google",
-            redirectTo: `${window.location.origin}/auth/callback`,
-            code,  // Google'dan alınan kod
+            provider: "google",  // Google sağlayıcısını belirtiyoruz
+            // Burada redirectTo parametresine gerek yok, redirect URI'yi Google Console'da ayarlıyoruz
+            // Google OAuth callback yönlendirmesi console'dan yapılır
           });
 
           if (error) {
