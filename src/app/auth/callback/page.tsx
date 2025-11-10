@@ -8,15 +8,43 @@ export default function AuthCallbackPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
+    const handleOAuthCallback = async () => {
+      // Google'dan gelen kodu almak
+      const { code, error } = new URLSearchParams(window.location.search);
+      
+      if (error) {
+        console.error("OAuth Error:", error);
         router.replace("/");
-      } else {
-        router.replace("/");
+        return;
+      }
+
+      if (code) {
+        try {
+          // Google OAuth kodunu Supabase'e gönderip token almak
+          const { data, error } = await supabase.auth.signInWithOAuth({
+            provider: "google",
+            redirectTo: `${window.location.origin}/auth/callback`,
+            code,  // Google'dan alınan kod
+          });
+
+          if (error) {
+            console.error("OAuth Error:", error.message);
+            router.replace("/");
+            return;
+          }
+
+          if (data) {
+            console.log("Google OAuth success:", data);
+            router.replace("/"); // Giriş başarılı ise yönlendir
+          }
+        } catch (err) {
+          console.error("Error during OAuth callback:", err);
+          router.replace("/");
+        }
       }
     };
-    checkSession();
+
+    handleOAuthCallback();
   }, [router]);
 
   return (
@@ -25,5 +53,3 @@ export default function AuthCallbackPage() {
     </main>
   );
 }
-
-
