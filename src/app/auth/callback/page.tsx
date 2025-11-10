@@ -8,33 +8,15 @@ export default function AuthCallbackPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const handleCallback = async () => {
-      // Supabase OAuth yönlendirmesini tamamla
-      const { data, error } = await supabase.auth.getSession();
-
-      if (error) {
-        console.error("Auth error:", error);
-        router.replace("/?error=auth_failed");
-        return;
-      }
-
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
       if (data.session) {
-        console.log("✅ Giriş başarılı:", data.session.user);
-        router.replace("/"); // veya "/dashboard" nereye yönlendirmek istiyorsan
+        router.replace("/");
       } else {
-        console.log(⚠️ Henüz session yok, tekrar deneyelim...");
-        // Supabase URL'de hash token varsa yakala
-        await supabase.auth.getSessionFromUrl({ storeSession: true });
-        const { data: newData } = await supabase.auth.getSession();
-        if (newData.session) {
-          router.replace("/");
-        } else {
-          router.replace("/?error=session_missing");
-        }
+        router.replace("/");
       }
     };
-
-    handleCallback();
+    checkSession();
   }, [router]);
 
   return (
@@ -43,3 +25,5 @@ export default function AuthCallbackPage() {
     </main>
   );
 }
+
+
