@@ -722,6 +722,48 @@ export default function LeaderboardPage() {
                   </div>
                 ) : (
                   restPlayers.map((player, idx) => (
+                    <div
+                      key={player.rank}
+                      className="animate-slide-in"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'clamp(12px, 3vw, 20px)',
+                        padding: 'clamp(14px, 3vw, 18px)',
+                        marginBottom: '12px',
+                        borderRadius: '16px',
+                        border: '1px solid rgba(255, 255, 255, 0.05)',
+                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.05), rgba(217, 70, 239, 0.03))',
+                        transition: 'all 0.3s',
+                        animationDelay: `${idx * 0.02}s`,
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(217, 70, 239, 0.1))';
+                        e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+                        e.currentTarget.style.transform = 'translateX(8px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.05), rgba(217, 70, 239, 0.03))';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
+                        e.currentTarget.style.transform = 'translateX(0)';
+                      }}
+                    >
+                      {/* Rank */}
+                      <div style={{
+                        width: 'clamp(40px, 8vw, 50px)',
+                        height: 'clamp(40px, 8vw, 50px)',
+                        borderRadius: '12px',
+                        background: `linear-gradient(135deg, ${getRankColor(player.rank)})`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 'clamp(14px, 3vw, 18px)',
+                        fontWeight: 900,
+                        flexShrink: 0,
+                        border: '2px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+                      }}
                   <div
                     key={player.rank}
                     className="animate-slide-in"
