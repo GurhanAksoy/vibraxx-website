@@ -105,6 +105,20 @@ export default function HomePage() {
     router.push("/lobby");
   };
 
+  // FREE QUIZ (her kullanıcıya günde 1 defa ücretsiz)
+  const handleStartFreeQuiz = async () => {
+    const { data } = await supabase.auth.getSession();
+    const currentUser = data.session?.user;
+
+    if (!currentUser) {
+      await handleSignIn();
+      return;
+    }
+
+    // Ücretsiz hakkın kontrolü backend'de yapılacak (rate limit, tarih kontrolü)
+    router.push("/free");
+  };
+
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -381,6 +395,7 @@ export default function HomePage() {
         @media (min-width: 640px) {
           .vx-cta-wrap {
             margin-bottom: 64px;
+            flex-direction: row;
           }
         }
 
@@ -916,7 +931,8 @@ export default function HomePage() {
               <Sparkles
                 style={{ width: 14, height: 14, color: "#c4b5fd" }}
               />
-              Global Competition · Every 15 Minutes
+              Global Competition · Every 15 Minutes ·
+              <strong style={{ marginLeft: 6 }}>£1000 Monthly Prize</strong>
             </div>
 
             {/* Title */}
@@ -928,15 +944,12 @@ export default function HomePage() {
 
             {/* Subtitle */}
             <p className="vx-hero-subtitle">
-              Compete live with the world. Rise on the leaderboard
+              Compete live with the world. Rise on the leaderboard.
             </p>
 
-            {/* CTA */}
+            {/* CTA - İki simetrik buton */}
             <div className="vx-cta-wrap">
-              <button
-                className="vx-cta-btn"
-                onClick={handleStartQuiz}
-              >
+              <button className="vx-cta-btn" onClick={handleStartQuiz}>
                 <div
                   style={{
                     position: "absolute",
@@ -959,7 +972,42 @@ export default function HomePage() {
                     zIndex: 10,
                   }}
                 >
-                  Start Quiz
+                  Start Live Quiz (£1 / Round)
+                </span>
+                <ArrowRight
+                  style={{
+                    position: "relative",
+                    zIndex: 10,
+                    width: 20,
+                    height: 20,
+                  }}
+                />
+              </button>
+
+              <button className="vx-cta-btn" onClick={handleStartFreeQuiz}>
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background:
+                      "linear-gradient(to right,#22c55e,#16a34a)",
+                  }}
+                />
+                <Play
+                  style={{
+                    position: "relative",
+                    zIndex: 10,
+                    width: 20,
+                    height: 20,
+                  }}
+                />
+                <span
+                  style={{
+                    position: "relative",
+                    zIndex: 10,
+                  }}
+                >
+                  Start Free Quiz
                 </span>
                 <ArrowRight
                   style={{
@@ -971,6 +1019,15 @@ export default function HomePage() {
                 />
               </button>
             </div>
+
+            {/* Paket metni */}
+            <p
+              className="vx-hero-subtitle"
+              style={{ marginTop: -10, opacity: 0.95 }}
+            >
+              <strong>1 Round = £1</strong> ·{" "}
+              <strong>12 Rounds = £10 Bundle</strong>
+            </p>
 
             {/* Stats */}
             <div className="vx-stats-grid">
@@ -1006,9 +1063,7 @@ export default function HomePage() {
                 >
                   2.8M+
                 </div>
-                <div className="vx-stat-label">
-                  Questions Answered
-                </div>
+                <div className="vx-stat-label">Questions Answered</div>
               </div>
               <div className="vx-stat-card">
                 <Zap
