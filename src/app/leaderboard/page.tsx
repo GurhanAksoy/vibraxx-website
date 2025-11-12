@@ -176,16 +176,53 @@ export default function LeaderboardPage() {
           background: 'rgba(15, 23, 42, 0.8)'
         }}>
           <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 clamp(16px, 3vw, 24px)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px', flexWrap: 'wrap', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px', gap: '16px' }}>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <Trophy style={{ width: 'clamp(28px, 6vw, 36px)', height: 'clamp(28px, 6vw, 36px)', color: '#facc15' }} />
-                <div>
-                  <div style={{ fontSize: 'clamp(18px, 3.5vw, 24px)', fontWeight: 'bold' }}>Leaderboard</div>
-                  <div style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#94a3b8' }}>Global Rankings</div>
+              {/* Left - Logo */}
+              <div 
+                onClick={() => window.location.href = '/'}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '12px',
+                  cursor: 'pointer',
+                  transition: 'transform 0.3s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                <div style={{
+                  width: 'clamp(50px, 10vw, 60px)',
+                  height: 'clamp(50px, 10vw, 60px)',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(to bottom right, #7c3aed, #d946ef)',
+                  padding: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 0 30px rgba(139, 92, 246, 0.6)',
+                  border: '2px solid rgba(255, 255, 255, 0.1)',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}>
+                  <img 
+                    src="/logo.png" 
+                    alt="VibraXX Logo"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                      filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3))'
+                    }}
+                  />
+                </div>
+                <div className="mobile-hide">
+                  <div style={{ fontSize: 'clamp(16px, 3vw, 20px)', fontWeight: 'bold' }}>VibraXX</div>
+                  <div style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#94a3b8' }}>Live Quiz Arena</div>
                 </div>
               </div>
 
+              {/* Center - Title */}
               <div className="animate-shimmer" style={{ 
                 fontSize: 'clamp(16px, 3vw, 28px)',
                 fontWeight: 900,
@@ -195,10 +232,47 @@ export default function LeaderboardPage() {
                 WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
                 textTransform: 'uppercase',
-                letterSpacing: '0.05em'
+                letterSpacing: '0.05em',
+                textAlign: 'center'
               }}>
-                Top Players
+                Leaderboard
               </div>
+
+              {/* Right - Home Button */}
+              <button
+                onClick={() => window.location.href = '/'}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: 'clamp(10px, 2vw, 12px) clamp(16px, 3vw, 24px)',
+                  borderRadius: '12px',
+                  border: '2px solid rgba(139, 92, 246, 0.3)',
+                  background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(217, 70, 239, 0.1))',
+                  color: 'white',
+                  fontSize: 'clamp(13px, 2.5vw, 15px)',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.3s',
+                  backdropFilter: 'blur(10px)',
+                  boxShadow: '0 0 20px rgba(139, 92, 246, 0.3)',
+                  whiteSpace: 'nowrap'
+                }}
+                className="neon-border"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(217, 70, 239, 0.2))';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 5px 30px rgba(139, 92, 246, 0.5)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(217, 70, 239, 0.1))';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 0 20px rgba(139, 92, 246, 0.3)';
+                }}
+              >
+                <Zap style={{ width: 'clamp(16px, 3vw, 20px)', height: 'clamp(16px, 3vw, 20px)', color: '#a78bfa' }} />
+                <span className="mobile-hide">Home</span>
+              </button>
             </div>
           </div>
         </header>
