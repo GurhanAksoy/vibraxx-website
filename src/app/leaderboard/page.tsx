@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { Crown, Trophy, Medal, Flame, Zap, TrendingUp, Star, Award, ChevronRight } from "lucide-react";
+// import { supabase } from "@/lib/supabaseClient"; // Uncomment when ready
 
 export default function LeaderboardPage() {
   const [activeTab, setActiveTab] = useState('daily');
   const [topPlayers, setTopPlayers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Mock data - Replace with API
   const leaderboardData = {
@@ -51,8 +53,113 @@ export default function LeaderboardPage() {
     }))
   };
 
+  // Fetch leaderboard from Supabase
   useEffect(() => {
-    setTopPlayers(leaderboardData[activeTab]);
+    const fetchLeaderboard = async () => {
+      setLoading(true);
+      
+      // OPTION 1: Direct Supabase Query (Uncomment when ready)
+      /*
+      try {
+        const now = new Date();
+        let dateFilter;
+        
+        // Calculate date range based on active tab
+        if (activeTab === 'daily') {
+          dateFilter = new Date(now.setHours(0, 0, 0, 0)).toISOString();
+        } else if (activeTab === 'weekly') {
+          const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
+          dateFilter = weekStart.toISOString();
+        } else if (activeTab === 'monthly') {
+          dateFilter = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        }
+
+        let query = supabase
+          .from('leaderboard')
+          .select(`
+            *,
+            user:user_id (
+              id,
+              full_name,
+              avatar_url,
+              country
+            )
+          `)
+          .order('score', { ascending: false })
+          .limit(100);
+
+        // Add date filter for daily/weekly/monthly
+        if (activeTab !== 'allTime') {
+          query = query.gte('created_at', dateFilter);
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+
+        // Transform data to match component format
+        const formattedData = data.map((item, index) => ({
+          rank: index + 1,
+          name: item.user.full_name,
+          avatar: item.user.avatar_url,
+          score: item.score,
+          accuracy: item.accuracy,
+          streak: item.streak,
+          country: item.user.country || '🌍',
+          isOnline: item.is_online || false
+        }));
+
+        setTopPlayers(formattedData);
+      } catch (error) {
+        console.error('Error fetching leaderboard:', error);
+        setTopPlayers(leaderboardData[activeTab]); // Fallback to mock data
+      } finally {
+        setLoading(false);
+      }
+      */
+
+      // OPTION 2: API Route (Recommended for complex queries)
+      /*
+      try {
+        const response = await fetch(`/api/leaderboard?period=${activeTab}`);
+        if (!response.ok) throw new Error('Failed to fetch');
+        
+        const data = await response.json();
+        setTopPlayers(data);
+      } catch (error) {
+        console.error('Error fetching leaderboard:', error);
+        setTopPlayers(leaderboardData[activeTab]); // Fallback
+      } finally {
+        setLoading(false);
+      }
+      */
+
+      // TEMPORARY: Using mock data
+      setTimeout(() => {
+        setTopPlayers(leaderboardData[activeTab]);
+        setLoading(false);
+      }, 500);
+    };
+
+    fetchLeaderboard();
+
+    // Optional: Real-time updates with Supabase
+    /*
+    const subscription = supabase
+      .channel('leaderboard_changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'leaderboard' },
+        (payload) => {
+          console.log('Leaderboard updated:', payload);
+          fetchLeaderboard(); // Refresh data
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+    */
   }, [activeTab]);
 
   const getRankColor = (rank) => {
@@ -116,6 +223,10 @@ export default function LeaderboardPage() {
                         0 0 60px rgba(234, 179, 8, 0.7),
                         0 0 90px rgba(234, 179, 8, 0.4);
           }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
         .animate-float { animation: float 3s ease-in-out infinite; }
         .animate-shimmer {
@@ -589,7 +700,28 @@ export default function LeaderboardPage() {
               </div>
 
               <div style={{ maxHeight: '800px', overflowY: 'auto', padding: 'clamp(12px, 3vw, 20px)' }}>
-                {restPlayers.map((player, idx) => (
+                {loading ? (
+                  // Loading skeleton
+                  <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+                    <div className="animate-glow" style={{
+                      width: '60px',
+                      height: '60px',
+                      margin: '0 auto 20px',
+                      borderRadius: '50%',
+                      border: '4px solid rgba(139, 92, 246, 0.3)',
+                      borderTopColor: '#a78bfa',
+                      animation: 'spin 1s linear infinite'
+                    }}></div>
+                    <p style={{ color: '#94a3b8', fontSize: '16px' }}>Loading leaderboard...</p>
+                  </div>
+                ) : restPlayers.length === 0 ? (
+                  // Empty state
+                  <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+                    <Trophy style={{ width: '60px', height: '60px', color: '#64748b', margin: '0 auto 20px' }} />
+                    <p style={{ color: '#94a3b8', fontSize: '16px' }}>No players yet. Be the first!</p>
+                  </div>
+                ) : (
+                  restPlayers.map((player, idx) => (
                   <div
                     key={player.rank}
                     className="animate-slide-in"
@@ -739,6 +871,7 @@ export default function LeaderboardPage() {
                     />
                   </div>
                 ))}
+              </div>
               </div>
             </div>
 
