@@ -920,8 +920,7 @@ export default function LobbyPage() {
                     >
                       Pro Tip:
                     </strong>{" "}
-                    Faster answers earn more points! The
-                    first 10 seconds give maximum points.
+                    🏆 £1000 Monthly Prize Most points. One champion !
                   </div>
                 </div>
               </div>
