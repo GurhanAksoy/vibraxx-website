@@ -912,15 +912,15 @@ export default function LobbyPage() {
                       marginBottom: "8px",
                     }}
                   >
-                    💡{" "}
+                    💰{" "}
                     <strong
                       style={{
                         color: "white",
                       }}
                     >
-                      Pro Tip:
+                      Monthly Prize:
                     </strong>{" "}
-                    🏆 £1000 Monthly Prize Most points. One champion !
+                    The player who earns the most points during the month wins £1000!
                   </div>
                 </div>
               </div>
