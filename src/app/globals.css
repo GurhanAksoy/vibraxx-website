@@ -1,4 +1,4 @@
-@tailwind base;
+﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -14,7 +14,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   overflow-x: hidden;
-  transition: background-color 0.3s ease-in-out; /* Sayfa geçişleri için yumuşak geçiş */
+  /* ❌ Sayfa geçişinde renk patlamasını önlemek için transition kaldırıldı */
 }
 
 /* ========== DESIGN TOKENS ========== */
@@ -40,6 +40,8 @@ body {
       radial-gradient(900px 500px at 100% 0%, var(--neon-pink), transparent);
     animation: neon-flicker 2.4s ease-in-out infinite alternate;
     pointer-events: none;
+    opacity: 0.9;
+    transition: opacity 0.6s ease;
   }
 
   @keyframes neon-flicker {
@@ -145,6 +147,7 @@ body {
     backdrop-filter: blur(18px);
     min-height: 120px;
     padding: 1.5rem;
+    will-change: transform, opacity;
   }
 
   @media (min-width: 640px) {
@@ -220,4 +223,15 @@ body {
       font-size: 12px;
     }
   }
+}
+
+/* ========== FIX: SSR beyaz ekran / yeşil flaş ========== */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: var(--c-bg, #020817);
+  z-index: -1;
+  opacity: 1;
+  transition: opacity 0.6s ease;
 }
