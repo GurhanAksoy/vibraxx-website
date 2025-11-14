@@ -90,7 +90,7 @@ export default function HomePage() {
           .single();
         
         if (data) {
-          const diff = Math.floor((new Date(data.start_time) - new Date()) / 1000);
+          const diff = Math.floor((new Date(data.start_time).getTime() - new Date().getTime()) / 1000);
           setNextRound(Math.max(0, diff));
         }
       } catch (error) {
