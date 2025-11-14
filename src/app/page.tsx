@@ -151,7 +151,7 @@ export default function HomePage() {
       try {
         const { data: daily } = await supabase
           .from('leaderboard')
-          .select('user_id, score, profiles(name)')
+          .select('user_id, score, profiles!inner(name)')
           .eq('period', 'daily')
           .order('score', { ascending: false })
           .limit(1)
@@ -159,7 +159,7 @@ export default function HomePage() {
 
         const { data: weekly } = await supabase
           .from('leaderboard')
-          .select('user_id, score, profiles(name)')
+          .select('user_id, score, profiles!inner(name)')
           .eq('period', 'weekly')
           .order('score', { ascending: false })
           .limit(1)
@@ -167,16 +167,16 @@ export default function HomePage() {
 
         const { data: monthly } = await supabase
           .from('leaderboard')
-          .select('user_id, score, profiles(name)')
+          .select('user_id, score, profiles!inner(name)')
           .eq('period', 'monthly')
           .order('score', { ascending: false })
           .limit(1)
           .single();
 
         setChampions([
-          { period: 'Daily', name: daily?.profiles?.name || 'TBA', score: daily?.score || 0, gradient: 'linear-gradient(135deg, #eab308, #f97316)', color: '#facc15' },
-          { period: 'Weekly', name: weekly?.profiles?.name || 'TBA', score: weekly?.score || 0, gradient: 'linear-gradient(135deg, #8b5cf6, #d946ef)', color: '#c084fc' },
-          { period: 'Monthly', name: monthly?.profiles?.name || 'TBA', score: monthly?.score || 0, gradient: 'linear-gradient(135deg, #3b82f6, #06b6d4)', color: '#22d3ee' }
+          { period: 'Daily', name: (daily?.profiles as any)?.name || 'TBA', score: daily?.score || 0, gradient: 'linear-gradient(135deg, #eab308, #f97316)', color: '#facc15' },
+          { period: 'Weekly', name: (weekly?.profiles as any)?.name || 'TBA', score: weekly?.score || 0, gradient: 'linear-gradient(135deg, #8b5cf6, #d946ef)', color: '#c084fc' },
+          { period: 'Monthly', name: (monthly?.profiles as any)?.name || 'TBA', score: monthly?.score || 0, gradient: 'linear-gradient(135deg, #3b82f6, #06b6d4)', color: '#22d3ee' }
         ]);
       } catch (error) {
         console.error('Error fetching champions:', error);
