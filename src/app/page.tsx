@@ -633,7 +633,7 @@ export default function HomePage() {
               }}>
                 <Trophy style={{ width: isMobile ? '18px' : '20px', height: isMobile ? '18px' : '20px', color: '#facc15' }} />
                 <span style={{ fontSize: isMobile ? '12px' : '16px', fontWeight: 700, color: '#fef08a' }}>
-                  £{prizePool?.amount?.toLocaleString() || '---'} MONTHLY GRAND PRIZE
+                  £{prizePool?.amount?.toLocaleString() || '1000'} MONTHLY GRAND PRIZE
                 </span>
               </div>
 
