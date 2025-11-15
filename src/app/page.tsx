@@ -43,14 +43,19 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    const fetchUserData = async () => {
+    let mounted = true;
+
+    const initAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        // Get current session
+        const { data: { session }, error } = await supabase.auth.getSession();
         
-        if (session?.user) {
+        if (error) throw error;
+        
+        if (session?.user && mounted) {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('rounds, is_over_18')
+            .select('rounds, is_over_18, name, email')
             .eq('id', session.user.id)
             .single();
           
@@ -58,29 +63,39 @@ export default function HomePage() {
           setUserRounds(profile?.rounds || 0);
         }
       } catch (error) {
-        console.error('Error fetching user:', error);
+        console.error('Error initializing auth:', error);
       }
     };
-    
-    fetchUserData();
 
+    initAuth();
+
+    // Listen to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
       if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('rounds, is_over_18')
-          .eq('id', session.user.id)
-          .single();
-        
-        setUser(session.user);
-        setUserRounds(profile?.rounds || 0);
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('rounds, is_over_18, name, email')
+            .eq('id', session.user.id)
+            .single();
+          
+          setUser(session.user);
+          setUserRounds(profile?.rounds || 0);
+        } catch (error) {
+          console.error('Error fetching profile:', error);
+        }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setUserRounds(0);
       }
     });
 
-    return () => subscription?.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription?.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -127,15 +142,24 @@ export default function HomePage() {
           supabase.from('leaderboard').select('user_id, score, profiles!inner(name)').eq('period', 'monthly').order('score', { ascending: false }).limit(1).single()
         ]);
 
-        setPrizePool(prizePoolRes.data);
-        setStats(statsRes.data);
-        setChampions([
+        if (prizePoolRes.data) setPrizePool(prizePoolRes.data);
+        if (statsRes.data) setStats(statsRes.data);
+        
+        const championsData = [
           { period: 'Daily', name: (dailyRes.data?.profiles as any)?.name || 'TBA', score: dailyRes.data?.score || 0, gradient: 'linear-gradient(135deg, #eab308, #f97316)', color: '#facc15' },
           { period: 'Weekly', name: (weeklyRes.data?.profiles as any)?.name || 'TBA', score: weeklyRes.data?.score || 0, gradient: 'linear-gradient(135deg, #8b5cf6, #d946ef)', color: '#c084fc' },
           { period: 'Monthly', name: (monthlyRes.data?.profiles as any)?.name || 'TBA', score: monthlyRes.data?.score || 0, gradient: 'linear-gradient(135deg, #3b82f6, #06b6d4)', color: '#22d3ee' }
-        ]);
+        ];
+        
+        setChampions(championsData);
       } catch (error) {
         console.error('Error fetching data:', error);
+        // Set default champions if fetch fails
+        setChampions([
+          { period: 'Daily', name: 'TBA', score: 0, gradient: 'linear-gradient(135deg, #eab308, #f97316)', color: '#facc15' },
+          { period: 'Weekly', name: 'TBA', score: 0, gradient: 'linear-gradient(135deg, #8b5cf6, #d946ef)', color: '#c084fc' },
+          { period: 'Monthly', name: 'TBA', score: 0, gradient: 'linear-gradient(135deg, #3b82f6, #06b6d4)', color: '#22d3ee' }
+        ]);
       }
     };
     
@@ -265,19 +289,119 @@ export default function HomePage() {
       <audio ref={audioRef} src="/sounds/vibraxx.mp3" loop />
       
       <style jsx global>{`
-        @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-20px); } }
-        @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
-        @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 20px rgba(234, 179, 8, 0.4); } 50% { box-shadow: 0 0 40px rgba(234, 179, 8, 0.8); } }
-        @keyframes neon-pulse { 
-          0%, 100% { box-shadow: 0 0 20px rgba(124, 58, 237, 0.6), 0 0 40px rgba(124, 58, 237, 0.4), inset 0 0 20px rgba(124, 58, 237, 0.2); } 
-          50% { box-shadow: 0 0 30px rgba(124, 58, 237, 0.8), 0 0 60px rgba(124, 58, 237, 0.6), inset 0 0 30px rgba(124, 58, 237, 0.3); } 
+        @keyframes float { 
+          0%, 100% { transform: translateY(0px); } 
+          50% { transform: translateY(-20px); } 
         }
+        @keyframes shimmer { 
+          0% { background-position: -200% center; } 
+          100% { background-position: 200% center; } 
+        }
+        @keyframes pulse-glow { 
+          0%, 100% { box-shadow: 0 0 20px rgba(234, 179, 8, 0.4), 0 0 40px rgba(234, 179, 8, 0.2); } 
+          50% { box-shadow: 0 0 40px rgba(234, 179, 8, 0.8), 0 0 80px rgba(234, 179, 8, 0.4); } 
+        }
+        @keyframes neon-pulse { 
+          0%, 100% { 
+            box-shadow: 0 0 20px rgba(124, 58, 237, 0.6), 
+                        0 0 40px rgba(124, 58, 237, 0.4), 
+                        inset 0 0 20px rgba(124, 58, 237, 0.2); 
+          } 
+          50% { 
+            box-shadow: 0 0 30px rgba(124, 58, 237, 0.8), 
+                        0 0 60px rgba(124, 58, 237, 0.6), 
+                        inset 0 0 30px rgba(124, 58, 237, 0.3); 
+          } 
+        }
+        @keyframes gradient-shift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        @keyframes slide-up {
+          from { 
+            opacity: 0; 
+            transform: translateY(30px); 
+          }
+          to { 
+            opacity: 1; 
+            transform: translateY(0); 
+          }
+        }
+        @keyframes scale-in {
+          from { 
+            opacity: 0; 
+            transform: scale(0.9); 
+          }
+          to { 
+            opacity: 1; 
+            transform: scale(1); 
+          }
+        }
+        @keyframes glow-pulse {
+          0%, 100% { 
+            filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.4)); 
+          }
+          50% { 
+            filter: drop-shadow(0 0 20px rgba(139, 92, 246, 0.8)); 
+          }
+        }
+        
         .animate-float { animation: float 6s ease-in-out infinite; }
         .animate-shimmer { background-size: 200% 100%; animation: shimmer 3s linear infinite; }
         .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
         .animate-neon-pulse { animation: neon-pulse 2s ease-in-out infinite; }
+        .animate-gradient { background-size: 200% 200%; animation: gradient-shift 8s ease infinite; }
+        .animate-slide-up { animation: slide-up 0.6s ease-out forwards; }
+        .animate-scale-in { animation: scale-in 0.5s ease-out forwards; }
+        .animate-glow-pulse { animation: glow-pulse 3s ease-in-out infinite; }
+        
+        .glass-card {
+          background: rgba(2, 8, 23, 0.6);
+          backdrop-filter: blur(20px) saturate(180%);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4),
+                      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+        
+        .glass-card:hover {
+          background: rgba(2, 8, 23, 0.7);
+          border-color: rgba(139, 92, 246, 0.3);
+          box-shadow: 0 12px 48px rgba(139, 92, 246, 0.3),
+                      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+          transform: translateY(-4px);
+        }
+        
+        .premium-card {
+          position: relative;
+          overflow: hidden;
+        }
+        
+        .premium-card::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+          transition: left 0.5s;
+        }
+        
+        .premium-card:hover::before {
+          left: 100%;
+        }
+        
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: system-ui, -apple-system, sans-serif; overflow-x: hidden; }
+        
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+          }
+        }
       `}</style>
 
       <div style={{
@@ -528,12 +652,23 @@ export default function HomePage() {
                 padding: isMobile ? '8px 16px' : '10px 24px', 
                 borderRadius: '9999px',
                 border: '2px solid rgba(234, 179, 8, 0.4)',
-                background: 'rgba(234, 179, 8, 0.1)',
+                background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.15), rgba(202, 138, 4, 0.1))',
+                backdropFilter: 'blur(10px)',
                 marginBottom: isMobile ? '20px' : '24px', 
-                boxShadow: '0 0 30px rgba(234, 179, 8, 0.3)'
-              }}>
+                boxShadow: '0 0 40px rgba(234, 179, 8, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3)',
+                transition: 'all 0.3s ease'
+              }}
+              className="animate-glow-pulse"
+              >
                 <Trophy style={{ width: isMobile ? '18px' : '20px', height: isMobile ? '18px' : '20px', color: '#facc15' }} />
-                <span style={{ fontSize: isMobile ? '12px' : '16px', fontWeight: 700, color: '#fef08a' }}>
+                <span style={{ 
+                  fontSize: isMobile ? '12px' : '16px', 
+                  fontWeight: 700, 
+                  background: 'linear-gradient(135deg, #fef08a, #facc15)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text'
+                }}>
                   £{prizePool?.amount || 1000} MONTHLY GRAND PRIZE
                 </span>
               </div>
@@ -546,13 +681,18 @@ export default function HomePage() {
                   gap: '8px',
                   padding: isMobile ? '8px 16px' : '10px 20px',
                   borderRadius: '12px',
-                  background: 'rgba(34, 197, 94, 0.1)',
+                  background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(16, 185, 129, 0.1))',
+                  backdropFilter: 'blur(10px)',
                   border: '1px solid rgba(34, 197, 94, 0.3)',
                   marginBottom: isMobile ? '16px' : '20px',
                   fontSize: isMobile ? '11px' : '13px',
                   fontWeight: 600,
-                  color: '#22c55e'
-                }}>
+                  color: '#22c55e',
+                  boxShadow: '0 4px 16px rgba(34, 197, 94, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  transition: 'all 0.3s ease'
+                }}
+                className="animate-scale-in"
+                >
                   <Sparkles style={{ width: '14px', height: '14px' }} />
                   <span>Cash prize unlocks at 2,000 active players • Currently {prizePool.current_participants} joined!</span>
                 </div>
@@ -688,14 +828,28 @@ export default function HomePage() {
             </div>
 
             {prizePool && (
-              <div className="animate-pulse-glow" style={{
+              <div className="animate-pulse-glow animate-slide-up" style={{
                 padding: isMobile ? '24px' : '48px',
                 borderRadius: '24px',
                 border: '2px solid rgba(234, 179, 8, 0.3)',
-                background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.1), rgba(202, 138, 4, 0.05))',
-                backdropFilter: 'blur(20px)',
-                marginBottom: isMobile ? '40px' : '60px'
+                background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.15), rgba(202, 138, 4, 0.05))',
+                backdropFilter: 'blur(20px) saturate(180%)',
+                marginBottom: isMobile ? '40px' : '60px',
+                boxShadow: '0 12px 48px rgba(234, 179, 8, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                position: 'relative',
+                overflow: 'hidden'
               }}>
+                {/* Animated gradient overlay */}
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.1), transparent, rgba(234, 179, 8, 0.05))',
+                  opacity: 0.5,
+                  pointerEvents: 'none'
+                }} className="animate-gradient" />
                 <div style={{ textAlign: 'center', marginBottom: '32px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '16px' }}>
                     <Award style={{ width: isMobile ? '32px' : '48px', height: isMobile ? '32px' : '48px', color: '#facc15' }} />
@@ -783,20 +937,31 @@ export default function HomePage() {
                 marginBottom: isMobile ? '40px' : '60px'
               }}>
                 {statsData.map((stat, i) => (
-                  <div key={i} style={{
-                    padding: isMobile ? '24px 20px' : '32px',
-                    borderRadius: '20px',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    background: 'rgba(2, 8, 23, 0.8)',
-                    backdropFilter: 'blur(20px)',
-                    textAlign: 'center',
-                    transition: 'transform 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
-                  onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                  <div key={i} 
+                    className="glass-card premium-card animate-slide-up"
+                    style={{
+                      padding: isMobile ? '24px 20px' : '32px',
+                      borderRadius: '20px',
+                      textAlign: 'center',
+                      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                      animationDelay: `${i * 0.1}s`,
+                      willChange: 'transform'
+                    }}
                   >
-                    <stat.icon style={{ width: isMobile ? '28px' : '32px', height: isMobile ? '28px' : '32px', color: stat.color, margin: '0 auto 16px' }} />
-                    <div style={{ fontSize: isMobile ? '32px' : '36px', fontWeight: 900, color: stat.color, marginBottom: '8px' }}>
+                    <stat.icon style={{ 
+                      width: isMobile ? '28px' : '32px', 
+                      height: isMobile ? '28px' : '32px', 
+                      color: stat.color, 
+                      margin: '0 auto 16px',
+                      filter: `drop-shadow(0 0 10px ${stat.color}80)`
+                    }} />
+                    <div style={{ 
+                      fontSize: isMobile ? '32px' : '36px', 
+                      fontWeight: 900, 
+                      color: stat.color, 
+                      marginBottom: '8px',
+                      textShadow: `0 0 20px ${stat.color}60`
+                    }}>
                       {stat.value}
                     </div>
                     <div style={{ fontSize: isMobile ? '14px' : '15px', color: '#94a3b8' }}>
@@ -819,7 +984,12 @@ export default function HomePage() {
                   gap: '12px',
                   flexWrap: 'wrap'
                 }}>
-                  <Crown style={{ width: isMobile ? '28px' : '32px', height: isMobile ? '28px' : '32px', color: '#facc15' }} />
+                  <Crown style={{ 
+                    width: isMobile ? '28px' : '32px', 
+                    height: isMobile ? '28px' : '32px', 
+                    color: '#facc15',
+                    filter: 'drop-shadow(0 0 10px #facc15)'
+                  }} />
                   <span>Current Champions</span>
                 </h2>
 
@@ -829,17 +999,16 @@ export default function HomePage() {
                   gap: isMobile ? '16px' : '24px'
                 }}>
                   {champions.map((champ, i) => (
-                    <div key={i} style={{
-                      padding: isMobile ? '24px 20px' : '32px',
-                      borderRadius: '20px',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      background: 'rgba(2, 8, 23, 0.8)',
-                      backdropFilter: 'blur(20px)',
-                      textAlign: 'center',
-                      transition: 'transform 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
-                    onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                    <div key={i}
+                      className="glass-card premium-card animate-slide-up"
+                      style={{
+                        padding: isMobile ? '24px 20px' : '32px',
+                        borderRadius: '20px',
+                        textAlign: 'center',
+                        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                        animationDelay: `${i * 0.15}s`,
+                        willChange: 'transform'
+                      }}
                     >
                       <div style={{
                         width: isMobile ? '64px' : '72px', 
@@ -850,8 +1019,11 @@ export default function HomePage() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: `0 0 30px ${champ.color}40`
-                      }}>
+                        boxShadow: `0 0 30px ${champ.color}60, 0 8px 24px rgba(0, 0, 0, 0.3)`,
+                        transition: 'all 0.3s ease'
+                      }}
+                      className="animate-scale-in"
+                      >
                         <Crown style={{ width: isMobile ? '32px' : '36px', height: isMobile ? '32px' : '36px', color: 'white' }} />
                       </div>
                       <div style={{
@@ -864,10 +1036,20 @@ export default function HomePage() {
                       }}>
                         {champ.period} Champion
                       </div>
-                      <div style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: 700, marginBottom: '8px' }}>
+                      <div style={{ 
+                        fontSize: isMobile ? '18px' : '20px', 
+                        fontWeight: 700, 
+                        marginBottom: '8px',
+                        color: 'white'
+                      }}>
                         {champ.name}
                       </div>
-                      <div style={{ fontSize: isMobile ? '24px' : '28px', fontWeight: 900, color: champ.color }}>
+                      <div style={{ 
+                        fontSize: isMobile ? '24px' : '28px', 
+                        fontWeight: 900, 
+                        color: champ.color,
+                        textShadow: `0 0 20px ${champ.color}60`
+                      }}>
                         {champ.score.toLocaleString()} pts
                       </div>
                     </div>
