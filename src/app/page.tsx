@@ -2,15 +2,32 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
 import { 
   Crown, Trophy, Zap, Play, Volume2, VolumeX, Sparkles, Globe,
   User, CreditCard, Award, Gift, Check, AlertCircle
 } from "lucide-react";
 
+// Create Supabase client with proper cookie handling
+const createSupabaseClient = () => {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+    {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+        storageKey: 'vibraxx-auth-token',
+      }
+    }
+  );
+};
+
 export default function HomePage() {
   const router = useRouter();
-  const supabase = useMemo(() => createClientComponentClient(), []);
+  const supabase = useMemo(() => createSupabaseClient(), []);
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [nextRound, setNextRound] = useState(null);
@@ -334,6 +351,16 @@ export default function HomePage() {
           }
           50% { 
             filter: drop-shadow(0 0 20px rgba(139, 92, 246, 0.8)); 
+          }
+        }
+        @keyframes pulse {
+          0%, 100% { 
+            transform: scale(1); 
+            opacity: 1; 
+          }
+          50% { 
+            transform: scale(1.02); 
+            opacity: 0.95; 
           }
         }
         
@@ -840,29 +867,63 @@ export default function HomePage() {
                   opacity: 0.5,
                   pointerEvents: 'none'
                 }} className="animate-gradient" />
-                <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                <div style={{ textAlign: 'center', marginBottom: '32px', position: 'relative', zIndex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '16px' }}>
                     <Award style={{ width: isMobile ? '32px' : '48px', height: isMobile ? '32px' : '48px', color: '#facc15' }} />
                     <h2 style={{ fontSize: isMobile ? '24px' : '36px', fontWeight: 900, color: '#fef08a' }}>Monthly Rewards</h2>
                   </div>
-                  <p style={{ fontSize: isMobile ? '13px' : '16px', color: '#cbd5e1', maxWidth: '800px', margin: '0 auto', marginBottom: '12px' }}>
+                  <p style={{ fontSize: isMobile ? '13px' : '16px', color: '#cbd5e1', maxWidth: '800px', margin: '0 auto', marginBottom: '20px' }}>
                     Test your knowledge and earn rewards. Top performers win prizes!
                   </p>
+                  
+                  {/* Cash Prize Activation Notice */}
                   {prizePool && prizePool.current_participants < prizePool.required_participants && (
                     <div style={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '8px',
-                      padding: '8px 16px',
-                      borderRadius: '12px',
-                      background: 'rgba(239, 68, 68, 0.1)',
-                      border: '1px solid rgba(239, 68, 68, 0.3)',
-                      fontSize: isMobile ? '12px' : '14px',
-                      fontWeight: 600,
-                      color: '#fca5a5'
+                      gap: '10px',
+                      padding: isMobile ? '12px 20px' : '16px 32px',
+                      borderRadius: '16px',
+                      background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(220, 38, 38, 0.15))',
+                      backdropFilter: 'blur(10px)',
+                      border: '2px solid rgba(239, 68, 68, 0.4)',
+                      fontSize: isMobile ? '13px' : '15px',
+                      fontWeight: 700,
+                      color: '#fca5a5',
+                      boxShadow: '0 8px 32px rgba(239, 68, 68, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                      animation: 'pulse 2s ease-in-out infinite',
+                      maxWidth: '100%',
+                      textAlign: 'center'
                     }}>
-                      <AlertCircle style={{ width: '16px', height: '16px' }} />
-                      <span>💰 Cash prize activates when we reach 2,000 active players</span>
+                      <AlertCircle style={{ width: isMobile ? '20px' : '24px', height: isMobile ? '20px' : '24px', flexShrink: 0 }} />
+                      <span style={{ lineHeight: 1.5 }}>
+                        💰 <strong>Cash Prize Unlocks</strong> when we reach <strong>2,000 active players</strong>
+                        <br />
+                        <span style={{ fontSize: isMobile ? '11px' : '13px', opacity: 0.9 }}>
+                          Currently {prizePool.current_participants} joined • {prizePool.required_participants - prizePool.current_participants} more needed!
+                        </span>
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Cash Prize Activated */}
+                  {prizePool && prizePool.current_participants >= prizePool.required_participants && (
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: isMobile ? '12px 20px' : '16px 32px',
+                      borderRadius: '16px',
+                      background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(22, 163, 74, 0.15))',
+                      backdropFilter: 'blur(10px)',
+                      border: '2px solid rgba(34, 197, 94, 0.4)',
+                      fontSize: isMobile ? '13px' : '15px',
+                      fontWeight: 700,
+                      color: '#86efac',
+                      boxShadow: '0 8px 32px rgba(34, 197, 94, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+                    }}>
+                      <Check style={{ width: isMobile ? '20px' : '24px', height: isMobile ? '20px' : '24px', flexShrink: 0 }} />
+                      <span>🎉 Cash Prize <strong>ACTIVATED!</strong> {prizePool.current_participants} players joined!</span>
                     </div>
                   )}
                 </div>
