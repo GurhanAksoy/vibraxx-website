@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from '@supabase/supabase-js';
 import { 
@@ -9,8 +9,15 @@ import {
 } from "lucide-react";
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  }
 );
 
 export default function HomePage() {
@@ -38,15 +45,16 @@ export default function HomePage() {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (authUser) {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
           const { data: profile } = await supabase
             .from('profiles')
             .select('rounds, is_over_18')
-            .eq('id', authUser.id)
+            .eq('id', session.user.id)
             .single();
           
-          setUser(authUser);
+          setUser(session.user);
           setUserRounds(profile?.rounds || 0);
         }
       } catch (error) {
@@ -56,9 +64,8 @@ export default function HomePage() {
     
     fetchUserData();
 
-    // Listen to auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
         const { data: profile } = await supabase
           .from('profiles')
           .select('rounds, is_over_18')
@@ -73,9 +80,7 @@ export default function HomePage() {
       }
     });
 
-    return () => {
-      subscription?.unsubscribe();
-    };
+    return () => subscription?.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -112,118 +117,63 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    const fetchPrizePool = async () => {
+    const fetchData = async () => {
       try {
-        const { data } = await supabase
-          .from('prize_pools')
-          .select('*')
-          .eq('active', true)
-          .single();
-        
-        setPrizePool(data);
-      } catch (error) {
-        console.error('Error fetching prize pool:', error);
-      }
-    };
-    
-    fetchPrizePool();
-  }, []);
+        const [prizePoolRes, statsRes, dailyRes, weeklyRes, monthlyRes] = await Promise.all([
+          supabase.from('prize_pools').select('*').eq('active', true).single(),
+          supabase.from('platform_stats').select('*').single(),
+          supabase.from('leaderboard').select('user_id, score, profiles!inner(name)').eq('period', 'daily').order('score', { ascending: false }).limit(1).single(),
+          supabase.from('leaderboard').select('user_id, score, profiles!inner(name)').eq('period', 'weekly').order('score', { ascending: false }).limit(1).single(),
+          supabase.from('leaderboard').select('user_id, score, profiles!inner(name)').eq('period', 'monthly').order('score', { ascending: false }).limit(1).single()
+        ]);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const { data } = await supabase
-          .from('platform_stats')
-          .select('*')
-          .single();
-        
-        setStats(data);
-      } catch (error) {
-        console.error('Error fetching stats:', error);
-      }
-    };
-    
-    fetchStats();
-  }, []);
-
-  useEffect(() => {
-    const fetchChampions = async () => {
-      try {
-        const { data: daily } = await supabase
-          .from('leaderboard')
-          .select('user_id, score, profiles!inner(name)')
-          .eq('period', 'daily')
-          .order('score', { ascending: false })
-          .limit(1)
-          .single();
-
-        const { data: weekly } = await supabase
-          .from('leaderboard')
-          .select('user_id, score, profiles!inner(name)')
-          .eq('period', 'weekly')
-          .order('score', { ascending: false })
-          .limit(1)
-          .single();
-
-        const { data: monthly } = await supabase
-          .from('leaderboard')
-          .select('user_id, score, profiles!inner(name)')
-          .eq('period', 'monthly')
-          .order('score', { ascending: false })
-          .limit(1)
-          .single();
-
+        setPrizePool(prizePoolRes.data);
+        setStats(statsRes.data);
         setChampions([
-          { period: 'Daily', name: (daily?.profiles as any)?.name || 'TBA', score: daily?.score || 0, gradient: 'linear-gradient(135deg, #eab308, #f97316)', color: '#facc15' },
-          { period: 'Weekly', name: (weekly?.profiles as any)?.name || 'TBA', score: weekly?.score || 0, gradient: 'linear-gradient(135deg, #8b5cf6, #d946ef)', color: '#c084fc' },
-          { period: 'Monthly', name: (monthly?.profiles as any)?.name || 'TBA', score: monthly?.score || 0, gradient: 'linear-gradient(135deg, #3b82f6, #06b6d4)', color: '#22d3ee' }
+          { period: 'Daily', name: (dailyRes.data?.profiles as any)?.name || 'TBA', score: dailyRes.data?.score || 0, gradient: 'linear-gradient(135deg, #eab308, #f97316)', color: '#facc15' },
+          { period: 'Weekly', name: (weeklyRes.data?.profiles as any)?.name || 'TBA', score: weeklyRes.data?.score || 0, gradient: 'linear-gradient(135deg, #8b5cf6, #d946ef)', color: '#c084fc' },
+          { period: 'Monthly', name: (monthlyRes.data?.profiles as any)?.name || 'TBA', score: monthlyRes.data?.score || 0, gradient: 'linear-gradient(135deg, #3b82f6, #06b6d4)', color: '#22d3ee' }
         ]);
       } catch (error) {
-        console.error('Error fetching champions:', error);
+        console.error('Error fetching data:', error);
       }
     };
     
-    fetchChampions();
+    fetchData();
   }, []);
 
-  const toggleMusic = () => {
+  const toggleMusic = useCallback(() => {
     if (audioRef.current) {
       if (isPlaying) {
         audioRef.current.pause();
       } else {
-        audioRef.current.play().catch(() => {
-          setIsPlaying(false);
-        });
+        audioRef.current.play().catch(() => setIsPlaying(false));
       }
       setIsPlaying(!isPlaying);
     }
-  };
+  }, [isPlaying]);
 
-  const formatTime = (seconds) => {
+  const formatTime = useCallback((seconds) => {
     if (seconds === null) return '--:--';
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m}:${s.toString().padStart(2, '0')}`;
-  };
+  }, []);
 
-  const navigate = (path) => router.push(path);
+  const navigate = useCallback((path) => router.push(path), [router]);
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleSignIn = useCallback(async () => {
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`
-        }
+        options: { redirectTo: `${window.location.origin}/auth/callback` }
       });
-      
-      if (error) throw error;
     } catch (error) {
       console.error('Error signing in with Google:', error);
     }
-  };
+  }, []);
 
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
     try {
       await supabase.auth.signOut();
       setUser(null);
@@ -232,19 +182,17 @@ export default function HomePage() {
     } catch (error) {
       console.error('Error signing out:', error);
     }
-  };
+  }, [navigate]);
 
-  const handleJoinQuiz = async () => {
+  const handleJoinQuiz = useCallback(async () => {
     if (!user) {
       await handleGoogleSignIn();
       return;
     }
-
     if (userRounds <= 0) {
       navigate('/buy');
       return;
     }
-
     try {
       const { data: profile } = await supabase
         .from('profiles')
@@ -261,39 +209,56 @@ export default function HomePage() {
       console.error('Error checking age:', error);
       setShow18Modal(true);
     }
-  };
+  }, [user, userRounds, handleGoogleSignIn, navigate]);
 
-  const confirm18Plus = async () => {
+  const confirm18Plus = useCallback(async () => {
     try {
-      await supabase
-        .from('profiles')
-        .update({ is_over_18: true })
-        .eq('id', user.id);
-      
+      await supabase.from('profiles').update({ is_over_18: true }).eq('id', user.id);
       setShow18Modal(false);
       navigate('/lobby');
     } catch (error) {
       console.error('Error updating age verification:', error);
     }
-  };
+  }, [user, navigate]);
 
-  const handleFreeQuiz = async () => {
+  const handleFreeQuiz = useCallback(async () => {
     if (!user) {
       await handleGoogleSignIn();
       return;
     }
     navigate('/free');
-  };
+  }, [user, handleGoogleSignIn, navigate]);
 
-  const handleBuyBundle = async () => {
+  const handleBuyBundle = useCallback(async () => {
     if (!user) {
       await handleGoogleSignIn();
       return;
     }
     navigate('/buy');
-  };
+  }, [user, handleGoogleSignIn, navigate]);
 
-  const prizeProgress = prizePool ? (prizePool.current_participants / prizePool.required_participants) * 100 : 0;
+  const prizeProgress = useMemo(() => 
+    prizePool ? (prizePool.current_participants / prizePool.required_participants) * 100 : 0,
+    [prizePool]
+  );
+
+  const statsData = useMemo(() => stats ? [
+    { icon: Globe, value: `${Math.floor(stats.total_players / 1000)}K+`, label: 'Active Players', color: '#a78bfa' },
+    { icon: Sparkles, value: `${(stats.questions_answered / 1000000).toFixed(1)}M+`, label: 'Questions Answered', color: '#f0abfc' },
+    { icon: Zap, value: `${stats.daily_rounds}/day`, label: 'Live Rounds', color: '#22d3ee' }
+  ] : [], [stats]);
+
+  const prizeRules = useMemo(() => [
+    { icon: Check, title: 'Minimum 2000 Players', desc: 'Rewards activate when we reach 2,000 active participants in the monthly competition.', bg: 'green' },
+    { icon: Award, title: 'Rollover System', desc: 'If the participation target isn\'t met, only the cash prize is disabled; round rewards are still awarded as usual', bg: 'purple' },
+    { icon: Crown, title: 'Top 3 Performers', desc: '1st place wins £1000, 2nd wins 30 rounds, 3rd wins 10 rounds!', bg: 'yellow' }
+  ], []);
+
+  const prizeList = useMemo(() => [
+    { place: '1st', reward: '£1,000 Cash Prize', icon: '🏆', color: '#facc15' },
+    { place: '2nd', reward: '30 Free Rounds', icon: '🥈', color: '#c0c0c0' },
+    { place: '3rd', reward: '10 Free Rounds', icon: '🥉', color: '#cd7f32' }
+  ], []);
 
   return (
     <>
@@ -307,12 +272,10 @@ export default function HomePage() {
           0%, 100% { box-shadow: 0 0 20px rgba(124, 58, 237, 0.6), 0 0 40px rgba(124, 58, 237, 0.4), inset 0 0 20px rgba(124, 58, 237, 0.2); } 
           50% { box-shadow: 0 0 30px rgba(124, 58, 237, 0.8), 0 0 60px rgba(124, 58, 237, 0.6), inset 0 0 30px rgba(124, 58, 237, 0.3); } 
         }
-        
         .animate-float { animation: float 6s ease-in-out infinite; }
         .animate-shimmer { background-size: 200% 100%; animation: shimmer 3s linear infinite; }
         .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
         .animate-neon-pulse { animation: neon-pulse 2s ease-in-out infinite; }
-
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: system-ui, -apple-system, sans-serif; overflow-x: hidden; }
       `}</style>
@@ -324,7 +287,6 @@ export default function HomePage() {
         position: 'relative',
         overflow: 'hidden'
       }}>
-        {/* Animated Background */}
         <div className="animate-float" style={{
           position: 'fixed', top: '5%', left: '-5%',
           width: '400px', height: '400px', borderRadius: '50%',
@@ -344,7 +306,6 @@ export default function HomePage() {
           opacity: 0.1, filter: 'blur(80px)', zIndex: 0, animationDelay: '1s'
         }} />
 
-        {/* Header */}
         <header style={{
           position: 'sticky', top: 0, zIndex: 50,
           borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
@@ -362,16 +323,7 @@ export default function HomePage() {
               padding: '8px 0'
             }}>
               
-              {/* Logo */}
-              <div 
-                onClick={() => navigate('/')}
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '16px',
-                  cursor: 'pointer'
-                }}
-              >
+              <div onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer' }}>
                 <div className="animate-neon-pulse" style={{
                   width: isMobile ? '80px' : '100px', 
                   height: isMobile ? '80px' : '100px', 
@@ -383,30 +335,13 @@ export default function HomePage() {
                   justifyContent: 'center',
                   padding: '10px'
                 }}>
-                  <img 
-                    src="/images/logo.png" 
-                    alt="VibraXX Logo" 
-                    style={{ 
-                      width: '100%', 
-                      height: '100%', 
-                      objectFit: 'contain' 
-                    }} 
-                  />
+                  <img src="/images/logo.png" alt="VibraXX Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 </div>
-                <div>
-                  <div style={{ 
-                    fontSize: isMobile ? '11px' : '14px', 
-                    color: '#94a3b8', 
-                    textTransform: 'uppercase', 
-                    letterSpacing: '0.15em',
-                    fontWeight: 700
-                  }}>
-                    LIVE QUIZ ARENA
-                  </div>
+                <div style={{ fontSize: isMobile ? '11px' : '14px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.15em', fontWeight: 700 }}>
+                  LIVE QUIZ ARENA
                 </div>
               </div>
 
-              {/* Actions */}
               <div style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
@@ -415,50 +350,40 @@ export default function HomePage() {
                 width: isMobile ? '100%' : 'auto',
                 justifyContent: isMobile ? 'flex-end' : 'flex-start'
               }}>
-                {/* Music */}
-                <button
-                  onClick={toggleMusic}
-                  style={{
-                    padding: '10px', 
-                    borderRadius: '12px',
-                    border: '1px solid rgba(139, 92, 246, 0.3)',
-                    background: isPlaying ? 'rgba(139, 92, 246, 0.2)' : 'transparent',
-                    cursor: 'pointer', 
-                    transition: 'all 0.3s',
-                    minWidth: '40px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  {isPlaying ? 
-                    <Volume2 style={{ width: '18px', height: '18px', color: '#a78bfa' }} /> : 
-                    <VolumeX style={{ width: '18px', height: '18px', color: '#64748b' }} />
-                  }
+                <button onClick={toggleMusic} style={{
+                  padding: '10px', 
+                  borderRadius: '12px',
+                  border: '1px solid rgba(139, 92, 246, 0.3)',
+                  background: isPlaying ? 'rgba(139, 92, 246, 0.2)' : 'transparent',
+                  cursor: 'pointer', 
+                  transition: 'all 0.3s',
+                  minWidth: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {isPlaying ? <Volume2 style={{ width: '18px', height: '18px', color: '#a78bfa' }} /> : <VolumeX style={{ width: '18px', height: '18px', color: '#64748b' }} />}
                 </button>
 
-                {/* Leaderboard */}
-                <button
-                  onClick={() => navigate('/leaderboard')}
-                  style={{
-                    padding: isMobile ? '10px' : '10px 18px', 
-                    borderRadius: '12px',
-                    border: '1px solid rgba(139, 92, 246, 0.3)',
-                    background: 'transparent', 
-                    color: 'white',
-                    fontSize: '14px', 
-                    fontWeight: 600, 
-                    cursor: 'pointer',
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '8px',
-                    transition: 'all 0.3s',
-                    whiteSpace: 'nowrap',
-                    minWidth: isMobile ? '40px' : 'auto',
-                    justifyContent: 'center'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                <button onClick={() => navigate('/leaderboard')} style={{
+                  padding: isMobile ? '10px' : '10px 18px', 
+                  borderRadius: '12px',
+                  border: '1px solid rgba(139, 92, 246, 0.3)',
+                  background: 'transparent', 
+                  color: 'white',
+                  fontSize: '14px', 
+                  fontWeight: 600, 
+                  cursor: 'pointer',
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px',
+                  transition: 'all 0.3s',
+                  whiteSpace: 'nowrap',
+                  minWidth: isMobile ? '40px' : 'auto',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                 >
                   <Trophy style={{ width: '18px', height: '18px', color: '#a78bfa' }} />
                   {!isMobile && <span>Leaderboard</span>}
@@ -466,7 +391,6 @@ export default function HomePage() {
 
                 {user ? (
                   <>
-                    {/* Rounds Display */}
                     <div style={{
                       padding: isMobile ? '10px 12px' : '10px 16px',
                       borderRadius: '12px',
@@ -478,59 +402,46 @@ export default function HomePage() {
                       minWidth: isMobile ? 'auto' : 'auto'
                     }}>
                       <Zap style={{ width: '16px', height: '16px', color: '#22c55e' }} />
-                      <span style={{ 
-                        fontSize: '14px', 
-                        fontWeight: 700, 
-                        color: '#22c55e' 
-                      }}>
-                        {userRounds}
-                      </span>
+                      <span style={{ fontSize: '14px', fontWeight: 700, color: '#22c55e' }}>{userRounds}</span>
                     </div>
 
-                    {/* Profile */}
-                    <button
-                      onClick={() => navigate('/profile')}
-                      style={{
-                        padding: isMobile ? '10px' : '10px 18px', 
-                        borderRadius: '12px',
-                        border: '1px solid rgba(139, 92, 246, 0.3)',
-                        background: 'rgba(139, 92, 246, 0.15)', 
-                        color: 'white',
-                        fontSize: '14px', 
-                        fontWeight: 600, 
-                        cursor: 'pointer',
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '8px',
-                        transition: 'all 0.3s',
-                        whiteSpace: 'nowrap',
-                        minWidth: isMobile ? '40px' : 'auto',
-                        justifyContent: 'center'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(139, 92, 246, 0.25)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)'}
+                    <button onClick={() => navigate('/profile')} style={{
+                      padding: isMobile ? '10px' : '10px 18px', 
+                      borderRadius: '12px',
+                      border: '1px solid rgba(139, 92, 246, 0.3)',
+                      background: 'rgba(139, 92, 246, 0.15)', 
+                      color: 'white',
+                      fontSize: '14px', 
+                      fontWeight: 600, 
+                      cursor: 'pointer',
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px',
+                      transition: 'all 0.3s',
+                      whiteSpace: 'nowrap',
+                      minWidth: isMobile ? '40px' : 'auto',
+                      justifyContent: 'center'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(139, 92, 246, 0.25)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)'}
                     >
                       <User style={{ width: '18px', height: '18px', color: '#a78bfa' }} />
                       {!isMobile && <span>Profile</span>}
                     </button>
 
-                    {/* Sign Out */}
-                    <button
-                      onClick={handleSignOut}
-                      style={{
-                        position: 'relative', 
-                        padding: isMobile ? '10px 16px' : '10px 18px', 
-                        borderRadius: '12px',
-                        border: 'none', 
-                        background: 'transparent', 
-                        color: 'white',
-                        fontSize: '13px', 
-                        fontWeight: 600, 
-                        cursor: 'pointer',
-                        overflow: 'hidden',
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
+                    <button onClick={handleSignOut} style={{
+                      position: 'relative', 
+                      padding: isMobile ? '10px 16px' : '10px 18px', 
+                      borderRadius: '12px',
+                      border: 'none', 
+                      background: 'transparent', 
+                      color: 'white',
+                      fontSize: '13px', 
+                      fontWeight: 600, 
+                      cursor: 'pointer',
+                      overflow: 'hidden',
+                      whiteSpace: 'nowrap'
+                    }}>
                       <div className="animate-shimmer" style={{
                         position: 'absolute', inset: 0,
                         background: 'linear-gradient(90deg, #ef4444, #f97316, #ef4444)'
@@ -539,27 +450,25 @@ export default function HomePage() {
                     </button>
                   </>
                 ) : (
-                  <button
-                    onClick={handleGoogleSignIn}
-                    style={{
-                      position: 'relative', 
-                      padding: isMobile ? '12px 18px' : '12px 24px', 
-                      borderRadius: '12px',
-                      border: 'none', 
-                      background: 'white', 
-                      color: '#1f2937',
-                      fontSize: isMobile ? '14px' : '15px', 
-                      fontWeight: 700, 
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      whiteSpace: 'nowrap',
-                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
-                      transition: 'transform 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                  <button onClick={handleGoogleSignIn} style={{
+                    position: 'relative', 
+                    padding: isMobile ? '12px 18px' : '12px 24px', 
+                    borderRadius: '12px',
+                    border: 'none', 
+                    background: 'white', 
+                    color: '#1f2937',
+                    fontSize: isMobile ? '14px' : '15px', 
+                    fontWeight: 700, 
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
+                    transition: 'transform 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                   >
                     <svg width="20" height="20" viewBox="0 0 18 18">
                       <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
@@ -575,7 +484,6 @@ export default function HomePage() {
           </div>
         </header>
 
-        {/* Live Banner */}
         <div style={{
           borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
           background: 'linear-gradient(90deg, rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.08))',
@@ -609,17 +517,10 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Main Content */}
-        <main style={{ 
-          position: 'relative', 
-          zIndex: 10, 
-          padding: isMobile ? '30px 16px' : '60px 24px' 
-        }}>
+        <main style={{ position: 'relative', zIndex: 10, padding: isMobile ? '30px 16px' : '60px 24px' }}>
           <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
             
-            {/* Hero Section */}
             <div style={{ textAlign: 'center', marginBottom: isMobile ? '40px' : '80px' }}>
-              {/* Prize Badge */}
               <div style={{
                 display: 'inline-flex', 
                 alignItems: 'center', 
@@ -633,11 +534,30 @@ export default function HomePage() {
               }}>
                 <Trophy style={{ width: isMobile ? '18px' : '20px', height: isMobile ? '18px' : '20px', color: '#facc15' }} />
                 <span style={{ fontSize: isMobile ? '12px' : '16px', fontWeight: 700, color: '#fef08a' }}>
-                  £{prizePool?.amount?.toLocaleString() || '1000'} MONTHLY GRAND PRIZE
+                  £{prizePool?.amount || 1000} MONTHLY GRAND PRIZE
                 </span>
               </div>
 
-              {/* Title */}
+              {/* Cash Prize Unlock Notice */}
+              {prizePool && prizePool.current_participants < prizePool.required_participants && (
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: isMobile ? '8px 16px' : '10px 20px',
+                  borderRadius: '12px',
+                  background: 'rgba(34, 197, 94, 0.1)',
+                  border: '1px solid rgba(34, 197, 94, 0.3)',
+                  marginBottom: isMobile ? '16px' : '20px',
+                  fontSize: isMobile ? '11px' : '13px',
+                  fontWeight: 600,
+                  color: '#22c55e'
+                }}>
+                  <Sparkles style={{ width: '14px', height: '14px' }} />
+                  <span>Cash prize unlocks at 2,000 active players • Currently {prizePool.current_participants} joined!</span>
+                </div>
+              )}
+
               <h1 style={{
                 fontSize: isMobile ? '28px' : '64px',
                 fontWeight: 900, 
@@ -668,37 +588,28 @@ export default function HomePage() {
                 Compete worldwide. Show your knowledge. Earn rewards!
               </p>
 
-              {/* CTA Buttons */}
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: '16px', 
-                alignItems: 'center', 
-                marginBottom: '32px' 
-              }}>
-                <button 
-                  onClick={handleJoinQuiz}
-                  style={{
-                    position: 'relative', 
-                    padding: isMobile ? '14px 28px' : '20px 48px',
-                    borderRadius: '16px', 
-                    border: 'none', 
-                    cursor: 'pointer',
-                    fontSize: isMobile ? '15px' : '18px', 
-                    fontWeight: 700,
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '12px',
-                    overflow: 'hidden', 
-                    boxShadow: '0 20px 60px -10px rgba(139, 92, 246, 0.6)',
-                    transition: 'transform 0.2s', 
-                    color: 'white',
-                    width: isMobile ? '100%' : 'auto',
-                    maxWidth: isMobile ? '350px' : 'none',
-                    justifyContent: 'center'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-                  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', marginBottom: '32px' }}>
+                <button onClick={handleJoinQuiz} style={{
+                  position: 'relative', 
+                  padding: isMobile ? '14px 28px' : '20px 48px',
+                  borderRadius: '16px', 
+                  border: 'none', 
+                  cursor: 'pointer',
+                  fontSize: isMobile ? '15px' : '18px', 
+                  fontWeight: 700,
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '12px',
+                  overflow: 'hidden', 
+                  boxShadow: '0 20px 60px -10px rgba(139, 92, 246, 0.6)',
+                  transition: 'transform 0.2s', 
+                  color: 'white',
+                  width: isMobile ? '100%' : 'auto',
+                  maxWidth: isMobile ? '350px' : 'none',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                 >
                   <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, #7c3aed, #d946ef)' }} />
                   <Play style={{ position: 'relative', zIndex: 10, width: '24px', height: '24px' }} />
@@ -715,49 +626,44 @@ export default function HomePage() {
                   width: '100%',
                   maxWidth: isMobile ? '350px' : 'none'
                 }}>
-                  <button 
-                    onClick={handleFreeQuiz}
-                    style={{
-                      padding: isMobile ? '10px 16px' : '14px 32px',
-                      borderRadius: '12px', 
-                      border: '1px solid rgba(34, 197, 94, 0.3)',
-                      background: 'rgba(34, 197, 94, 0.1)', 
-                      color: '#22c55e',
-                      fontSize: isMobile ? '13px' : '16px', 
-                      fontWeight: 600,
-                      cursor: 'pointer', 
-                      transition: 'all 0.2s',
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '8px',
-                      flex: isMobile ? '1' : 'none'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(34, 197, 94, 0.2)'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(34, 197, 94, 0.1)'}
+                  <button onClick={handleFreeQuiz} style={{
+                    padding: isMobile ? '10px 16px' : '14px 32px',
+                    borderRadius: '12px', 
+                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                    background: 'rgba(34, 197, 94, 0.1)', 
+                    color: '#22c55e',
+                    fontSize: isMobile ? '13px' : '16px', 
+                    fontWeight: 600,
+                    cursor: 'pointer', 
+                    transition: 'all 0.2s',
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '8px',
+                    flex: isMobile ? '1' : 'none'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(34, 197, 94, 0.2)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(34, 197, 94, 0.1)'}
                   >
                     <Gift style={{ width: '18px', height: '18px' }} />
                     <span>{isMobile ? 'Free' : 'Try Free Quiz'}</span>
                   </button>
 
-                  <button 
-                    onClick={handleBuyBundle}
-                    style={{
-                      position: 'relative', 
-                      padding: isMobile ? '10px 16px' : '14px 32px',
-                      borderRadius: '12px', 
-                      border: 'none',
-                      background: 'transparent', 
-                      color: 'white',
-                      fontSize: isMobile ? '13px' : '16px', 
-                      fontWeight: 600,
-                      cursor: 'pointer', 
-                      overflow: 'hidden',
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '8px',
-                      flex: isMobile ? '1' : 'none'
-                    }}
-                  >
+                  <button onClick={handleBuyBundle} style={{
+                    position: 'relative', 
+                    padding: isMobile ? '10px 16px' : '14px 32px',
+                    borderRadius: '12px', 
+                    border: 'none',
+                    background: 'transparent', 
+                    color: 'white',
+                    fontSize: isMobile ? '13px' : '16px', 
+                    fontWeight: 600,
+                    cursor: 'pointer', 
+                    overflow: 'hidden',
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '8px',
+                    flex: isMobile ? '1' : 'none'
+                  }}>
                     <div className="animate-shimmer" style={{
                       position: 'absolute', inset: 0,
                       background: 'linear-gradient(90deg, #06b6d4, #0891b2, #06b6d4)'
@@ -771,12 +677,7 @@ export default function HomePage() {
               </div>
 
               {!user && (
-                <p style={{ 
-                  fontSize: isMobile ? '13px' : '15px', 
-                  color: '#ef4444',
-                  fontWeight: 600,
-                  marginBottom: '12px'
-                }}>
+                <p style={{ fontSize: isMobile ? '13px' : '15px', color: '#ef4444', fontWeight: 600, marginBottom: '12px' }}>
                   ⚠️ Sign in with Google required to play
                 </p>
               )}
@@ -786,7 +687,6 @@ export default function HomePage() {
               </p>
             </div>
 
-            {/* Prize Pool Info */}
             {prizePool && (
               <div className="animate-pulse-glow" style={{
                 padding: isMobile ? '24px' : '48px',
@@ -799,21 +699,33 @@ export default function HomePage() {
                 <div style={{ textAlign: 'center', marginBottom: '32px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '16px' }}>
                     <Award style={{ width: isMobile ? '32px' : '48px', height: isMobile ? '32px' : '48px', color: '#facc15' }} />
-                    <h2 style={{ fontSize: isMobile ? '24px' : '36px', fontWeight: 900, color: '#fef08a' }}>
-                      Monthly Rewards
-                    </h2>
+                    <h2 style={{ fontSize: isMobile ? '24px' : '36px', fontWeight: 900, color: '#fef08a' }}>Monthly Rewards</h2>
                   </div>
-                  <p style={{ fontSize: isMobile ? '13px' : '16px', color: '#cbd5e1', maxWidth: '800px', margin: '0 auto' }}>
+                  <p style={{ fontSize: isMobile ? '13px' : '16px', color: '#cbd5e1', maxWidth: '800px', margin: '0 auto', marginBottom: '12px' }}>
                     Test your knowledge and earn rewards. Top performers win prizes!
                   </p>
+                  {prizePool && prizePool.current_participants < prizePool.required_participants && (
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 16px',
+                      borderRadius: '12px',
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      fontSize: isMobile ? '12px' : '14px',
+                      fontWeight: 600,
+                      color: '#fca5a5'
+                    }}>
+                      <AlertCircle style={{ width: '16px', height: '16px' }} />
+                      <span>💰 Cash prize activates when we reach 2,000 active players</span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Prize Progress */}
                 <div style={{ marginBottom: '32px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <span style={{ fontSize: isMobile ? '13px' : '16px', fontWeight: 600, color: '#94a3b8' }}>
-                      Participants Required
-                    </span>
+                    <span style={{ fontSize: isMobile ? '13px' : '16px', fontWeight: 600, color: '#94a3b8' }}>Participants Required</span>
                     <span style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: 900, color: '#facc15' }}>
                       {prizePool.current_participants} / {prizePool.required_participants}
                     </span>
@@ -833,71 +745,29 @@ export default function HomePage() {
                   </p>
                 </div>
 
-                {/* Prize Rules */}
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', 
-                  gap: isMobile ? '16px' : '20px' 
-                }}>
-                  <div style={{
-                    padding: isMobile ? '16px' : '20px', 
-                    borderRadius: '16px',
-                    background: 'rgba(34, 197, 94, 0.1)',
-                    border: '1px solid rgba(34, 197, 94, 0.2)'
-                  }}>
-                    <Check style={{ width: '24px', height: '24px', color: '#22c55e', marginBottom: '12px' }} />
-                    <h3 style={{ fontSize: isMobile ? '15px' : '16px', fontWeight: 700, marginBottom: '8px', color: 'white' }}>Minimum 2000 Players</h3>
-                    <p style={{ fontSize: isMobile ? '13px' : '14px', color: '#94a3b8', lineHeight: 1.5 }}>
-                      Rewards activate when we reach 2,000 active participants in the monthly competition.
-                    </p>
-                  </div>
-
-                  <div style={{
-                    padding: isMobile ? '16px' : '20px', 
-                    borderRadius: '16px',
-                    background: 'rgba(139, 92, 246, 0.1)',
-                    border: '1px solid rgba(139, 92, 246, 0.2)'
-                  }}>
-                    <Award style={{ width: '24px', height: '24px', color: '#a78bfa', marginBottom: '12px' }} />
-                    <h3 style={{ fontSize: isMobile ? '15px' : '16px', fontWeight: 700, marginBottom: '8px', color: 'white' }}>Rollover System</h3>
-                    <p style={{ fontSize: isMobile ? '13px' : '14px', color: '#94a3b8', lineHeight: 1.5 }}>
-                      If the participation target isn't met, only the cash prize is disabled; round rewards are still awarded as usual
-                    </p>
-                  </div>
-
-                  <div style={{
-                    padding: isMobile ? '16px' : '20px', 
-                    borderRadius: '16px',
-                    background: 'rgba(234, 179, 8, 0.1)',
-                    border: '1px solid rgba(234, 179, 8, 0.2)'
-                  }}>
-                    <Crown style={{ width: '24px', height: '24px', color: '#facc15', marginBottom: '12px' }} />
-                    <h3 style={{ fontSize: isMobile ? '15px' : '16px', fontWeight: 700, marginBottom: '8px', color: 'white' }}>Top 3 Performers</h3>
-                    <p style={{ fontSize: isMobile ? '13px' : '14px', color: '#94a3b8', lineHeight: 1.5 }}>
-                      1st place wins £1000, 2nd wins 30 rounds, 3rd wins 10 rounds!
-                    </p>
-                  </div>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: isMobile ? '16px' : '20px' }}>
+                  {prizeRules.map((item, i) => (
+                    <div key={i} style={{
+                      padding: isMobile ? '16px' : '20px', 
+                      borderRadius: '16px',
+                      background: `rgba(${item.bg === 'green' ? '34, 197, 94' : item.bg === 'purple' ? '139, 92, 246' : '234, 179, 8'}, 0.1)`,
+                      border: `1px solid rgba(${item.bg === 'green' ? '34, 197, 94' : item.bg === 'purple' ? '139, 92, 246' : '234, 179, 8'}, 0.2)`
+                    }}>
+                      <item.icon style={{ width: '24px', height: '24px', color: item.bg === 'green' ? '#22c55e' : item.bg === 'purple' ? '#a78bfa' : '#facc15', marginBottom: '12px' }} />
+                      <h3 style={{ fontSize: isMobile ? '15px' : '16px', fontWeight: 700, marginBottom: '8px', color: 'white' }}>{item.title}</h3>
+                      <p style={{ fontSize: isMobile ? '13px' : '14px', color: '#94a3b8', lineHeight: 1.5 }}>{item.desc}</p>
+                    </div>
+                  ))}
                 </div>
 
-                <button
-                  onClick={() => setShowPrizeModal(true)}
-                  style={{
-                    marginTop: '24px',
-                    padding: '12px 24px',
-                    borderRadius: '12px',
-                    border: '1px solid rgba(234, 179, 8, 0.3)',
-                    background: 'transparent',
-                    color: '#facc15',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    margin: '24px auto 0'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(234, 179, 8, 0.1)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                <button onClick={() => setShowPrizeModal(true)} style={{
+                  marginTop: '24px', padding: '12px 24px', borderRadius: '12px',
+                  border: '1px solid rgba(234, 179, 8, 0.3)', background: 'transparent',
+                  color: '#facc15', fontSize: '14px', fontWeight: 600, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '8px', margin: '24px auto 0'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(234, 179, 8, 0.1)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                 >
                   <AlertCircle style={{ width: '18px', height: '18px' }} />
                   View Full Reward Details
@@ -905,19 +775,14 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Stats Grid */}
-            {stats && (
+            {stats && statsData.length > 0 && (
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
                 gap: isMobile ? '16px' : '24px',
                 marginBottom: isMobile ? '40px' : '60px'
               }}>
-                {[
-                  { icon: Globe, value: `${Math.floor(stats.total_players / 1000)}K+`, label: 'Active Players', color: '#a78bfa' },
-                  { icon: Sparkles, value: `${(stats.questions_answered / 1000000).toFixed(1)}M+`, label: 'Questions Answered', color: '#f0abfc' },
-                  { icon: Zap, value: `${stats.daily_rounds}/day`, label: 'Live Rounds', color: '#22d3ee' }
-                ].map((stat, i) => (
+                {statsData.map((stat, i) => (
                   <div key={i} style={{
                     padding: isMobile ? '24px 20px' : '32px',
                     borderRadius: '20px',
@@ -942,7 +807,6 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Champions */}
             {champions.length > 0 && (
               <div style={{ textAlign: 'center' }}>
                 <h2 style={{
@@ -1014,7 +878,6 @@ export default function HomePage() {
           </div>
         </main>
 
-        {/* Footer */}
         <footer style={{
           borderTop: '1px solid rgba(255, 255, 255, 0.1)',
           background: 'rgba(2, 8, 23, 0.95)',
@@ -1027,13 +890,7 @@ export default function HomePage() {
             <div style={{ fontSize: isMobile ? '13px' : '14px', color: '#64748b', marginBottom: '16px' }}>
               © 2025 VibraXX · Powered by Sermin Limited
             </div>
-            <div style={{ 
-              display: 'flex', 
-              gap: isMobile ? '16px' : '24px', 
-              justifyContent: 'center', 
-              flexWrap: 'wrap', 
-              fontSize: isMobile ? '13px' : '14px' 
-            }}>
+            <div style={{ display: 'flex', gap: isMobile ? '16px' : '24px', justifyContent: 'center', flexWrap: 'wrap', fontSize: isMobile ? '13px' : '14px' }}>
               <a href="/privacy" style={{ color: '#64748b', textDecoration: 'none' }}>Privacy</a>
               <a href="/terms" style={{ color: '#64748b', textDecoration: 'none' }}>Terms</a>
               <a href="/support" style={{ color: '#64748b', textDecoration: 'none' }}>Support</a>
@@ -1042,49 +899,28 @@ export default function HomePage() {
           </div>
         </footer>
 
-        {/* 18+ Age Verification Modal */}
         {show18Modal && (
-          <div
-            onClick={() => setShow18Modal(false)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0, 0, 0, 0.9)',
-              backdropFilter: 'blur(12px)',
-              zIndex: 150,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '20px'
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                maxWidth: '500px',
-                width: '100%',
-                padding: isMobile ? '32px 24px' : '48px 40px',
-                borderRadius: '24px',
-                border: '3px solid rgba(239, 68, 68, 0.4)',
-                background: 'linear-gradient(135deg, rgba(2, 8, 23, 0.98), rgba(10, 10, 26, 0.98))',
-                backdropFilter: 'blur(20px)',
-                textAlign: 'center',
-                boxShadow: '0 0 60px rgba(239, 68, 68, 0.3)'
-              }}
-            >
+          <div onClick={() => setShow18Modal(false)} style={{
+            position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.9)',
+            backdropFilter: 'blur(12px)', zIndex: 150, display: 'flex',
+            alignItems: 'center', justifyContent: 'center', padding: '20px'
+          }}>
+            <div onClick={(e) => e.stopPropagation()} style={{
+              maxWidth: '500px', width: '100%', padding: isMobile ? '32px 24px' : '48px 40px',
+              borderRadius: '24px', border: '3px solid rgba(239, 68, 68, 0.4)',
+              background: 'linear-gradient(135deg, rgba(2, 8, 23, 0.98), rgba(10, 10, 26, 0.98))',
+              backdropFilter: 'blur(20px)', textAlign: 'center',
+              boxShadow: '0 0 60px rgba(239, 68, 68, 0.3)'
+            }}>
               <AlertCircle style={{ width: '64px', height: '64px', color: '#ef4444', margin: '0 auto 24px' }} />
-              
               <h2 style={{ fontSize: isMobile ? '24px' : '32px', fontWeight: 900, marginBottom: '16px', color: '#ef4444' }}>
                 Age Verification Required
               </h2>
-              
               <p style={{ fontSize: isMobile ? '15px' : '18px', color: '#cbd5e1', marginBottom: '24px', lineHeight: 1.6 }}>
                 You must be <strong style={{ color: '#ef4444' }}>18 years or older</strong> to participate in paid quiz competitions with rewards.
               </p>
-
               <div style={{
-                padding: '20px',
-                borderRadius: '12px',
+                padding: '20px', borderRadius: '12px',
                 background: 'rgba(239, 68, 68, 0.1)',
                 border: '1px solid rgba(239, 68, 68, 0.2)',
                 marginBottom: '32px'
@@ -1093,56 +929,36 @@ export default function HomePage() {
                   By confirming, you certify that you are 18+ and agree to participate in this knowledge-based quiz competition.
                 </p>
               </div>
-
               <div style={{ display: 'flex', gap: '12px', flexDirection: isMobile ? 'column' : 'row' }}>
-                <button
-                  onClick={confirm18Plus}
-                  style={{
-                    flex: 1,
-                    padding: '16px 24px',
-                    borderRadius: '12px',
-                    border: 'none',
-                    background: 'linear-gradient(135deg, #22c55e, #16a34a)',
-                    color: 'white',
-                    fontSize: '16px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'transform 0.2s',
-                    boxShadow: '0 0 30px rgba(34, 197, 94, 0.4)'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-                  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                <button onClick={confirm18Plus} style={{
+                  flex: 1, padding: '16px 24px', borderRadius: '12px', border: 'none',
+                  background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: 'white',
+                  fontSize: '16px', fontWeight: 700, cursor: 'pointer', transition: 'transform 0.2s',
+                  boxShadow: '0 0 30px rgba(34, 197, 94, 0.4)'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                 >
                   ✓ I am 18 or older
                 </button>
-
-                <button
-                  onClick={() => setShow18Modal(false)}
-                  style={{
-                    flex: 1,
-                    padding: '16px 24px',
-                    borderRadius: '12px',
-                    border: '2px solid rgba(239, 68, 68, 0.3)',
-                    background: 'transparent',
-                    color: '#ef4444',
-                    fontSize: '16px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.5)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.3)';
-                  }}
+                <button onClick={() => setShow18Modal(false)} style={{
+                  flex: 1, padding: '16px 24px', borderRadius: '12px',
+                  border: '2px solid rgba(239, 68, 68, 0.3)', background: 'transparent',
+                  color: '#ef4444', fontSize: '16px', fontWeight: 700, cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                  e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                }}
                 >
                   Cancel
                 </button>
               </div>
-
               <p style={{ fontSize: '12px', color: '#64748b', marginTop: '20px', lineHeight: 1.5 }}>
                 Free quiz option is available for all ages without age verification.
               </p>
@@ -1150,62 +966,29 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Prize Modal */}
         {showPrizeModal && (
-          <div
-            onClick={() => setShowPrizeModal(false)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0, 0, 0, 0.8)',
-              backdropFilter: 'blur(8px)',
-              zIndex: 100,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '20px'
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                maxWidth: '600px',
-                width: '100%',
-                padding: isMobile ? '24px' : '40px',
-                borderRadius: '24px',
-                border: '2px solid rgba(234, 179, 8, 0.3)',
-                background: 'linear-gradient(135deg, rgba(2, 8, 23, 0.98), rgba(10, 10, 26, 0.98))',
-                backdropFilter: 'blur(20px)',
-                maxHeight: '80vh',
-                overflowY: 'auto'
-              }}
-            >
+          <div onClick={() => setShowPrizeModal(false)} style={{
+            position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.8)',
+            backdropFilter: 'blur(8px)', zIndex: 100, display: 'flex',
+            alignItems: 'center', justifyContent: 'center', padding: '20px'
+          }}>
+            <div onClick={(e) => e.stopPropagation()} style={{
+              maxWidth: '600px', width: '100%', padding: isMobile ? '24px' : '40px',
+              borderRadius: '24px', border: '2px solid rgba(234, 179, 8, 0.3)',
+              background: 'linear-gradient(135deg, rgba(2, 8, 23, 0.98), rgba(10, 10, 26, 0.98))',
+              backdropFilter: 'blur(20px)', maxHeight: '80vh', overflowY: 'auto'
+            }}>
               <div style={{ textAlign: 'center', marginBottom: '32px' }}>
                 <Trophy style={{ width: '48px', height: '48px', color: '#facc15', margin: '0 auto 16px' }} />
-                <h2 style={{ fontSize: isMobile ? '24px' : '32px', fontWeight: 900, marginBottom: '12px' }}>
-                  Reward Distribution
-                </h2>
-                <p style={{ fontSize: '16px', color: '#94a3b8' }}>
-                  Monthly Quiz Competition Rewards
-                </p>
+                <h2 style={{ fontSize: isMobile ? '24px' : '32px', fontWeight: 900, marginBottom: '12px' }}>Reward Distribution</h2>
+                <p style={{ fontSize: '16px', color: '#94a3b8' }}>Monthly Quiz Competition Rewards</p>
               </div>
-
               <div style={{ marginBottom: '24px' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: '#facc15' }}>
-                  Top 3 Performer Rewards
-                </h3>
-                {[
-                  { place: '1st', reward: '£1,000 Cash Prize', icon: '🏆', color: '#facc15' },
-                  { place: '2nd', reward: '30 Free Rounds', icon: '🥈', color: '#c0c0c0' },
-                  { place: '3rd', reward: '10 Free Rounds', icon: '🥉', color: '#cd7f32' }
-                ].map((prize, i) => (
+                <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: '#facc15' }}>Top 3 Performer Rewards</h3>
+                {prizeList.map((prize, i) => (
                   <div key={i} style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: isMobile ? '16px' : '20px',
-                    marginBottom: '12px',
-                    borderRadius: '12px',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: isMobile ? '16px' : '20px', marginBottom: '12px', borderRadius: '12px',
                     background: i === 0 ? 'rgba(234, 179, 8, 0.15)' : 'rgba(139, 92, 246, 0.08)',
                     border: `2px solid ${i === 0 ? 'rgba(234, 179, 8, 0.3)' : 'rgba(139, 92, 246, 0.15)'}`,
                     boxShadow: i === 0 ? '0 0 20px rgba(234, 179, 8, 0.2)' : 'none'
@@ -1214,36 +997,23 @@ export default function HomePage() {
                       <span style={{ fontSize: '28px' }}>{prize.icon}</span>
                       <div>
                         <span style={{ 
-                          fontSize: isMobile ? '16px' : '18px', 
-                          fontWeight: 800, 
-                          color: prize.color,
-                          display: 'block',
-                          marginBottom: '4px'
+                          fontSize: isMobile ? '16px' : '18px', fontWeight: 800, color: prize.color,
+                          display: 'block', marginBottom: '4px'
                         }}>
                           {prize.place} Place
                         </span>
-                        <span style={{ fontSize: isMobile ? '13px' : '14px', color: '#94a3b8' }}>
-                          Top Performer
-                        </span>
+                        <span style={{ fontSize: isMobile ? '13px' : '14px', color: '#94a3b8' }}>Top Performer</span>
                       </div>
                     </div>
-                    <span style={{ 
-                      fontSize: isMobile ? '15px' : '17px', 
-                      fontWeight: 900, 
-                      color: prize.color,
-                      textAlign: 'right'
-                    }}>
+                    <span style={{ fontSize: isMobile ? '15px' : '17px', fontWeight: 900, color: prize.color, textAlign: 'right' }}>
                       {prize.reward}
                     </span>
                   </div>
                 ))}
               </div>
-
               <div style={{
-                padding: isMobile ? '16px' : '20px',
-                borderRadius: '12px',
-                background: 'rgba(59, 130, 246, 0.1)',
-                border: '1px solid rgba(59, 130, 246, 0.2)',
+                padding: isMobile ? '16px' : '20px', borderRadius: '12px',
+                background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)',
                 marginBottom: '24px'
               }}>
                 <h4 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '12px', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1260,23 +1030,13 @@ export default function HomePage() {
                   <li>Only players who are in the lobby at the time can join the round</li>
                 </ul>
               </div>
-
-              <button
-                onClick={() => setShowPrizeModal(false)}
-                style={{
-                  width: '100%',
-                  padding: '16px',
-                  borderRadius: '12px',
-                  border: 'none',
-                  background: 'linear-gradient(135deg, #7c3aed, #d946ef)',
-                  color: 'white',
-                  fontSize: '16px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'transform 0.2s'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              <button onClick={() => setShowPrizeModal(false)} style={{
+                width: '100%', padding: '16px', borderRadius: '12px', border: 'none',
+                background: 'linear-gradient(135deg, #7c3aed, #d946ef)', color: 'white',
+                fontSize: '16px', fontWeight: 700, cursor: 'pointer', transition: 'transform 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
               >
                 Got it!
               </button>
