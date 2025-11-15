@@ -2,31 +2,21 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from '@supabase/supabase-js';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { 
   Crown, Trophy, Zap, Play, Volume2, VolumeX, Sparkles, Globe,
   User, CreditCard, Award, Gift, Check, AlertCircle
 } from "lucide-react";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true
-    }
-  }
-);
-
 export default function HomePage() {
   const router = useRouter();
+  const supabase = useMemo(() => createClientComponentClient(), []);
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [nextRound, setNextRound] = useState(null);
   const [activePlayers, setActivePlayers] = useState(1000);
   const [user, setUser] = useState(null);
+  const [userName, setUserName] = useState('');
   const [userRounds, setUserRounds] = useState(0);
   const [showPrizeModal, setShowPrizeModal] = useState(false);
   const [show18Modal, setShow18Modal] = useState(false);
