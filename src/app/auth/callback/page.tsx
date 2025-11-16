@@ -9,19 +9,13 @@ export default function AuthCallbackPage() {
 
   useEffect(() => {
     const handleCallback = async () => {
-      // 1) Supabase session'ı burada otomatik olarak URL'den okur
-      const { data } = await supabase.auth.getSession();
+      try {
+        // Google’dan gelen “code” parametresini session’a çevirir!
+        await supabase.auth.exchangeCodeForSession(window.location.href);
 
-      // 2) Birkaç ms beklemek gerekebiliyor (Google dönüşü bazen geç yazılıyor)
-      if (!data.session) {
-        await new Promise((res) => setTimeout(res, 500));
-      }
-
-      const { data: finalCheck } = await supabase.auth.getSession();
-
-      if (finalCheck.session) {
         router.replace("/");
-      } else {
+      } catch (error) {
+        console.error("OAuth callback error:", error);
         router.replace("/");
       }
     };
