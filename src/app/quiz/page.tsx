@@ -278,7 +278,7 @@ export default function QuizGamePage() {
 
     const timeout = setTimeout(() => {
       clearInterval(interval);
-      router.push("/");
+      router.push("/lobby");
     }, FINAL_SCORE_DURATION * 1000);
 
     return () => {

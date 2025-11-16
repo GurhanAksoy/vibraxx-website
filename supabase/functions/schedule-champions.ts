@@ -1,9 +1,13 @@
-import { supabaseServer } from "@/lib/supabaseServer";
+import { createClient } from "@supabase/supabase-js";
+
+// Supabase client oluştur
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 // 🔹 Günlük Şampiyon
 export async function dailyChampion() {
-  const supabase = supabaseServer;
-
   const start = new Date();
   start.setUTCHours(0, 0, 0, 0);
   const end = new Date();
@@ -31,16 +35,12 @@ export async function dailyChampion() {
 
 // 🔹 Haftalık Şampiyon
 export async function weeklyChampion() {
-  const supabase = supabaseServer;
-
   const now = new Date();
   const day = now.getUTCDay();
-  const diff = day === 0 ? -6 : 1 - day;
-
+  const diff = (day === 0 ? -6 : 1 - day);
   const monday = new Date(now);
   monday.setUTCDate(now.getUTCDate() + diff);
   monday.setUTCHours(0, 0, 0, 0);
-
   const sunday = new Date(monday);
   sunday.setUTCDate(monday.getUTCDate() + 6);
   sunday.setUTCHours(23, 59, 59, 999);
@@ -68,8 +68,6 @@ export async function weeklyChampion() {
 
 // 🔹 Aylık Şampiyon
 export async function monthlyChampion() {
-  const supabase = supabaseServer;
-
   const now = new Date();
   const firstDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const nextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));

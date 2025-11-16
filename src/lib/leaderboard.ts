@@ -2,6 +2,9 @@ import { supabase } from "./supabaseClient";
 
 /**
  * Save a user's finished round result.
+ * - roundId: the synchronized global round id (if you don't have server sync yet, pass null)
+ * - accuracy: 0..100
+ * - durationSeconds: total time player spent (optional)
  */
 export async function saveRoundResult(opts: {
   userId: string;
@@ -13,9 +16,6 @@ export async function saveRoundResult(opts: {
 }) {
   const { userId, roundId = null, correct, wrong, accuracy, durationSeconds = 0 } = opts;
 
-  // Score hesapla
-  const score = correct * 10 - wrong * 5 + accuracy;
-
   const { error } = await supabase.from("user_rounds").insert([
     {
       user_id: userId,
@@ -24,7 +24,6 @@ export async function saveRoundResult(opts: {
       wrong_count: wrong,
       accuracy,
       duration_seconds: durationSeconds,
-      score,
     },
   ]);
 
@@ -35,12 +34,12 @@ export async function saveRoundResult(opts: {
 }
 
 /**
- * Get champions for round / day / week / month
+ * Get champions:
+ * - roundChampion: top score for the latest round (by rounds.started_at)
+ * - day/week/month: top 3 by score within the time windows
  */
 export async function getChampions() {
-  // -------------------------------
-  // 1) Latest round
-  // -------------------------------
+  // Latest round id
   const { data: latestRound } = await supabase
     .from("rounds")
     .select("*")
@@ -49,91 +48,46 @@ export async function getChampions() {
     .maybeSingle();
 
   let roundChampion: any[] = [];
-
   if (latestRound?.id) {
-    const { data } = await supabase
+    const { data: rc } = await supabase
       .from("user_rounds")
-      .select(`
-        id,
-        score,
-        correct_count,
-        wrong_count,
-        accuracy,
-        profiles!inner(id, name)
-      `)
+      .select("*, user:auth.users(id, email, user_metadata)")
       .eq("round_id", latestRound.id)
       .order("score", { ascending: false })
       .limit(3);
-
-    roundChampion = data || [];
+    roundChampion = rc || [];
   }
 
-  // -------------------------------
-  // 2) Time windows
-  // -------------------------------
   const now = new Date();
-
-  // Day start (midnight)
   const dayStart = new Date(now);
   dayStart.setHours(0, 0, 0, 0);
 
-  // Week start (Monday based)
+  // Simple window helpers
   const weekStart = new Date(now);
-  const dow = weekStart.getDay(); // 0-6
-  const diff = (dow + 6) % 7;
+  const day = weekStart.getDay(); // 0..6
+  const diff = (day + 6) % 7; // Monday-based week
   weekStart.setDate(weekStart.getDate() - diff);
   weekStart.setHours(0, 0, 0, 0);
 
-  // Month start
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  // -------------------------------
-  // 3) Day Leaderboard
-  // -------------------------------
   const { data: dayTop } = await supabase
     .from("user_rounds")
-    .select(`
-      id,
-      score,
-      correct_count,
-      wrong_count,
-      accuracy,
-      profiles!inner(id, name)
-    `)
+    .select("*, user:auth.users(id, email, user_metadata)")
     .gte("created_at", dayStart.toISOString())
     .order("score", { ascending: false })
     .limit(3);
 
-  // -------------------------------
-  // 4) Week Leaderboard
-  // -------------------------------
   const { data: weekTop } = await supabase
     .from("user_rounds")
-    .select(`
-      id,
-      score,
-      correct_count,
-      wrong_count,
-      accuracy,
-      profiles!inner(id, name)
-    `)
+    .select("*, user:auth.users(id, email, user_metadata)")
     .gte("created_at", weekStart.toISOString())
     .order("score", { ascending: false })
     .limit(3);
 
-  // -------------------------------
-  // 5) Month Leaderboard
-  // -------------------------------
   const { data: monthTop } = await supabase
     .from("user_rounds")
-    .select(`
-      id,
-      score,
-      correct_count,
-      wrong_count,
-      accuracy,
-      profiles!inner(id, name)
-    `)
+    .select("*, user:auth.users(id, email, user_metadata)")
     .gte("created_at", monthStart.toISOString())
     .order("score", { ascending: false })
     .limit(3);

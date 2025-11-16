@@ -302,7 +302,9 @@ export default function LobbyPage() {
                       "rgba(8,47,73,0.9)";
                   }}
                 >
-                  <ArrowLeft style={{ width: 14, height: 14 }} />
+                  <ArrowLeft
+                    style={{ width: 14, height: 14 }}
+                  />
                   Main Stage
                 </button>
 
@@ -313,10 +315,12 @@ export default function LobbyPage() {
                     textTransform: "uppercase",
                     padding: "4px 12px",
                     borderRadius: 9999,
-                    border: "1px solid rgba(167,139,250,0.7)",
+                    border:
+                      "1px solid rgba(167,139,250,0.7)",
                     background: "rgba(10,16,30,0.98)",
                     color: "#c4b5fd",
-                    boxShadow: "0 0 14px rgba(167,139,250,0.6)",
+                    boxShadow:
+                      "0 0 14px rgba(167,139,250,0.6)",
                     display: "inline-flex",
                     alignItems: "center",
                     gap: 6,
@@ -378,8 +382,10 @@ export default function LobbyPage() {
                   style={{
                     padding: "12px",
                     borderRadius: "12px",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    background: "rgba(255, 255, 255, 0.05)",
+                    border:
+                      "1px solid rgba(255, 255, 255, 0.1)",
+                    background:
+                      "rgba(255, 255, 255, 0.05)",
                     cursor: "pointer",
                     transition: "all 0.3s",
                     display: "flex",
@@ -421,8 +427,10 @@ export default function LobbyPage() {
                     gap: "8px",
                     padding: "8px 16px",
                     borderRadius: "12px",
-                    background: "rgba(139, 92, 246, 0.1)",
-                    border: "1px solid rgba(139, 92, 246, 0.3)",
+                    background:
+                      "rgba(139, 92, 246, 0.1)",
+                    border:
+                      "1px solid rgba(139, 92, 246, 0.3)",
                   }}
                 >
                   <Users
@@ -543,13 +551,15 @@ export default function LobbyPage() {
                   style={{
                     padding: "clamp(20px, 4vw, 32px)",
                     borderRadius: "24px",
-                    border: "1px solid rgba(167,139,250,0.9)",
+                    border:
+                      "1px solid rgba(167,139,250,0.9)",
                     background: "rgba(6, 10, 25, 0.96)",
                     backdropFilter: "blur(20px)",
                     textAlign: "center",
                     position: "relative",
                     overflow: "hidden",
-                    boxShadow: "0 0 18px rgba(168,85,247,0.45)",
+                    boxShadow:
+                      "0 0 18px rgba(168,85,247,0.45)",
                   }}
                 >
                   {/* Neon outer glow line */}
@@ -558,8 +568,10 @@ export default function LobbyPage() {
                       position: "absolute",
                       inset: "-1px",
                       borderRadius: "24px",
-                      border: "1px solid rgba(236,72,153,0.18)",
-                      boxShadow: "0 0 22px rgba(236,72,153,0.35)",
+                      border:
+                        "1px solid rgba(236,72,153,0.18)",
+                      boxShadow:
+                        "0 0 22px rgba(236,72,153,0.35)",
                       pointerEvents: "none",
                     }}
                   ></div>
@@ -574,7 +586,8 @@ export default function LobbyPage() {
                       height: "2px",
                       background:
                         "linear-gradient(90deg, transparent, #a78bfa, #f0abfc, transparent)",
-                      animation: "shimmer 3s linear infinite",
+                      animation:
+                        "shimmer 3s linear infinite",
                       opacity: 0.9,
                     }}
                   ></div>
@@ -600,24 +613,28 @@ export default function LobbyPage() {
                       borderRadius: "16px",
                       background:
                         "radial-gradient(circle at top, rgba(167,139,250,0.18), transparent 70%)",
-                      border: "1px solid rgba(148,163,253,0.35)",
+                      border:
+                        "1px solid rgba(148,163,253,0.35)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       padding: "10px 14px",
                       cursor: "pointer",
                       transition: "all 0.3s",
-                      boxShadow: "0 0 16px rgba(79,70,229,0.35)",
+                      boxShadow:
+                        "0 0 16px rgba(79,70,229,0.35)",
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = "scale(1.02)";
+                      e.currentTarget.style.transform =
+                        "scale(1.02)";
                       e.currentTarget.style.boxShadow =
                         "0 0 26px rgba(168,85,247,0.6)";
                       e.currentTarget.style.borderColor =
                         "rgba(236,72,153,0.6)";
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "scale(1)";
+                      e.currentTarget.style.transform =
+                        "scale(1)";
                       e.currentTarget.style.boxShadow =
                         "0 0 16px rgba(79,70,229,0.35)";
                       e.currentTarget.style.borderColor =
@@ -660,8 +677,10 @@ export default function LobbyPage() {
                       position: "relative",
                       padding: "48px",
                       borderRadius: "32px",
-                      border: "1px solid rgba(255, 255, 255, 0.1)",
-                      background: "rgba(15, 23, 42, 0.8)",
+                      border:
+                        "1px solid rgba(255, 255, 255, 0.1)",
+                      background:
+                        "rgba(15, 23, 42, 0.8)",
                       backdropFilter: "blur(20px)",
                     }}
                   >
@@ -683,7 +702,8 @@ export default function LobbyPage() {
                           gap: "8px",
                           padding: "8px 20px",
                           borderRadius: "9999px",
-                          background: "rgba(239, 68, 68, 0.2)",
+                          background:
+                            "rgba(239, 68, 68, 0.2)",
                           border:
                             "1px solid rgba(239, 68, 68, 0.3)",
                         }}
@@ -699,7 +719,8 @@ export default function LobbyPage() {
                         ></div>
                         <span
                           style={{
-                            fontSize: "clamp(11px, 2vw, 14px)",
+                            fontSize:
+                              "clamp(11px, 2vw, 14px)",
                             fontWeight: 600,
                             color: "#f87171",
                           }}
@@ -728,7 +749,8 @@ export default function LobbyPage() {
                         <div
                           style={{
                             position: "relative",
-                            width: "clamp(180px, 35vw, 220px)",
+                            width:
+                              "clamp(180px, 35vw, 220px)",
                             height:
                               "clamp(180px, 35vw, 220px)",
                             borderRadius: "50%",
@@ -830,7 +852,8 @@ export default function LobbyPage() {
                         >
                           <span>Waiting...</span>
                           <span>
-                            {Math.floor(progress)}% Complete
+                            {Math.floor(progress)}%
+                            {" "}Complete
                           </span>
                         </div>
                       </div>
@@ -852,7 +875,8 @@ export default function LobbyPage() {
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          justifyContent: "center",
+                          justifyContent:
+                            "center",
                           gap: "12px",
                           marginBottom: "8px",
                         }}
@@ -862,7 +886,8 @@ export default function LobbyPage() {
                             width: 12,
                             height: 12,
                             borderRadius: "50%",
-                            background: "#22c55e",
+                            background:
+                              "#22c55e",
                             boxShadow:
                               "0 0 12px #22c55e",
                           }}
@@ -872,10 +897,12 @@ export default function LobbyPage() {
                             fontSize:
                               "clamp(14px, 2.5vw, 16px)",
                             fontWeight: 700,
-                            color: "#4ade80",
+                            color:
+                              "#4ade80",
                           }}
                         >
-                          YOU&apos;RE IN THE LOBBY
+                          YOU&apos;RE IN THE
+                          LOBBY
                         </span>
                       </div>
                       <p
@@ -886,41 +913,212 @@ export default function LobbyPage() {
                           margin: 0,
                         }}
                       >
-                        You&apos;ll automatically join when the
-                        round starts
+                        You&apos;ll
+                        automatically join when
+                        the round starts
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Pro Tip (bu KALDI) */}
+                {/* Game Info */}
                 <div
                   style={{
-                    marginTop: "20px",
-                    padding: "16px",
-                    borderRadius: "12px",
-                    background: "rgba(59, 130, 246, 0.1)",
+                    padding: "clamp(20px, 4vw, 32px)",
+                    borderRadius: "24px",
                     border:
-                      "1px solid rgba(59, 130, 246, 0.2)",
+                      "1px solid rgba(255, 255, 255, 0.1)",
+                    background:
+                      "rgba(15, 23, 42, 0.6)",
+                    backdropFilter: "blur(20px)",
                   }}
                 >
-                  <div
+                  <h3
                     style={{
                       fontSize:
-                        "clamp(12px, 2.5vw, 14px)",
-                      color: "#94a3b8",
-                      marginBottom: "8px",
+                        "clamp(16px, 3vw, 20px)",
+                      fontWeight: 700,
+                      marginBottom: "20px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
                     }}
                   >
-                    💰{" "}
-                    <strong
+                    <Target
                       style={{
-                        color: "white",
+                        width: 24,
+                        height: 24,
+                        color: "#a78bfa",
+                      }}
+                    />
+                    Round Information
+                  </h3>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(120px, 1fr))",
+                      gap: "16px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        padding: "16px",
+                        borderRadius: "12px",
+                        background:
+                          "rgba(139, 92, 246, 0.1)",
+                        border:
+                          "1px solid rgba(139, 92, 246, 0.2)",
                       }}
                     >
-                      Monthly Prize:
-                    </strong>{" "}
-                    The player who earns the most points during the month wins £1000!
+                      <div
+                        style={{
+                          fontSize:
+                            "clamp(10px, 2vw, 12px)",
+                          color: "#94a3b8",
+                          marginBottom: "4px",
+                        }}
+                      >
+                        Question Type
+                      </div>
+                      <div
+                        style={{
+                          fontSize:
+                            "clamp(14px, 3vw, 18px)",
+                          fontWeight: 700,
+                          color: "#a78bfa",
+                        }}
+                      >
+                        Multiple Choice
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        padding: "16px",
+                        borderRadius: "12px",
+                        background:
+                          "rgba(236, 72, 153, 0.1)",
+                        border:
+                          "1px solid rgba(236, 72, 153, 0.2)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize:
+                            "clamp(10px, 2vw, 12px)",
+                          color: "#94a3b8",
+                          marginBottom: "4px",
+                        }}
+                      >
+                        Time Limit
+                      </div>
+                      <div
+                        style={{
+                          fontSize:
+                            "clamp(14px, 3vw, 18px)",
+                          fontWeight: 700,
+                          color: "#f0abfc",
+                        }}
+                      >
+                        30 seconds
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        padding: "16px",
+                        borderRadius: "12px",
+                        background:
+                          "rgba(34, 197, 94, 0.1)",
+                        border:
+                          "1px solid rgba(34, 197, 94, 0.2)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize:
+                            "clamp(10px, 2vw, 12px)",
+                          color: "#94a3b8",
+                          marginBottom: "4px",
+                        }}
+                      >
+                        Points
+                      </div>
+                      <div
+                        style={{
+                          fontSize:
+                            "clamp(14px, 3vw, 18px)",
+                          fontWeight: 700,
+                          color: "#4ade80",
+                        }}
+                      >
+                        100-500
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        padding: "16px",
+                        borderRadius: "12px",
+                        background:
+                          "rgba(234, 179, 8, 0.1)",
+                        border:
+                          "1px solid rgba(234, 179, 8, 0.2)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize:
+                            "clamp(10px, 2vw, 12px)",
+                          color: "#94a3b8",
+                          marginBottom: "4px",
+                        }}
+                      >
+                        Difficulty
+                      </div>
+                      <div
+                        style={{
+                          fontSize:
+                            "clamp(14px, 3vw, 18px)",
+                          fontWeight: 700,
+                          color: "#facc15",
+                        }}
+                      >
+                        Medium
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: "20px",
+                      padding: "16px",
+                      borderRadius: "12px",
+                      background:
+                        "rgba(59, 130, 246, 0.1)",
+                      border:
+                        "1px solid rgba(59, 130, 246, 0.2)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize:
+                          "clamp(12px, 2.5vw, 14px)",
+                        color: "#94a3b8",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      💡{" "}
+                      <strong
+                        style={{
+                          color: "white",
+                        }}
+                      >
+                        Pro Tip:
+                      </strong>{" "}
+                      Faster answers earn more points!
+                      The first 10 seconds give maximum
+                      points.
+                    </div>
                   </div>
                 </div>
               </div>
@@ -943,7 +1141,8 @@ export default function LobbyPage() {
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "space-between",
+                      justifyContent:
+                        "space-between",
                       marginBottom: "24px",
                     }}
                   >

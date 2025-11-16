@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { supabase } from "@/lib/supabaseClient";
 
 export async function GET() {
   try {
-    const supabase = supabaseServer;  // ✔ server client
-
     // latest round
     const { data: latestRound } = await supabase
       .from("rounds")
@@ -31,7 +29,7 @@ export async function GET() {
       .order("accuracy", { ascending: false })
       .limit(3);
 
-    // daily
+    // daily, weekly, monthly global stats
     const { data: dayTop } = await supabase
       .from("user_rounds")
       .select("*")
@@ -39,7 +37,6 @@ export async function GET() {
       .order("accuracy", { ascending: false })
       .limit(3);
 
-    // weekly
     const { data: weekTop } = await supabase
       .from("user_rounds")
       .select("*")
@@ -47,7 +44,6 @@ export async function GET() {
       .order("accuracy", { ascending: false })
       .limit(3);
 
-    // monthly
     const { data: monthTop } = await supabase
       .from("user_rounds")
       .select("*")

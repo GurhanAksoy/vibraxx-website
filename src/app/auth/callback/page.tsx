@@ -8,24 +8,22 @@ export default function AuthCallbackPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const run = async () => {
-      try {
-        // Supabase URL'deki code parametresini okuyup session oluşturur
-        await supabase.auth.exchangeCodeForSession(window.location.href);
-
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
         router.replace("/");
-      } catch (e) {
-        console.error("Callback error:", e);
+      } else {
         router.replace("/");
       }
     };
-
-    run();
-  }, []);
+    checkSession();
+  }, [router]);
 
   return (
-    <main className="min-h-screen grid place-items-center text-white">
+    <main className="min-h-screen bg-black text-white grid place-items-center">
       <p>Signing you in...</p>
     </main>
   );
 }
+
+

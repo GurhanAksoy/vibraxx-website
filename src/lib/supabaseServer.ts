@@ -1,12 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 
-export const supabaseServer = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SECRET_KEY!, // ✔ sadece private key
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
-);
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+export const supabaseAdmin = () => {
+  return createClient(url, serviceKey, {
+    auth: { persistSession: false },
+  });
+};
