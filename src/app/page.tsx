@@ -74,30 +74,42 @@ export default function HomePage() {
 
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
+   const { data: { subscription } } = supabase.auth.onAuthStateChange(
+  async (event, session) => {
+    if (!mounted) return;
 
-      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') && session?.user) {
-        try {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('rounds, is_over_18, name')
-            .eq('id', session.user.id)
-            .single();
-          
-          const displayName = profile?.name || 
-                             session.user.user_metadata?.full_name || 
-                             session.user.email?.split('@')[0] || 
-                             'User';
-          
-          setUser(session.user);
-          setUserName(displayName);
-          setUserRounds(profile?.rounds || 0);
-        } catch (error) {
-          console.error('Error fetching profile:', error);
-        }
+    // 🔥 HER DURUMDA authLoading'i kapat
+    setAuthLoading(false);
+
+    if (session?.user) {
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('rounds, is_over_18, name')
+          .eq('id', session.user.id)
+          .single();
+
+        const displayName =
+          profile?.name ||
+          session.user.user_metadata?.full_name ||
+          session.user.email?.split("@")[0] ||
+          "User";
+
+        setUser(session.user);
+        setUserName(displayName);
+        setUserRounds(profile?.rounds || 0);
+      } catch (error) {
+        console.error("Error fetching profile:", error);
       }
-    });
+    } else {
+      // Logout olunca state sıfırlansın
+      setUser(null);
+      setUserName("");
+      setUserRounds(0);
+    }
+  }
+);
+
 
     return () => {
       mounted = false;
