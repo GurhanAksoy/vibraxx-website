@@ -33,60 +33,21 @@ export default function HomePage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Auth initialization
-  useEffect(() => {
-    let mounted = true;
+// Auth initialization
+useEffect(() => {
+  let mounted = true;
 
-    const initAuth = async () => {
-      try {
-        setAuthLoading(true);
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Session error:', error);
-          setAuthLoading(false);
-          return;
-        }
-        
-        if (session?.user && mounted) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('rounds, is_over_18, name')
-            .eq('id', session.user.id)
-            .single();
-          
-          const displayName = profile?.name || 
-                             session.user.user_metadata?.full_name || 
-                             session.user.email?.split('@')[0] || 
-                             'User';
-          
-          setUser(session.user);
-          setUserName(displayName);
-          setUserRounds(profile?.rounds || 0);
-        }
-        
-        setAuthLoading(false);
-      } catch (error) {
-        console.error('Error initializing auth:', error);
-        setAuthLoading(false);
-      }
-    };
+  const initAuth = async () => {
+    try {
+      setAuthLoading(true);
 
-    initAuth();
+      const { data: { session } } = await supabase.auth.getSession();
 
-   const { data: { subscription } } = supabase.auth.onAuthStateChange(
-  async (event, session) => {
-    if (!mounted) return;
-
-    // 🔥 HER DURUMDA authLoading'i kapat
-    setAuthLoading(false);
-
-    if (session?.user) {
-      try {
+      if (session?.user && mounted) {
         const { data: profile } = await supabase
-          .from('profiles')
-          .select('rounds, is_over_18, name')
-          .eq('id', session.user.id)
+          .from("profiles")
+          .select("rounds, is_over_18, name")
+          .eq("id", session.user.id)
           .single();
 
         const displayName =
@@ -98,24 +59,54 @@ export default function HomePage() {
         setUser(session.user);
         setUserName(displayName);
         setUserRounds(profile?.rounds || 0);
-      } catch (error) {
-        console.error("Error fetching profile:", error);
       }
-    } else {
-      // Logout olunca state sıfırlansın
-      setUser(null);
-      setUserName("");
-      setUserRounds(0);
+
+      setAuthLoading(false);
+    } catch (e) {
+      console.error("Auth init error:", e);
+      setAuthLoading(false);
     }
-  }
-);
+  };
 
+  initAuth();
 
-    return () => {
-      mounted = false;
-      subscription?.unsubscribe();
-    };
-  }, []);
+  // 🔥 OnAuth listener — logout sorunun ana noktası
+  const { data: subscription } = supabase.auth.onAuthStateChange(
+    async (event, session) => {
+      if (!mounted) return;
+
+      setAuthLoading(false);
+
+      if (session?.user) {
+        try {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("rounds, is_over_18, name")
+            .eq("id", session.user.id)
+            .single();
+
+          const displayName =
+            profile?.name ||
+            session.user.user_metadata?.full_name ||
+            session.user.email?.split("@")[0] ||
+            "User";
+
+          setUser(session.user);
+          setUserName(displayName);
+          setUserRounds(profile?.rounds || 0);
+        } catch (err) {
+          console.error("Error fetching profile:", err);
+        }
+      }
+    }
+  );
+
+  return () => {
+    mounted = false;
+    subscription?.unsubscribe();
+  };
+}, []);
+
 
   // Fetch next round
   useEffect(() => {

@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
+const isBrowser = typeof window !== "undefined";
+
 export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -7,7 +9,8 @@ export const supabase = createClient(
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: false,  // ❌ BU MUTLAKA FALSE OLACAK
+      detectSessionInUrl: true,
+      storage: isBrowser ? localStorage : undefined,   // 🔥 EN KRİTİK NOKTA
     },
   }
 );
