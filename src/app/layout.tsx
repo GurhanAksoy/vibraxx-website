@@ -2,6 +2,7 @@
 import "./globals.css";
 import { Inter } from "next/font/google";
 import ClientWrapper from "./ClientWrapper";
+import SupabaseProvider from "./providers/SupabaseProvider";
 
 export const metadata: Metadata = {
   title: "VIBRAXX - 24/7 Quiz Arena",
@@ -22,7 +23,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={inter.className + " bg-[#020817] text-white antialiased"}>
-        <ClientWrapper>{children}</ClientWrapper>
+        <SupabaseProvider>
+          <ClientWrapper>{children}</ClientWrapper>
+        </SupabaseProvider>
       </body>
     </html>
   );
