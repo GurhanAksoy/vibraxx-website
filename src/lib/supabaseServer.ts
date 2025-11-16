@@ -5,8 +5,8 @@ export const supabaseServer = createClient(
   process.env.SUPABASE_SECRET_KEY!,
   {
     auth: {
-      autoRefreshToken: false,
       persistSession: false,
+      autoRefreshToken: false,
     },
   }
 );
