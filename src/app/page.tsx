@@ -202,6 +202,134 @@ const AgeVerificationModal = memo(({ onConfirm, onCancel }: any) => (
 ));
 AgeVerificationModal.displayName = "AgeVerificationModal";
 
+// No Rounds Modal Component
+const NoRoundsModal = memo(({ onBuyRounds, onCancel }: any) => (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0, 0, 0, 0.85)",
+      backdropFilter: "blur(8px)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 100,
+      padding: "20px",
+    }}
+    onClick={onCancel}
+  >
+    <div
+      style={{
+        background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+        borderRadius: 24,
+        padding: "32px",
+        maxWidth: 480,
+        width: "100%",
+        border: "1px solid rgba(251, 191, 36, 0.3)",
+        boxShadow: "0 20px 60px rgba(251, 191, 36, 0.3)",
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div style={{ textAlign: "center", marginBottom: 24 }}>
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            margin: "0 auto 16px",
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, #f59e0b, #fbbf24)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <ShoppingCart style={{ width: 32, height: 32, color: "white" }} />
+        </div>
+        <h3
+          style={{
+            fontSize: 24,
+            fontWeight: 700,
+            marginBottom: 12,
+            color: "white",
+          }}
+        >
+          No Rounds Available
+        </h3>
+        <p style={{ fontSize: 15, color: "#94a3b8", lineHeight: 1.6 }}>
+          You need to purchase rounds to enter the Live Quiz lobby and compete for the <strong style={{ color: "#fbbf24" }}>£1000 monthly prize</strong>!
+        </p>
+      </div>
+
+      <div
+        style={{
+          background: "rgba(251, 191, 36, 0.1)",
+          borderRadius: 16,
+          padding: 20,
+          marginBottom: 24,
+          border: "1px solid rgba(251, 191, 36, 0.2)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "start", gap: 12, marginBottom: 12 }}>
+          <Trophy style={{ width: 20, height: 20, color: "#fbbf24", flexShrink: 0, marginTop: 2 }} />
+          <p style={{ fontSize: 14, color: "#cbd5e1", margin: 0 }}>
+            <strong style={{ color: "white" }}>Live competitions</strong> every 15 minutes
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "start", gap: 12 }}>
+          <Crown style={{ width: 20, height: 20, color: "#fbbf24", flexShrink: 0, marginTop: 2 }} />
+          <p style={{ fontSize: 14, color: "#cbd5e1", margin: 0 }}>
+            Compete for <strong style={{ color: "white" }}>real prizes</strong> and leaderboard glory
+          </p>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 12 }}>
+        <button
+          onClick={onCancel}
+          style={{
+            flex: 1,
+            padding: "14px 24px",
+            borderRadius: 12,
+            border: "1px solid rgba(148, 163, 253, 0.3)",
+            background: "transparent",
+            color: "#94a3b8",
+            fontSize: 15,
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: "all 0.2s",
+          }}
+        >
+          Maybe Later
+        </button>
+        <button
+          onClick={onBuyRounds}
+          style={{
+            flex: 1,
+            padding: "14px 24px",
+            borderRadius: 12,
+            border: "none",
+            background: "linear-gradient(135deg, #f59e0b, #fbbf24)",
+            color: "white",
+            fontSize: 15,
+            fontWeight: 700,
+            cursor: "pointer",
+            transition: "all 0.2s",
+            boxShadow: "0 8px 24px rgba(251, 191, 36, 0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+          }}
+        >
+          <ShoppingCart style={{ width: 18, height: 18 }} />
+          Buy Rounds Now
+        </button>
+      </div>
+    </div>
+  </div>
+));
+NoRoundsModal.displayName = "NoRoundsModal";
+
 export default function HomePage() {
   const router = useRouter();
   const [isPlaying, setIsPlaying] = useState(false);
@@ -214,6 +342,33 @@ export default function HomePage() {
   const [showAgeModal, setShowAgeModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<"live" | "free" | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [userRounds, setUserRounds] = useState(0);
+  const [showNoRoundsModal, setShowNoRoundsModal] = useState(false);
+
+  // Fetch user's available rounds
+  const fetchUserRounds = useCallback(async () => {
+    if (!user) {
+      setUserRounds(0);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("user_rounds")
+        .select("available_rounds")
+        .eq("user_id", user.id)
+        .single();
+
+      if (!error && data) {
+        setUserRounds(data.available_rounds || 0);
+      } else {
+        setUserRounds(0);
+      }
+    } catch (err) {
+      console.error("User rounds fetch error:", err);
+      setUserRounds(0);
+    }
+  }, [user]);
 
   // Initial Load with smooth fade in
   useEffect(() => {
@@ -234,6 +389,13 @@ export default function HomePage() {
       });
     }
   }, [isInitialLoad]);
+
+  // Fetch user rounds when user changes
+  useEffect(() => {
+    if (user) {
+      fetchUserRounds();
+    }
+  }, [user, fetchUserRounds]);
 
   // Real-time Active Players with Dynamic Variation
   const fetchActivePlayers = useCallback(async () => {
@@ -466,12 +628,17 @@ export default function HomePage() {
     setShowAgeModal(false);
     
     if (pendingAction === "live") {
-      router.push("/quiz");
+      // Re-check rounds after age verification
+      if (userRounds <= 0) {
+        setShowNoRoundsModal(true);
+      } else {
+        router.push("/lobby");
+      }
     } else if (pendingAction === "free") {
       router.push("/free");
     }
     setPendingAction(null);
-  }, [pendingAction, router]);
+  }, [pendingAction, userRounds, router]);
 
   // Check if user is verified 18+
   const checkAgeVerification = useCallback(() => {
@@ -491,8 +658,15 @@ export default function HomePage() {
       return;
     }
 
-    router.push("/quiz");
-  }, [user, handleSignIn, checkAgeVerification, router]);
+    // Check if user has available rounds
+    if (userRounds <= 0) {
+      setShowNoRoundsModal(true);
+      return;
+    }
+
+    // User has rounds, go to lobby
+    router.push("/lobby");
+  }, [user, handleSignIn, checkAgeVerification, userRounds, router]);
 
   // Start Free Quiz
   const handleStartFreeQuiz = useCallback(async () => {
@@ -684,18 +858,42 @@ export default function HomePage() {
           display: inline-flex;
           align-items: center;
           gap: 8px;
-          padding: 6px 16px;
+          padding: 8px 20px;
           border-radius: 9999px;
-          border: 1px solid rgba(139, 92, 246, 0.35);
-          background: rgba(15, 23, 42, 0.9);
-          color: #c4b5fd;
+          border: 2px solid rgba(251, 191, 36, 0.4);
+          background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
+          color: #fbbf24;
           font-size: 12px;
           margin-bottom: 24px;
           backdrop-filter: blur(10px);
+          font-weight: 700;
+          box-shadow: 0 0 20px rgba(251, 191, 36, 0.3), inset 0 0 20px rgba(251, 191, 36, 0.1);
+          position: relative;
+          overflow: hidden;
+        }
+
+        .vx-hero-badge::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+          animation: badge-shine 3s infinite;
+        }
+
+        @keyframes badge-shine {
+          0% { left: -100%; }
+          50%, 100% { left: 100%; }
         }
 
         @media (min-width: 640px) {
-          .vx-hero-badge { padding: 8px 20px; font-size: 14px; margin-bottom: 32px; }
+          .vx-hero-badge { 
+            padding: 10px 24px; 
+            font-size: 14px; 
+            margin-bottom: 32px;
+          }
         }
 
         .vx-hero-title {
@@ -950,6 +1148,17 @@ export default function HomePage() {
           />
         )}
 
+        {/* No Rounds Modal */}
+        {showNoRoundsModal && (
+          <NoRoundsModal
+            onBuyRounds={() => {
+              setShowNoRoundsModal(false);
+              router.push("/buy");
+            }}
+            onCancel={() => setShowNoRoundsModal(false)}
+          />
+        )}
+
         {/* HEADER */}
         <header className="vx-header">
           <div className="vx-container">
@@ -1062,7 +1271,7 @@ export default function HomePage() {
                   }}
                 >
                   <ShoppingCart style={{ width: 14, height: 14 }} />
-                  Buy Round
+                  {user && userRounds > 0 ? `${userRounds} Rounds` : "Buy Round"}
                 </button>
 
                 {/* Leaderboard */}
@@ -1267,8 +1476,9 @@ export default function HomePage() {
         <main className="vx-hero">
           <div className="vx-container">
             <div className="vx-hero-badge">
-              <Sparkles style={{ width: 14, height: 14, color: "#c4b5fd" }} />
-              Global Competition · Every 15 Minutes
+              <Crown style={{ width: 16, height: 16, color: "#fbbf24" }} />
+              Knowledge Quiz with a £1000 Monthly Prize
+              <Trophy style={{ width: 16, height: 16, color: "#fbbf24" }} />
             </div>
 
             <h1 className="vx-hero-title">
