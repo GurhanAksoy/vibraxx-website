@@ -1,8 +1,9 @@
 ﻿"use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import Head from "next/head";
 import {
   Crown,
   Trophy,
@@ -13,6 +14,11 @@ import {
   VolumeX,
   Sparkles,
   Globe,
+  Gift,
+  User,
+  ShoppingCart,
+  CheckCircle,
+  AlertCircle,
 } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 import { playMenuMusic, stopMenuMusic } from "@/lib/audioManager";
@@ -22,97 +28,308 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+// Memoized Components
+const StatCard = memo(({ icon: Icon, value, label, color }: any) => (
+  <div className="vx-stat-card">
+    <Icon style={{ width: 22, height: 22, color, marginBottom: 4 }} />
+    <div className="vx-stat-value" style={{ color }}>{value}</div>
+    <div className="vx-stat-label">{label}</div>
+  </div>
+));
+StatCard.displayName = "StatCard";
+
+const ChampionCard = memo(({ champion }: any) => {
+  const Icon = champion.icon;
+  return (
+    <div className="vx-champ-card">
+      <div
+        style={{
+          width: 56,
+          height: 56,
+          margin: "0 auto 18px",
+          borderRadius: 18,
+          background: champion.gradient,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Icon style={{ width: 26, height: 26, color: "#ffffff" }} />
+      </div>
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: "0.12em",
+          color: "#6b7280",
+          marginBottom: 6,
+        }}
+      >
+        {champion.period} Champion
+      </div>
+      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>
+        {champion.name}
+      </div>
+      <div style={{ fontSize: 20, fontWeight: 800, color: champion.color }}>
+        {champion.score.toLocaleString()} pts
+      </div>
+    </div>
+  );
+});
+ChampionCard.displayName = "ChampionCard";
+
+// Age Verification Modal Component
+const AgeVerificationModal = memo(({ onConfirm, onCancel }: any) => (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0, 0, 0, 0.85)",
+      backdropFilter: "blur(8px)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 100,
+      padding: "20px",
+    }}
+    onClick={onCancel}
+  >
+    <div
+      style={{
+        background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+        borderRadius: 24,
+        padding: "32px",
+        maxWidth: 480,
+        width: "100%",
+        border: "1px solid rgba(139, 92, 246, 0.3)",
+        boxShadow: "0 20px 60px rgba(0, 0, 0, 0.5)",
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div style={{ textAlign: "center", marginBottom: 24 }}>
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            margin: "0 auto 16px",
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <AlertCircle style={{ width: 32, height: 32, color: "white" }} />
+        </div>
+        <h3
+          style={{
+            fontSize: 24,
+            fontWeight: 700,
+            marginBottom: 12,
+            color: "white",
+          }}
+        >
+          Age Verification Required
+        </h3>
+        <p style={{ fontSize: 15, color: "#94a3b8", lineHeight: 1.6 }}>
+          To participate in Live Quiz competitions with real prizes, you must be at least 18 years old.
+        </p>
+      </div>
+
+      <div
+        style={{
+          background: "rgba(139, 92, 246, 0.1)",
+          borderRadius: 16,
+          padding: 20,
+          marginBottom: 24,
+          border: "1px solid rgba(139, 92, 246, 0.2)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "start", gap: 12, marginBottom: 12 }}>
+          <CheckCircle style={{ width: 20, height: 20, color: "#a78bfa", flexShrink: 0, marginTop: 2 }} />
+          <p style={{ fontSize: 14, color: "#cbd5e1", margin: 0 }}>
+            I confirm that I am <strong style={{ color: "white" }}>18 years or older</strong>
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "start", gap: 12 }}>
+          <CheckCircle style={{ width: 20, height: 20, color: "#a78bfa", flexShrink: 0, marginTop: 2 }} />
+          <p style={{ fontSize: 14, color: "#cbd5e1", margin: 0 }}>
+            I agree to participate responsibly in quiz competitions
+          </p>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 12 }}>
+        <button
+          onClick={onCancel}
+          style={{
+            flex: 1,
+            padding: "14px 24px",
+            borderRadius: 12,
+            border: "1px solid rgba(148, 163, 253, 0.3)",
+            background: "transparent",
+            color: "#94a3b8",
+            fontSize: 15,
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: "all 0.2s",
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={onConfirm}
+          style={{
+            flex: 1,
+            padding: "14px 24px",
+            borderRadius: 12,
+            border: "none",
+            background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+            color: "white",
+            fontSize: 15,
+            fontWeight: 700,
+            cursor: "pointer",
+            transition: "all 0.2s",
+            boxShadow: "0 8px 24px rgba(124, 58, 237, 0.4)",
+          }}
+        >
+          I'm 18+ - Continue
+        </button>
+      </div>
+    </div>
+  </div>
+));
+AgeVerificationModal.displayName = "AgeVerificationModal";
+
 export default function HomePage() {
   const router = useRouter();
-
   const [isPlaying, setIsPlaying] = useState(false);
-  const [nextRound, setNextRound] = useState(847);
-  const [activePlayers, setActivePlayers] = useState(15234);
+  const [nextRound, setNextRound] = useState<number | null>(null);
+  const [activePlayers, setActivePlayers] = useState(600);
   const [user, setUser] = useState<any>(null);
+  const [champions, setChampions] = useState<any[]>([]);
+  const [stats, setStats] = useState({ totalQuestions: 0, roundsPerDay: 96 });
+  const [isLoading, setIsLoading] = useState(true);
+  const [showAgeModal, setShowAgeModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"live" | "free" | null>(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // LIVE STATS
+  // Initial Load with smooth fade in
   useEffect(() => {
-    const timer = setInterval(() => {
-      setNextRound((prev) => (prev > 0 ? prev - 1 : 900));
-      setActivePlayers((prev) => {
-        const delta = Math.floor(Math.random() * 10 - 5);
-        const next = prev + delta;
-        return next < 0 ? 0 : next;
+    const timer = setTimeout(() => {
+      setIsInitialLoad(false);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    // Smooth fade in for neon orbs after page loads
+    if (!isInitialLoad) {
+      const orbs = document.querySelectorAll('.animate-float');
+      orbs.forEach((orb, index) => {
+        setTimeout(() => {
+          (orb as HTMLElement).style.opacity = index === 0 ? '0.28' : '0.22';
+        }, 300 + index * 200);
       });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // AUTH LISTENER
-  useEffect(() => {
-    const loadUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user || null);
-    };
-    loadUser();
-
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
-    });
-
-    return () => {
-      sub.subscription.unsubscribe();
-    };
-  }, []);
-
-  // MUSIC
-  const toggleMusic = () => {
-    if (isPlaying) {
-      stopMenuMusic();
-      setIsPlaying(false);
-    } else {
-      playMenuMusic();
-      setIsPlaying(true);
     }
-  };
+  }, [isInitialLoad]);
 
-  useEffect(() => {
-    return () => {
-      stopMenuMusic();
-    };
+  // Real-time Active Players with Dynamic Variation
+  const fetchActivePlayers = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("active_sessions")
+        .select("count", { count: "exact", head: true });
+      
+      if (!error && data !== null) {
+        const realCount = (data as any) || 0;
+        // Base: 600 + gerçek sayı + rastgele varyasyon (-50 ile +150 arası)
+        const variation = Math.floor(Math.random() * 200) - 50;
+        const finalCount = Math.max(600, 600 + realCount + variation);
+        setActivePlayers(finalCount);
+      } else {
+        // Supabase hatası varsa dinamik sayı üret
+        const variation = Math.floor(Math.random() * 200) - 50;
+        setActivePlayers(Math.max(600, 600 + variation));
+      }
+    } catch (err) {
+      console.error("Active players fetch error:", err);
+      const variation = Math.floor(Math.random() * 200) - 50;
+      setActivePlayers(Math.max(600, 600 + variation));
+    }
   }, []);
 
-  // AUTH ACTIONS
-  const handleSignIn = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-  };
+  // Next Round Countdown
+  const fetchNextRound = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("quiz_rounds")
+        .select("scheduled_at")
+        .gte("scheduled_at", new Date().toISOString())
+        .order("scheduled_at", { ascending: true })
+        .limit(1)
+        .single();
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-  };
-
-  // START QUIZ (herkes önce lobby, sadece google login ile)
-  const handleStartQuiz = async () => {
-    const { data } = await supabase.auth.getSession();
-    const currentUser = data.session?.user;
-
-    if (!currentUser) {
-      await handleSignIn();
-      return;
+      if (!error && data) {
+        const scheduledTime = new Date(data.scheduled_at).getTime();
+        const now = Date.now();
+        const diff = Math.max(0, Math.floor((scheduledTime - now) / 1000));
+        setNextRound(diff);
+      } else {
+        setNextRound(900);
+      }
+    } catch (err) {
+      console.error("Next round fetch error:", err);
+      setNextRound(900);
     }
+  }, []);
 
-    router.push("/lobby");
-  };
+  // Fetch Champions
+  const fetchChampions = useCallback(async () => {
+    try {
+      const periods = ["daily", "weekly", "monthly"];
+      const championsData = await Promise.all(
+        periods.map(async (period) => {
+          const { data, error } = await supabase
+            .from("leaderboard")
+            .select("user_id, score, users(full_name, avatar_url)")
+            .eq("period", period)
+            .order("score", { ascending: false })
+            .limit(1)
+            .single();
 
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, "0")}`;
-  };
+          if (error || !data) return null;
 
-  // MOCK CHAMPIONS
-  const champions = [
+          const icons = [Crown, Trophy, Sparkles];
+          const gradients = [
+            "linear-gradient(to bottom right, #eab308, #f97316)",
+            "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
+            "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
+          ];
+          const colors = ["#facc15", "#c084fc", "#22d3ee"];
+
+          return {
+            period: period.charAt(0).toUpperCase() + period.slice(1),
+            name: (data.users as any)?.full_name || "Anonymous",
+            score: data.score,
+            gradient: gradients[periods.indexOf(period)],
+            color: colors[periods.indexOf(period)],
+            icon: icons[periods.indexOf(period)],
+          };
+        })
+      );
+
+      const validChampions = championsData.filter((c) => c !== null);
+      setChampions(validChampions.length > 0 ? validChampions : getDefaultChampions());
+    } catch (err) {
+      console.error("Champions fetch error:", err);
+      setChampions(getDefaultChampions());
+    }
+  }, []);
+
+  // Default Champions
+  const getDefaultChampions = () => [
     {
       period: "Daily",
       name: "Sarah Chen",
@@ -139,85 +356,277 @@ export default function HomePage() {
     },
   ];
 
+  // Fetch Stats
+  const fetchStats = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("quiz_stats")
+        .select("total_questions, rounds_per_day")
+        .single();
+
+      if (!error && data) {
+        setStats({
+          totalQuestions: data.total_questions || 2800000,
+          roundsPerDay: data.rounds_per_day || 96,
+        });
+      }
+    } catch (err) {
+      console.error("Stats fetch error:", err);
+    }
+  }, []);
+
+  // Initial Load
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      await Promise.all([
+        fetchActivePlayers(),
+        fetchNextRound(),
+        fetchChampions(),
+        fetchStats(),
+      ]);
+      setIsLoading(false);
+    };
+    loadData();
+  }, [fetchActivePlayers, fetchNextRound, fetchChampions, fetchStats]);
+
+  // Real-time Updates
+  useEffect(() => {
+    const playersInterval = setInterval(fetchActivePlayers, 8000);
+    const roundInterval = setInterval(() => {
+      setNextRound((prev) => (prev !== null && prev > 0 ? prev - 1 : null));
+    }, 1000);
+
+    if (nextRound === 0) {
+      fetchNextRound();
+    }
+
+    return () => {
+      clearInterval(playersInterval);
+      clearInterval(roundInterval);
+    };
+  }, [fetchActivePlayers, fetchNextRound, nextRound]);
+
+  // Auth Listener
+  useEffect(() => {
+    const loadUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user || null);
+    };
+    loadUser();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+    });
+
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  // Music Toggle
+  const toggleMusic = useCallback(() => {
+    if (isPlaying) {
+      stopMenuMusic();
+      setIsPlaying(false);
+      localStorage.setItem("vibraxx_music", "false");
+    } else {
+      playMenuMusic();
+      setIsPlaying(true);
+      localStorage.setItem("vibraxx_music", "true");
+    }
+  }, [isPlaying]);
+
+  // Load Music Preference
+  useEffect(() => {
+    const musicPref = localStorage.getItem("vibraxx_music");
+    if (musicPref === "true") {
+      playMenuMusic();
+      setIsPlaying(true);
+    }
+    return () => stopMenuMusic();
+  }, []);
+
+  // Auth Actions
+  const handleSignIn = useCallback(async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+  }, []);
+
+  const handleSignOut = useCallback(async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  }, []);
+
+  // Age Verification Handler
+  const handleAgeVerification = useCallback(() => {
+    localStorage.setItem("vibraxx_age_verified", "true");
+    setShowAgeModal(false);
+    
+    if (pendingAction === "live") {
+      router.push("/quiz");
+    } else if (pendingAction === "free") {
+      router.push("/free");
+    }
+    setPendingAction(null);
+  }, [pendingAction, router]);
+
+  // Check if user is verified 18+
+  const checkAgeVerification = useCallback(() => {
+    return localStorage.getItem("vibraxx_age_verified") === "true";
+  }, []);
+
+  // Start Live Quiz
+  const handleStartLiveQuiz = useCallback(async () => {
+    if (!user) {
+      await handleSignIn();
+      return;
+    }
+
+    if (!checkAgeVerification()) {
+      setPendingAction("live");
+      setShowAgeModal(true);
+      return;
+    }
+
+    router.push("/quiz");
+  }, [user, handleSignIn, checkAgeVerification, router]);
+
+  // Start Free Quiz
+  const handleStartFreeQuiz = useCallback(async () => {
+    if (!user) {
+      await handleSignIn();
+      return;
+    }
+
+    if (!checkAgeVerification()) {
+      setPendingAction("free");
+      setShowAgeModal(true);
+      return;
+    }
+
+    router.push("/free");
+  }, [user, handleSignIn, checkAgeVerification, router]);
+
+  // Format Time
+  const formatTime = useCallback((seconds: number | null) => {
+    if (seconds === null) return "--:--";
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  }, []);
+
+  // Stats Cards
+  const statsCards = useMemo(
+    () => [
+      {
+        icon: Globe,
+        value: `${Math.floor(activePlayers / 1000)}K+`,
+        label: "Active Players",
+        color: "#a78bfa",
+      },
+      {
+        icon: Sparkles,
+        value: `${(stats.totalQuestions / 1000000).toFixed(1)}M+`,
+        label: "Questions Answered",
+        color: "#f0abfc",
+      },
+      {
+        icon: Zap,
+        value: `${stats.roundsPerDay}/day`,
+        label: "Live Rounds",
+        color: "#22d3ee",
+      },
+    ],
+    [activePlayers, stats]
+  );
+
   return (
     <>
+      <Head>
+        <title>VibraXX - World's #1 Educational Quiz | Compete & Win</title>
+        <meta
+          name="description"
+          content="The world's number one educational and award-winning quiz! Compete globally, win prizes, and prove your knowledge."
+        />
+        <meta name="keywords" content="live quiz, educational quiz, trivia, competition, prizes, leaderboard" />
+        <meta property="og:title" content="VibraXX - World's #1 Educational Quiz" />
+        <meta property="og:description" content="The world's number one educational and award-winning quiz!" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <link rel="canonical" href="https://vibraxx.com" />
+      </Head>
+
       <style jsx global>{`
-        :root {
+        :root { 
           color-scheme: dark;
+          background-color: #020817;
+        }
+        
+        * { 
+          box-sizing: border-box;
+        }
+
+        body {
+          background-color: #020817;
+          margin: 0;
+          padding: 0;
         }
 
         @keyframes float {
-          0%,
-          100% {
-            transform: translateY(0px);
-          }
-          50% {
-            transform: translateY(-20px);
-          }
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
         }
 
         @keyframes glow {
-          0%,
-          100% {
-            opacity: 0.3;
-          }
-          50% {
-            opacity: 0.6;
-          }
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 0.6; }
         }
 
         @keyframes shimmer {
-          0% {
-            background-position: -200% center;
-          }
-          100% {
-            background-position: 200% center;
-          }
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
         }
 
         @keyframes pulse-slow {
-          0%,
-          100% {
-            opacity: 0.5;
-          }
-          50% {
-            opacity: 0.8;
-          }
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 0.8; }
         }
 
-        .animate-float {
-          animation: float 6s ease-in-out infinite;
+        .animate-float { 
+          animation: float 6s ease-in-out infinite; 
+          will-change: transform;
+          animation-delay: 0.3s;
+          animation-fill-mode: backwards;
         }
-
-        .animate-glow {
+        
+        .animate-glow { 
           animation: glow 3s ease-in-out infinite;
+          animation-delay: 0.5s;
+          animation-fill-mode: backwards;
         }
-
-        .animate-shimmer {
-          background-size: 200% 100%;
+        
+        .animate-shimmer { 
+          background-size: 200% 100%; 
           animation: shimmer 3s linear infinite;
+          animation-delay: 0.2s;
+          animation-fill-mode: backwards;
         }
-
-        .animate-pulse-slow {
+        
+        .animate-pulse-slow { 
           animation: pulse-slow 4s ease-in-out infinite;
+          animation-delay: 0.4s;
+          animation-fill-mode: backwards;
         }
 
-        /* LAYOUT HELPERS */
-        .vx-container {
-          max-width: 1280px;
-          margin: 0 auto;
-          padding: 0 16px;
-        }
+        .vx-container { max-width: 1280px; margin: 0 auto; padding: 0 16px; }
+        @media (min-width: 640px) { .vx-container { padding: 0 24px; } }
 
-        @media (min-width: 640px) {
-          .vx-container {
-            padding: 0 24px;
-          }
-        }
-
-        /* HEADER */
         .vx-header {
-          position: relative;
+          position: sticky;
+          top: 0;
           z-index: 50;
           border-bottom: 1px solid rgba(255, 255, 255, 0.12);
           backdrop-filter: blur(20px);
@@ -233,49 +642,25 @@ export default function HomePage() {
           flex-wrap: wrap;
         }
 
-        .vx-header-right {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-
-        .vx-hide-mobile {
-          display: none;
-        }
+        .vx-header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .vx-hide-mobile { display: none; }
 
         @media (min-width: 640px) {
-          .vx-header-inner {
-            height: 80px;
-            flex-wrap: nowrap;
-          }
-          .vx-header-right {
-            gap: 12px;
-          }
-          .vx-hide-mobile {
-            display: inline-flex;
-          }
+          .vx-header-inner { height: 80px; flex-wrap: nowrap; }
+          .vx-header-right { gap: 12px; }
+          .vx-hide-mobile { display: inline-flex; }
         }
 
         @media (max-width: 639px) {
-          .vx-header-inner {
-            justify-content: center;
-          }
-          .vx-header-right {
-            justify-content: center;
-          }
+          .vx-header-inner { justify-content: center; }
+          .vx-header-right { justify-content: center; }
         }
 
-        /* LIVE BAR */
         .vx-livebar {
           z-index: 40;
           border-bottom: 1px solid rgba(255, 255, 255, 0.12);
           backdrop-filter: blur(16px);
-          background: linear-gradient(
-            90deg,
-            rgba(139, 92, 246, 0.12),
-            rgba(236, 72, 153, 0.08)
-          );
+          background: linear-gradient(90deg, rgba(139, 92, 246, 0.12), rgba(236, 72, 153, 0.08));
           font-size: 12px;
         }
 
@@ -289,23 +674,11 @@ export default function HomePage() {
         }
 
         @media (min-width: 640px) {
-          .vx-livebar-inner {
-            font-size: 14px;
-            padding: 10px 24px;
-          }
+          .vx-livebar-inner { font-size: 14px; padding: 10px 24px; }
         }
 
-        /* HERO */
-        .vx-hero {
-          padding: 72px 16px 80px;
-          text-align: center;
-        }
-
-        @media (min-width: 640px) {
-          .vx-hero {
-            padding: 96px 24px 96px;
-          }
-        }
+        .vx-hero { padding: 72px 16px 80px; text-align: center; }
+        @media (min-width: 640px) { .vx-hero { padding: 96px 24px 96px; } }
 
         .vx-hero-badge {
           display: inline-flex;
@@ -322,11 +695,7 @@ export default function HomePage() {
         }
 
         @media (min-width: 640px) {
-          .vx-hero-badge {
-            padding: 8px 20px;
-            font-size: 14px;
-            margin-bottom: 32px;
-          }
+          .vx-hero-badge { padding: 8px 20px; font-size: 14px; margin-bottom: 32px; }
         }
 
         .vx-hero-title {
@@ -339,17 +708,11 @@ export default function HomePage() {
 
         .vx-hero-neon {
           display: inline-block;
-          background: linear-gradient(
-            90deg,
-            #7c3aed,
-            #22d3ee,
-            #f97316,
-            #d946ef,
-            #7c3aed
-          );
+          background: linear-gradient(90deg, #7c3aed, #22d3ee, #f97316, #d946ef, #7c3aed);
           background-size: 250% 100%;
           -webkit-background-clip: text;
-          color: transparent;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
           animation: shimmer 4s linear infinite;
           text-shadow: 0 0 14px rgba(124, 58, 237, 0.45);
         }
@@ -363,10 +726,7 @@ export default function HomePage() {
         }
 
         @media (min-width: 640px) {
-          .vx-hero-subtitle {
-            font-size: 18px;
-            margin-bottom: 40px;
-          }
+          .vx-hero-subtitle { font-size: 18px; margin-bottom: 40px; }
         }
 
         .vx-cta-wrap {
@@ -379,9 +739,7 @@ export default function HomePage() {
         }
 
         @media (min-width: 640px) {
-          .vx-cta-wrap {
-            margin-bottom: 64px;
-          }
+          .vx-cta-wrap { flex-direction: row; margin-bottom: 64px; }
         }
 
         .vx-cta-btn {
@@ -397,17 +755,20 @@ export default function HomePage() {
           font-weight: 700;
           font-size: 16px;
           overflow: hidden;
-          box-shadow: 0 20px 40px -16px rgba(139, 92, 246, 0.6);
+          transition: transform 0.2s, box-shadow 0.2s;
+          min-width: 200px;
         }
+
+        .vx-cta-btn:hover { transform: translateY(-2px); }
+        .vx-cta-btn:active { transform: translateY(0); }
 
         @media (min-width: 640px) {
-          .vx-cta-btn {
-            padding: 18px 34px;
-            font-size: 18px;
-          }
+          .vx-cta-btn { padding: 18px 34px; font-size: 18px; }
         }
 
-        /* STATS GRID */
+        .vx-cta-live { box-shadow: 0 20px 40px -16px rgba(139, 92, 246, 0.6); }
+        .vx-cta-free { box-shadow: 0 20px 40px -16px rgba(34, 211, 238, 0.5); }
+
         .vx-stats-grid {
           display: grid;
           grid-template-columns: 1fr;
@@ -436,32 +797,22 @@ export default function HomePage() {
           backdrop-filter: blur(18px);
           min-height: 120px;
           padding: 1.5rem;
+          transition: transform 0.3s;
         }
+
+        .vx-stat-card:hover { transform: translateY(-4px); }
 
         @media (min-width: 640px) {
-          .vx-stat-card {
-            min-height: 150px;
-            padding: 1.75rem;
-          }
+          .vx-stat-card { min-height: 150px; padding: 1.75rem; }
         }
 
-        .vx-stat-label {
-          color: #94a3b8;
-          font-size: 13px;
-        }
-
-        .vx-stat-value {
-          font-weight: 800;
-          font-size: 24px;
-        }
+        .vx-stat-label { color: #94a3b8; font-size: 13px; }
+        .vx-stat-value { font-weight: 800; font-size: 24px; }
 
         @media (min-width: 640px) {
-          .vx-stat-value {
-            font-size: 28px;
-          }
+          .vx-stat-value { font-size: 28px; }
         }
 
-        /* CHAMPIONS */
         .vx-champions-title {
           font-size: 24px;
           font-weight: 700;
@@ -473,10 +824,7 @@ export default function HomePage() {
         }
 
         @media (min-width: 640px) {
-          .vx-champions-title {
-            font-size: 32px;
-            margin-bottom: 32px;
-          }
+          .vx-champions-title { font-size: 32px; margin-bottom: 32px; }
         }
 
         .vx-champions-grid {
@@ -501,15 +849,15 @@ export default function HomePage() {
           background: rgba(9, 9, 13, 0.96);
           backdrop-filter: blur(18px);
           text-align: center;
+          transition: transform 0.3s;
         }
+
+        .vx-champ-card:hover { transform: translateY(-4px); }
 
         @media (min-width: 640px) {
-          .vx-champ-card {
-            padding: 26px;
-          }
+          .vx-champ-card { padding: 26px; }
         }
 
-        /* FOOTER */
         .vx-footer {
           border-top: 1px solid rgba(255, 255, 255, 0.12);
           background: rgba(9, 9, 13, 0.96);
@@ -521,10 +869,7 @@ export default function HomePage() {
         }
 
         @media (min-width: 640px) {
-          .vx-footer {
-            font-size: 13px;
-            padding: 24px 24px 32px;
-          }
+          .vx-footer { font-size: 13px; padding: 24px 24px 32px; }
         }
 
         .vx-footer-links {
@@ -534,15 +879,25 @@ export default function HomePage() {
           justify-content: center;
           flex-wrap: wrap;
         }
+
+        .vx-footer-links a {
+          color: #94a3b8;
+          text-decoration: none;
+          transition: color 0.2s;
+        }
+
+        .vx-footer-links a:hover { color: #c4b5fd; }
       `}</style>
 
       <div
         style={{
           minHeight: "100vh",
-          background: "linear-gradient(to bottom right, #020817, #020817)",
+          background: "#020817",
           color: "white",
           position: "relative",
           overflow: "hidden",
+          opacity: isInitialLoad ? 0 : 1,
+          transition: "opacity 0.3s ease-in",
         }}
       >
         {/* Neon Orbs */}
@@ -556,9 +911,12 @@ export default function HomePage() {
             height: "260px",
             borderRadius: "50%",
             background: "#7c3aed",
-            opacity: 0.28,
+            opacity: 0,
             filter: "blur(70px)",
             zIndex: 0,
+            pointerEvents: "none",
+            animation: isInitialLoad ? "none" : undefined,
+            transition: "opacity 0.8s ease-in 0.3s",
           }}
         />
         <div
@@ -571,26 +929,32 @@ export default function HomePage() {
             height: "260px",
             borderRadius: "50%",
             background: "#d946ef",
-            opacity: 0.22,
+            opacity: 0,
             filter: "blur(70px)",
             zIndex: 0,
             animationDelay: "2s",
+            pointerEvents: "none",
+            animation: isInitialLoad ? "none" : undefined,
+            transition: "opacity 0.8s ease-in 0.5s",
           }}
         />
+
+        {/* Age Verification Modal */}
+        {showAgeModal && (
+          <AgeVerificationModal
+            onConfirm={handleAgeVerification}
+            onCancel={() => {
+              setShowAgeModal(false);
+              setPendingAction(null);
+            }}
+          />
+        )}
 
         {/* HEADER */}
         <header className="vx-header">
           <div className="vx-container">
             <div className="vx-header-inner">
-              {/* Logo + Title */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  minWidth: 0,
-                }}
-              >
+              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                 <div
                   style={{
                     position: "relative",
@@ -598,8 +962,7 @@ export default function HomePage() {
                     height: 72,
                     borderRadius: "9999px",
                     padding: 3,
-                    background:
-                      "radial-gradient(circle at 0 0,#7c3aed,#d946ef)",
+                    background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)",
                     boxShadow: "0 0 26px rgba(124,58,237,0.55)",
                     flexShrink: 0,
                   }}
@@ -610,10 +973,10 @@ export default function HomePage() {
                       position: "absolute",
                       inset: -4,
                       borderRadius: "9999px",
-                      background:
-                        "radial-gradient(circle,#a855f7,transparent)",
+                      background: "radial-gradient(circle,#a855f7,transparent)",
                       opacity: 0.4,
                       filter: "blur(8px)",
+                      pointerEvents: "none",
                     }}
                   />
                   <div
@@ -631,20 +994,15 @@ export default function HomePage() {
                   >
                     <Image
                       src="/images/logo.png"
-                      alt="VibraXX"
+                      alt="VibraXX Logo"
                       fill
                       sizes="72px"
                       style={{ objectFit: "contain" }}
+                      priority
                     />
                   </div>
                 </div>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 2,
-                  }}
-                >
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   <span
                     style={{
                       fontSize: 13,
@@ -659,12 +1017,11 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Right controls */}
               <div className="vx-header-right">
-                {/* Music */}
+                {/* Music Toggle */}
                 <button
                   onClick={toggleMusic}
-                  aria-label="Toggle music"
+                  aria-label={isPlaying ? "Mute music" : "Play music"}
                   style={{
                     padding: 9,
                     borderRadius: 12,
@@ -674,23 +1031,45 @@ export default function HomePage() {
                     alignItems: "center",
                     justifyContent: "center",
                     cursor: "pointer",
+                    transition: "all 0.2s",
                   }}
                 >
                   {isPlaying ? (
-                    <Volume2
-                      style={{ width: 18, height: 18, color: "#a78bfa" }}
-                    />
+                    <Volume2 style={{ width: 18, height: 18, color: "#a78bfa" }} />
                   ) : (
-                    <VolumeX
-                      style={{ width: 18, height: 18, color: "#6b7280" }}
-                    />
+                    <VolumeX style={{ width: 18, height: 18, color: "#6b7280" }} />
                   )}
+                </button>
+
+                {/* Buy Round Button */}
+                <button
+                  onClick={() => router.push("/buy")}
+                  className="vx-hide-mobile"
+                  aria-label="Buy quiz rounds"
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(251,191,36,0.3)",
+                    background: "linear-gradient(135deg, rgba(251,191,36,0.1), rgba(245,158,11,0.1))",
+                    color: "#fbbf24",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    transition: "all 0.2s",
+                  }}
+                >
+                  <ShoppingCart style={{ width: 14, height: 14 }} />
+                  Buy Round
                 </button>
 
                 {/* Leaderboard */}
                 <button
                   onClick={() => router.push("/leaderboard")}
                   className="vx-hide-mobile"
+                  aria-label="View leaderboard"
                   style={{
                     padding: "8px 16px",
                     borderRadius: 12,
@@ -702,28 +1081,32 @@ export default function HomePage() {
                     display: "inline-flex",
                     alignItems: "center",
                     gap: 6,
+                    transition: "all 0.2s",
                   }}
                 >
-                  <Trophy
-                    style={{ width: 14, height: 14, color: "#a78bfa" }}
-                  />
+                  <Trophy style={{ width: 14, height: 14, color: "#a78bfa" }} />
                   Leaderboard
                 </button>
 
-                {/* Auth */}
+                {/* Auth Section */}
                 {user ? (
                   <>
-                    <div
-                      className="vx-hide-mobile"
+                    {/* Profile Button */}
+                    <button
+                      onClick={() => router.push("/profile")}
+                      aria-label="View profile"
                       style={{
+                        padding: "8px 16px",
+                        borderRadius: 12,
+                        border: "1px solid rgba(148,163,253,0.26)",
+                        background: "rgba(9,9,13,0.96)",
+                        color: "white",
+                        fontSize: 13,
+                        cursor: "pointer",
                         display: "inline-flex",
                         alignItems: "center",
                         gap: 8,
-                        padding: "4px 10px",
-                        borderRadius: 9999,
-                        background: "rgba(9,9,13,0.96)",
-                        border:
-                          "1px solid rgba(148,163,253,0.26)",
+                        transition: "all 0.2s",
                       }}
                     >
                       <div
@@ -733,26 +1116,23 @@ export default function HomePage() {
                           borderRadius: "9999px",
                           overflow: "hidden",
                           backgroundColor: "#020817",
-                          border:
-                            "1px solid rgba(148,163,253,0.26)",
+                          border: "1px solid rgba(148,163,253,0.26)",
                         }}
                       >
                         <Image
-                          src={
-                            user?.user_metadata?.avatar_url ||
-                            "/images/logo.png"
-                          }
-                          alt="Profile"
+                          src={user?.user_metadata?.avatar_url || "/images/logo.png"}
+                          alt="User avatar"
                           width={20}
                           height={20}
                           style={{ objectFit: "cover" }}
                         />
                       </div>
                       <span
+                        className="vx-hide-mobile"
                         style={{
                           fontSize: 11,
                           color: "#e5e7eb",
-                          maxWidth: 120,
+                          maxWidth: 100,
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
@@ -760,9 +1140,13 @@ export default function HomePage() {
                       >
                         {user.user_metadata?.full_name || "Player"}
                       </span>
-                    </div>
+                    </button>
+
+                    {/* Sign Out */}
                     <button
                       onClick={handleSignOut}
+                      aria-label="Sign out"
+                      className="vx-hide-mobile"
                       style={{
                         position: "relative",
                         padding: "8px 18px",
@@ -774,6 +1158,7 @@ export default function HomePage() {
                         color: "white",
                         overflow: "hidden",
                         background: "transparent",
+                        transition: "transform 0.2s",
                       }}
                     >
                       <div
@@ -781,20 +1166,16 @@ export default function HomePage() {
                         style={{
                           position: "absolute",
                           inset: 0,
-                          background:
-                            "linear-gradient(90deg,#ef4444,#f97316,#ef4444)",
+                          background: "linear-gradient(90deg,#ef4444,#f97316,#ef4444)",
                         }}
                       />
-                      <span
-                        style={{ position: "relative", zIndex: 10 }}
-                      >
-                        Sign Out
-                      </span>
+                      <span style={{ position: "relative", zIndex: 10 }}>Sign Out</span>
                     </button>
                   </>
                 ) : (
                   <button
                     onClick={handleSignIn}
+                    aria-label="Sign in with Google"
                     style={{
                       position: "relative",
                       padding: "8px 18px",
@@ -806,6 +1187,7 @@ export default function HomePage() {
                       color: "white",
                       overflow: "hidden",
                       background: "transparent",
+                      transition: "transform 0.2s",
                     }}
                   >
                     <div
@@ -813,15 +1195,10 @@ export default function HomePage() {
                       style={{
                         position: "absolute",
                         inset: 0,
-                        background:
-                          "linear-gradient(90deg,#7c3aed,#d946ef,#7c3aed)",
+                        background: "linear-gradient(90deg,#7c3aed,#d946ef,#7c3aed)",
                       }}
                     />
-                    <span
-                      style={{ position: "relative", zIndex: 10 }}
-                    >
-                      Sign in with Google
-                    </span>
+                    <span style={{ position: "relative", zIndex: 10 }}>Sign in with Google</span>
                   </button>
                 )}
               </div>
@@ -833,14 +1210,9 @@ export default function HomePage() {
         <div className="vx-livebar">
           <div className="vx-container">
             <div className="vx-livebar-inner">
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                 <div
+                  className="animate-pulse-slow"
                   style={{
                     width: 8,
                     height: 8,
@@ -848,14 +1220,7 @@ export default function HomePage() {
                     background: "#ef4444",
                   }}
                 />
-                <span
-                  style={{
-                    color: "#f97316",
-                    fontWeight: 600,
-                  }}
-                >
-                  LIVE
-                </span>
+                <span style={{ color: "#f97316", fontWeight: 600 }}>LIVE</span>
               </div>
 
               <div
@@ -866,15 +1231,8 @@ export default function HomePage() {
                   color: "#cbd5e1",
                 }}
               >
-                <Globe
-                  style={{ width: 14, height: 14, color: "#a78bfa" }}
-                />
-                <span
-                  style={{
-                    fontWeight: 700,
-                    color: "white",
-                  }}
-                >
+                <Globe style={{ width: 14, height: 14, color: "#a78bfa" }} />
+                <span style={{ fontWeight: 700, color: "white" }}>
                   {activePlayers.toLocaleString()}
                 </span>
                 <span>players online</span>
@@ -888,15 +1246,12 @@ export default function HomePage() {
                   color: "#cbd5e1",
                 }}
               >
-                <Sparkles
-                  style={{ width: 14, height: 14, color: "#f0abfc" }}
-                />
+                <Sparkles style={{ width: 14, height: 14, color: "#f0abfc" }} />
                 <span>Next round</span>
                 <span
                   style={{
                     fontWeight: 700,
-                    background:
-                      "linear-gradient(to right,#a78bfa,#f0abfc)",
+                    background: "linear-gradient(to right,#a78bfa,#f0abfc)",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                   }}
@@ -911,38 +1266,31 @@ export default function HomePage() {
         {/* HERO + CONTENT */}
         <main className="vx-hero">
           <div className="vx-container">
-            {/* Badge */}
             <div className="vx-hero-badge">
-              <Sparkles
-                style={{ width: 14, height: 14, color: "#c4b5fd" }}
-              />
+              <Sparkles style={{ width: 14, height: 14, color: "#c4b5fd" }} />
               Global Competition · Every 15 Minutes
             </div>
 
-            {/* Title */}
             <h1 className="vx-hero-title">
-              <span className="vx-hero-neon">
-                The Next Generation Live Quiz
-              </span>
+              <span className="vx-hero-neon">The Next Generation Live Quiz</span>
             </h1>
 
-            {/* Subtitle */}
             <p className="vx-hero-subtitle">
-              Compete live with the world. Rise on the leaderboard
+              The world's number one educational and award-winning quiz!
             </p>
 
-            {/* CTA */}
+            {/* CTA Buttons */}
             <div className="vx-cta-wrap">
               <button
-                className="vx-cta-btn"
-                onClick={handleStartQuiz}
+                className="vx-cta-btn vx-cta-live"
+                onClick={handleStartLiveQuiz}
+                aria-label="Start live quiz with prizes"
               >
                 <div
                   style={{
                     position: "absolute",
                     inset: 0,
-                    background:
-                      "linear-gradient(to right,#7c3aed,#d946ef)",
+                    background: "linear-gradient(to right,#7c3aed,#d946ef)",
                   }}
                 />
                 <Play
@@ -953,14 +1301,38 @@ export default function HomePage() {
                     height: 20,
                   }}
                 />
-                <span
+                <span style={{ position: "relative", zIndex: 10 }}>Start Live Quiz</span>
+                <ArrowRight
                   style={{
                     position: "relative",
                     zIndex: 10,
+                    width: 20,
+                    height: 20,
                   }}
-                >
-                  Start Quiz
-                </span>
+                />
+              </button>
+
+              <button
+                className="vx-cta-btn vx-cta-free"
+                onClick={handleStartFreeQuiz}
+                aria-label="Start free practice quiz"
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: "linear-gradient(to right,#06b6d4,#22d3ee)",
+                  }}
+                />
+                <Gift
+                  style={{
+                    position: "relative",
+                    zIndex: 10,
+                    width: 20,
+                    height: 20,
+                  }}
+                />
+                <span style={{ position: "relative", zIndex: 10 }}>Start Free Quiz</span>
                 <ArrowRight
                   style={{
                     position: "relative",
@@ -974,131 +1346,21 @@ export default function HomePage() {
 
             {/* Stats */}
             <div className="vx-stats-grid">
-              <div className="vx-stat-card">
-                <Globe
-                  style={{
-                    width: 22,
-                    height: 22,
-                    color: "#a78bfa",
-                    marginBottom: 4,
-                  }}
-                />
-                <div
-                  className="vx-stat-value"
-                  style={{ color: "#a78bfa" }}
-                >
-                  15K+
-                </div>
-                <div className="vx-stat-label">Active Players</div>
-              </div>
-              <div className="vx-stat-card">
-                <Sparkles
-                  style={{
-                    width: 22,
-                    height: 22,
-                    color: "#f0abfc",
-                    marginBottom: 4,
-                  }}
-                />
-                <div
-                  className="vx-stat-value"
-                  style={{ color: "#f0abfc" }}
-                >
-                  2.8M+
-                </div>
-                <div className="vx-stat-label">
-                  Questions Answered
-                </div>
-              </div>
-              <div className="vx-stat-card">
-                <Zap
-                  style={{
-                    width: 22,
-                    height: 22,
-                    color: "#22d3ee",
-                    marginBottom: 4,
-                  }}
-                />
-                <div
-                  className="vx-stat-value"
-                  style={{ color: "#22d3ee" }}
-                >
-                  96/day
-                </div>
-                <div className="vx-stat-label">Live Rounds</div>
-              </div>
+              {statsCards.map((stat, i) => (
+                <StatCard key={i} {...stat} />
+              ))}
             </div>
 
             {/* Champions */}
             <h2 className="vx-champions-title">
-              <Crown
-                style={{
-                  width: 24,
-                  height: 24,
-                  color: "#facc15",
-                }}
-              />
+              <Crown style={{ width: 24, height: 24, color: "#facc15" }} />
               Top Champions
             </h2>
 
             <div className="vx-champions-grid">
-              {champions.map((champ, i) => {
-                const Icon = champ.icon;
-                return (
-                  <div key={i} className="vx-champ-card">
-                    <div
-                      style={{
-                        width: 56,
-                        height: 56,
-                        margin: "0 auto 18px",
-                        borderRadius: 18,
-                        background: champ.gradient,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Icon
-                        style={{
-                          width: 26,
-                          height: 26,
-                          color: "#ffffff",
-                        }}
-                      />
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.12em",
-                        color: "#6b7280",
-                        marginBottom: 6,
-                      }}
-                    >
-                      {champ.period} Champion
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 18,
-                        fontWeight: 700,
-                        marginBottom: 4,
-                      }}
-                    >
-                      {champ.name}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 20,
-                        fontWeight: 800,
-                        color: champ.color,
-                      }}
-                    >
-                      {champ.score.toLocaleString()} pts
-                    </div>
-                  </div>
-                );
-              })}
+              {champions.map((champion, i) => (
+                <ChampionCard key={i} champion={champion} />
+              ))}
             </div>
           </div>
         </main>
@@ -1106,11 +1368,11 @@ export default function HomePage() {
         {/* Footer */}
         <footer className="vx-footer">
           <div>© 2025 VibraXX · Powered by Sermin Limited</div>
-          <div className="vx-footer-links">
+          <nav className="vx-footer-links" aria-label="Footer navigation">
             <a href="/privacy">Privacy</a>
             <a href="/terms">Terms</a>
             <a href="/support">Support</a>
-          </div>
+          </nav>
         </footer>
       </div>
     </>
