@@ -7,7 +7,7 @@ export const supabase = createClient(
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true, // Google login callback içindir
+      detectSessionInUrl: false,  // ❌ BU MUTLAKA FALSE OLACAK
     },
   }
 );
