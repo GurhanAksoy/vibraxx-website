@@ -422,57 +422,142 @@ useEffect(() => {
 
               {/* Navigation */}
               <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '10px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'flex-end' : 'flex-start' }}>
-                {authLoading ? (
-                  <div style={{ padding: '10px 16px', borderRadius: '12px', background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', fontSize: '14px', color: '#a78bfa', animation: 'pulse 1.5s ease-in-out infinite' }}>
-                    Loading...
-                  </div>
-                ) : (
-                  <>
-                    <button onClick={toggleMusic} style={{ padding: '10px', borderRadius: '12px', border: '1px solid rgba(139, 92, 246, 0.3)', background: isPlaying ? 'rgba(139, 92, 246, 0.2)' : 'transparent', cursor: 'pointer', transition: 'all 0.3s', minWidth: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {isPlaying ? <Volume2 style={{ width: '18px', height: '18px', color: '#a78bfa' }} /> : <VolumeX style={{ width: '18px', height: '18px', color: '#64748b' }} />}
-                    </button>
+                {/* AUTH SAFE NAVIGATION */}
+{user === null ? (
+  // 1) Kullanıcı hiç giriş yapmamış → Google butonu
+  <button
+    onClick={handleGoogleSignIn}
+    style={{
+      position: "relative",
+      padding: isMobile ? "12px 18px" : "12px 24px",
+      borderRadius: "12px",
+      border: "none",
+      background: "white",
+      color: "#1f2937",
+      fontSize: isMobile ? "14px" : "15px",
+      fontWeight: 700,
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      gap: "10px",
+      whiteSpace: "nowrap",
+      boxShadow: "0 4px 16px rgba(0, 0, 0, 0.4)",
+      transition: "transform 0.2s",
+    }}
+  >
+    <svg width="20" height="20" viewBox="0 0 18 18">
+      <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
+      <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/>
+      <path fill="#FBBC05" d="M3.964 10.707c-.18-.54-.282-1.117-.282-1.707 0-.593.102-1.17.282-1.709V4.958H.957C.347 6.173 0 7.548 0 9c0 1.452.348 2.827.957 4.042l3.007-2.335z"/>
+      <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
+    </svg>
+    <span>{isMobile ? 'Sign In' : 'Sign in with Google'}</span>
+  </button>
 
-                    <button onClick={() => navigate('/leaderboard')} style={{ padding: isMobile ? '10px' : '10px 18px', borderRadius: '12px', border: '1px solid rgba(139, 92, 246, 0.3)', background: 'transparent', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.3s', whiteSpace: 'nowrap', minWidth: isMobile ? '40px' : 'auto', justifyContent: 'center' }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-                      <Trophy style={{ width: '18px', height: '18px', color: '#a78bfa' }} />
-                      {!isMobile && <span>Leaderboard</span>}
-                    </button>
+) : user ? (
+  // 2) Kullanıcı giriş yapmış → User info + profile + logout
+  <>
+    <div
+      style={{
+        padding: isMobile ? "10px 12px" : "10px 16px",
+        borderRadius: "12px",
+        border: "2px solid rgba(34, 197, 94, 0.4)",
+        background: "rgba(34, 197, 94, 0.1)",
+        display: "flex",
+        alignItems: "center",
+        gap: "6px",
+      }}
+    >
+      <Zap style={{ width: "16px", height: "16px", color: "#22c55e" }} />
+      <span
+        style={{ fontSize: "14px", fontWeight: 700, color: "#22c55e" }}
+      >
+        {userRounds}
+      </span>
+    </div>
 
-                    {user ? (
-                      <>
-                        <div style={{ padding: isMobile ? '10px 12px' : '10px 16px', borderRadius: '12px', border: '2px solid rgba(34, 197, 94, 0.4)', background: 'rgba(34, 197, 94, 0.1)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Zap style={{ width: '16px', height: '16px', color: '#22c55e' }} />
-                          <span style={{ fontSize: '14px', fontWeight: 700, color: '#22c55e' }}>{userRounds}</span>
-                        </div>
+    {!isMobile && userName && (
+      <div
+        style={{
+          padding: "10px 16px",
+          borderRadius: "12px",
+          border: "1px solid rgba(139, 92, 246, 0.3)",
+          background: "rgba(139, 92, 246, 0.1)",
+          fontSize: "14px",
+          fontWeight: 600,
+          color: "#a78bfa",
+          whiteSpace: "nowrap",
+          maxWidth: "150px",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {userName}
+      </div>
+    )}
 
-                        {!isMobile && userName && (
-                          <div style={{ padding: '10px 16px', borderRadius: '12px', border: '1px solid rgba(139, 92, 246, 0.3)', background: 'rgba(139, 92, 246, 0.1)', fontSize: '14px', fontWeight: 600, color: '#a78bfa', whiteSpace: 'nowrap', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {userName}
-                          </div>
-                        )}
+    <button
+      onClick={() => navigate("/profile")}
+      style={{
+        padding: isMobile ? "10px" : "10px 18px",
+        borderRadius: "12px",
+        border: "1px solid rgba(139, 92, 246, 0.3)",
+        background: "rgba(139, 92, 246, 0.15)",
+        color: "white",
+        fontSize: "14px",
+        fontWeight: 600,
+        cursor: "pointer",
+      }}
+    >
+      <User style={{ width: "18px", height: "18px", color: "#a78bfa" }} />
+      {!isMobile && <span>Profile</span>}
+    </button>
 
-                        <button onClick={() => navigate('/profile')} style={{ padding: isMobile ? '10px' : '10px 18px', borderRadius: '12px', border: '1px solid rgba(139, 92, 246, 0.3)', background: 'rgba(139, 92, 246, 0.15)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.3s', whiteSpace: 'nowrap', minWidth: isMobile ? '40px' : 'auto', justifyContent: 'center' }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(139, 92, 246, 0.25)'} onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)'}>
-                          <User style={{ width: '18px', height: '18px', color: '#a78bfa' }} />
-                          {!isMobile && <span>Profile</span>}
-                        </button>
+    <button
+      onClick={handleSignOut}
+      style={{
+        position: "relative",
+        padding: isMobile ? "10px 14px" : "10px 18px",
+        borderRadius: "12px",
+        background: "transparent",
+        color: "white",
+        fontSize: isMobile ? "12px" : "13px",
+        fontWeight: 600,
+        cursor: "pointer",
+      }}
+    >
+      <div
+        className="animate-shimmer"
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "linear-gradient(90deg, #ef4444, #f97316, #ef4444)",
+        }}
+      />
+      <span style={{ position: "relative", zIndex: 10 }}>
+        {isMobile ? "Exit" : "Sign Out"}
+      </span>
+    </button>
+  </>
 
-                        <button onClick={handleSignOut} style={{ position: 'relative', padding: isMobile ? '10px 14px' : '10px 18px', borderRadius: '12px', border: 'none', background: 'transparent', color: 'white', fontSize: isMobile ? '12px' : '13px', fontWeight: 600, cursor: 'pointer', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                          <div className="animate-shimmer" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, #ef4444, #f97316, #ef4444)' }} />
-                          <span style={{ position: 'relative', zIndex: 10 }}>{isMobile ? 'Exit' : 'Sign Out'}</span>
-                        </button>
-                      </>
-                    ) : (
-                      <button onClick={handleGoogleSignIn} style={{ position: 'relative', padding: isMobile ? '12px 18px' : '12px 24px', borderRadius: '12px', border: 'none', background: 'white', color: '#1f2937', fontSize: isMobile ? '14px' : '15px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', whiteSpace: 'nowrap', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)', transition: 'transform 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}>
-                        <svg width="20" height="20" viewBox="0 0 18 18">
-                          <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
-                          <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/>
-                          <path fill="#FBBC05" d="M3.964 10.707c-.18-.54-.282-1.117-.282-1.707 0-.593.102-1.17.282-1.709V4.958H.957C.347 6.173 0 7.548 0 9c0 1.452.348 2.827.957 4.042l3.007-2.335z"/>
-                          <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
-                        </svg>
-                        <span>{isMobile ? 'Sign In' : 'Sign in with Google'}</span>
-                      </button>
-                    )}
-                  </>
-                )}
+) : (
+  // 3) İlk yüklenme → Loading
+  <div
+    style={{
+      padding: "10px 16px",
+      borderRadius: "12px",
+      background: "rgba(139, 92, 246, 0.1)",
+      border: "1px solid rgba(139, 92, 246, 0.3)",
+      fontSize: "14px",
+      color: "#a78bfa",
+      animation: "pulse 1.5s ease-in-out infinite",
+    }}
+  >
+    Loading…
+  </div>
+)}
+
               </div>
             </div>
           </div>
