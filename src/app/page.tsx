@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseclient";
+import { supabase } from "@/lib/supabaseClient";
 import { 
   Crown, Trophy, Zap, Play, Volume2, VolumeX, Sparkles, Globe,
   User, CreditCard, Award, Gift, Check, AlertCircle
