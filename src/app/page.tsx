@@ -41,7 +41,9 @@ useEffect(() => {
     try {
       setAuthLoading(true);
 
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
       if (session?.user && mounted) {
         const { data: profile } = await supabase
@@ -70,43 +72,47 @@ useEffect(() => {
 
   initAuth();
 
-  // 🔥 OnAuth listener — logout sorunun ana noktası
-  const { data: subscription } = supabase.auth.onAuthStateChange(
-    async (event, session) => {
-      if (!mounted) return;
+  // 🔥 Doğru onAuthStateChange kullanımı
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange(async (event, session) => {
+    if (!mounted) return;
 
-      setAuthLoading(false);
+    setAuthLoading(false);
 
-      if (session?.user) {
-        try {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("rounds, is_over_18, name")
-            .eq("id", session.user.id)
-            .single();
+    if (session?.user) {
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("rounds, is_over_18, name")
+          .eq("id", session.user.id)
+          .single();
 
-          const displayName =
-            profile?.name ||
-            session.user.user_metadata?.full_name ||
-            session.user.email?.split("@")[0] ||
-            "User";
+        const displayName =
+          profile?.name ||
+          session.user.user_metadata?.full_name ||
+          session.user.email?.split("@")[0] ||
+          "User";
 
-          setUser(session.user);
-          setUserName(displayName);
-          setUserRounds(profile?.rounds || 0);
-        } catch (err) {
-          console.error("Error fetching profile:", err);
-        }
+        setUser(session.user);
+        setUserName(displayName);
+        setUserRounds(profile?.rounds || 0);
+      } catch (err) {
+        console.error("Error fetching profile:", err);
       }
+    } else {
+      // logout sonrası state’i temizle
+      setUser(null);
+      setUserName("");
+      setUserRounds(0);
     }
-  );
+  });
 
   return () => {
     mounted = false;
-    subscription?.unsubscribe();
+    subscription.unsubscribe();
   };
 }, []);
-
 
   // Fetch next round
   useEffect(() => {
