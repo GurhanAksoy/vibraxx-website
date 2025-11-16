@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseclient";
 import { 
   Crown, Trophy, Zap, Play, Volume2, VolumeX, Sparkles, Globe,
   User, CreditCard, Award, Gift, Check, AlertCircle
@@ -155,11 +155,30 @@ export default function HomePage() {
         if (prizePoolRes.data) setPrizePool(prizePoolRes.data);
         if (statsRes.data) setStats(statsRes.data);
         
-        const championsData = [
-          { period: 'Daily', name: dailyRes.data?.profiles?.name || 'TBA', score: dailyRes.data?.score || 0, gradient: 'linear-gradient(135deg, #eab308, #f97316)', color: '#facc15' },
-          { period: 'Weekly', name: weeklyRes.data?.profiles?.name || 'TBA', score: weeklyRes.data?.score || 0, gradient: 'linear-gradient(135deg, #8b5cf6, #d946ef)', color: '#c084fc' },
-          { period: 'Monthly', name: monthlyRes.data?.profiles?.name || 'TBA', score: monthlyRes.data?.score || 0, gradient: 'linear-gradient(135deg, #3b82f6, #06b6d4)', color: '#22d3ee' }
-        ];
+     const championsData = [
+  {
+    period: "Daily",
+    name: dailyRes.data?.profiles?.[0]?.name || "TBA",
+    score: dailyRes.data?.score || 0,
+    gradient: "linear-gradient(135deg, #eab308, #f97316)",
+    color: "#facc15"
+  },
+  {
+    period: "Weekly",
+    name: weeklyRes.data?.profiles?.[0]?.name || "TBA",
+    score: weeklyRes.data?.score || 0,
+    gradient: "linear-gradient(135deg, #8b5cf6, #d946ef)",
+    color: "#c084fc"
+  },
+  {
+    period: "Monthly",
+    name: monthlyRes.data?.profiles?.[0]?.name || "TBA",
+    score: monthlyRes.data?.score || 0,
+    gradient: "linear-gradient(135deg, #3b82f6, #06b6d4)",
+    color: "#22d3ee"
+  }
+];
+
         
         setChampions(championsData);
       } catch (error) {
