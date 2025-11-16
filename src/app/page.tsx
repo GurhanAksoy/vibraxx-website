@@ -49,20 +49,66 @@ export default function HomePage() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // AUTH INIT + LISTENER
-  useEffect(() => {
-    let mounted = true;
+ // AUTH INIT + LISTENER
+useEffect(() => {
+  let mounted = true;
 
-    const initAuth = async () => {
-      try {
-        setAuthLoading(true);
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
-        if (error) console.error("Session error:", error);
+  const initAuth = async () => {
+    try {
+      setAuthLoading(true);
 
-        if (session?.user && mounted) {
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
+
+      if (error) console.error("Session error:", error);
+
+      if (session?.user && mounted) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("rounds, is_over_18, name")
+          .eq("id", session.user.id)
+          .single();
+
+        const displayName =
+          profile?.name ||
+          session.user.user_metadata?.full_name ||
+          session.user.email?.split("@")[0] ||
+          "User";
+
+        setUser(session.user);
+        setUserName(displayName);
+        setUserRounds(profile?.rounds || 0);
+
+        console.log("✅ User loaded:", displayName);
+      }
+
+      // Her durumda loading kapansın
+      if (mounted) setAuthLoading(false);
+    } catch (err) {
+      console.error("Error initializing auth:", err);
+      if (mounted) setAuthLoading(false);
+    }
+  };
+
+  initAuth();
+
+  // AUTH STATE LISTENER
+  const { data } = supabase.auth.onAuthStateChange(
+    async (event, session) => {
+      console.log("🔔 Auth event:", event);
+
+      if (!mounted) return;
+
+      // Kullanıcı giriş yaptı / token yenilendi / ilk session yüklendi
+      if (
+        (event === "SIGNED_IN" ||
+          event === "TOKEN_REFRESHED" ||
+          event === "INITIAL_SESSION") &&
+        session?.user
+      ) {
+        try {
           const { data: profile } = await supabase
             .from("profiles")
             .select("rounds, is_over_18, name")
@@ -78,66 +124,41 @@ export default function HomePage() {
           setUser(session.user);
           setUserName(displayName);
           setUserRounds(profile?.rounds || 0);
-          console.log("✅ User loaded:", displayName);
-        }
 
-        setAuthLoading(false);
-      } catch (err) {
-        console.error("Error initializing auth:", err);
-        setAuthLoading(false);
-      }
-    };
-
-    initAuth();
-
-    const { data } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log("🔔 Auth event:", event);
-        if (!mounted) return;
-
-        if (
-          (event === "SIGNED_IN" ||
-            event === "TOKEN_REFRESHED" ||
-            event === "INITIAL_SESSION") &&
-          session?.user
-        ) {
-          try {
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("rounds, is_over_18, name")
-              .eq("id", session.user.id)
-              .single();
-
-            const displayName =
-              profile?.name ||
-              session.user.user_metadata?.full_name ||
-              session.user.email?.split("@")[0] ||
-              "User";
-
-            setUser(session.user);
-            setUserName(displayName);
-            setUserRounds(profile?.rounds || 0);
-            console.log("✅ Auth updated:", displayName);
-          } catch (error) {
-            console.error("Error fetching profile:", error);
-          }
-        }
-
-        if (event === "SIGNED_OUT") {
-          setUser(null);
-          setUserName("");
-          setUserRounds(0);
+          console.log("✅ Auth updated:", displayName);
+        } catch (error) {
+          console.error("Error fetching profile:", error);
         }
       }
-    );
 
-    const subscription = data?.subscription;
+      // Kullanıcı çıkış yaptı
+      if (event === "SIGNED_OUT") {
+        setUser(null);
+        setUserName("");
+        setUserRounds(0);
+      }
 
-    return () => {
-      mounted = false;
-      subscription?.unsubscribe();
-    };
-  }, []);
+      // Hangi event olursa olsun loading kapanmalı
+      setAuthLoading(false);
+    }
+  );
+
+  const subscription = data?.subscription;
+
+  // EK GÜVENLİK: auth event gelmese bile loading sonsuz kalmasın
+  const timeoutId = setTimeout(() => {
+    if (mounted) {
+      setAuthLoading(false);
+    }
+  }, 1500);
+
+  return () => {
+    mounted = false;
+    subscription?.unsubscribe();
+    clearTimeout(timeoutId);
+  };
+}, []); // ❗ BURASI ÖNEMLİ: dependencies boş olmalı
+
 
   // NEXT ROUND
   useEffect(() => {
