@@ -447,38 +447,59 @@ export default function HomePage() {
     }
   }, []);
 
-  // Fetch Champions
+  // Fetch Champions from Supabase (Optimized with proper error handling)
   const fetchChampions = useCallback(async () => {
     try {
       const periods = ["daily", "weekly", "monthly"];
       const championsData = await Promise.all(
-        periods.map(async (period) => {
-          const { data, error } = await supabase
-            .from("leaderboard")
-            .select("user_id, score, users(full_name, avatar_url)")
-            .eq("period", period)
-            .order("score", { ascending: false })
-            .limit(1)
-            .single();
+        periods.map(async (period, index) => {
+          try {
+            const { data, error } = await supabase
+              .from("leaderboard")
+              .select(`
+                user_id,
+                score,
+                users:user_id (
+                  full_name,
+                  avatar_url
+                )
+              `)
+              .eq("period", period)
+              .order("score", { ascending: false })
+              .limit(1)
+              .single();
 
-          if (error || !data) return null;
+            if (error) {
+              console.warn(`No ${period} champion data:`, error.message);
+              return null;
+            }
 
-          const icons = [Crown, Trophy, Sparkles];
-          const gradients = [
-            "linear-gradient(to bottom right, #eab308, #f97316)",
-            "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
-            "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
-          ];
-          const colors = ["#facc15", "#c084fc", "#22d3ee"];
+            if (!data) return null;
 
-          return {
-            period: period.charAt(0).toUpperCase() + period.slice(1),
-            name: (data.users as any)?.full_name || "Anonymous",
-            score: data.score,
-            gradient: gradients[periods.indexOf(period)],
-            color: colors[periods.indexOf(period)],
-            icon: icons[periods.indexOf(period)],
-          };
+            const icons = [Crown, Trophy, Sparkles];
+            const gradients = [
+              "linear-gradient(to bottom right, #eab308, #f97316)",
+              "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
+              "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
+            ];
+            const colors = ["#facc15", "#c084fc", "#22d3ee"];
+
+            // Safely access nested user data
+            const userData = data.users as any;
+            const userName = userData?.full_name || "Anonymous Player";
+
+            return {
+              period: period.charAt(0).toUpperCase() + period.slice(1),
+              name: userName,
+              score: data.score || 0,
+              gradient: gradients[index],
+              color: colors[index],
+              icon: icons[index],
+            };
+          } catch (err) {
+            console.error(`Error fetching ${period} champion:`, err);
+            return null;
+          }
         })
       );
 
@@ -490,35 +511,35 @@ export default function HomePage() {
     }
   }, []);
 
-  // Default Champions
+  // Default Champions (removed fake names, will be populated from DB)
   const getDefaultChampions = () => [
     {
       period: "Daily",
-      name: "Sarah Chen",
-      score: 2840,
+      name: "TBA",
+      score: 0,
       gradient: "linear-gradient(to bottom right, #eab308, #f97316)",
       color: "#facc15",
       icon: Crown,
     },
     {
       period: "Weekly",
-      name: "Alex Kumar",
-      score: 18250,
+      name: "TBA",
+      score: 0,
       gradient: "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
       color: "#c084fc",
       icon: Trophy,
     },
     {
       period: "Monthly",
-      name: "Emma Rodriguez",
-      score: 125600,
+      name: "TBA",
+      score: 0,
       gradient: "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
       color: "#22d3ee",
       icon: Sparkles,
     },
   ];
 
-  // Fetch Stats
+  // Fetch Stats from Supabase (Optimized)
   const fetchStats = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -531,9 +552,19 @@ export default function HomePage() {
           totalQuestions: data.total_questions || 2800000,
           roundsPerDay: data.rounds_per_day || 96,
         });
+      } else {
+        console.warn("No stats data found, using defaults");
+        setStats({
+          totalQuestions: 2800000,
+          roundsPerDay: 96,
+        });
       }
     } catch (err) {
       console.error("Stats fetch error:", err);
+      setStats({
+        totalQuestions: 2800000,
+        roundsPerDay: 96,
+      });
     }
   }, []);
 
@@ -826,8 +857,13 @@ export default function HomePage() {
         }
 
         @media (max-width: 639px) {
-          .vx-header-inner { justify-content: center; }
-          .vx-header-right { justify-content: center; }
+          .vx-header-inner { 
+            justify-content: space-between;
+            padding: 12px 0;
+          }
+          .vx-header-right { 
+            justify-content: flex-end;
+          }
         }
 
         .vx-livebar {
@@ -864,7 +900,7 @@ export default function HomePage() {
           background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
           color: #fbbf24;
           font-size: 12px;
-          margin-bottom: 24px;
+          margin-bottom: 12px;
           backdrop-filter: blur(10px);
           font-weight: 700;
           box-shadow: 0 0 20px rgba(251, 191, 36, 0.3), inset 0 0 20px rgba(251, 191, 36, 0.1);
@@ -892,7 +928,7 @@ export default function HomePage() {
           .vx-hero-badge { 
             padding: 10px 24px; 
             font-size: 14px; 
-            margin-bottom: 32px;
+            margin-bottom: 14px;
           }
         }
 
@@ -934,10 +970,17 @@ export default function HomePage() {
           align-items: center;
           justify-content: center;
           margin-bottom: 48px;
+          width: 100%;
+          max-width: 100%;
+          padding: 0 16px;
         }
 
         @media (min-width: 640px) {
-          .vx-cta-wrap { flex-direction: row; margin-bottom: 64px; }
+          .vx-cta-wrap { 
+            flex-direction: row; 
+            margin-bottom: 64px; 
+            padding: 0;
+          }
         }
 
         .vx-cta-btn {
@@ -954,14 +997,20 @@ export default function HomePage() {
           font-size: 16px;
           overflow: hidden;
           transition: transform 0.2s, box-shadow 0.2s;
-          min-width: 200px;
+          width: 100%;
+          max-width: 320px;
         }
 
         .vx-cta-btn:hover { transform: translateY(-2px); }
         .vx-cta-btn:active { transform: translateY(0); }
 
         @media (min-width: 640px) {
-          .vx-cta-btn { padding: 18px 34px; font-size: 18px; }
+          .vx-cta-btn { 
+            padding: 18px 34px; 
+            font-size: 18px;
+            width: auto;
+            min-width: 220px;
+          }
         }
 
         .vx-cta-live { box-shadow: 0 20px 40px -16px rgba(139, 92, 246, 0.6); }
@@ -1167,12 +1216,12 @@ export default function HomePage() {
                 <div
                   style={{
                     position: "relative",
-                    width: 72,
-                    height: 72,
+                    width: 90,
+                    height: 90,
                     borderRadius: "9999px",
-                    padding: 3,
+                    padding: 4,
                     background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)",
-                    boxShadow: "0 0 26px rgba(124,58,237,0.55)",
+                    boxShadow: "0 0 30px rgba(124,58,237,0.6)",
                     flexShrink: 0,
                   }}
                 >
@@ -1180,11 +1229,11 @@ export default function HomePage() {
                     className="animate-glow"
                     style={{
                       position: "absolute",
-                      inset: -4,
+                      inset: -5,
                       borderRadius: "9999px",
                       background: "radial-gradient(circle,#a855f7,transparent)",
                       opacity: 0.4,
-                      filter: "blur(8px)",
+                      filter: "blur(10px)",
                       pointerEvents: "none",
                     }}
                   />
@@ -1205,7 +1254,7 @@ export default function HomePage() {
                       src="/images/logo.png"
                       alt="VibraXX Logo"
                       fill
-                      sizes="72px"
+                      sizes="90px"
                       style={{ objectFit: "contain" }}
                       priority
                     />
@@ -1481,6 +1530,28 @@ export default function HomePage() {
               <Trophy style={{ width: 16, height: 16, color: "#fbbf24" }} />
             </div>
 
+            {/* Prize Pool Notice - Below badge with proper block display */}
+            <div style={{ textAlign: "center", marginBottom: 28 }}>
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  padding: "8px 18px",
+                  borderRadius: 10,
+                  background: "rgba(34, 197, 94, 0.1)",
+                  border: "1px solid rgba(34, 197, 94, 0.3)",
+                  fontSize: 13,
+                  color: "#4ade80",
+                  fontWeight: 600,
+                }}
+              >
+                <AlertCircle style={{ width: 15, height: 15 }} />
+                Prize pool activates at 2000+
+              </div>
+            </div>
+
             <h1 className="vx-hero-title">
               <span className="vx-hero-neon">The Next Generation Live Quiz</span>
             </h1>
@@ -1552,6 +1623,147 @@ export default function HomePage() {
                   }}
                 />
               </button>
+            </div>
+
+            {/* Pricing Info Section */}
+            <div
+              style={{
+                maxWidth: 640,
+                margin: "0 auto 48px",
+                padding: "20px 16px",
+                borderRadius: 20,
+                background: "linear-gradient(135deg, rgba(251, 191, 36, 0.05), rgba(245, 158, 11, 0.05))",
+                border: "1px solid rgba(251, 191, 36, 0.2)",
+                backdropFilter: "blur(10px)",
+              }}
+            >
+              <div style={{ textAlign: "center", marginBottom: 20 }}>
+                <h3
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 700,
+                    color: "#fbbf24",
+                    marginBottom: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                  }}
+                >
+                  <ShoppingCart style={{ width: 20, height: 20 }} />
+                  Round Pricing
+                </h3>
+                <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>
+                  Affordable entry to compete for big prizes
+                </p>
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 12,
+                  marginBottom: 16,
+                }}
+              >
+                <div
+                  style={{
+                    padding: 14,
+                    borderRadius: 16,
+                    background: "rgba(15, 23, 42, 0.8)",
+                    border: "1px solid rgba(251, 191, 36, 0.2)",
+                    textAlign: "center",
+                  }}
+                >
+                  <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 6 }}>
+                    Single Round
+                  </div>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: "#fbbf24", marginBottom: 2 }}>
+                    £1
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b" }}>per round</div>
+                </div>
+
+                <div
+                  style={{
+                    padding: 14,
+                    borderRadius: 16,
+                    background: "linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1))",
+                    border: "2px solid rgba(251, 191, 36, 0.4)",
+                    textAlign: "center",
+                    position: "relative",
+                    boxShadow: "0 0 20px rgba(251, 191, 36, 0.2)",
+                  }}
+                >
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: -8,
+                      right: -8,
+                      background: "linear-gradient(135deg, #ef4444, #dc2626)",
+                      color: "white",
+                      fontSize: 9,
+                      fontWeight: 700,
+                      padding: "3px 6px",
+                      borderRadius: 6,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Save 17%
+                  </div>
+                  <div style={{ fontSize: 13, color: "#fbbf24", marginBottom: 6, fontWeight: 600 }}>
+                    Value Pack
+                  </div>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: "#fbbf24", marginBottom: 2 }}>
+                    £29
+                  </div>
+                  <div style={{ fontSize: 11, color: "#cbd5e1" }}>35 rounds (£0.83 each)</div>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: 14,
+                  borderRadius: 12,
+                  background: "rgba(59, 130, 246, 0.1)",
+                  border: "1px solid rgba(59, 130, 246, 0.2)",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "start", gap: 8, marginBottom: 8 }}>
+                  <AlertCircle
+                    style={{
+                      width: 16,
+                      height: 16,
+                      color: "#60a5fa",
+                      flexShrink: 0,
+                      marginTop: 2,
+                    }}
+                  />
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "#60a5fa", marginBottom: 3 }}>
+                      Prize Pool Activation
+                    </div>
+                    <p style={{ fontSize: 11, color: "#94a3b8", margin: 0, lineHeight: 1.5 }}>
+                      The <strong style={{ color: "white" }}>£1000 monthly prize</strong> activates when we reach{" "}
+                      <strong style={{ color: "white" }}>2000+ active participants</strong>. This ensures we can cover platform costs (Stripe fees, infrastructure) and deliver the full prize pool to winners.
+                    </p>
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "start", gap: 8 }}>
+                  <CheckCircle
+                    style={{
+                      width: 16,
+                      height: 16,
+                      color: "#4ade80",
+                      flexShrink: 0,
+                      marginTop: 2,
+                    }}
+                  />
+                  <p style={{ fontSize: 11, color: "#94a3b8", margin: 0, lineHeight: 1.5 }}>
+                    <strong style={{ color: "#4ade80" }}>Fair & Transparent:</strong> All rounds purchased contribute to the prize pool. The more players, the bigger the rewards for everyone!
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Stats */}
