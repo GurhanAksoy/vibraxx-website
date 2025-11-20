@@ -199,7 +199,7 @@ export default function QuizGamePage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     
-    const score = correctCount * 100;
+    const score = correctCount * 2;
     
     await supabase.from('user_stats').upsert({
       user_id: user.id,
@@ -348,7 +348,7 @@ export default function QuizGamePage() {
 
     const timeout = setTimeout(() => {
       clearInterval(interval);
-      router.push("//");
+      router.push("/lobby");
     }, FINAL_SCORE_DURATION * 1000);
 
     return () => {
