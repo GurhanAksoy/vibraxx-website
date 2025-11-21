@@ -1,97 +1,142 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { 
   User, Crown, Trophy, Target, Calendar, CheckCircle, XCircle, 
   Zap, TrendingUp, Mail, Send, Package, Home, BarChart3,
   Clock, Flame, Award, Star, Volume2, VolumeX
 } from "lucide-react";
-// import { supabase } from "@/lib/supabaseClient"; // Uncomment when ready
+import { supabase } from "@/lib/supabaseClient";
 
 export default function ProfilePage() {
   const [user, setUser] = useState({
-    name: "John Doe",
-    email: "john.doe@example.com",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=john",
-    joinedDate: "2025-01-15"
+    name: "",
+    email: "",
+    avatar: "",
+    joinedDate: ""
   });
 
   const [stats, setStats] = useState({
-    lastRound: { correct: 42, wrong: 8, score: 4200, rank: 15 },
-    today: { correct: 128, wrong: 22, score: 12800, rounds: 3 },
-    monthly: { correct: 1450, wrong: 250, score: 145000, rounds: 35 },
-    rounds: { purchased: 100, used: 38, remaining: 62 }
+    lastRound: { correct: 0, wrong: 0, score: 0, rank: 0 },
+    today: { correct: 0, wrong: 0, score: 0, rounds: 0 },
+    monthly: { correct: 0, wrong: 0, score: 0, rounds: 0 },
+    rounds: { purchased: 0, used: 0, remaining: 0 }
   });
 
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [messageSent, setMessageSent] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioRef = useRef(null);
 
-  // Fetch user data from Supabase
-  useEffect(() => {
-    const fetchUserData = async () => {
-      /* --- SUPABASE USER DATA (Uncomment when ready) ---
-      try {
-        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-        
-        if (authError) throw authError;
-        
-        // Fetch user profile
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', authUser.id)
-          .single();
-        
-        if (profileError) throw profileError;
-        
-        setUser({
-          name: profile.name || authUser.email,
-          email: authUser.email,
-          avatar: profile.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${authUser.id}`,
-          joinedDate: authUser.created_at
-        });
+  // Fetch user data (profile, stats, rounds)
+useEffect(() => {
+  const fetchUserData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-        // Fetch user statistics
-        const { data: statsData, error: statsError } = await supabase
-          .from('user_stats')
-          .select('*')
-          .eq('user_id', authUser.id)
-          .single();
-        
-        if (!statsError && statsData) {
-          setStats({
-            lastRound: statsData.last_round,
-            today: statsData.today,
-            monthly: statsData.monthly,
-            rounds: statsData.rounds
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching user data:', error);
+      // Get logged-in user
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+if (sessionError) throw sessionError;
+
+if (!session) {
+  window.location.href = "/login";
+  return;
+}
+
+const authUser = session.user;
+
+
+      //
+      // 1) Fetch Profile
+      //
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.error("Profile fetch error:", profileError);
       }
-      */
-    };
 
-    fetchUserData();
-  }, []);
+      setUser({
+        name: profile?.name || profile?.full_name || authUser.email?.split("@")[0] || "User",
+        email: authUser.email || "",
+        avatar: profile?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${authUser.id}`,
+        joinedDate: authUser.created_at || new Date().toISOString(),
+      });
+
+      //
+      // 2) Fetch user_stats (lastRound, today, monthly)
+      //
+      const { data: statsData, error: statsError } = await supabase
+        .from("user_stats")
+        .select("*")
+        .eq("user_id", authUser.id)
+        .single();
+
+      if (!statsError && statsData) {
+        setStats(prev => ({
+          ...prev,
+          lastRound: statsData.last_round || prev.lastRound,
+          today: statsData.today || prev.today,
+          monthly: statsData.monthly || prev.monthly,
+        }));
+      } else if (statsError && statsError.code !== "PGRST116") {
+        console.error("Stats error:", statsError);
+      }
+
+      //
+      // 3) Fetch user_rounds (purchased, used, remaining)
+      //
+      const { data: roundsData, error: roundsError } = await supabase
+        .from("user_rounds")
+        .select("*")
+        .eq("user_id", authUser.id)
+        .single();
+
+      if (!roundsError && roundsData) {
+        setStats(prev => ({
+          ...prev,
+          rounds: {
+            purchased: roundsData.purchased || 0,
+            used: roundsData.used || 0,
+            remaining: roundsData.remaining || 0,
+          },
+        }));
+      } else if (roundsError && roundsError.code !== "PGRST116") {
+        console.error("Rounds fetch error:", roundsError);
+      }
+
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchUserData();
+}, []);
 
   // Audio control
-  const toggleAudio = () => {
+  const toggleAudio = useCallback(() => {
     if (audioRef.current) {
       if (isMuted) {
         audioRef.current.muted = false;
-        audioRef.current.play();
+        audioRef.current.play().catch(e => console.log('Audio play failed:', e));
       } else {
         audioRef.current.muted = true;
         audioRef.current.pause();
       }
       setIsMuted(!isMuted);
     }
-  };
+  }, [isMuted]);
 
   // Initialize audio
   useEffect(() => {
@@ -107,15 +152,21 @@ export default function ProfilePage() {
     
     setSending(true);
     
-    /* --- SUPABASE CONTACT MESSAGE (Uncomment when ready) ---
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !authUser) {
+        alert('Please log in to send messages');
+        return;
+      }
       
       const { error } = await supabase
         .from('support_messages')
         .insert({
           user_id: authUser.id,
+          user_email: authUser.email,
           message: message.trim(),
+          status: 'pending',
           created_at: new Date().toISOString()
         });
       
@@ -126,26 +177,28 @@ export default function ProfilePage() {
       setTimeout(() => setMessageSent(false), 3000);
     } catch (error) {
       console.error('Error sending message:', error);
+      alert('Failed to send message. Please try again.');
     } finally {
       setSending(false);
     }
-    */
-
-    // TEMPORARY: Mock API call
-    setTimeout(() => {
-      setSending(false);
-      setMessageSent(true);
-      setMessage("");
-      setTimeout(() => setMessageSent(false), 3000);
-    }, 1500);
   };
+
+  const calculateAccuracy = useCallback((correct, wrong) => {
+    const total = correct + wrong;
+    return total > 0 ? Math.round((correct / total) * 100) : 0;
+  }, []);
+
+  const formatDate = useCallback((dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  }, []);
 
   return (
     <>
       <audio 
         ref={audioRef} 
-        src="sounds/vibraxx.mp3"
+        src="/sounds/vibraxx.mp3"
         aria-label="Background music"
+        preload="none"
       />
 
       <style jsx global>{`
@@ -198,9 +251,20 @@ export default function ProfilePage() {
           scroll-behavior: smooth;
         }
 
+        body {
+          overflow-x: hidden;
+        }
+
+        * {
+          box-sizing: border-box;
+        }
+
         @media (max-width: 768px) {
           .mobile-stack { grid-template-columns: 1fr !important; }
-          .mobile-hide { display: none !important; }
+        }
+
+        @media (max-width: 640px) {
+          .mobile-2-col { grid-template-columns: 1fr !important; }
         }
 
         ::-webkit-scrollbar { width: 8px; }
@@ -210,7 +274,6 @@ export default function ProfilePage() {
           border-radius: 4px;
         }
 
-        /* Footer Styles */
         .vx-footer {
           position: relative;
           z-index: 10;
@@ -309,7 +372,9 @@ export default function ProfilePage() {
         background: 'linear-gradient(to bottom right, #0f172a, #1e1b4b, #0f172a)',
         color: 'white',
         position: 'relative',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        width: '100%',
+        maxWidth: '100vw'
       }}
       role="main"
       aria-label="Profile page">
@@ -324,7 +389,8 @@ export default function ProfilePage() {
           background: 'radial-gradient(circle, #7c3aed 0%, transparent 70%)',
           opacity: 0.2,
           filter: 'blur(100px)',
-          zIndex: 0
+          zIndex: 0,
+          pointerEvents: 'none'
         }}
         aria-hidden="true"></div>
         <div className="animate-float" style={{
@@ -338,7 +404,8 @@ export default function ProfilePage() {
           opacity: 0.15,
           filter: 'blur(100px)',
           zIndex: 0,
-          animationDelay: '1.5s'
+          animationDelay: '1.5s',
+          pointerEvents: 'none'
         }}
         aria-hidden="true"></div>
 
@@ -351,8 +418,8 @@ export default function ProfilePage() {
           background: 'rgba(15, 23, 42, 0.8)'
         }}
         role="banner">
-          <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 clamp(16px, 3vw, 24px)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px', gap: 'clamp(12px, 2vw, 16px)' }}>
+          <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 clamp(12px, 3vw, 24px)', width: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '70px', gap: 'clamp(8px, 2vw, 16px)' }}>
               
               {/* Home Button */}
               <button
@@ -360,35 +427,36 @@ export default function ProfilePage() {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  padding: 'clamp(8px, 2vw, 10px) clamp(12px, 2.5vw, 16px)',
-                  borderRadius: '12px',
+                  gap: '4px',
+                  padding: 'clamp(6px, 2vw, 10px) clamp(8px, 2.5vw, 16px)',
+                  borderRadius: '10px',
                   border: '2px solid rgba(139, 92, 246, 0.3)',
                   background: 'rgba(139, 92, 246, 0.1)',
                   color: 'white',
-                  fontSize: 'clamp(12px, 2.2vw, 14px)',
+                  fontSize: 'clamp(11px, 2.2vw, 14px)',
                   fontWeight: 600,
                   cursor: 'pointer',
                   transition: 'all 0.3s',
-                  flexShrink: 0
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap'
                 }}
                 aria-label="Go to homepage"
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background = 'rgba(139, 92, 246, 0.2)';
-                  (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.05)';
+                  e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)';
+                  e.currentTarget.style.transform = 'scale(1.05)';
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background = 'rgba(139, 92, 246, 0.1)';
-                  (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
+                  e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
+                  e.currentTarget.style.transform = 'scale(1)';
                 }}
               >
-                <Home style={{ width: 'clamp(14px, 2.8vw, 18px)', height: 'clamp(14px, 2.8vw, 18px)', color: '#a78bfa' }} aria-hidden="true" />
-                <span>Home</span>
+                <Home style={{ width: 'clamp(12px, 2.8vw, 18px)', height: 'clamp(12px, 2.8vw, 18px)', color: '#a78bfa' }} aria-hidden="true" />
+                <span style={{ display: 'inline' }}>Home</span>
               </button>
 
               {/* Title */}
               <h1 className="animate-shimmer" style={{ 
-                fontSize: 'clamp(16px, 3.2vw, 28px)',
+                fontSize: 'clamp(14px, 3.2vw, 28px)',
                 fontWeight: 900,
                 background: 'linear-gradient(90deg, #7c3aed, #d946ef, #f0abfc, #d946ef, #7c3aed)',
                 backgroundSize: '200% 100%',
@@ -396,10 +464,14 @@ export default function ProfilePage() {
                 WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
                 textTransform: 'uppercase',
-                letterSpacing: '0.05em',
+                letterSpacing: '0.03em',
                 textAlign: 'center',
                 margin: 0,
-                flex: 1
+                flex: 1,
+                minWidth: 0,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
               }}>
                 My Profile
               </h1>
@@ -408,8 +480,8 @@ export default function ProfilePage() {
               <button
                 onClick={toggleAudio}
                 style={{
-                  width: 'clamp(36px, 7vw, 44px)',
-                  height: 'clamp(36px, 7vw, 44px)',
+                  width: 'clamp(34px, 7vw, 44px)',
+                  height: 'clamp(34px, 7vw, 44px)',
                   borderRadius: '50%',
                   background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(217, 70, 239, 0.1))',
                   border: '2px solid rgba(139, 92, 246, 0.3)',
@@ -420,22 +492,23 @@ export default function ProfilePage() {
                   color: '#a78bfa',
                   transition: 'all 0.3s',
                   boxShadow: '0 0 15px rgba(139, 92, 246, 0.3)',
-                  flexShrink: 0
+                  flexShrink: 0,
+                  padding: 0
                 }}
                 className="neon-border"
                 aria-label={isMuted ? 'Unmute audio' : 'Mute audio'}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.1)';
-                  (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 25px rgba(139, 92, 246, 0.5)';
+                  e.currentTarget.style.transform = 'scale(1.1)';
+                  e.currentTarget.style.boxShadow = '0 0 25px rgba(139, 92, 246, 0.5)';
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
-                  (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 15px rgba(139, 92, 246, 0.3)';
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.boxShadow = '0 0 15px rgba(139, 92, 246, 0.3)';
                 }}
               >
                 {isMuted ? 
-                  <VolumeX style={{ width: 'clamp(16px, 3vw, 20px)', height: 'clamp(16px, 3vw, 20px)' }} /> : 
-                  <Volume2 style={{ width: 'clamp(16px, 3vw, 20px)', height: 'clamp(16px, 3vw, 20px)' }} />
+                  <VolumeX style={{ width: 'clamp(14px, 3vw, 20px)', height: 'clamp(14px, 3vw, 20px)' }} /> : 
+                  <Volume2 style={{ width: 'clamp(14px, 3vw, 20px)', height: 'clamp(14px, 3vw, 20px)' }} />
                 }
               </button>
             </div>
@@ -445,6 +518,29 @@ export default function ProfilePage() {
         {/* Main Content */}
         <main style={{ position: 'relative', zIndex: 10, padding: 'clamp(20px, 4vw, 50px) clamp(12px, 3vw, 24px)' }}>
           <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+            
+            {/* Loading State */}
+            {loading ? (
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                minHeight: '400px',
+                flexDirection: 'column',
+                gap: '20px'
+              }}>
+                <div className="animate-spin" style={{
+                  width: '60px',
+                  height: '60px',
+                  border: '4px solid rgba(139, 92, 246, 0.2)',
+                  borderTopColor: '#a78bfa',
+                  borderRadius: '50%'
+                }}
+                aria-hidden="true"></div>
+                <p style={{ color: '#94a3b8', fontSize: '18px' }}>Loading your profile...</p>
+              </div>
+            ) : (
+              <>
             
             {/* Profile Card */}
             <article className="animate-slide-up animate-pulse-glow" style={{
@@ -470,8 +566,8 @@ export default function ProfilePage() {
               }}
               aria-hidden="true"></div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(16px, 3vw, 32px)', flexWrap: 'wrap' }}>
-                <div style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(16px, 3vw, 32px)', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <div style={{ position: 'relative', flexShrink: 0 }}>
                   <div className="animate-pulse-glow" style={{
                     width: 'clamp(80px, 16vw, 140px)',
                     height: 'clamp(80px, 16vw, 140px)',
@@ -488,6 +584,7 @@ export default function ProfilePage() {
                         borderRadius: '50%',
                         border: '4px solid rgba(15, 23, 42, 0.9)'
                       }}
+                      loading="lazy"
                     />
                   </div>
                   <div style={{
@@ -505,14 +602,14 @@ export default function ProfilePage() {
                   title="Online"></div>
                 </div>
 
-                <div style={{ flex: 1, minWidth: '200px' }}>
-                  <h2 style={{ fontSize: 'clamp(20px, 4vw, 36px)', fontWeight: 900, marginBottom: '6px' }}>
+                <div style={{ flex: 1, minWidth: '200px', textAlign: 'center' }}>
+                  <h2 style={{ fontSize: 'clamp(20px, 4vw, 36px)', fontWeight: 900, marginBottom: '6px', wordBreak: 'break-word' }}>
                     {user.name}
                   </h2>
-                  <p style={{ fontSize: 'clamp(12px, 2.5vw, 16px)', color: '#94a3b8', marginBottom: '10px' }}>
+                  <p style={{ fontSize: 'clamp(12px, 2.5vw, 16px)', color: '#94a3b8', marginBottom: '10px', wordBreak: 'break-all' }}>
                     {user.email}
                   </p>
-                  <div style={{ display: 'flex', gap: 'clamp(10px, 2vw, 16px)', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 'clamp(10px, 2vw, 16px)', flexWrap: 'wrap', justifyContent: 'center' }}>
                     <div style={{ 
                       display: 'flex', 
                       alignItems: 'center', 
@@ -524,7 +621,7 @@ export default function ProfilePage() {
                     }}>
                       <Calendar style={{ width: 'clamp(14px, 2.8vw, 16px)', height: 'clamp(14px, 2.8vw, 16px)', color: '#a78bfa' }} aria-hidden="true" />
                       <span style={{ fontSize: 'clamp(11px, 2.2vw, 14px)', color: '#c4b5fd' }}>
-                        Joined {new Date(user.joinedDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                        Joined {formatDate(user.joinedDate)}
                       </span>
                     </div>
                     <div style={{ 
@@ -549,7 +646,7 @@ export default function ProfilePage() {
             {/* Stats Grid */}
             <section className="mobile-stack" style={{ 
               display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(clamp(250px, 45vw, 300px), 1fr))', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', 
               gap: 'clamp(16px, 3vw, 32px)',
               marginBottom: 'clamp(20px, 4vw, 40px)'
             }}
@@ -629,9 +726,11 @@ export default function ProfilePage() {
                     }}>
                       {stats.lastRound.score.toLocaleString()}
                     </div>
-                    <div style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#64748b', marginTop: '4px' }}>
-                      Rank #{stats.lastRound.rank}
-                    </div>
+                    {stats.lastRound.rank > 0 && (
+                      <div style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#64748b', marginTop: '4px' }}>
+                        Rank #{stats.lastRound.rank}
+                      </div>
+                    )}
                   </div>
                 </div>
               </article>
@@ -704,7 +803,7 @@ export default function ProfilePage() {
                       {stats.today.score.toLocaleString()}
                     </div>
                     <div style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#64748b', marginTop: '4px' }}>
-                      Accuracy: {Math.round((stats.today.correct / (stats.today.correct + stats.today.wrong)) * 100)}%
+                      Accuracy: {calculateAccuracy(stats.today.correct, stats.today.wrong)}%
                     </div>
                   </div>
                 </div>
@@ -778,7 +877,7 @@ export default function ProfilePage() {
                       {stats.monthly.score.toLocaleString()}
                     </div>
                     <div style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#64748b', marginTop: '4px' }}>
-                      Accuracy: {Math.round((stats.monthly.correct / (stats.monthly.correct + stats.monthly.wrong)) * 100)}%
+                      Accuracy: {calculateAccuracy(stats.monthly.correct, stats.monthly.wrong)}%
                     </div>
                   </div>
                 </div>
@@ -786,7 +885,7 @@ export default function ProfilePage() {
             </section>
 
             {/* Rounds & Contact Section */}
-            <section className="mobile-stack" style={{ 
+            <section className="mobile-stack mobile-2-col" style={{ 
               display: 'grid', 
               gridTemplateColumns: '1fr 1fr', 
               gap: 'clamp(16px, 3vw, 32px)'
@@ -864,12 +963,12 @@ export default function ProfilePage() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                       <span style={{ fontSize: 'clamp(12px, 2.4vw, 14px)', color: '#94a3b8' }}>Usage</span>
                       <span style={{ fontSize: 'clamp(12px, 2.4vw, 14px)', fontWeight: 700, color: '#22d3ee' }}>
-                        {Math.round((stats.rounds.used / stats.rounds.purchased) * 100)}%
+                        {stats.rounds.purchased > 0 ? Math.round((stats.rounds.used / stats.rounds.purchased) * 100) : 0}%
                       </span>
                     </div>
                     <div style={{ width: '100%', height: '8px', borderRadius: '9999px', background: 'rgba(0, 0, 0, 0.3)', overflow: 'hidden' }}>
                       <div style={{
-                        width: `${(stats.rounds.used / stats.rounds.purchased) * 100}%`,
+                        width: `${stats.rounds.purchased > 0 ? (stats.rounds.used / stats.rounds.purchased) * 100 : 0}%`,
                         height: '100%',
                         background: 'linear-gradient(to right, #06b6d4, #0891b2)',
                         borderRadius: '9999px',
@@ -879,6 +978,7 @@ export default function ProfilePage() {
                   </div>
 
                   <button
+                    onClick={() => window.location.href = '/pricing'}
                     style={{
                       width: '100%',
                       marginTop: 'clamp(16px, 3vw, 20px)',
@@ -893,8 +993,8 @@ export default function ProfilePage() {
                       transition: 'all 0.3s'
                     }}
                     aria-label="Purchase more rounds"
-                    onMouseEnter={(e) => (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.02)'}
-                    onMouseLeave={(e) => (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'}
+                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                   >
                     Buy More Rounds
                   </button>
@@ -936,6 +1036,7 @@ export default function ProfilePage() {
                     placeholder="Type your message here..."
                     disabled={sending}
                     aria-label="Support message"
+                    maxLength={1000}
                     style={{
                       width: '100%',
                       minHeight: 'clamp(150px, 30vw, 200px)',
@@ -951,12 +1052,12 @@ export default function ProfilePage() {
                       transition: 'all 0.3s'
                     }}
                     onFocus={(e) => {
-                      (e.currentTarget as HTMLTextAreaElement).style.borderColor = 'rgba(139, 92, 246, 0.5)';
-                      (e.currentTarget as HTMLTextAreaElement).style.boxShadow = '0 0 20px rgba(139, 92, 246, 0.2)';
+                      e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.5)';
+                      e.currentTarget.style.boxShadow = '0 0 20px rgba(139, 92, 246, 0.2)';
                     }}
                     onBlur={(e) => {
-                      (e.currentTarget as HTMLTextAreaElement).style.borderColor = 'rgba(139, 92, 246, 0.2)';
-                      (e.currentTarget as HTMLTextAreaElement).style.boxShadow = 'none';
+                      e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.2)';
+                      e.currentTarget.style.boxShadow = 'none';
                     }}
                   />
 
@@ -1005,10 +1106,10 @@ export default function ProfilePage() {
                     }}
                     onMouseEnter={(e) => {
                       if (!sending && message.trim()) {
-                        (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.02)';
+                        e.currentTarget.style.transform = 'scale(1.02)';
                       }
                     }}
-                    onMouseLeave={(e) => (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'}
+                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                   >
                     {sending ? (
                       <>
@@ -1032,24 +1133,21 @@ export default function ProfilePage() {
                 </div>
               </article>
             </section>
+              </>
+            )}
           </div>
         </main>
 
-       {/* Footer */}
+        {/* Footer */}
         <footer className="vx-footer">
           <div className="vx-container">
-            {/* Legal Disclaimer */}
             <div className="vx-footer-legal">
               <strong style={{ color: "#94a3b8" }}>Educational Quiz Competition.</strong> 18+ only. 
               This is a 100% skill-based knowledge competition with no element of chance. 
               Entry fees apply. Prize pool activates with 2000+ monthly participants. See{" "}
-              <a href="/terms" style={{ color: "#a78bfa", textDecoration: "underline" }}>
-                Terms & Conditions
-              </a>{" "}
-              for full details.
+              <a href="/terms">Terms & Conditions</a> for full details.
             </div>
 
-            {/* Main Links */}
             <nav className="vx-footer-links" aria-label="Footer navigation">
               <a href="/privacy">Privacy Policy</a>
               <span className="vx-footer-divider">•</span>
@@ -1072,7 +1170,6 @@ export default function ProfilePage() {
               <a href="/faq">FAQ</a>
             </nav>
 
-            {/* Company Info */}
             <div className="vx-footer-company">
               <div style={{ marginBottom: 8, textAlign: "center" }}>
                 © 2025 VibraXX. Operated by Sermin Limited (UK)

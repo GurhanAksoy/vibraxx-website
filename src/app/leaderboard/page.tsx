@@ -1,14 +1,31 @@
 "use client";
 
+import { createClient } from "@supabase/supabase-js";
 import { useState, useEffect, useRef } from "react";
 import { Crown, Trophy, Medal, Flame, Zap, TrendingUp, Star, Award, ChevronRight, Volume2, VolumeX } from "lucide-react";
 // import { supabase } from "@/lib/supabaseClient"; // Uncomment and configure when ready
 
 export default function LeaderboardPage() {
   const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly' | 'allTime'>('daily');
+  const [particles, setParticles] = useState<any[]>([]);
+
+useEffect(() => {
+  const arr = [...Array(8)].map((_, i) => ({
+    top: Math.random() * 100,
+    left: Math.random() * 100,
+    duration: 2 + Math.random() * 2,
+    delay: i * 0.3,
+  }));
+  setParticles(arr);
+}, []);
+
   const [topPlayers, setTopPlayers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDesktop, setIsDesktop] = useState(false);
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
   
   // Audio controls - Simple mute/unmute
   const [isMuted, setIsMuted] = useState(true);
@@ -48,80 +65,29 @@ export default function LeaderboardPage() {
     };
   }, []);
 
-  // Mock data
-  const leaderboardData: Record<string, any[]> = {
-    daily: Array.from({ length: 100 }, (_, i) => ({
-      rank: i + 1,
-      name: ['Sarah Chen', 'Alex Kumar', 'Emma Rodriguez', 'Michael Zhang', 'Sofia Martinez', 'James Wilson', 'Lisa Anderson', 'David Lee', 'Maria Garcia', 'John Smith'][i % 10],
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${i}`,
-      score: 50000 - (i * 450),
-      accuracy: Math.max(0, Math.floor(98 - (i * 0.3))),
-      streak: Math.max(1, 20 - i),
-      country: ['🇺🇸', '🇬🇧', '🇨🇦', '🇦🇺', '🇩🇪', '🇫🇷', '🇯🇵', '🇰🇷', '🇧🇷', '🇮🇳'][i % 10],
-      isOnline: i < 30
-    })),
-    weekly: Array.from({ length: 100 }, (_, i) => ({
-      rank: i + 1,
-      name: ['Alex Kumar', 'Sarah Chen', 'Emma Rodriguez', 'Michael Zhang', 'Sofia Martinez', 'James Wilson', 'Lisa Anderson', 'David Lee', 'Maria Garcia', 'John Smith'][i % 10],
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${i + 50}`,
-      score: 180000 - (i * 1600),
-      accuracy: Math.max(0, Math.floor(96 - (i * 0.25))),
-      streak: Math.max(1, 25 - i),
-      country: ['🇬🇧', '🇺🇸', '🇨🇦', '🇦🇺', '🇩🇪', '🇫🇷', '🇯🇵', '🇰🇷', '🇧🇷', '🇮🇳'][i % 10],
-      isOnline: i < 25
-    })),
-    monthly: Array.from({ length: 100 }, (_, i) => ({
-      rank: i + 1,
-      name: ['Emma Rodriguez', 'Alex Kumar', 'Sarah Chen', 'Michael Zhang', 'Sofia Martinez', 'James Wilson', 'Lisa Anderson', 'David Lee', 'Maria Garcia', 'John Smith'][i % 10],
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${i + 100}`,
-      score: 750000 - (i * 7000),
-      accuracy: Math.max(0, Math.floor(95 - (i * 0.2))),
-      streak: Math.max(1, 30 - i),
-      country: ['🇪🇸', '🇬🇧', '🇺🇸', '🇨🇦', '🇦🇺', '🇩🇪', '🇫🇷', '🇯🇵', '🇰🇷', '🇧🇷'][i % 10],
-      isOnline: i < 20
-    })),
-    allTime: Array.from({ length: 100 }, (_, i) => ({
-      rank: i + 1,
-      name: ['Michael Zhang', 'Emma Rodriguez', 'Alex Kumar', 'Sarah Chen', 'Sofia Martinez', 'James Wilson', 'Lisa Anderson', 'David Lee', 'Maria Garcia', 'John Smith'][i % 10],
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${i + 150}`,
-      score: 2500000 - (i * 23000),
-      accuracy: Math.max(0, Math.floor(94 - (i * 0.15))),
-      streak: Math.max(1, 50 - i),
-      country: ['🇨🇳', '🇪🇸', '🇬🇧', '🇺🇸', '🇨🇦', '🇦🇺', '🇩🇪', '🇫🇷', '🇯🇵', '🇰🇷'][i % 10],
-      isOnline: i < 15
-    }))
-  };
-
-  // Fetch leaderboard with Supabase support
+    // Fetch leaderboard with Supabase support
   useEffect(() => {
     const fetchLeaderboard = async () => {
       setLoading(true);
 
-      /* --- SUPABASE INTEGRATION (Uncomment when ready) ---
-      try {
-        const { data, error } = await supabase
-          .from('leaderboard')
-          .select('*')
-          .eq('period', activeTab)
-          .order('score', { ascending: false })
-          .limit(100);
+         try {
+  const { data, error } = await supabase
+    .from("leaderboard")
+    .select("*")
+    .eq("period", activeTab)
+    .order("score", { ascending: false })
+    .limit(100);
 
-        if (error) throw error;
-        
-        setTopPlayers(data || []);
-      } catch (error) {
-        console.error('Error fetching leaderboard:', error);
-        setTopPlayers(leaderboardData[activeTab]);
-      } finally {
-        setLoading(false);
-      }
-      */
+  if (error) throw error;
 
-      // TEMPORARY: Using mock data
-      setTimeout(() => {
-        setTopPlayers(leaderboardData[activeTab]);
-        setLoading(false);
-      }, 400);
+  setTopPlayers(data || []);
+} catch (error) {
+  console.error("Error fetching leaderboard:", error);
+  setTopPlayers([]);
+} finally {
+  setLoading(false);
+}
+         
     };
 
     fetchLeaderboard();
@@ -372,26 +338,27 @@ export default function LeaderboardPage() {
         }}
         aria-hidden="true"></div>
 
-        {/* Floating Particles */}
-        {[...Array(8)].map((_, i) => (
-          <div
-            key={i}
-            className="animate-particle"
-            style={{
-              position: 'fixed',
-              width: '4px',
-              height: '4px',
-              borderRadius: '50%',
-              background: 'rgba(167, 139, 250, 0.6)',
-              top: `${Math.random() * 100}%`,
-              left: `${Math.random() * 100}%`,
-              animationDelay: `${i * 0.3}s`,
-              animationDuration: `${2 + Math.random() * 2}s`,
-              zIndex: 0
-            }}
-            aria-hidden="true"
-          />
-        ))}
+      {/* Floating Particles */}
+{particles.map((p, i) => (
+  <div
+    key={i}
+    className="animate-particle"
+    style={{
+      position: "fixed",
+      width: "4px",
+      height: "4px",
+      borderRadius: "50%",
+      background: "rgba(167, 139, 250, 0.6)",
+      top: `${p.top}%`,
+      left: `${p.left}%`,
+      animationDelay: `${p.delay}s`,
+      animationDuration: `${p.duration}s`,
+      zIndex: 0,
+    }}
+    aria-hidden="true"
+  />
+))}
+
 
         {/* Header */}
         <header 

@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
+
 import {
   Trophy,
   Clock,
@@ -17,6 +19,12 @@ import {
   Star,
   Sparkles,
 } from "lucide-react";
+
+// ❗ Tek satırlık supabase tanımı — EN ÜSTE ve İNDETSİZ
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 // === CONFIGURATION ===
 const TOTAL_QUESTIONS = 50;
@@ -35,80 +43,13 @@ interface Question {
   explanation: string;
 }
 
-// === SAMPLE QUESTIONS ===
-const baseQuestions: Omit<Question, "id">[] = [
-  {
-    question: "Which planet is known as the Red Planet?",
-    options: [
-      { id: "A", text: "Mars" },
-      { id: "B", text: "Venus" },
-      { id: "C", text: "Jupiter" },
-      { id: "D", text: "Mercury" },
-    ],
-    correctAnswer: "A",
-    explanation: "Mars is often called the Red Planet due to its iron oxide-rich surface, which gives it a reddish appearance.",
-  },
-  {
-    question: "What is the chemical symbol for Gold?",
-    options: [
-      { id: "A", text: "Ag" },
-      { id: "B", text: "Au" },
-      { id: "C", text: "Gd" },
-      { id: "D", text: "Go" },
-    ],
-    correctAnswer: "B",
-    explanation: "The symbol Au comes from the Latin word 'Aurum', meaning 'shining dawn'.",
-  },
-  {
-    question: "Which ocean is the largest by surface area?",
-    options: [
-      { id: "A", text: "Atlantic Ocean" },
-      { id: "B", text: "Indian Ocean" },
-      { id: "C", text: "Pacific Ocean" },
-      { id: "D", text: "Arctic Ocean" },
-    ],
-    correctAnswer: "C",
-    explanation: "The Pacific Ocean covers more than 30% of the Earth's surface, making it the largest ocean.",
-  },
-  {
-    question: "Who developed the theory of general relativity?",
-    options: [
-      { id: "A", text: "Isaac Newton" },
-      { id: "B", text: "Albert Einstein" },
-      { id: "C", text: "Niels Bohr" },
-      { id: "D", text: "Galileo Galilei" },
-    ],
-    correctAnswer: "B",
-    explanation: "Albert Einstein published the theory of general relativity in 1915, changing our understanding of gravity.",
-  },
-  {
-    question: "Which is the smallest prime number?",
-    options: [
-      { id: "A", text: "0" },
-      { id: "B", text: "1" },
-      { id: "C", text: "2" },
-      { id: "D", text: "3" },
-    ],
-    correctAnswer: "C",
-    explanation: "2 is the smallest and the only even prime number.",
-  },
-];
-
-const questions: Question[] = Array.from({ length: TOTAL_QUESTIONS }, (_, i) => {
-  const base = baseQuestions[i % baseQuestions.length];
-  return {
-    id: i + 1,
-    question: `Q${i + 1}: ${base.question}`,
-    options: base.options,
-    correctAnswer: base.correctAnswer,
-    explanation: base.explanation,
-  };
-});
 
 export default function QuizGamePage() {
   const router = useRouter();
 
   // === STATE ===
+  const [questions, setQuestions] = useState<Question[]>([]);
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(QUESTION_DURATION);
   const [selectedAnswer, setSelectedAnswer] = useState<OptionId | null>(null);
@@ -139,61 +80,41 @@ export default function QuizGamePage() {
   const whooshSoundRef = useRef<HTMLAudioElement | null>(null);
   const tickSoundRef = useRef<HTMLAudioElement | null>(null);
 
-  const currentQ = questions[currentIndex];
+  const currentQ = questions[currentIndex] ?? null;
 
-  /* === SUPABASE INTEGRATION (Ready to use) ===
-  
-  import { createClient } from '@supabase/supabase-js';
-  
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+    // Fetch questions from Supabase
 
-  // Fetch questions from Supabase
   useEffect(() => {
-    const fetchQuestions = async () => {
-      const { data, error } = await supabase
-        .from('quiz_questions')
-        .select('*')
-        .eq('active', true)
-        .order('order_index', { ascending: true })
-        .limit(TOTAL_QUESTIONS);
-      
-      if (!error && data) {
-        const formattedQuestions: Question[] = data.map((q, idx) => ({
-          id: q.id,
-          question: `Q${idx + 1}: ${q.question_text}`,
-          options: [
-            { id: "A", text: q.option_a },
-            { id: "B", text: q.option_b },
-            { id: "C", text: q.option_c },
-            { id: "D", text: q.option_d },
-          ],
-          correctAnswer: q.correct_answer as OptionId,
-          explanation: q.explanation,
-        }));
-        // Set questions state here
-      }
-    };
-    fetchQuestions();
-  }, []);
+  const fetchQuestions = async () => {
+    const { data, error } = await supabase
+      .from('questions')
+      .select('*')
+      .eq('active', true)
+      .order('order_index', { ascending: true })
+      .limit(TOTAL_QUESTIONS);
 
-  // Save user answer to Supabase
-  const saveAnswer = async (questionId: number, answer: OptionId, isCorrect: boolean) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    
-    await supabase.from('user_answers').insert({
-      user_id: user.id,
-      question_id: questionId,
-      selected_answer: answer,
-      is_correct: isCorrect,
-      time_taken: QUESTION_DURATION - timeLeft,
-      answered_at: new Date().toISOString()
-    });
+    if (!error && data) {
+      const formattedQuestions: Question[] = data.map((q, idx) => ({
+        id: q.id,
+        question: `Q${idx + 1}: ${q.question_text}`,
+        options: [
+          { id: "A", text: q.option_a },
+          { id: "B", text: q.option_b },
+          { id: "C", text: q.option_c },
+          { id: "D", text: q.option_d },
+        ],
+        correctAnswer: q.correct_answer,
+        explanation: q.explanation,
+      }));
+
+      setQuestions(formattedQuestions); // 🔥 ARTIK SET EDİYOR
+    }
   };
 
+  fetchQuestions();
+}, []);
+
+  
   // Update user stats after quiz
   const updateUserStats = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -225,8 +146,6 @@ export default function QuizGamePage() {
       completed_at: new Date().toISOString()
     });
   };
-
-  */
 
   // === SOUND HELPERS ===
   const playSound = (audio: HTMLAudioElement | null, options?: { loop?: boolean }) => {
@@ -331,31 +250,32 @@ export default function QuizGamePage() {
   }, [showExplanation, currentIndex, showFinalScore, isSoundEnabled]);
 
   // === FINAL SCORE COUNTDOWN ===
-  useEffect(() => {
-    if (!showFinalScore) return;
+useEffect(() => {
+  if (!showFinalScore) return;
 
-    stopTick();
-    playSound(gameoverSoundRef.current);
+  stopTick();
+  playSound(gameoverSoundRef.current);
 
-    // Call updateUserStats() here when Supabase is ready
+  updateUserStats(); // 🔥 BURAYA EKLE — TEK SATIR
 
-    let remaining = FINAL_SCORE_DURATION;
-    setFinalCountdown(remaining);
+  let remaining = FINAL_SCORE_DURATION;
+  setFinalCountdown(remaining);
 
-    const interval = setInterval(() => {
-      setFinalCountdown((prev) => Math.max(0, prev - 1));
-    }, 1000);
+  const interval = setInterval(() => {
+    setFinalCountdown((prev) => Math.max(0, prev - 1));
+  }, 1000);
 
-    const timeout = setTimeout(() => {
-      clearInterval(interval);
-      router.push("/lobby");
-    }, FINAL_SCORE_DURATION * 1000);
+  const timeout = setTimeout(() => {
+    clearInterval(interval);
+    router.push("/lobby");
+  }, FINAL_SCORE_DURATION * 1000);
 
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
-    };
-  }, [showFinalScore, router]);
+  return () => {
+    clearInterval(interval);
+    clearTimeout(timeout);
+  };
+}, [showFinalScore, router]);
+
 
   // Sound toggle effect
   useEffect(() => {
@@ -375,38 +295,55 @@ export default function QuizGamePage() {
     }
   }, [showFinalScore, showExplanation, timeLeft]);
 
+// === SUPABASE: Save each answer ===
+const saveAnswer = async (questionId: number, answer: OptionId, isCorrect: boolean) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase.from('user_answers').insert({
+    user_id: user.id,
+    question_id: questionId,
+    selected_answer: answer,
+    is_correct: isCorrect,
+    time_taken: QUESTION_DURATION - timeLeft,
+    answered_at: new Date().toISOString()
+  });
+};
+
+
   // === HANDLERS ===
-  const handleAnswerClick = (optionId: OptionId) => {
-    if (isAnswerLocked || showExplanation || showFinalScore) return;
+const handleAnswerClick = async (optionId: OptionId) => {
+  if (isAnswerLocked || showExplanation || showFinalScore) return;
 
-    playClick();
-    setSelectedAnswer(optionId);
-    setIsAnswerLocked(true);
+  playClick();
+  setSelectedAnswer(optionId);
+  setIsAnswerLocked(true);
 
-    const correct = optionId === currentQ.correctAnswer;
-    setIsCorrect(correct);
+  const correct = optionId === currentQ.correctAnswer;
+  setIsCorrect(correct);
 
-    setAnswers((prev) => {
-      const next = [...prev];
-      next[currentIndex] = correct ? "correct" : "wrong";
-      return next;
-    });
+  setAnswers((prev) => {
+    const next = [...prev];
+    next[currentIndex] = correct ? "correct" : "wrong";
+    return next;
+  });
 
-    if (correct) {
-      setCorrectCount((c) => c + 1);
-      const newStreak = streak + 1;
-      setStreak(newStreak);
-      setMaxStreak((max) => Math.max(max, newStreak));
-      playSound(correctSoundRef.current);
-    } else {
-      setWrongCount((w) => w + 1);
-      setStreak(0);
-      playSound(wrongSoundRef.current);
-    }
+  if (correct) {
+    setCorrectCount((c) => c + 1);
+    const newStreak = streak + 1;
+    setStreak(newStreak);
+    setMaxStreak((max) => Math.max(max, newStreak));
+    playSound(correctSoundRef.current);
+  } else {
+    setWrongCount((w) => w + 1);
+    setStreak(0);
+    playSound(wrongSoundRef.current);
+  }
 
-    // Call saveAnswer(currentQ.id, optionId, correct) here when Supabase is ready
+  // 🔥 SUPABASE: kullanıcının cevabını kaydet
+  await saveAnswer(currentQ.id, optionId, correct);
   };
-
+  
   const handleExitClick = () => {
     if (showFinalScore) return;
     playClick();
@@ -438,8 +375,25 @@ export default function QuizGamePage() {
   };
 
   const accuracy = TOTAL_QUESTIONS > 0 ? Math.round((correctCount / TOTAL_QUESTIONS) * 100) : 0;
-  const score = correctCount * 100;
+  const score = correctCount * 2;
 
+  // Sorular yüklenmeden ekranı gösterme
+if (!currentQ) {
+  return (
+    <div
+      style={{
+        color: "white",
+        minHeight: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        fontSize: "24px"
+      }}
+    >
+      Loading questions...
+    </div>
+  );
+}
   return (
     <>
       <style jsx global>{`
