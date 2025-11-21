@@ -15,7 +15,6 @@ import {
   Sparkles,
   Globe,
   Gift,
-  User,
   ShoppingCart,
   CheckCircle,
   AlertCircle,
@@ -194,7 +193,7 @@ const AgeVerificationModal = memo(({ onConfirm, onCancel }: any) => (
             boxShadow: "0 8px 24px rgba(124, 58, 237, 0.4)",
           }}
         >
-          I'm 18+ - Continue
+          I&apos;m 18+ - Continue
         </button>
       </div>
     </div>
@@ -334,10 +333,10 @@ export default function HomePage() {
   const router = useRouter();
   const [isPlaying, setIsPlaying] = useState(false);
   const [nextRound, setNextRound] = useState<number | null>(null);
-  const [activePlayers, setActivePlayers] = useState(600);
+  const [activePlayers, setActivePlayers] = useState(0);
   const [user, setUser] = useState<any>(null);
   const [champions, setChampions] = useState<any[]>([]);
-  const [stats, setStats] = useState({ totalQuestions: 0, roundsPerDay: 96 });
+  const [stats, setStats] = useState({ totalQuestions: 0, roundsPerDay: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [showAgeModal, setShowAgeModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<"live" | "free" | null>(null);
@@ -355,12 +354,12 @@ export default function HomePage() {
     try {
       const { data, error } = await supabase
         .from("user_rounds")
-        .select("available_rounds")
+        .select("purchased, used, remaining")
         .eq("user_id", user.id)
         .single();
 
       if (!error && data) {
-        setUserRounds(data.available_rounds || 0);
+        setUserRounds(data.remaining || 0);
       } else {
         setUserRounds(0);
       }
@@ -397,37 +396,32 @@ export default function HomePage() {
     }
   }, [user, fetchUserRounds]);
 
-  // Real-time Active Players with Dynamic Variation
+  // Real-time Active Players from Supabase
   const fetchActivePlayers = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      const { count, error } = await supabase
         .from("active_sessions")
-        .select("count", { count: "exact", head: true });
+        .select("*", { count: "exact", head: true })
+        .gte("last_activity", new Date(Date.now() - 15 * 60 * 1000).toISOString());
       
-      if (!error && data !== null) {
-        const realCount = (data as any) || 0;
-        // Base: 600 + gerçek sayı + rastgele varyasyon (-50 ile +150 arası)
-        const variation = Math.floor(Math.random() * 200) - 50;
-        const finalCount = Math.max(600, 600 + realCount + variation);
-        setActivePlayers(finalCount);
+      if (!error && count !== null) {
+        setActivePlayers(count);
       } else {
-        // Supabase hatası varsa dinamik sayı üret
-        const variation = Math.floor(Math.random() * 200) - 50;
-        setActivePlayers(Math.max(600, 600 + variation));
+        setActivePlayers(0);
       }
     } catch (err) {
       console.error("Active players fetch error:", err);
-      const variation = Math.floor(Math.random() * 200) - 50;
-      setActivePlayers(Math.max(600, 600 + variation));
+      setActivePlayers(0);
     }
   }, []);
 
-  // Next Round Countdown
+  // Next Round Countdown from Supabase
   const fetchNextRound = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("quiz_rounds")
         .select("scheduled_at")
+        .eq("status", "scheduled")
         .gte("scheduled_at", new Date().toISOString())
         .order("scheduled_at", { ascending: true })
         .limit(1)
@@ -439,15 +433,15 @@ export default function HomePage() {
         const diff = Math.max(0, Math.floor((scheduledTime - now) / 1000));
         setNextRound(diff);
       } else {
-        setNextRound(900);
+        setNextRound(null);
       }
     } catch (err) {
       console.error("Next round fetch error:", err);
-      setNextRound(900);
+      setNextRound(null);
     }
   }, []);
 
-  // Fetch Champions from Supabase (Optimized with proper error handling)
+  // Fetch Champions from Supabase
   const fetchChampions = useCallback(async () => {
     try {
       const periods = ["daily", "weekly", "monthly"];
@@ -469,12 +463,9 @@ export default function HomePage() {
               .limit(1)
               .single();
 
-            if (error) {
-              console.warn(`No ${period} champion data:`, error.message);
+            if (error || !data) {
               return null;
             }
-
-            if (!data) return null;
 
             const icons = [Crown, Trophy, Sparkles];
             const gradients = [
@@ -484,7 +475,6 @@ export default function HomePage() {
             ];
             const colors = ["#facc15", "#c084fc", "#22d3ee"];
 
-            // Safely access nested user data
             const userData = data.users as any;
             const userName = userData?.full_name || "Anonymous Player";
 
@@ -504,42 +494,14 @@ export default function HomePage() {
       );
 
       const validChampions = championsData.filter((c) => c !== null);
-      setChampions(validChampions.length > 0 ? validChampions : getDefaultChampions());
+      setChampions(validChampions);
     } catch (err) {
       console.error("Champions fetch error:", err);
-      setChampions(getDefaultChampions());
+      setChampions([]);
     }
   }, []);
 
-  // Default Champions (removed fake names, will be populated from DB)
-  const getDefaultChampions = () => [
-    {
-      period: "Daily",
-      name: "TBA",
-      score: 0,
-      gradient: "linear-gradient(to bottom right, #eab308, #f97316)",
-      color: "#facc15",
-      icon: Crown,
-    },
-    {
-      period: "Weekly",
-      name: "TBA",
-      score: 0,
-      gradient: "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
-      color: "#c084fc",
-      icon: Trophy,
-    },
-    {
-      period: "Monthly",
-      name: "TBA",
-      score: 0,
-      gradient: "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
-      color: "#22d3ee",
-      icon: Sparkles,
-    },
-  ];
-
-  // Fetch Stats from Supabase (Optimized)
+  // Fetch Stats from Supabase
   const fetchStats = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -549,21 +511,20 @@ export default function HomePage() {
 
       if (!error && data) {
         setStats({
-          totalQuestions: data.total_questions || 2800000,
-          roundsPerDay: data.rounds_per_day || 96,
+          totalQuestions: data.total_questions || 0,
+          roundsPerDay: data.rounds_per_day || 0,
         });
       } else {
-        console.warn("No stats data found, using defaults");
         setStats({
-          totalQuestions: 2800000,
-          roundsPerDay: 96,
+          totalQuestions: 0,
+          roundsPerDay: 0,
         });
       }
     } catch (err) {
       console.error("Stats fetch error:", err);
       setStats({
-        totalQuestions: 2800000,
-        roundsPerDay: 96,
+        totalQuestions: 0,
+        roundsPerDay: 0,
       });
     }
   }, []);
@@ -728,19 +689,19 @@ export default function HomePage() {
     () => [
       {
         icon: Globe,
-        value: `${Math.floor(activePlayers / 1000)}K+`,
+        value: activePlayers > 0 ? `${Math.floor(activePlayers / 1000)}K+` : "0",
         label: "Active Players",
         color: "#a78bfa",
       },
       {
         icon: Sparkles,
-        value: `${(stats.totalQuestions / 1000000).toFixed(1)}M+`,
+        value: stats.totalQuestions > 0 ? `${(stats.totalQuestions / 1000000).toFixed(1)}M+` : "0",
         label: "Questions Answered",
         color: "#f0abfc",
       },
       {
         icon: Zap,
-        value: `${stats.roundsPerDay}/day`,
+        value: stats.roundsPerDay > 0 ? `${stats.roundsPerDay}/day` : "0/day",
         label: "Live Rounds",
         color: "#22d3ee",
       },
@@ -751,7 +712,7 @@ export default function HomePage() {
   return (
     <>
       <Head>
-        <title>VibraXX - World's #1 Educational Quiz | Compete & Win</title>
+        <title>VibraXX - World&apos;s #1 Educational Quiz | Compete & Win</title>
         <meta
           name="description"
           content="The world's number one educational and award-winning quiz! Compete globally, win prizes, and prove your knowledge."
@@ -762,6 +723,7 @@ export default function HomePage() {
         <meta property="og:type" content="website" />
         <meta name="twitter:card" content="summary_large_image" />
         <link rel="canonical" href="https://vibraxx.com" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
       </Head>
 
       <style jsx global>{`
@@ -772,12 +734,14 @@ export default function HomePage() {
         
         * { 
           box-sizing: border-box;
+          -webkit-tap-highlight-color: transparent;
         }
 
         body {
           background-color: #020817;
           margin: 0;
           padding: 0;
+          overflow-x: hidden;
         }
 
         @keyframes float {
@@ -826,7 +790,12 @@ export default function HomePage() {
           animation-fill-mode: backwards;
         }
 
-        .vx-container { max-width: 1280px; margin: 0 auto; padding: 0 16px; }
+        .vx-container { 
+          max-width: 1280px; 
+          margin: 0 auto; 
+          padding: 0 16px;
+          width: 100%;
+        }
         @media (min-width: 640px) { .vx-container { padding: 0 24px; } }
 
         .vx-header {
@@ -847,7 +816,13 @@ export default function HomePage() {
           flex-wrap: wrap;
         }
 
-        .vx-header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .vx-header-right { 
+          display: flex; 
+          align-items: center; 
+          gap: 8px; 
+          flex-wrap: wrap;
+        }
+        
         .vx-hide-mobile { display: none; }
 
         @media (min-width: 640px) {
@@ -887,7 +862,11 @@ export default function HomePage() {
           .vx-livebar-inner { font-size: 14px; padding: 10px 24px; }
         }
 
-        .vx-hero { padding: 72px 16px 80px; text-align: center; }
+        .vx-hero { 
+          padding: 72px 16px 80px; 
+          text-align: center;
+          width: 100%;
+        }
         @media (min-width: 640px) { .vx-hero { padding: 96px 24px 96px; } }
 
         .vx-hero-badge {
@@ -999,6 +978,7 @@ export default function HomePage() {
           transition: transform 0.2s, box-shadow 0.2s;
           width: 100%;
           max-width: 320px;
+          touch-action: manipulation;
         }
 
         .vx-cta-btn:hover { transform: translateY(-2px); }
@@ -1105,7 +1085,6 @@ export default function HomePage() {
           .vx-champ-card { padding: 26px; }
         }
 
-        /* Footer */}
         .vx-footer {
           border-top: 1px solid rgba(255, 255, 255, 0.12);
           background: rgba(9, 9, 13, 0.96);
@@ -1521,7 +1500,7 @@ export default function HomePage() {
               >
                 <Globe style={{ width: 14, height: 14, color: "#a78bfa" }} />
                 <span style={{ fontWeight: 700, color: "white" }}>
-                  {activePlayers.toLocaleString()}
+                  {activePlayers > 0 ? activePlayers.toLocaleString() : "0"}
                 </span>
                 <span>players online</span>
               </div>
@@ -1560,7 +1539,7 @@ export default function HomePage() {
               <Trophy style={{ width: 16, height: 16, color: "#fbbf24" }} />
             </div>
 
-            {/* Prize Pool Notice - Below badge with proper block display */}
+            {/* Prize Pool Notice */}
             <div style={{ textAlign: "center", marginBottom: 28 }}>
               <div
                 style={{
@@ -1587,7 +1566,7 @@ export default function HomePage() {
             </h1>
 
             <p className="vx-hero-subtitle">
-              The world's number one educational and award-winning quiz!
+              The world&apos;s number one educational and award-winning quiz!
             </p>
 
             {/* CTA Buttons */}
@@ -1809,11 +1788,29 @@ export default function HomePage() {
               Top Champions
             </h2>
 
-            <div className="vx-champions-grid">
-              {champions.map((champion, i) => (
-                <ChampionCard key={i} champion={champion} />
-              ))}
-            </div>
+            {champions.length > 0 ? (
+              <div className="vx-champions-grid">
+                {champions.map((champion, i) => (
+                  <ChampionCard key={i} champion={champion} />
+                ))}
+              </div>
+            ) : (
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: "40px 20px",
+                  borderRadius: 20,
+                  background: "rgba(9, 9, 13, 0.96)",
+                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  marginBottom: 56,
+                }}
+              >
+                <Trophy style={{ width: 48, height: 48, color: "#64748b", margin: "0 auto 16px" }} />
+                <p style={{ fontSize: 16, color: "#94a3b8", margin: 0 }}>
+                  No champions yet. Be the first to compete!
+                </p>
+              </div>
+            )}
           </div>
         </main>
 
