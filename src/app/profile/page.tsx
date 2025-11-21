@@ -49,7 +49,7 @@ if (!session) {
 }
 
 const authUser = session.user;
-
+console.log("AUTH USER METADATA:", authUser.user_metadata);
 
       //
       // 1) Fetch Profile
