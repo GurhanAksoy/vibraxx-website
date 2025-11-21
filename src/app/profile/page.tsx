@@ -64,12 +64,25 @@ console.log("AUTH USER METADATA:", authUser.user_metadata);
         console.error("Profile fetch error:", profileError);
       }
 
-      setUser({
-        name: profile?.name || profile?.full_name || authUser.email?.split("@")[0] || "User",
-        email: authUser.email || "",
-        avatar: profile?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${authUser.id}`,
-        joinedDate: authUser.created_at || new Date().toISOString(),
-      });
+     setUser({
+  name: profile?.name 
+        || profile?.full_name 
+        || authUser.user_metadata?.full_name
+        || authUser.email?.split("@")[0] 
+        || "User",
+
+  email: authUser.email || "",
+
+  avatar:
+    profile?.avatar ||
+    authUser.user_metadata?.avatar_url ||
+    authUser.user_metadata?.picture ||
+    authUser.user_metadata?.full_picture ||
+    `https://api.dicebear.com/7.x/avataaars/svg?seed=${authUser.id}`,
+
+  joinedDate: authUser.created_at || new Date().toISOString(),
+});
+
 
       //
       // 2) Fetch user_stats (lastRound, today, monthly)

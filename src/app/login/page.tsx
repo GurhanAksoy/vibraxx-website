@@ -1,18 +1,37 @@
 ﻿"use client";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { createOrUpdateProfile } from "@/lib/createProfile";
 
 export default function LoginPage() {
   const router = useRouter();
 
+  // Login sonrası geri dönüşte user'ı yakala ve profile oluştur
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        // Profil oluştur veya güncelle
+        await createOrUpdateProfile(session.user);
+
+        // Yönlendirme
+        router.push("/dashboard");
+      }
+    };
+
+    checkUser();
+  }, [router]);
+
   const handleGoogleLogin = async () => {
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: "http://localhost:3000/dashboard", // GiriÅŸ sonrasÄ± yÃ¶nlendirme
+        redirectTo: "http://localhost:3000/login", 
+        // kullanıcı login sonra yine login sayfasına dönsün → user'ı yakalayacağız
       },
     });
-    if (error) console.error("Login error:", error.message);
   };
 
   return (
@@ -27,5 +46,3 @@ export default function LoginPage() {
     </main>
   );
 }
-
-
