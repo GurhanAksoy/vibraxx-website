@@ -12,6 +12,9 @@ const nextConfig = {
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
       { protocol: "https", hostname: "avatars.githubusercontent.com" },
       { protocol: "https", hostname: "cdn.supabase.com" },
+
+      // ✅ DICEBEAR AVATAR FIX
+      { protocol: "https", hostname: "api.dicebear.com" },
     ],
   },
 
@@ -20,7 +23,6 @@ const nextConfig = {
     return config;
   },
 
-  // ✅ Turbopack ayarı eklendi
   turbopack: {},
 };
 
