@@ -15,7 +15,6 @@ import {
   Sparkles,
   Globe,
   Gift,
-  User,
   ShoppingCart,
   CheckCircle,
   AlertCircle,
@@ -23,12 +22,17 @@ import {
 import { createClient } from "@supabase/supabase-js";
 import { playMenuMusic, stopMenuMusic } from "@/lib/audioManager";
 
+// -----------------------------------------------
+// SUPABASE CLIENT
+// -----------------------------------------------
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// Memoized Components
+// -----------------------------------------------
+// MEMO COMPONENTS
+// -----------------------------------------------
 const StatCard = memo(({ icon: Icon, value, label, color }: any) => (
   <div className="vx-stat-card">
     <Icon style={{ width: 22, height: 22, color, marginBottom: 4 }} />
@@ -79,7 +83,9 @@ const ChampionCard = memo(({ champion }: any) => {
 });
 ChampionCard.displayName = "ChampionCard";
 
-// Age Verification Modal Component
+// -----------------------------------------------
+// AGE VERIFICATION MODAL
+// -----------------------------------------------
 const AgeVerificationModal = memo(({ onConfirm, onCancel }: any) => (
   <div
     style={{
@@ -202,7 +208,9 @@ const AgeVerificationModal = memo(({ onConfirm, onCancel }: any) => (
 ));
 AgeVerificationModal.displayName = "AgeVerificationModal";
 
-// No Rounds Modal Component
+// -----------------------------------------------
+// NO ROUNDS MODAL
+// -----------------------------------------------
 const NoRoundsModal = memo(({ onBuyRounds, onCancel }: any) => (
   <div
     style={{
@@ -256,7 +264,8 @@ const NoRoundsModal = memo(({ onBuyRounds, onCancel }: any) => (
           No Rounds Available
         </h3>
         <p style={{ fontSize: 15, color: "#94a3b8", lineHeight: 1.6 }}>
-          You need to purchase rounds to enter the Live Quiz lobby and compete for the <strong style={{ color: "#fbbf24" }}>£1000 monthly prize</strong>!
+          You need to purchase rounds to enter the Live Quiz lobby and compete for the{" "}
+          <strong style={{ color: "#fbbf24" }}>£1000 monthly prize</strong>!
         </p>
       </div>
 
@@ -330,17 +339,54 @@ const NoRoundsModal = memo(({ onBuyRounds, onCancel }: any) => (
 ));
 NoRoundsModal.displayName = "NoRoundsModal";
 
+// -----------------------------------------------
+// DEFAULT CHAMPIONS
+// -----------------------------------------------
+const getDefaultChampions = () => [
+  {
+    period: "Daily",
+    name: "TBA",
+    score: 0,
+    gradient: "linear-gradient(to bottom right, #eab308, #f97316)",
+    color: "#facc15",
+    icon: Crown,
+  },
+  {
+    period: "Weekly",
+    name: "TBA",
+    score: 0,
+    gradient: "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
+    color: "#c084fc",
+    icon: Trophy,
+  },
+  {
+    period: "Monthly",
+    name: "TBA",
+    score: 0,
+    gradient: "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
+    color: "#22d3ee",
+    icon: Sparkles,
+  },
+];
+
+// -----------------------------------------------
+// PAGE COMPONENT
+// -----------------------------------------------
 export default function HomePage() {
   const router = useRouter();
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [nextRound, setNextRound] = useState<number | null>(null);
   const [activePlayers, setActivePlayers] = useState(600);
+
   const [user, setUser] = useState<any>(null);
   const [champions, setChampions] = useState<any[]>([]);
   const [stats, setStats] = useState({ totalQuestions: 0, roundsPerDay: 96 });
+
   const [isLoading, setIsLoading] = useState(true);
   const [showAgeModal, setShowAgeModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<"live" | "free" | null>(null);
+
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [userRounds, setUserRounds] = useState(0);
   const [showNoRoundsModal, setShowNoRoundsModal] = useState(false);
@@ -378,13 +424,13 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Neon Orbs Fade In
   useEffect(() => {
-    // Smooth fade in for neon orbs after page loads
     if (!isInitialLoad) {
-      const orbs = document.querySelectorAll('.animate-float');
+      const orbs = document.querySelectorAll(".animate-float");
       orbs.forEach((orb, index) => {
         setTimeout(() => {
-          (orb as HTMLElement).style.opacity = index === 0 ? '0.28' : '0.22';
+          (orb as HTMLElement).style.opacity = index === 0 ? "0.28" : "0.22";
         }, 300 + index * 200);
       });
     }
@@ -397,23 +443,20 @@ export default function HomePage() {
     }
   }, [user, fetchUserRounds]);
 
-  // Real-time Active Players with Dynamic Variation
+  // Active Players logic
   const fetchActivePlayers = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      const { count, error } = await supabase
         .from("active_sessions")
-        .select("count", { count: "exact", head: true });
-      
-      if (!error && data !== null) {
-        const realCount = (data as any) || 0;
-        // Base: 600 + gerçek sayı + rastgele varyasyon (-50 ile +150 arası)
-        const variation = Math.floor(Math.random() * 200) - 50;
-        const finalCount = Math.max(600, 600 + realCount + variation);
-        setActivePlayers(finalCount);
+        .select("*", { count: "exact", head: true });
+
+      const variation = Math.floor(Math.random() * 200) - 50;
+      const base = 600;
+
+      if (!error) {
+        setActivePlayers(Math.max(base, base + (count || 0) + variation));
       } else {
-        // Supabase hatası varsa dinamik sayı üret
-        const variation = Math.floor(Math.random() * 200) - 50;
-        setActivePlayers(Math.max(600, 600 + variation));
+        setActivePlayers(Math.max(base, base + variation));
       }
     } catch (err) {
       console.error("Active players fetch error:", err);
@@ -422,7 +465,7 @@ export default function HomePage() {
     }
   }, []);
 
-  // Next Round Countdown
+  // Next Round Fetch
   const fetchNextRound = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -447,7 +490,7 @@ export default function HomePage() {
     }
   }, []);
 
-  // Fetch Champions from Supabase (Optimized with proper error handling)
+  // Fetch Champions
   const fetchChampions = useCallback(async () => {
     try {
       const periods = ["daily", "weekly", "monthly"];
@@ -456,25 +499,25 @@ export default function HomePage() {
           try {
             const { data, error } = await supabase
               .from("leaderboard")
-              .select(`
+              .select(
+                `
                 user_id,
                 score,
                 users:user_id (
                   full_name,
                   avatar_url
                 )
-              `)
+              `
+              )
               .eq("period", period)
               .order("score", { ascending: false })
               .limit(1)
               .single();
 
-            if (error) {
-              console.warn(`No ${period} champion data:`, error.message);
+            if (error || !data) {
+              console.warn(`No ${period} champion data`);
               return null;
             }
-
-            if (!data) return null;
 
             const icons = [Crown, Trophy, Sparkles];
             const gradients = [
@@ -484,14 +527,13 @@ export default function HomePage() {
             ];
             const colors = ["#facc15", "#c084fc", "#22d3ee"];
 
-            // Safely access nested user data
-            const userData = data.users as any;
-            const userName = userData?.full_name || "Anonymous Player";
+            const userData = (data as any).users;
+            const userName = userData?.full_name || "Anonymous";
 
             return {
               period: period.charAt(0).toUpperCase() + period.slice(1),
               name: userName,
-              score: data.score || 0,
+              score: (data as any).score || 0,
               gradient: gradients[index],
               color: colors[index],
               icon: icons[index],
@@ -504,42 +546,14 @@ export default function HomePage() {
       );
 
       const validChampions = championsData.filter((c) => c !== null);
-      setChampions(validChampions.length > 0 ? validChampions : getDefaultChampions());
+      setChampions(validChampions.length > 0 ? (validChampions as any[]) : getDefaultChampions());
     } catch (err) {
-      console.error("Champions fetch error:", err);
+      console.error("Champions main error:", err);
       setChampions(getDefaultChampions());
     }
   }, []);
 
-  // Default Champions (removed fake names, will be populated from DB)
-  const getDefaultChampions = () => [
-    {
-      period: "Daily",
-      name: "TBA",
-      score: 0,
-      gradient: "linear-gradient(to bottom right, #eab308, #f97316)",
-      color: "#facc15",
-      icon: Crown,
-    },
-    {
-      period: "Weekly",
-      name: "TBA",
-      score: 0,
-      gradient: "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
-      color: "#c084fc",
-      icon: Trophy,
-    },
-    {
-      period: "Monthly",
-      name: "TBA",
-      score: 0,
-      gradient: "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
-      color: "#22d3ee",
-      icon: Sparkles,
-    },
-  ];
-
-  // Fetch Stats from Supabase (Optimized)
+  // Fetch Stats
   const fetchStats = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -553,22 +567,16 @@ export default function HomePage() {
           roundsPerDay: data.rounds_per_day || 96,
         });
       } else {
-        console.warn("No stats data found, using defaults");
-        setStats({
-          totalQuestions: 2800000,
-          roundsPerDay: 96,
-        });
+        console.warn("Stats missing, defaults used");
+        setStats({ totalQuestions: 2800000, roundsPerDay: 96 });
       }
     } catch (err) {
       console.error("Stats fetch error:", err);
-      setStats({
-        totalQuestions: 2800000,
-        roundsPerDay: 96,
-      });
+      setStats({ totalQuestions: 2800000, roundsPerDay: 96 });
     }
   }, []);
 
-  // Initial Load
+  // Initial Data Load
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
@@ -587,18 +595,14 @@ export default function HomePage() {
   useEffect(() => {
     const playersInterval = setInterval(fetchActivePlayers, 8000);
     const roundInterval = setInterval(() => {
-      setNextRound((prev) => (prev !== null && prev > 0 ? prev - 1 : null));
+      setNextRound((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
     }, 1000);
-
-    if (nextRound === 0) {
-      fetchNextRound();
-    }
 
     return () => {
       clearInterval(playersInterval);
       clearInterval(roundInterval);
     };
-  }, [fetchActivePlayers, fetchNextRound, nextRound]);
+  }, [fetchActivePlayers]);
 
   // Auth Listener
   useEffect(() => {
@@ -608,30 +612,29 @@ export default function HomePage() {
     };
     loadUser();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
     });
 
-    return () => sub.subscription.unsubscribe();
+    return () => listener?.subscription.unsubscribe();
   }, []);
 
   // Music Toggle
   const toggleMusic = useCallback(() => {
-    if (isPlaying) {
-      stopMenuMusic();
-      setIsPlaying(false);
-      localStorage.setItem("vibraxx_music", "false");
-    } else {
+    const newState = !isPlaying;
+    if (newState) {
       playMenuMusic();
-      setIsPlaying(true);
-      localStorage.setItem("vibraxx_music", "true");
+    } else {
+      stopMenuMusic();
     }
+    setIsPlaying(newState);
+    localStorage.setItem("vibraxx_music", newState ? "true" : "false");
   }, [isPlaying]);
 
-  // Load Music Preference
+  // Load music preference
   useEffect(() => {
-    const musicPref = localStorage.getItem("vibraxx_music");
-    if (musicPref === "true") {
+    const pref = localStorage.getItem("vibraxx_music");
+    if (pref === "true") {
       playMenuMusic();
       setIsPlaying(true);
     }
@@ -653,13 +656,12 @@ export default function HomePage() {
     setUser(null);
   }, []);
 
-  // Age Verification Handler
+  // Age Verification
   const handleAgeVerification = useCallback(() => {
     localStorage.setItem("vibraxx_age_verified", "true");
     setShowAgeModal(false);
-    
+
     if (pendingAction === "live") {
-      // Re-check rounds after age verification
       if (userRounds <= 0) {
         setShowNoRoundsModal(true);
       } else {
@@ -671,7 +673,6 @@ export default function HomePage() {
     setPendingAction(null);
   }, [pendingAction, userRounds, router]);
 
-  // Check if user is verified 18+
   const checkAgeVerification = useCallback(() => {
     return localStorage.getItem("vibraxx_age_verified") === "true";
   }, []);
@@ -689,13 +690,11 @@ export default function HomePage() {
       return;
     }
 
-    // Check if user has available rounds
     if (userRounds <= 0) {
       setShowNoRoundsModal(true);
       return;
     }
 
-    // User has rounds, go to lobby
     router.push("/lobby");
   }, [user, handleSignIn, checkAgeVerification, userRounds, router]);
 
@@ -756,21 +755,27 @@ export default function HomePage() {
           name="description"
           content="The world's number one educational and award-winning quiz! Compete globally, win prizes, and prove your knowledge."
         />
-        <meta name="keywords" content="live quiz, educational quiz, trivia, competition, prizes, leaderboard" />
+        <meta
+          name="keywords"
+          content="live quiz, educational quiz, trivia, competition, prizes, leaderboard"
+        />
         <meta property="og:title" content="VibraXX - World's #1 Educational Quiz" />
-        <meta property="og:description" content="The world's number one educational and award-winning quiz!" />
+        <meta
+          property="og:description"
+          content="The world's number one educational and award-winning quiz!"
+        />
         <meta property="og:type" content="website" />
         <meta name="twitter:card" content="summary_large_image" />
         <link rel="canonical" href="https://vibraxx.com" />
       </Head>
 
       <style jsx global>{`
-        :root { 
+        :root {
           color-scheme: dark;
           background-color: #020817;
         }
-        
-        * { 
+
+        * {
           box-sizing: border-box;
         }
 
@@ -781,53 +786,80 @@ export default function HomePage() {
         }
 
         @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-20px); }
+          0%,
+          100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-20px);
+          }
         }
 
         @keyframes glow {
-          0%, 100% { opacity: 0.3; }
-          50% { opacity: 0.6; }
+          0%,
+          100% {
+            opacity: 0.3;
+          }
+          50% {
+            opacity: 0.6;
+          }
         }
 
         @keyframes shimmer {
-          0% { background-position: -200% center; }
-          100% { background-position: 200% center; }
+          0% {
+            background-position: -200% center;
+          }
+          100% {
+            background-position: 200% center;
+          }
         }
 
         @keyframes pulse-slow {
-          0%, 100% { opacity: 0.5; }
-          50% { opacity: 0.8; }
+          0%,
+          100% {
+            opacity: 0.5;
+          }
+          50% {
+            opacity: 0.8;
+          }
         }
 
-        .animate-float { 
-          animation: float 6s ease-in-out infinite; 
+        .animate-float {
+          animation: float 6s ease-in-out infinite;
           will-change: transform;
           animation-delay: 0.3s;
           animation-fill-mode: backwards;
         }
-        
-        .animate-glow { 
+
+        .animate-glow {
           animation: glow 3s ease-in-out infinite;
           animation-delay: 0.5s;
           animation-fill-mode: backwards;
         }
-        
-        .animate-shimmer { 
-          background-size: 200% 100%; 
+
+        .animate-shimmer {
+          background-size: 200% 100%;
           animation: shimmer 3s linear infinite;
           animation-delay: 0.2s;
           animation-fill-mode: backwards;
         }
-        
-        .animate-pulse-slow { 
+
+        .animate-pulse-slow {
           animation: pulse-slow 4s ease-in-out infinite;
           animation-delay: 0.4s;
           animation-fill-mode: backwards;
         }
 
-        .vx-container { max-width: 1280px; margin: 0 auto; padding: 0 16px; }
-        @media (min-width: 640px) { .vx-container { padding: 0 24px; } }
+        .vx-container {
+          max-width: 1280px;
+          margin: 0 auto;
+          padding: 0 16px;
+        }
+        @media (min-width: 640px) {
+          .vx-container {
+            padding: 0 24px;
+          }
+        }
 
         .vx-header {
           position: sticky;
@@ -847,21 +879,35 @@ export default function HomePage() {
           flex-wrap: wrap;
         }
 
-        .vx-header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .vx-hide-mobile { display: none; }
+        .vx-header-right {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .vx-hide-mobile {
+          display: none;
+        }
 
         @media (min-width: 640px) {
-          .vx-header-inner { height: 80px; flex-wrap: nowrap; }
-          .vx-header-right { gap: 12px; }
-          .vx-hide-mobile { display: inline-flex; }
+          .vx-header-inner {
+            height: 80px;
+            flex-wrap: nowrap;
+          }
+          .vx-header-right {
+            gap: 12px;
+          }
+          .vx-hide-mobile {
+            display: inline-flex;
+          }
         }
 
         @media (max-width: 639px) {
-          .vx-header-inner { 
+          .vx-header-inner {
             justify-content: space-between;
             padding: 12px 0;
           }
-          .vx-header-right { 
+          .vx-header-right {
             justify-content: flex-end;
           }
         }
@@ -870,7 +916,11 @@ export default function HomePage() {
           z-index: 40;
           border-bottom: 1px solid rgba(255, 255, 255, 0.12);
           backdrop-filter: blur(16px);
-          background: linear-gradient(90deg, rgba(139, 92, 246, 0.12), rgba(236, 72, 153, 0.08));
+          background: linear-gradient(
+            90deg,
+            rgba(139, 92, 246, 0.12),
+            rgba(236, 72, 153, 0.08)
+          );
           font-size: 12px;
         }
 
@@ -884,11 +934,21 @@ export default function HomePage() {
         }
 
         @media (min-width: 640px) {
-          .vx-livebar-inner { font-size: 14px; padding: 10px 24px; }
+          .vx-livebar-inner {
+            font-size: 14px;
+            padding: 10px 24px;
+          }
         }
 
-        .vx-hero { padding: 72px 16px 80px; text-align: center; }
-        @media (min-width: 640px) { .vx-hero { padding: 96px 24px 96px; } }
+        .vx-hero {
+          padding: 72px 16px 80px;
+          text-align: center;
+        }
+        @media (min-width: 640px) {
+          .vx-hero {
+            padding: 96px 24px 96px;
+          }
+        }
 
         .vx-hero-badge {
           display: inline-flex;
@@ -897,39 +957,20 @@ export default function HomePage() {
           padding: 8px 20px;
           border-radius: 9999px;
           border: 2px solid rgba(251, 191, 36, 0.4);
-          background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
+          background: linear-gradient(
+            135deg,
+            rgba(251, 191, 36, 0.15),
+            rgba(245, 158, 11, 0.1)
+          );
           color: #fbbf24;
           font-size: 12px;
           margin-bottom: 12px;
           backdrop-filter: blur(10px);
           font-weight: 700;
-          box-shadow: 0 0 20px rgba(251, 191, 36, 0.3), inset 0 0 20px rgba(251, 191, 36, 0.1);
+          box-shadow: 0 0 20px rgba(251, 191, 36, 0.3),
+            inset 0 0 20px rgba(251, 191, 36, 0.1);
           position: relative;
           overflow: hidden;
-        }
-
-        .vx-hero-badge::before {
-          content: "";
-          position: absolute;
-          top: 0;
-          left: -100%;
-          width: 100%;
-          height: 100%;
-          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-          animation: badge-shine 3s infinite;
-        }
-
-        @keyframes badge-shine {
-          0% { left: -100%; }
-          50%, 100% { left: 100%; }
-        }
-
-        @media (min-width: 640px) {
-          .vx-hero-badge { 
-            padding: 10px 24px; 
-            font-size: 14px; 
-            margin-bottom: 14px;
-          }
         }
 
         .vx-hero-title {
@@ -942,7 +983,14 @@ export default function HomePage() {
 
         .vx-hero-neon {
           display: inline-block;
-          background: linear-gradient(90deg, #7c3aed, #22d3ee, #f97316, #d946ef, #7c3aed);
+          background: linear-gradient(
+            90deg,
+            #7c3aed,
+            #22d3ee,
+            #f97316,
+            #d946ef,
+            #7c3aed
+          );
           background-size: 250% 100%;
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
@@ -960,7 +1008,10 @@ export default function HomePage() {
         }
 
         @media (min-width: 640px) {
-          .vx-hero-subtitle { font-size: 18px; margin-bottom: 40px; }
+          .vx-hero-subtitle {
+            font-size: 18px;
+            margin-bottom: 40px;
+          }
         }
 
         .vx-cta-wrap {
@@ -976,9 +1027,9 @@ export default function HomePage() {
         }
 
         @media (min-width: 640px) {
-          .vx-cta-wrap { 
-            flex-direction: row; 
-            margin-bottom: 64px; 
+          .vx-cta-wrap {
+            flex-direction: row;
+            margin-bottom: 64px;
             padding: 0;
           }
         }
@@ -1001,20 +1052,28 @@ export default function HomePage() {
           max-width: 320px;
         }
 
-        .vx-cta-btn:hover { transform: translateY(-2px); }
-        .vx-cta-btn:active { transform: translateY(0); }
+        .vx-cta-btn:hover {
+          transform: translateY(-2px);
+        }
+        .vx-cta-btn:active {
+          transform: translateY(0);
+        }
 
         @media (min-width: 640px) {
-          .vx-cta-btn { 
-            padding: 18px 34px; 
+          .vx-cta-btn {
+            padding: 18px 34px;
             font-size: 18px;
             width: auto;
             min-width: 220px;
           }
         }
 
-        .vx-cta-live { box-shadow: 0 20px 40px -16px rgba(139, 92, 246, 0.6); }
-        .vx-cta-free { box-shadow: 0 20px 40px -16px rgba(34, 211, 238, 0.5); }
+        .vx-cta-live {
+          box-shadow: 0 20px 40px -16px rgba(139, 92, 246, 0.6);
+        }
+        .vx-cta-free {
+          box-shadow: 0 20px 40px -16px rgba(34, 211, 238, 0.5);
+        }
 
         .vx-stats-grid {
           display: grid;
@@ -1047,17 +1106,30 @@ export default function HomePage() {
           transition: transform 0.3s;
         }
 
-        .vx-stat-card:hover { transform: translateY(-4px); }
-
-        @media (min-width: 640px) {
-          .vx-stat-card { min-height: 150px; padding: 1.75rem; }
+        .vx-stat-card:hover {
+          transform: translateY(-4px);
         }
 
-        .vx-stat-label { color: #94a3b8; font-size: 13px; }
-        .vx-stat-value { font-weight: 800; font-size: 24px; }
+        @media (min-width: 640px) {
+          .vx-stat-card {
+            min-height: 150px;
+            padding: 1.75rem;
+          }
+        }
+
+        .vx-stat-label {
+          color: #94a3b8;
+          font-size: 13px;
+        }
+        .vx-stat-value {
+          font-weight: 800;
+          font-size: 24px;
+        }
 
         @media (min-width: 640px) {
-          .vx-stat-value { font-size: 28px; }
+          .vx-stat-value {
+            font-size: 28px;
+          }
         }
 
         .vx-champions-title {
@@ -1071,7 +1143,10 @@ export default function HomePage() {
         }
 
         @media (min-width: 640px) {
-          .vx-champions-title { font-size: 32px; margin-bottom: 32px; }
+          .vx-champions-title {
+            font-size: 32px;
+            margin-bottom: 32px;
+          }
         }
 
         .vx-champions-grid {
@@ -1099,13 +1174,16 @@ export default function HomePage() {
           transition: transform 0.3s;
         }
 
-        .vx-champ-card:hover { transform: translateY(-4px); }
-
-        @media (min-width: 640px) {
-          .vx-champ-card { padding: 26px; }
+        .vx-champ-card:hover {
+          transform: translateY(-4px);
         }
 
-        /* Footer */}
+        @media (min-width: 640px) {
+          .vx-champ-card {
+            padding: 26px;
+          }
+        }
+
         .vx-footer {
           border-top: 1px solid rgba(255, 255, 255, 0.12);
           background: rgba(9, 9, 13, 0.96);
@@ -1117,7 +1195,10 @@ export default function HomePage() {
         }
 
         @media (min-width: 640px) {
-          .vx-footer { font-size: 13px; padding: 40px 24px 28px; }
+          .vx-footer {
+            font-size: 13px;
+            padding: 40px 24px 28px;
+          }
         }
 
         .vx-footer-links {
@@ -1142,7 +1223,9 @@ export default function HomePage() {
           font-size: 12px;
         }
 
-        .vx-footer-links a:hover { color: #c4b5fd; }
+        .vx-footer-links a:hover {
+          color: #c4b5fd;
+        }
 
         .vx-footer-legal {
           max-width: 800px;
@@ -1161,8 +1244,12 @@ export default function HomePage() {
         }
 
         @media (min-width: 640px) {
-          .vx-footer-legal { font-size: 12px; }
-          .vx-footer-company { font-size: 12px; }
+          .vx-footer-legal {
+            font-size: 12px;
+          }
+          .vx-footer-company {
+            font-size: 12px;
+          }
         }
       `}</style>
 
@@ -1459,6 +1546,28 @@ export default function HomePage() {
                       />
                       <span style={{ position: "relative", zIndex: 10 }}>Sign Out</span>
                     </button>
+		{/* Sign Out (MOBILE ONLY) */}
+<button
+  onClick={handleSignOut}
+  aria-label="Sign out mobile"
+  className="sm:hidden"
+  style={{
+    padding: "8px 12px",
+    borderRadius: 10,
+    background: "rgba(239,68,68,0.15)",
+    border: "1px solid rgba(239,68,68,0.35)",
+    color: "#ef4444",
+    fontSize: 12,
+    fontWeight: 600,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    marginLeft: 6,
+  }}
+>
+  Sign Out
+</button>
+
                   </>
                 ) : (
                   <button
@@ -1486,7 +1595,9 @@ export default function HomePage() {
                         background: "linear-gradient(90deg,#7c3aed,#d946ef,#7c3aed)",
                       }}
                     />
-                    <span style={{ position: "relative", zIndex: 10 }}>Sign in with Google</span>
+                    <span style={{ position: "relative", zIndex: 10 }}>
+                      Sign in with Google
+                    </span>
                   </button>
                 )}
               </div>
@@ -1560,7 +1671,7 @@ export default function HomePage() {
               <Trophy style={{ width: 16, height: 16, color: "#fbbf24" }} />
             </div>
 
-            {/* Prize Pool Notice - Below badge with proper block display */}
+            {/* Prize Pool Notice */}
             <div style={{ textAlign: "center", marginBottom: 28 }}>
               <div
                 style={{
@@ -1612,7 +1723,9 @@ export default function HomePage() {
                     height: 20,
                   }}
                 />
-                <span style={{ position: "relative", zIndex: 10 }}>Start Live Quiz</span>
+                <span style={{ position: "relative", zIndex: 10 }}>
+                  Start Live Quiz
+                </span>
                 <ArrowRight
                   style={{
                     position: "relative",
@@ -1643,7 +1756,9 @@ export default function HomePage() {
                     height: 20,
                   }}
                 />
-                <span style={{ position: "relative", zIndex: 10 }}>Start Free Quiz</span>
+                <span style={{ position: "relative", zIndex: 10 }}>
+                  Start Free Quiz
+                </span>
                 <ArrowRight
                   style={{
                     position: "relative",
@@ -1662,7 +1777,8 @@ export default function HomePage() {
                 margin: "0 auto 48px",
                 padding: "20px 16px",
                 borderRadius: 20,
-                background: "linear-gradient(135deg, rgba(251, 191, 36, 0.05), rgba(245, 158, 11, 0.05))",
+                background:
+                  "linear-gradient(135deg, rgba(251, 191, 36, 0.05), rgba(245, 158, 11, 0.05))",
                 border: "1px solid rgba(251, 191, 36, 0.2)",
                 backdropFilter: "blur(10px)",
               }}
@@ -1705,10 +1821,23 @@ export default function HomePage() {
                     textAlign: "center",
                   }}
                 >
-                  <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 6 }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: "#94a3b8",
+                      marginBottom: 6,
+                    }}
+                  >
                     Single Round
                   </div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: "#fbbf24", marginBottom: 2 }}>
+                  <div
+                    style={{
+                      fontSize: 24,
+                      fontWeight: 800,
+                      color: "#fbbf24",
+                      marginBottom: 2,
+                    }}
+                  >
                     £1
                   </div>
                   <div style={{ fontSize: 11, color: "#64748b" }}>per round</div>
@@ -1718,7 +1847,8 @@ export default function HomePage() {
                   style={{
                     padding: 14,
                     borderRadius: 16,
-                    background: "linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1))",
+                    background:
+                      "linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1))",
                     border: "2px solid rgba(251, 191, 36, 0.4)",
                     textAlign: "center",
                     position: "relative",
@@ -1741,13 +1871,29 @@ export default function HomePage() {
                   >
                     Save 17%
                   </div>
-                  <div style={{ fontSize: 13, color: "#fbbf24", marginBottom: 6, fontWeight: 600 }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: "#fbbf24",
+                      marginBottom: 6,
+                      fontWeight: 600,
+                    }}
+                  >
                     Value Pack
                   </div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: "#fbbf24", marginBottom: 2 }}>
+                  <div
+                    style={{
+                      fontSize: 24,
+                      fontWeight: 800,
+                      color: "#fbbf24",
+                      marginBottom: 2,
+                    }}
+                  >
                     £29
                   </div>
-                  <div style={{ fontSize: 11, color: "#cbd5e1" }}>35 rounds (£0.83 each)</div>
+                  <div style={{ fontSize: 11, color: "#cbd5e1" }}>
+                    35 rounds (£0.83 each)
+                  </div>
                 </div>
               </div>
 
@@ -1759,7 +1905,14 @@ export default function HomePage() {
                   border: "1px solid rgba(59, 130, 246, 0.2)",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "start", gap: 8, marginBottom: 8 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "start",
+                    gap: 8,
+                    marginBottom: 8,
+                  }}
+                >
                   <AlertCircle
                     style={{
                       width: 16,
@@ -1770,16 +1923,41 @@ export default function HomePage() {
                     }}
                   />
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "#60a5fa", marginBottom: 3 }}>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: "#60a5fa",
+                        marginBottom: 3,
+                      }}
+                    >
                       Prize Pool Activation
                     </div>
-                    <p style={{ fontSize: 11, color: "#94a3b8", margin: 0, lineHeight: 1.5 }}>
-                      The <strong style={{ color: "white" }}>£1000 monthly prize</strong> activates when we reach{" "}
-                      <strong style={{ color: "white" }}>2000+ active participants</strong>. This ensures we can cover platform costs (Stripe fees, infrastructure) and deliver the full prize pool to winners.
+                    <p
+                      style={{
+                        fontSize: 11,
+                        color: "#94a3b8",
+                        margin: 0,
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      The <strong style={{ color: "white" }}>£1000 monthly prize</strong>{" "}
+                      activates when we reach{" "}
+                      <strong style={{ color: "white" }}>
+                        2000+ active participants
+                      </strong>
+                      . This ensures we can cover platform costs (Stripe fees,
+                      infrastructure) and deliver the full prize pool to winners.
                     </p>
                   </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "start", gap: 8 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "start",
+                    gap: 8,
+                  }}
+                >
                   <CheckCircle
                     style={{
                       width: 16,
@@ -1789,8 +1967,17 @@ export default function HomePage() {
                       marginTop: 2,
                     }}
                   />
-                  <p style={{ fontSize: 11, color: "#94a3b8", margin: 0, lineHeight: 1.5 }}>
-                    <strong style={{ color: "#4ade80" }}>Fair & Transparent:</strong> All rounds purchased contribute to the prize pool. The more players, the bigger the rewards for everyone!
+                  <p
+                    style={{
+                      fontSize: 11,
+                      color: "#94a3b8",
+                      margin: 0,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    <strong style={{ color: "#4ade80" }}>Fair & Transparent:</strong>{" "}
+                    All rounds purchased contribute to the prize pool. The more
+                    players, the bigger the rewards for everyone!
                   </p>
                 </div>
               </div>
@@ -1822,10 +2009,14 @@ export default function HomePage() {
           <div className="vx-container">
             {/* Legal Disclaimer */}
             <div className="vx-footer-legal">
-              <strong style={{ color: "#94a3b8" }}>Educational Quiz Competition.</strong> 18+ only. 
-              This is a 100% skill-based knowledge competition with no element of chance. 
-              Entry fees apply. Prize pool activates with 2000+ monthly participants. See{" "}
-              <a href="/terms" style={{ color: "#a78bfa", textDecoration: "underline" }}>
+              <strong style={{ color: "#94a3b8" }}>Educational Quiz Competition.</strong>{" "}
+              18+ only. This is a 100% skill-based knowledge competition with no element
+              of chance. Entry fees apply. Prize pool activates with 2000+ monthly
+              participants. See{" "}
+              <a
+                href="/terms"
+                style={{ color: "#a78bfa", textDecoration: "underline" }}
+              >
                 Terms & Conditions
               </a>{" "}
               for full details.
@@ -1859,14 +2050,21 @@ export default function HomePage() {
               <div style={{ marginBottom: 8, textAlign: "center" }}>
                 © 2025 VibraXX. Operated by Sermin Limited (UK)
               </div>
-              <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8, textAlign: "center" }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "#64748b",
+                  marginBottom: 8,
+                  textAlign: "center",
+                }}
+              >
                 Registered in England & Wales | All rights reserved
               </div>
               <div style={{ marginBottom: 10, textAlign: "center" }}>
-                <a 
+                <a
                   href="mailto:team@vibraxx.com"
-                  style={{ 
-                    color: "#a78bfa", 
+                  style={{
+                    color: "#a78bfa",
                     textDecoration: "none",
                     fontSize: 12,
                     fontWeight: 600,
@@ -1877,15 +2075,15 @@ export default function HomePage() {
               </div>
               <div style={{ fontSize: 11, textAlign: "center" }}>
                 Payment processing by{" "}
-                <a 
-                  href="https://stripe.com" 
-                  target="_blank" 
+                <a
+                  href="https://stripe.com"
+                  target="_blank"
                   rel="noopener noreferrer"
                   style={{ color: "#a78bfa", textDecoration: "none" }}
                 >
                   Stripe
-                </a>
-                {" "}| Secure SSL encryption | Skill-based competition - Not gambling
+                </a>{" "}
+                | Secure SSL encryption | Skill-based competition - Not gambling
               </div>
             </div>
           </div>
