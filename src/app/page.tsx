@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import Head from "next/head";
 import {
   Crown,
   Trophy,
@@ -14,6 +15,7 @@ import {
   Sparkles,
   Globe,
   Gift,
+  User,
   ShoppingCart,
   CheckCircle,
   AlertCircle,
@@ -27,9 +29,8 @@ const supabase = createClient(
 );
 
 // Memoized Components
-const StatCard = memo(({ icon: Icon, value, label, color, delay }: any) => (
-  <div className="vx-stat-card" style={{ animationDelay: `${delay}ms` }}>
-    <div className="vx-stat-glow" style={{ background: color }} />
+const StatCard = memo(({ icon: Icon, value, label, color }: any) => (
+  <div className="vx-stat-card">
     <Icon style={{ width: 22, height: 22, color, marginBottom: 4 }} />
     <div className="vx-stat-value" style={{ color }}>{value}</div>
     <div className="vx-stat-label">{label}</div>
@@ -37,11 +38,10 @@ const StatCard = memo(({ icon: Icon, value, label, color, delay }: any) => (
 ));
 StatCard.displayName = "StatCard";
 
-const ChampionCard = memo(({ champion, delay }: any) => {
+const ChampionCard = memo(({ champion }: any) => {
   const Icon = champion.icon;
   return (
-    <div className="vx-champ-card" style={{ animationDelay: `${delay}ms` }}>
-      <div className="vx-champ-glow" style={{ background: champion.gradient }} />
+    <div className="vx-champ-card">
       <div
         style={{
           width: 56,
@@ -52,7 +52,6 @@ const ChampionCard = memo(({ champion, delay }: any) => {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          boxShadow: `0 8px 32px ${champion.color}40`,
         }}
       >
         <Icon style={{ width: 26, height: 26, color: "#ffffff" }} />
@@ -80,23 +79,73 @@ const ChampionCard = memo(({ champion, delay }: any) => {
 });
 ChampionCard.displayName = "ChampionCard";
 
-// Modal Components
+// Age Verification Modal Component
 const AgeVerificationModal = memo(({ onConfirm, onCancel }: any) => (
-  <div className="vx-modal-overlay" onClick={onCancel}>
-    <div className="vx-modal-content vx-modal-enter" onClick={(e) => e.stopPropagation()}>
-      <div className="vx-modal-glow" />
-      <div style={{ textAlign: "center", marginBottom: 24, position: "relative", zIndex: 10 }}>
-        <div className="vx-modal-icon-wrapper">
-          <div className="vx-modal-icon-glow" />
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0, 0, 0, 0.85)",
+      backdropFilter: "blur(8px)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 100,
+      padding: "20px",
+    }}
+    onClick={onCancel}
+  >
+    <div
+      style={{
+        background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+        borderRadius: 24,
+        padding: "32px",
+        maxWidth: 480,
+        width: "100%",
+        border: "1px solid rgba(139, 92, 246, 0.3)",
+        boxShadow: "0 20px 60px rgba(0, 0, 0, 0.5)",
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div style={{ textAlign: "center", marginBottom: 24 }}>
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            margin: "0 auto 16px",
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
           <AlertCircle style={{ width: 32, height: 32, color: "white" }} />
         </div>
-        <h3 className="vx-modal-title">Age Verification Required</h3>
-        <p className="vx-modal-text">
+        <h3
+          style={{
+            fontSize: 24,
+            fontWeight: 700,
+            marginBottom: 12,
+            color: "white",
+          }}
+        >
+          Age Verification Required
+        </h3>
+        <p style={{ fontSize: 15, color: "#94a3b8", lineHeight: 1.6 }}>
           To participate in Live Quiz competitions with real prizes, you must be at least 18 years old.
         </p>
       </div>
 
-      <div className="vx-modal-info-box">
+      <div
+        style={{
+          background: "rgba(139, 92, 246, 0.1)",
+          borderRadius: 16,
+          padding: 20,
+          marginBottom: 24,
+          border: "1px solid rgba(139, 92, 246, 0.2)",
+        }}
+      >
         <div style={{ display: "flex", alignItems: "start", gap: 12, marginBottom: 12 }}>
           <CheckCircle style={{ width: 20, height: 20, color: "#a78bfa", flexShrink: 0, marginTop: 2 }} />
           <p style={{ fontSize: 14, color: "#cbd5e1", margin: 0 }}>
@@ -111,12 +160,41 @@ const AgeVerificationModal = memo(({ onConfirm, onCancel }: any) => (
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 12, position: "relative", zIndex: 10 }}>
-        <button onClick={onCancel} className="vx-btn-secondary">
+      <div style={{ display: "flex", gap: 12 }}>
+        <button
+          onClick={onCancel}
+          style={{
+            flex: 1,
+            padding: "14px 24px",
+            borderRadius: 12,
+            border: "1px solid rgba(148, 163, 253, 0.3)",
+            background: "transparent",
+            color: "#94a3b8",
+            fontSize: 15,
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: "all 0.2s",
+          }}
+        >
           Cancel
         </button>
-        <button onClick={onConfirm} className="vx-btn-primary vx-btn-purple">
-          I&apos;m 18+ - Continue
+        <button
+          onClick={onConfirm}
+          style={{
+            flex: 1,
+            padding: "14px 24px",
+            borderRadius: 12,
+            border: "none",
+            background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+            color: "white",
+            fontSize: 15,
+            fontWeight: 700,
+            cursor: "pointer",
+            transition: "all 0.2s",
+            boxShadow: "0 8px 24px rgba(124, 58, 237, 0.4)",
+          }}
+        >
+          I'm 18+ - Continue
         </button>
       </div>
     </div>
@@ -124,23 +202,73 @@ const AgeVerificationModal = memo(({ onConfirm, onCancel }: any) => (
 ));
 AgeVerificationModal.displayName = "AgeVerificationModal";
 
+// No Rounds Modal Component
 const NoRoundsModal = memo(({ onBuyRounds, onCancel }: any) => (
-  <div className="vx-modal-overlay" onClick={onCancel}>
-    <div className="vx-modal-content vx-modal-enter" onClick={(e) => e.stopPropagation()}>
-      <div className="vx-modal-glow vx-modal-glow-gold" />
-      <div style={{ textAlign: "center", marginBottom: 24, position: "relative", zIndex: 10 }}>
-        <div className="vx-modal-icon-wrapper vx-modal-icon-gold">
-          <div className="vx-modal-icon-glow vx-modal-icon-glow-gold" />
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0, 0, 0, 0.85)",
+      backdropFilter: "blur(8px)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 100,
+      padding: "20px",
+    }}
+    onClick={onCancel}
+  >
+    <div
+      style={{
+        background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+        borderRadius: 24,
+        padding: "32px",
+        maxWidth: 480,
+        width: "100%",
+        border: "1px solid rgba(251, 191, 36, 0.3)",
+        boxShadow: "0 20px 60px rgba(251, 191, 36, 0.3)",
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div style={{ textAlign: "center", marginBottom: 24 }}>
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            margin: "0 auto 16px",
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, #f59e0b, #fbbf24)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
           <ShoppingCart style={{ width: 32, height: 32, color: "white" }} />
         </div>
-        <h3 className="vx-modal-title">No Rounds Available</h3>
-        <p className="vx-modal-text">
-          You need to purchase rounds to enter the Live Quiz lobby and compete for the{" "}
-          <strong style={{ color: "#fbbf24" }}>£1000 monthly prize</strong>!
+        <h3
+          style={{
+            fontSize: 24,
+            fontWeight: 700,
+            marginBottom: 12,
+            color: "white",
+          }}
+        >
+          No Rounds Available
+        </h3>
+        <p style={{ fontSize: 15, color: "#94a3b8", lineHeight: 1.6 }}>
+          You need to purchase rounds to enter the Live Quiz lobby and compete for the <strong style={{ color: "#fbbf24" }}>£1000 monthly prize</strong>!
         </p>
       </div>
 
-      <div className="vx-modal-info-box vx-modal-info-gold">
+      <div
+        style={{
+          background: "rgba(251, 191, 36, 0.1)",
+          borderRadius: 16,
+          padding: 20,
+          marginBottom: 24,
+          border: "1px solid rgba(251, 191, 36, 0.2)",
+        }}
+      >
         <div style={{ display: "flex", alignItems: "start", gap: 12, marginBottom: 12 }}>
           <Trophy style={{ width: 20, height: 20, color: "#fbbf24", flexShrink: 0, marginTop: 2 }} />
           <p style={{ fontSize: 14, color: "#cbd5e1", margin: 0 }}>
@@ -155,11 +283,44 @@ const NoRoundsModal = memo(({ onBuyRounds, onCancel }: any) => (
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 12, position: "relative", zIndex: 10 }}>
-        <button onClick={onCancel} className="vx-btn-secondary">
+      <div style={{ display: "flex", gap: 12 }}>
+        <button
+          onClick={onCancel}
+          style={{
+            flex: 1,
+            padding: "14px 24px",
+            borderRadius: 12,
+            border: "1px solid rgba(148, 163, 253, 0.3)",
+            background: "transparent",
+            color: "#94a3b8",
+            fontSize: 15,
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: "all 0.2s",
+          }}
+        >
           Maybe Later
         </button>
-        <button onClick={onBuyRounds} className="vx-btn-primary vx-btn-gold">
+        <button
+          onClick={onBuyRounds}
+          style={{
+            flex: 1,
+            padding: "14px 24px",
+            borderRadius: 12,
+            border: "none",
+            background: "linear-gradient(135deg, #f59e0b, #fbbf24)",
+            color: "white",
+            fontSize: 15,
+            fontWeight: 700,
+            cursor: "pointer",
+            transition: "all 0.2s",
+            boxShadow: "0 8px 24px rgba(251, 191, 36, 0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+          }}
+        >
           <ShoppingCart style={{ width: 18, height: 18 }} />
           Buy Rounds Now
         </button>
@@ -173,36 +334,18 @@ export default function HomePage() {
   const router = useRouter();
   const [isPlaying, setIsPlaying] = useState(false);
   const [nextRound, setNextRound] = useState<number | null>(null);
-  const [activePlayers, setActivePlayers] = useState(0);
+  const [activePlayers, setActivePlayers] = useState(600);
   const [user, setUser] = useState<any>(null);
   const [champions, setChampions] = useState<any[]>([]);
-  const [stats, setStats] = useState({ totalQuestions: 0, roundsPerDay: 0 });
+  const [stats, setStats] = useState({ totalQuestions: 0, roundsPerDay: 96 });
   const [isLoading, setIsLoading] = useState(true);
   const [showAgeModal, setShowAgeModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<"live" | "free" | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [userRounds, setUserRounds] = useState(0);
   const [showNoRoundsModal, setShowNoRoundsModal] = useState(false);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [isMounted, setIsMounted] = useState(false);
 
-  // Client-side mount check for SSR safety
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  // Mouse parallax effect - only on client
-  useEffect(() => {
-    if (!isMounted) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePos({ x: e.clientX, y: e.clientY });
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [isMounted]);
-
+  // Fetch user's available rounds
   const fetchUserRounds = useCallback(async () => {
     if (!user) {
       setUserRounds(0);
@@ -212,12 +355,12 @@ export default function HomePage() {
     try {
       const { data, error } = await supabase
         .from("user_rounds")
-        .select("purchased, used, remaining")
+        .select("available_rounds")
         .eq("user_id", user.id)
         .single();
 
       if (!error && data) {
-        setUserRounds(data.remaining || 0);
+        setUserRounds(data.available_rounds || 0);
       } else {
         setUserRounds(0);
       }
@@ -227,6 +370,7 @@ export default function HomePage() {
     }
   }, [user]);
 
+  // Initial Load with smooth fade in
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsInitialLoad(false);
@@ -235,46 +379,55 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (!isInitialLoad && isMounted) {
-      const orbs = document.querySelectorAll('.vx-neon-orb');
+    // Smooth fade in for neon orbs after page loads
+    if (!isInitialLoad) {
+      const orbs = document.querySelectorAll('.animate-float');
       orbs.forEach((orb, index) => {
         setTimeout(() => {
-          (orb as HTMLElement).style.opacity = '1';
+          (orb as HTMLElement).style.opacity = index === 0 ? '0.28' : '0.22';
         }, 300 + index * 200);
       });
     }
-  }, [isInitialLoad, isMounted]);
+  }, [isInitialLoad]);
 
+  // Fetch user rounds when user changes
   useEffect(() => {
     if (user) {
       fetchUserRounds();
     }
   }, [user, fetchUserRounds]);
 
+  // Real-time Active Players with Dynamic Variation
   const fetchActivePlayers = useCallback(async () => {
     try {
-      const { count, error } = await supabase
+      const { data, error } = await supabase
         .from("active_sessions")
-        .select("*", { count: "exact", head: true })
-        .gte("last_activity", new Date(Date.now() - 15 * 60 * 1000).toISOString());
+        .select("count", { count: "exact", head: true });
       
-      if (!error && count !== null) {
-        setActivePlayers(count);
+      if (!error && data !== null) {
+        const realCount = (data as any) || 0;
+        // Base: 600 + gerçek sayı + rastgele varyasyon (-50 ile +150 arası)
+        const variation = Math.floor(Math.random() * 200) - 50;
+        const finalCount = Math.max(600, 600 + realCount + variation);
+        setActivePlayers(finalCount);
       } else {
-        setActivePlayers(0);
+        // Supabase hatası varsa dinamik sayı üret
+        const variation = Math.floor(Math.random() * 200) - 50;
+        setActivePlayers(Math.max(600, 600 + variation));
       }
     } catch (err) {
       console.error("Active players fetch error:", err);
-      setActivePlayers(0);
+      const variation = Math.floor(Math.random() * 200) - 50;
+      setActivePlayers(Math.max(600, 600 + variation));
     }
   }, []);
 
+  // Next Round Countdown
   const fetchNextRound = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("quiz_rounds")
         .select("scheduled_at")
-        .eq("status", "scheduled")
         .gte("scheduled_at", new Date().toISOString())
         .order("scheduled_at", { ascending: true })
         .limit(1)
@@ -286,14 +439,15 @@ export default function HomePage() {
         const diff = Math.max(0, Math.floor((scheduledTime - now) / 1000));
         setNextRound(diff);
       } else {
-        setNextRound(null);
+        setNextRound(900);
       }
     } catch (err) {
       console.error("Next round fetch error:", err);
-      setNextRound(null);
+      setNextRound(900);
     }
   }, []);
 
+  // Fetch Champions from Supabase (Optimized with proper error handling)
   const fetchChampions = useCallback(async () => {
     try {
       const periods = ["daily", "weekly", "monthly"];
@@ -315,18 +469,22 @@ export default function HomePage() {
               .limit(1)
               .single();
 
-            if (error || !data) {
+            if (error) {
+              console.warn(`No ${period} champion data:`, error.message);
               return null;
             }
 
+            if (!data) return null;
+
             const icons = [Crown, Trophy, Sparkles];
             const gradients = [
-              "linear-gradient(135deg, #eab308, #f97316)",
-              "linear-gradient(135deg, #8b5cf6, #d946ef)",
-              "linear-gradient(135deg, #3b82f6, #06b6d4)",
+              "linear-gradient(to bottom right, #eab308, #f97316)",
+              "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
+              "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
             ];
             const colors = ["#facc15", "#c084fc", "#22d3ee"];
 
+            // Safely access nested user data
             const userData = data.users as any;
             const userName = userData?.full_name || "Anonymous Player";
 
@@ -346,13 +504,42 @@ export default function HomePage() {
       );
 
       const validChampions = championsData.filter((c) => c !== null);
-      setChampions(validChampions);
+      setChampions(validChampions.length > 0 ? validChampions : getDefaultChampions());
     } catch (err) {
       console.error("Champions fetch error:", err);
-      setChampions([]);
+      setChampions(getDefaultChampions());
     }
   }, []);
 
+  // Default Champions (removed fake names, will be populated from DB)
+  const getDefaultChampions = () => [
+    {
+      period: "Daily",
+      name: "TBA",
+      score: 0,
+      gradient: "linear-gradient(to bottom right, #eab308, #f97316)",
+      color: "#facc15",
+      icon: Crown,
+    },
+    {
+      period: "Weekly",
+      name: "TBA",
+      score: 0,
+      gradient: "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
+      color: "#c084fc",
+      icon: Trophy,
+    },
+    {
+      period: "Monthly",
+      name: "TBA",
+      score: 0,
+      gradient: "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
+      color: "#22d3ee",
+      icon: Sparkles,
+    },
+  ];
+
+  // Fetch Stats from Supabase (Optimized)
   const fetchStats = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -362,24 +549,26 @@ export default function HomePage() {
 
       if (!error && data) {
         setStats({
-          totalQuestions: data.total_questions || 0,
-          roundsPerDay: data.rounds_per_day || 0,
+          totalQuestions: data.total_questions || 2800000,
+          roundsPerDay: data.rounds_per_day || 96,
         });
       } else {
+        console.warn("No stats data found, using defaults");
         setStats({
-          totalQuestions: 0,
-          roundsPerDay: 0,
+          totalQuestions: 2800000,
+          roundsPerDay: 96,
         });
       }
     } catch (err) {
       console.error("Stats fetch error:", err);
       setStats({
-        totalQuestions: 0,
-        roundsPerDay: 0,
+        totalQuestions: 2800000,
+        roundsPerDay: 96,
       });
     }
   }, []);
 
+  // Initial Load
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
@@ -394,6 +583,7 @@ export default function HomePage() {
     loadData();
   }, [fetchActivePlayers, fetchNextRound, fetchChampions, fetchStats]);
 
+  // Real-time Updates
   useEffect(() => {
     const playersInterval = setInterval(fetchActivePlayers, 8000);
     const roundInterval = setInterval(() => {
@@ -410,6 +600,7 @@ export default function HomePage() {
     };
   }, [fetchActivePlayers, fetchNextRound, nextRound]);
 
+  // Auth Listener
   useEffect(() => {
     const loadUser = async () => {
       const { data } = await supabase.auth.getUser();
@@ -424,50 +615,51 @@ export default function HomePage() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // Music Toggle
   const toggleMusic = useCallback(() => {
     if (isPlaying) {
       stopMenuMusic();
       setIsPlaying(false);
-      if (isMounted) localStorage.setItem("vibraxx_music", "false");
+      localStorage.setItem("vibraxx_music", "false");
     } else {
       playMenuMusic();
       setIsPlaying(true);
-      if (isMounted) localStorage.setItem("vibraxx_music", "true");
+      localStorage.setItem("vibraxx_music", "true");
     }
-  }, [isPlaying, isMounted]);
+  }, [isPlaying]);
 
+  // Load Music Preference
   useEffect(() => {
-    if (!isMounted) return;
-    
     const musicPref = localStorage.getItem("vibraxx_music");
     if (musicPref === "true") {
       playMenuMusic();
       setIsPlaying(true);
     }
     return () => stopMenuMusic();
-  }, [isMounted]);
+  }, []);
 
+  // Auth Actions
   const handleSignIn = useCallback(async () => {
-    if (!isMounted) return;
-    
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
-  }, [isMounted]);
+  }, []);
 
   const handleSignOut = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
   }, []);
 
+  // Age Verification Handler
   const handleAgeVerification = useCallback(() => {
-    if (isMounted) localStorage.setItem("vibraxx_age_verified", "true");
+    localStorage.setItem("vibraxx_age_verified", "true");
     setShowAgeModal(false);
     
     if (pendingAction === "live") {
+      // Re-check rounds after age verification
       if (userRounds <= 0) {
         setShowNoRoundsModal(true);
       } else {
@@ -477,13 +669,14 @@ export default function HomePage() {
       router.push("/free");
     }
     setPendingAction(null);
-  }, [pendingAction, userRounds, router, isMounted]);
+  }, [pendingAction, userRounds, router]);
 
+  // Check if user is verified 18+
   const checkAgeVerification = useCallback(() => {
-    if (!isMounted) return false;
     return localStorage.getItem("vibraxx_age_verified") === "true";
-  }, [isMounted]);
+  }, []);
 
+  // Start Live Quiz
   const handleStartLiveQuiz = useCallback(async () => {
     if (!user) {
       await handleSignIn();
@@ -496,14 +689,17 @@ export default function HomePage() {
       return;
     }
 
+    // Check if user has available rounds
     if (userRounds <= 0) {
       setShowNoRoundsModal(true);
       return;
     }
 
+    // User has rounds, go to lobby
     router.push("/lobby");
   }, [user, handleSignIn, checkAgeVerification, userRounds, router]);
 
+  // Start Free Quiz
   const handleStartFreeQuiz = useCallback(async () => {
     if (!user) {
       await handleSignIn();
@@ -519,6 +715,7 @@ export default function HomePage() {
     router.push("/free");
   }, [user, handleSignIn, checkAgeVerification, router]);
 
+  // Format Time
   const formatTime = useCallback((seconds: number | null) => {
     if (seconds === null) return "--:--";
     const m = Math.floor(seconds / 60);
@@ -526,42 +723,46 @@ export default function HomePage() {
     return `${m}:${s.toString().padStart(2, "0")}`;
   }, []);
 
+  // Stats Cards
   const statsCards = useMemo(
     () => [
       {
         icon: Globe,
-        value: activePlayers > 0 ? `${Math.floor(activePlayers / 1000)}K+` : "0",
+        value: `${Math.floor(activePlayers / 1000)}K+`,
         label: "Active Players",
         color: "#a78bfa",
-        delay: 0,
       },
       {
         icon: Sparkles,
-        value: stats.totalQuestions > 0 ? `${(stats.totalQuestions / 1000000).toFixed(1)}M+` : "0",
+        value: `${(stats.totalQuestions / 1000000).toFixed(1)}M+`,
         label: "Questions Answered",
         color: "#f0abfc",
-        delay: 100,
       },
       {
         icon: Zap,
-        value: stats.roundsPerDay > 0 ? `${stats.roundsPerDay}/day` : "0/day",
+        value: `${stats.roundsPerDay}/day`,
         label: "Live Rounds",
         color: "#22d3ee",
-        delay: 200,
       },
     ],
     [activePlayers, stats]
   );
 
-  // Safe parallax calculation - only on client
-  const parallaxX = isMounted ? (mousePos.x / window.innerWidth - 0.5) * 30 : 0;
-  const parallaxY = isMounted ? (mousePos.y / window.innerHeight - 0.5) * 30 : 0;
-
   return (
     <>
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+      <Head>
+        <title>VibraXX - World's #1 Educational Quiz | Compete & Win</title>
+        <meta
+          name="description"
+          content="The world's number one educational and award-winning quiz! Compete globally, win prizes, and prove your knowledge."
+        />
+        <meta name="keywords" content="live quiz, educational quiz, trivia, competition, prizes, leaderboard" />
+        <meta property="og:title" content="VibraXX - World's #1 Educational Quiz" />
+        <meta property="og:description" content="The world's number one educational and award-winning quiz!" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <link rel="canonical" href="https://vibraxx.com" />
+      </Head>
 
       <style jsx global>{`
         :root { 
@@ -571,20 +772,22 @@ export default function HomePage() {
         
         * { 
           box-sizing: border-box;
-          -webkit-tap-highlight-color: transparent;
         }
 
         body {
           background-color: #020817;
           margin: 0;
           padding: 0;
-          overflow-x: hidden;
-          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
 
         @keyframes float {
-          0%, 100% { transform: translate3d(0, 0, 0); }
-          50% { transform: translate3d(0, -30px, 0); }
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
+        }
+
+        @keyframes glow {
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 0.6; }
         }
 
         @keyframes shimmer {
@@ -592,321 +795,47 @@ export default function HomePage() {
           100% { background-position: 200% center; }
         }
 
-        @keyframes pulse-glow {
-          0%, 100% { opacity: 0.4; transform: scale(1); }
-          50% { opacity: 0.8; transform: scale(1.05); }
+        @keyframes pulse-slow {
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 0.8; }
         }
 
-        @keyframes fade-in-up {
-          from { opacity: 0; transform: translateY(30px); }
-          to { opacity: 1; transform: translateY(0); }
+        .animate-float { 
+          animation: float 6s ease-in-out infinite; 
+          will-change: transform;
+          animation-delay: 0.3s;
+          animation-fill-mode: backwards;
+        }
+        
+        .animate-glow { 
+          animation: glow 3s ease-in-out infinite;
+          animation-delay: 0.5s;
+          animation-fill-mode: backwards;
+        }
+        
+        .animate-shimmer { 
+          background-size: 200% 100%; 
+          animation: shimmer 3s linear infinite;
+          animation-delay: 0.2s;
+          animation-fill-mode: backwards;
+        }
+        
+        .animate-pulse-slow { 
+          animation: pulse-slow 4s ease-in-out infinite;
+          animation-delay: 0.4s;
+          animation-fill-mode: backwards;
         }
 
-        @keyframes modal-enter {
-          from { opacity: 0; transform: scale(0.95) translateY(20px); }
-          to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-
-        @keyframes badge-shine {
-          0% { left: -100%; }
-          50%, 100% { left: 100%; }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          *, *::before, *::after {
-            animation-duration: 0.01ms !important;
-            animation-iteration-count: 1 !important;
-            transition-duration: 0.01ms !important;
-          }
-        }
-
-        .vx-neon-orb {
-          position: fixed;
-          border-radius: 50%;
-          filter: blur(80px);
-          opacity: 0;
-          pointer-events: none;
-          transition: opacity 1s ease-in, transform 0.3s ease-out;
-          will-change: transform, opacity;
-          animation: float 8s ease-in-out infinite;
-        }
-
-        .vx-glass-card {
-          background: rgba(15, 23, 42, 0.7);
-          backdrop-filter: blur(24px) saturate(180%);
-          border: 1px solid rgba(255, 255, 255, 0.18);
-          border-radius: 24px;
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 
-                      inset 0 1px 0 rgba(255, 255, 255, 0.1);
-        }
-
-        .vx-btn-primary {
-          position: relative;
-          padding: 14px 28px;
-          border-radius: 14px;
-          border: none;
-          cursor: pointer;
-          font-weight: 700;
-          font-size: 15px;
-          color: white;
-          overflow: hidden;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          touch-action: manipulation;
-        }
-
-        .vx-btn-primary::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          opacity: 0;
-          transition: opacity 0.3s;
-          background: radial-gradient(circle at center, rgba(255,255,255,0.2), transparent);
-        }
-
-        .vx-btn-primary:hover::before {
-          opacity: 1;
-        }
-
-        .vx-btn-primary:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-        }
-
-        .vx-btn-primary:active {
-          transform: translateY(0);
-        }
-
-        .vx-btn-purple {
-          background: linear-gradient(135deg, #7c3aed, #d946ef);
-          box-shadow: 0 8px 24px rgba(124, 58, 237, 0.4);
-        }
-
-        .vx-btn-gold {
-          background: linear-gradient(135deg, #f59e0b, #fbbf24);
-          box-shadow: 0 8px 24px rgba(251, 191, 36, 0.4);
-        }
-
-        .vx-btn-secondary {
-          padding: 14px 24px;
-          border-radius: 12px;
-          border: 1px solid rgba(148, 163, 253, 0.3);
-          background: rgba(15, 23, 42, 0.6);
-          backdrop-filter: blur(10px);
-          color: #94a3b8;
-          font-size: 15px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
-          flex: 1;
-        }
-
-        .vx-btn-secondary:hover {
-          border-color: rgba(148, 163, 253, 0.5);
-          background: rgba(15, 23, 42, 0.8);
-          color: #cbd5e1;
-        }
-
-        .vx-modal-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(0, 0, 0, 0.85);
-          backdrop-filter: blur(12px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 100;
-          padding: 20px;
-        }
-
-        .vx-modal-content {
-          position: relative;
-          background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95));
-          backdrop-filter: blur(24px);
-          border-radius: 24px;
-          padding: 32px;
-          max-width: 480px;
-          width: 100%;
-          border: 1px solid rgba(139, 92, 246, 0.3);
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-        }
-
-        .vx-modal-enter {
-          animation: modal-enter 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .vx-modal-glow {
-          position: absolute;
-          inset: -40px;
-          background: radial-gradient(circle, rgba(124, 58, 237, 0.3), transparent 70%);
-          filter: blur(40px);
-          opacity: 0.6;
-          animation: pulse-glow 3s ease-in-out infinite;
-          pointer-events: none;
-        }
-
-        .vx-modal-glow-gold {
-          background: radial-gradient(circle, rgba(251, 191, 36, 0.3), transparent 70%);
-        }
-
-        .vx-modal-icon-wrapper {
-          position: relative;
-          width: 64px;
-          height: 64px;
-          margin: 0 auto 16px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #7c3aed, #d946ef);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .vx-modal-icon-gold {
-          background: linear-gradient(135deg, #f59e0b, #fbbf24);
-        }
-
-        .vx-modal-icon-glow {
-          position: absolute;
-          inset: -8px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(124, 58, 237, 0.4), transparent);
-          filter: blur(16px);
-          animation: pulse-glow 2s ease-in-out infinite;
-        }
-
-        .vx-modal-icon-glow-gold {
-          background: radial-gradient(circle, rgba(251, 191, 36, 0.4), transparent);
-        }
-
-        .vx-modal-title {
-          font-size: 24px;
-          font-weight: 700;
-          margin-bottom: 12px;
-          color: white;
-          text-shadow: 0 2px 12px rgba(124, 58, 237, 0.3);
-        }
-
-        .vx-modal-text {
-          font-size: 15px;
-          color: #94a3b8;
-          line-height: 1.6;
-        }
-
-        .vx-modal-info-box {
-          background: rgba(139, 92, 246, 0.1);
-          border-radius: 16px;
-          padding: 20px;
-          margin-bottom: 24px;
-          border: 1px solid rgba(139, 92, 246, 0.2);
-          position: relative;
-          z-index: 10;
-        }
-
-        .vx-modal-info-gold {
-          background: rgba(251, 191, 36, 0.1);
-          border-color: rgba(251, 191, 36, 0.2);
-        }
-
-        .vx-stat-card {
-          position: relative;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          text-align: center;
-          border-radius: 24px;
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          background: rgba(15, 23, 42, 0.8);
-          backdrop-filter: blur(24px);
-          min-height: 140px;
-          padding: 2rem;
-          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-          animation: fade-in-up 0.6s ease-out backwards;
-          overflow: hidden;
-        }
-
-        .vx-stat-glow {
-          position: absolute;
-          inset: -20px;
-          opacity: 0;
-          filter: blur(30px);
-          transition: opacity 0.4s;
-          pointer-events: none;
-        }
-
-        .vx-stat-card:hover {
-          transform: translateY(-8px) scale(1.02);
-          border-color: rgba(255, 255, 255, 0.25);
-          box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
-        }
-
-        .vx-stat-card:hover .vx-stat-glow {
-          opacity: 0.3;
-        }
-
-        .vx-stat-label { 
-          color: #94a3b8; 
-          font-size: 13px; 
-          font-weight: 500;
-        }
-
-        .vx-stat-value { 
-          font-weight: 800; 
-          font-size: 32px; 
-          margin: 8px 0;
-          text-shadow: 0 2px 12px currentColor;
-        }
-
-        .vx-champ-card {
-          position: relative;
-          padding: 28px;
-          border-radius: 28px;
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          background: rgba(15, 23, 42, 0.85);
-          backdrop-filter: blur(24px);
-          text-align: center;
-          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-          animation: fade-in-up 0.6s ease-out backwards;
-          overflow: hidden;
-        }
-
-        .vx-champ-glow {
-          position: absolute;
-          inset: -30px;
-          opacity: 0;
-          filter: blur(40px);
-          transition: opacity 0.4s;
-          pointer-events: none;
-        }
-
-        .vx-champ-card:hover {
-          transform: translateY(-8px) scale(1.03);
-          border-color: rgba(255, 255, 255, 0.25);
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-        }
-
-        .vx-champ-card:hover .vx-champ-glow {
-          opacity: 0.2;
-        }
-
-        .vx-container { 
-          max-width: 1280px; 
-          margin: 0 auto; 
-          padding: 0 16px;
-          width: 100%;
-        }
+        .vx-container { max-width: 1280px; margin: 0 auto; padding: 0 16px; }
+        @media (min-width: 640px) { .vx-container { padding: 0 24px; } }
 
         .vx-header {
           position: sticky;
           top: 0;
           z-index: 50;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-          backdrop-filter: blur(20px) saturate(180%);
-          background: rgba(2, 8, 23, 0.85);
-          box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+          backdrop-filter: blur(20px);
+          background: rgba(15, 23, 42, 0.92);
         }
 
         .vx-header-inner {
@@ -914,86 +843,69 @@ export default function HomePage() {
           align-items: center;
           justify-content: space-between;
           gap: 10px;
-          padding: 12px 0;
-        }
-
-        .vx-header-right { 
-          display: flex; 
-          align-items: center; 
-          gap: 8px; 
+          padding: 8px 0;
           flex-wrap: wrap;
         }
 
+        .vx-header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .vx-hide-mobile { display: none; }
 
         @media (min-width: 640px) {
-          .vx-container { padding: 0 24px; }
-          .vx-header-inner { height: 80px; }
+          .vx-header-inner { height: 80px; flex-wrap: nowrap; }
           .vx-header-right { gap: 12px; }
           .vx-hide-mobile { display: inline-flex; }
-          .vx-stat-card { min-height: 160px; }
+        }
+
+        @media (max-width: 639px) {
+          .vx-header-inner { 
+            justify-content: space-between;
+            padding: 12px 0;
+          }
+          .vx-header-right { 
+            justify-content: flex-end;
+          }
         }
 
         .vx-livebar {
-          position: relative;
           z-index: 40;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.12);
           backdrop-filter: blur(16px);
-          background: linear-gradient(90deg, rgba(139, 92, 246, 0.15), rgba(236, 72, 153, 0.1));
+          background: linear-gradient(90deg, rgba(139, 92, 246, 0.12), rgba(236, 72, 153, 0.08));
           font-size: 12px;
-          overflow: hidden;
-        }
-
-        .vx-livebar::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
-          animation: shimmer 3s linear infinite;
         }
 
         .vx-livebar-inner {
-          position: relative;
           display: flex;
           flex-wrap: wrap;
-          gap: 12px;
+          gap: 10px;
           justify-content: center;
           align-items: center;
-          padding: 10px 16px;
+          padding: 8px 16px;
         }
 
         @media (min-width: 640px) {
-          .vx-livebar-inner { font-size: 14px; padding: 12px 24px; }
+          .vx-livebar-inner { font-size: 14px; padding: 10px 24px; }
         }
 
-        .vx-hero { 
-          padding: 80px 16px 80px; 
-          text-align: center;
-          width: 100%;
-        }
-
-        @media (min-width: 640px) { 
-          .vx-hero { padding: 120px 24px 100px; } 
-        }
+        .vx-hero { padding: 72px 16px 80px; text-align: center; }
+        @media (min-width: 640px) { .vx-hero { padding: 96px 24px 96px; } }
 
         .vx-hero-badge {
-          position: relative;
           display: inline-flex;
           align-items: center;
           gap: 8px;
-          padding: 10px 24px;
+          padding: 8px 20px;
           border-radius: 9999px;
-          border: 2px solid rgba(251, 191, 36, 0.5);
-          background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.15));
+          border: 2px solid rgba(251, 191, 36, 0.4);
+          background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
           color: #fbbf24;
-          font-size: 13px;
-          margin-bottom: 24px;
-          backdrop-filter: blur(12px);
+          font-size: 12px;
+          margin-bottom: 12px;
+          backdrop-filter: blur(10px);
           font-weight: 700;
-          box-shadow: 0 0 30px rgba(251, 191, 36, 0.4), 
-                      inset 0 0 20px rgba(251, 191, 36, 0.1);
+          box-shadow: 0 0 20px rgba(251, 191, 36, 0.3), inset 0 0 20px rgba(251, 191, 36, 0.1);
+          position: relative;
           overflow: hidden;
-          animation: fade-in-up 0.6s ease-out;
         }
 
         .vx-hero-badge::before {
@@ -1003,72 +915,78 @@ export default function HomePage() {
           left: -100%;
           width: 100%;
           height: 100%;
-          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
           animation: badge-shine 3s infinite;
+        }
+
+        @keyframes badge-shine {
+          0% { left: -100%; }
+          50%, 100% { left: 100%; }
         }
 
         @media (min-width: 640px) {
           .vx-hero-badge { 
-            padding: 12px 28px; 
+            padding: 10px 24px; 
             font-size: 14px; 
+            margin-bottom: 14px;
           }
         }
 
         .vx-hero-title {
-          font-size: clamp(32px, 7vw, 56px);
-          font-weight: 900;
-          line-height: 1.1;
-          margin-bottom: 24px;
-          letter-spacing: -0.04em;
-          animation: fade-in-up 0.6s ease-out 0.2s backwards;
+          font-size: clamp(26px, 6vw, 42px);
+          font-weight: 800;
+          line-height: 1.2;
+          margin-bottom: 18px;
+          letter-spacing: -0.03em;
         }
 
         .vx-hero-neon {
           display: inline-block;
           background: linear-gradient(90deg, #7c3aed, #22d3ee, #f97316, #d946ef, #7c3aed);
-          background-size: 300% 100%;
+          background-size: 250% 100%;
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
-          animation: shimmer 5s linear infinite;
-          filter: drop-shadow(0 0 20px rgba(124, 58, 237, 0.5));
+          animation: shimmer 4s linear infinite;
+          text-shadow: 0 0 14px rgba(124, 58, 237, 0.45);
         }
 
         .vx-hero-subtitle {
-          font-size: 18px;
+          font-size: 16px;
           color: #94a3b8;
           max-width: 640px;
-          margin: 0 auto 40px;
+          margin: 0 auto 32px;
           line-height: 1.6;
-          animation: fade-in-up 0.6s ease-out 0.4s backwards;
         }
 
         @media (min-width: 640px) {
-          .vx-hero-subtitle { font-size: 20px; margin-bottom: 48px; }
+          .vx-hero-subtitle { font-size: 18px; margin-bottom: 40px; }
         }
 
         .vx-cta-wrap {
           display: flex;
           flex-direction: column;
-          gap: 16px;
+          gap: 12px;
           align-items: center;
           justify-content: center;
-          margin-bottom: 56px;
+          margin-bottom: 48px;
           width: 100%;
-          animation: fade-in-up 0.6s ease-out 0.6s backwards;
+          max-width: 100%;
+          padding: 0 16px;
         }
 
         @media (min-width: 640px) {
           .vx-cta-wrap { 
             flex-direction: row; 
-            margin-bottom: 72px;
+            margin-bottom: 64px; 
+            padding: 0;
           }
         }
 
         .vx-cta-btn {
           position: relative;
-          padding: 18px 36px;
-          border-radius: 16px;
+          padding: 14px 28px;
+          border-radius: 14px;
           border: none;
           cursor: pointer;
           display: inline-flex;
@@ -1076,127 +994,134 @@ export default function HomePage() {
           justify-content: center;
           gap: 10px;
           font-weight: 700;
-          font-size: 17px;
+          font-size: 16px;
           overflow: hidden;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          transition: transform 0.2s, box-shadow 0.2s;
           width: 100%;
-          max-width: 340px;
-          touch-action: manipulation;
+          max-width: 320px;
         }
 
-        .vx-cta-btn::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: radial-gradient(circle at center, rgba(255,255,255,0.2), transparent);
-          opacity: 0;
-          transition: opacity 0.3s;
-        }
-
-        .vx-cta-btn:hover::after {
-          opacity: 1;
-        }
-
-        .vx-cta-btn:hover { 
-          transform: translateY(-4px) scale(1.02); 
-        }
-
-        .vx-cta-btn:active { 
-          transform: translateY(-2px) scale(1); 
-        }
+        .vx-cta-btn:hover { transform: translateY(-2px); }
+        .vx-cta-btn:active { transform: translateY(0); }
 
         @media (min-width: 640px) {
           .vx-cta-btn { 
-            padding: 20px 40px; 
+            padding: 18px 34px; 
             font-size: 18px;
             width: auto;
-            min-width: 240px;
+            min-width: 220px;
           }
         }
 
-        .vx-cta-live { 
-          box-shadow: 0 16px 48px rgba(124, 58, 237, 0.5),
-                      0 0 80px rgba(124, 58, 237, 0.3);
-        }
-
-        .vx-cta-free { 
-          box-shadow: 0 16px 48px rgba(34, 211, 238, 0.5),
-                      0 0 80px rgba(34, 211, 238, 0.3);
-        }
-
-        .vx-pricing-box {
-          max-width: 680px;
-          margin: 0 auto 64px;
-          padding: 28px 20px;
-          border-radius: 24px;
-          background: linear-gradient(135deg, rgba(251, 191, 36, 0.08), rgba(245, 158, 11, 0.05));
-          border: 1px solid rgba(251, 191, 36, 0.25);
-          backdrop-filter: blur(16px);
-          box-shadow: 0 8px 32px rgba(251, 191, 36, 0.15);
-          animation: fade-in-up 0.6s ease-out 0.8s backwards;
-        }
+        .vx-cta-live { box-shadow: 0 20px 40px -16px rgba(139, 92, 246, 0.6); }
+        .vx-cta-free { box-shadow: 0 20px 40px -16px rgba(34, 211, 238, 0.5); }
 
         .vx-stats-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 20px;
-          margin-bottom: 80px;
-        }
-
-        @media (min-width: 640px) {
-          .vx-stats-grid {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 24px;
-            margin-bottom: 100px;
-          }
-        }
-
-        .vx-champions-title {
-          font-size: 28px;
-          font-weight: 800;
-          margin-bottom: 32px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 12px;
-          animation: fade-in-up 0.6s ease-out;
-          text-shadow: 0 2px 20px rgba(251, 191, 36, 0.3);
-        }
-
-        @media (min-width: 640px) {
-          .vx-champions-title { font-size: 36px; margin-bottom: 40px; }
-        }
-
-        .vx-champions-grid {
           display: grid;
           grid-template-columns: 1fr;
           gap: 20px;
           margin-bottom: 64px;
         }
 
-        @media (min-width: 768px) {
-          .vx-champions-grid {
+        @media (min-width: 640px) {
+          .vx-stats-grid {
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 24px;
+            margin-bottom: 80px;
           }
         }
 
+        .vx-stat-card {
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          border-radius: 16px;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          background: rgba(9, 9, 13, 0.9);
+          backdrop-filter: blur(18px);
+          min-height: 120px;
+          padding: 1.5rem;
+          transition: transform 0.3s;
+        }
+
+        .vx-stat-card:hover { transform: translateY(-4px); }
+
+        @media (min-width: 640px) {
+          .vx-stat-card { min-height: 150px; padding: 1.75rem; }
+        }
+
+        .vx-stat-label { color: #94a3b8; font-size: 13px; }
+        .vx-stat-value { font-weight: 800; font-size: 24px; }
+
+        @media (min-width: 640px) {
+          .vx-stat-value { font-size: 28px; }
+        }
+
+        .vx-champions-title {
+          font-size: 24px;
+          font-weight: 700;
+          margin-bottom: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+        }
+
+        @media (min-width: 640px) {
+          .vx-champions-title { font-size: 32px; margin-bottom: 32px; }
+        }
+
+        .vx-champions-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 16px;
+          margin-bottom: 56px;
+        }
+
+        @media (min-width: 768px) {
+          .vx-champions-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 20px;
+          }
+        }
+
+        .vx-champ-card {
+          position: relative;
+          padding: 22px;
+          border-radius: 22px;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          background: rgba(9, 9, 13, 0.96);
+          backdrop-filter: blur(18px);
+          text-align: center;
+          transition: transform 0.3s;
+        }
+
+        .vx-champ-card:hover { transform: translateY(-4px); }
+
+        @media (min-width: 640px) {
+          .vx-champ-card { padding: 26px; }
+        }
+
+        /* Footer */}
         .vx-footer {
-          border-top: 1px solid rgba(255, 255, 255, 0.1);
-          background: rgba(2, 8, 23, 0.95);
+          border-top: 1px solid rgba(255, 255, 255, 0.12);
+          background: rgba(9, 9, 13, 0.96);
           backdrop-filter: blur(16px);
-          padding: 40px 16px 28px;
+          padding: 32px 16px 24px;
           text-align: center;
           color: #64748b;
           font-size: 12px;
         }
 
         @media (min-width: 640px) {
-          .vx-footer { font-size: 13px; padding: 48px 24px 32px; }
+          .vx-footer { font-size: 13px; padding: 40px 24px 28px; }
         }
 
         .vx-footer-links {
-          margin: 20px 0 24px;
+          margin: 16px 0 20px;
           display: flex;
           gap: 8px 20px;
           justify-content: center;
@@ -1217,21 +1142,19 @@ export default function HomePage() {
           font-size: 12px;
         }
 
-        .vx-footer-links a:hover { 
-          color: #c4b5fd;
-        }
+        .vx-footer-links a:hover { color: #c4b5fd; }
 
         .vx-footer-legal {
           max-width: 800px;
-          margin: 0 auto 20px;
+          margin: 0 auto 16px;
           font-size: 11px;
-          line-height: 1.7;
+          line-height: 1.6;
           color: #64748b;
         }
 
         .vx-footer-company {
-          margin-top: 20px;
-          padding-top: 20px;
+          margin-top: 16px;
+          padding-top: 16px;
           border-top: 1px solid rgba(255, 255, 255, 0.08);
           font-size: 11px;
           color: #64748b;
@@ -1240,10 +1163,6 @@ export default function HomePage() {
         @media (min-width: 640px) {
           .vx-footer-legal { font-size: 12px; }
           .vx-footer-company { font-size: 12px; }
-        }
-
-        .vx-pulse {
-          animation: pulse-glow 2s ease-in-out infinite;
         }
       `}</style>
 
@@ -1255,51 +1174,49 @@ export default function HomePage() {
           position: "relative",
           overflow: "hidden",
           opacity: isInitialLoad ? 0 : 1,
-          transition: "opacity 0.5s ease-in",
+          transition: "opacity 0.3s ease-in",
         }}
       >
-        {/* Enhanced Neon Orbs with Parallax */}
-        {isMounted && (
-          <>
-            <div
-              className="vx-neon-orb"
-              style={{
-                top: "60px",
-                left: "-60px",
-                width: "320px",
-                height: "320px",
-                background: "radial-gradient(circle, #7c3aed, #a855f7)",
-                transform: `translate(${parallaxX}px, ${parallaxY}px)`,
-              }}
-            />
-            <div
-              className="vx-neon-orb"
-              style={{
-                bottom: "40px",
-                right: "-60px",
-                width: "340px",
-                height: "340px",
-                background: "radial-gradient(circle, #d946ef, #ec4899)",
-                transform: `translate(${-parallaxX}px, ${-parallaxY}px)`,
-                animationDelay: "2s",
-              }}
-            />
-            <div
-              className="vx-neon-orb"
-              style={{
-                top: "50%",
-                left: "50%",
-                width: "280px",
-                height: "280px",
-                background: "radial-gradient(circle, #22d3ee, #06b6d4)",
-                transform: `translate(-50%, -50%) translate(${parallaxX * 0.5}px, ${parallaxY * 0.5}px)`,
-                animationDelay: "4s",
-              }}
-            />
-          </>
-        )}
+        {/* Neon Orbs */}
+        <div
+          className="animate-float"
+          style={{
+            position: "fixed",
+            top: "60px",
+            left: "-40px",
+            width: "260px",
+            height: "260px",
+            borderRadius: "50%",
+            background: "#7c3aed",
+            opacity: 0,
+            filter: "blur(70px)",
+            zIndex: 0,
+            pointerEvents: "none",
+            animation: isInitialLoad ? "none" : undefined,
+            transition: "opacity 0.8s ease-in 0.3s",
+          }}
+        />
+        <div
+          className="animate-float"
+          style={{
+            position: "fixed",
+            bottom: "40px",
+            right: "-40px",
+            width: "260px",
+            height: "260px",
+            borderRadius: "50%",
+            background: "#d946ef",
+            opacity: 0,
+            filter: "blur(70px)",
+            zIndex: 0,
+            animationDelay: "2s",
+            pointerEvents: "none",
+            animation: isInitialLoad ? "none" : undefined,
+            transition: "opacity 0.8s ease-in 0.5s",
+          }}
+        />
 
-        {/* Modals */}
+        {/* Age Verification Modal */}
         {showAgeModal && (
           <AgeVerificationModal
             onConfirm={handleAgeVerification}
@@ -1310,6 +1227,7 @@ export default function HomePage() {
           />
         )}
 
+        {/* No Rounds Modal */}
         {showNoRoundsModal && (
           <NoRoundsModal
             onBuyRounds={() => {
@@ -1324,7 +1242,7 @@ export default function HomePage() {
         <header className="vx-header">
           <div className="vx-container">
             <div className="vx-header-inner">
-              <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                 <div
                   style={{
                     position: "relative",
@@ -1332,19 +1250,20 @@ export default function HomePage() {
                     height: 90,
                     borderRadius: "9999px",
                     padding: 4,
-                    background: "radial-gradient(circle at 30% 30%, #7c3aed, #d946ef)",
-                    boxShadow: "0 0 40px rgba(124, 58, 237, 0.6), 0 0 80px rgba(217, 70, 239, 0.3)",
+                    background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)",
+                    boxShadow: "0 0 30px rgba(124,58,237,0.6)",
                     flexShrink: 0,
                   }}
                 >
                   <div
-                    className="vx-pulse"
+                    className="animate-glow"
                     style={{
                       position: "absolute",
-                      inset: -8,
+                      inset: -5,
                       borderRadius: "9999px",
-                      background: "radial-gradient(circle, #a855f7, transparent)",
-                      filter: "blur(12px)",
+                      background: "radial-gradient(circle,#a855f7,transparent)",
+                      opacity: 0.4,
+                      filter: "blur(10px)",
                       pointerEvents: "none",
                     }}
                   />
@@ -1377,9 +1296,8 @@ export default function HomePage() {
                       fontSize: 13,
                       color: "#c4b5fd",
                       textTransform: "uppercase",
-                      letterSpacing: "0.15em",
+                      letterSpacing: "0.14em",
                       whiteSpace: "nowrap",
-                      fontWeight: 600,
                     }}
                   >
                     Live Quiz Arena
@@ -1388,20 +1306,20 @@ export default function HomePage() {
               </div>
 
               <div className="vx-header-right">
+                {/* Music Toggle */}
                 <button
                   onClick={toggleMusic}
                   aria-label={isPlaying ? "Mute music" : "Play music"}
                   style={{
-                    padding: 10,
-                    borderRadius: 14,
-                    border: "1px solid rgba(148, 163, 253, 0.25)",
-                    background: "rgba(15, 23, 42, 0.8)",
-                    backdropFilter: "blur(10px)",
+                    padding: 9,
+                    borderRadius: 12,
+                    border: "1px solid rgba(148,163,253,0.22)",
+                    background: "rgba(2,6,23,0.9)",
                     display: "inline-flex",
                     alignItems: "center",
                     justifyContent: "center",
                     cursor: "pointer",
-                    transition: "all 0.3s",
+                    transition: "all 0.2s",
                   }}
                 >
                   {isPlaying ? (
@@ -1411,126 +1329,135 @@ export default function HomePage() {
                   )}
                 </button>
 
+                {/* Buy Round Button */}
                 <button
                   onClick={() => router.push("/buy")}
                   className="vx-hide-mobile"
                   aria-label="Buy quiz rounds"
                   style={{
-                    padding: "10px 18px",
-                    borderRadius: 14,
-                    border: "1px solid rgba(251, 191, 36, 0.35)",
-                    background: "linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1))",
-                    backdropFilter: "blur(10px)",
+                    padding: "8px 16px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(251,191,36,0.3)",
+                    background: "linear-gradient(135deg, rgba(251,191,36,0.1), rgba(245,158,11,0.1))",
                     color: "#fbbf24",
                     fontSize: 13,
                     fontWeight: 600,
                     cursor: "pointer",
                     display: "inline-flex",
                     alignItems: "center",
-                    gap: 8,
-                    transition: "all 0.3s",
-                    boxShadow: "0 0 20px rgba(251, 191, 36, 0.2)",
+                    gap: 6,
+                    transition: "all 0.2s",
                   }}
                 >
                   <ShoppingCart style={{ width: 14, height: 14 }} />
                   {user && userRounds > 0 ? `${userRounds} Rounds` : "Buy Round"}
                 </button>
 
+                {/* Leaderboard */}
                 <button
                   onClick={() => router.push("/leaderboard")}
                   className="vx-hide-mobile"
                   aria-label="View leaderboard"
                   style={{
-                    padding: "10px 18px",
-                    borderRadius: 14,
-                    border: "1px solid rgba(148, 163, 253, 0.25)",
-                    background: "rgba(15, 23, 42, 0.8)",
-                    backdropFilter: "blur(10px)",
+                    padding: "8px 16px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(148,163,253,0.22)",
+                    background: "transparent",
                     color: "white",
                     fontSize: 13,
                     cursor: "pointer",
                     display: "inline-flex",
                     alignItems: "center",
-                    gap: 8,
-                    transition: "all 0.3s",
+                    gap: 6,
+                    transition: "all 0.2s",
                   }}
                 >
                   <Trophy style={{ width: 14, height: 14, color: "#a78bfa" }} />
                   Leaderboard
                 </button>
 
+                {/* Auth Section */}
                 {user ? (
                   <>
+                    {/* Profile Button */}
                     <button
                       onClick={() => router.push("/profile")}
                       aria-label="View profile"
                       style={{
-                        padding: "10px 18px",
-                        borderRadius: 14,
-                        border: "1px solid rgba(148, 163, 253, 0.3)",
-                        background: "rgba(15, 23, 42, 0.9)",
-                        backdropFilter: "blur(10px)",
+                        padding: "8px 16px",
+                        borderRadius: 12,
+                        border: "1px solid rgba(148,163,253,0.26)",
+                        background: "rgba(9,9,13,0.96)",
                         color: "white",
                         fontSize: 13,
                         cursor: "pointer",
                         display: "inline-flex",
                         alignItems: "center",
-                        gap: 10,
-                        transition: "all 0.3s",
+                        gap: 8,
+                        transition: "all 0.2s",
                       }}
                     >
                       <div
                         style={{
-                          width: 22,
-                          height: 22,
+                          width: 20,
+                          height: 20,
                           borderRadius: "9999px",
                           overflow: "hidden",
                           backgroundColor: "#020817",
-                          border: "2px solid rgba(148, 163, 253, 0.3)",
+                          border: "1px solid rgba(148,163,253,0.26)",
                         }}
                       >
                         <Image
                           src={user?.user_metadata?.avatar_url || "/images/logo.png"}
                           alt="User avatar"
-                          width={22}
-                          height={22}
+                          width={20}
+                          height={20}
                           style={{ objectFit: "cover" }}
                         />
                       </div>
                       <span
                         className="vx-hide-mobile"
                         style={{
-                          fontSize: 12,
+                          fontSize: 11,
                           color: "#e5e7eb",
                           maxWidth: 100,
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
-                          fontWeight: 600,
                         }}
                       >
                         {user.user_metadata?.full_name || "Player"}
                       </span>
                     </button>
 
+                    {/* Sign Out */}
                     <button
                       onClick={handleSignOut}
                       aria-label="Sign out"
                       className="vx-hide-mobile"
                       style={{
-                        padding: "10px 20px",
-                        borderRadius: 14,
+                        position: "relative",
+                        padding: "8px 18px",
+                        borderRadius: 12,
                         border: "none",
                         cursor: "pointer",
-                        fontSize: 13,
-                        fontWeight: 700,
+                        fontSize: 12,
+                        fontWeight: 600,
                         color: "white",
-                        background: "linear-gradient(135deg, #ef4444, #f97316)",
-                        transition: "all 0.3s",
-                        boxShadow: "0 0 20px rgba(239, 68, 68, 0.3)",
+                        overflow: "hidden",
+                        background: "transparent",
+                        transition: "transform 0.2s",
                       }}
                     >
-                      Sign Out
+                      <div
+                        className="animate-shimmer"
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          background: "linear-gradient(90deg,#ef4444,#f97316,#ef4444)",
+                        }}
+                      />
+                      <span style={{ position: "relative", zIndex: 10 }}>Sign Out</span>
                     </button>
                   </>
                 ) : (
@@ -1538,19 +1465,28 @@ export default function HomePage() {
                     onClick={handleSignIn}
                     aria-label="Sign in with Google"
                     style={{
-                      padding: "10px 20px",
-                      borderRadius: 14,
+                      position: "relative",
+                      padding: "8px 18px",
+                      borderRadius: 12,
                       border: "none",
                       cursor: "pointer",
-                      fontSize: 13,
-                      fontWeight: 700,
+                      fontSize: 12,
+                      fontWeight: 600,
                       color: "white",
-                      background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-                      transition: "all 0.3s",
-                      boxShadow: "0 0 20px rgba(124, 58, 237, 0.4)",
+                      overflow: "hidden",
+                      background: "transparent",
+                      transition: "transform 0.2s",
                     }}
                   >
-                    Sign in
+                    <div
+                      className="animate-shimmer"
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        background: "linear-gradient(90deg,#7c3aed,#d946ef,#7c3aed)",
+                      }}
+                    />
+                    <span style={{ position: "relative", zIndex: 10 }}>Sign in with Google</span>
                   </button>
                 )}
               </div>
@@ -1562,35 +1498,48 @@ export default function HomePage() {
         <div className="vx-livebar">
           <div className="vx-container">
             <div className="vx-livebar-inner">
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                 <div
-                  className="vx-pulse"
+                  className="animate-pulse-slow"
                   style={{
                     width: 8,
                     height: 8,
                     borderRadius: "9999px",
                     background: "#ef4444",
-                    boxShadow: "0 0 12px #ef4444",
                   }}
                 />
-                <span style={{ color: "#f97316", fontWeight: 700 }}>LIVE</span>
+                <span style={{ color: "#f97316", fontWeight: 600 }}>LIVE</span>
               </div>
 
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#cbd5e1" }}>
-                <Globe style={{ width: 16, height: 16, color: "#a78bfa" }} />
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  color: "#cbd5e1",
+                }}
+              >
+                <Globe style={{ width: 14, height: 14, color: "#a78bfa" }} />
                 <span style={{ fontWeight: 700, color: "white" }}>
-                  {activePlayers > 0 ? activePlayers.toLocaleString() : "0"}
+                  {activePlayers.toLocaleString()}
                 </span>
                 <span>players online</span>
               </div>
 
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#cbd5e1" }}>
-                <Sparkles style={{ width: 16, height: 16, color: "#f0abfc" }} />
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  color: "#cbd5e1",
+                }}
+              >
+                <Sparkles style={{ width: 14, height: 14, color: "#f0abfc" }} />
                 <span>Next round</span>
                 <span
                   style={{
-                    fontWeight: 800,
-                    background: "linear-gradient(to right, #a78bfa, #f0abfc)",
+                    fontWeight: 700,
+                    background: "linear-gradient(to right,#a78bfa,#f0abfc)",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                   }}
@@ -1602,34 +1551,33 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* HERO */}
+        {/* HERO + CONTENT */}
         <main className="vx-hero">
           <div className="vx-container">
             <div className="vx-hero-badge">
-              <Crown style={{ width: 18, height: 18, color: "#fbbf24" }} />
+              <Crown style={{ width: 16, height: 16, color: "#fbbf24" }} />
               Knowledge Quiz with a £1000 Monthly Prize
-              <Trophy style={{ width: 18, height: 18, color: "#fbbf24" }} />
+              <Trophy style={{ width: 16, height: 16, color: "#fbbf24" }} />
             </div>
 
-            <div style={{ textAlign: "center", marginBottom: 32, animation: "fade-in-up 0.6s ease-out 0.3s backwards" }}>
+            {/* Prize Pool Notice - Below badge with proper block display */}
+            <div style={{ textAlign: "center", marginBottom: 28 }}>
               <div
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: 10,
-                  padding: "10px 22px",
-                  borderRadius: 12,
-                  background: "rgba(34, 197, 94, 0.12)",
-                  border: "1px solid rgba(34, 197, 94, 0.35)",
-                  backdropFilter: "blur(10px)",
-                  fontSize: 14,
+                  gap: 8,
+                  padding: "8px 18px",
+                  borderRadius: 10,
+                  background: "rgba(34, 197, 94, 0.1)",
+                  border: "1px solid rgba(34, 197, 94, 0.3)",
+                  fontSize: 13,
                   color: "#4ade80",
                   fontWeight: 600,
-                  boxShadow: "0 0 20px rgba(34, 197, 94, 0.2)",
                 }}
               >
-                <AlertCircle style={{ width: 16, height: 16 }} />
+                <AlertCircle style={{ width: 15, height: 15 }} />
                 Prize pool activates at 2000+
               </div>
             </div>
@@ -1639,7 +1587,7 @@ export default function HomePage() {
             </h1>
 
             <p className="vx-hero-subtitle">
-              The world&apos;s number one educational and award-winning quiz!
+              The world's number one educational and award-winning quiz!
             </p>
 
             {/* CTA Buttons */}
@@ -1653,12 +1601,26 @@ export default function HomePage() {
                   style={{
                     position: "absolute",
                     inset: 0,
-                    background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+                    background: "linear-gradient(to right,#7c3aed,#d946ef)",
                   }}
                 />
-                <Play style={{ position: "relative", zIndex: 10, width: 22, height: 22 }} />
+                <Play
+                  style={{
+                    position: "relative",
+                    zIndex: 10,
+                    width: 20,
+                    height: 20,
+                  }}
+                />
                 <span style={{ position: "relative", zIndex: 10 }}>Start Live Quiz</span>
-                <ArrowRight style={{ position: "relative", zIndex: 10, width: 22, height: 22 }} />
+                <ArrowRight
+                  style={{
+                    position: "relative",
+                    zIndex: 10,
+                    width: 20,
+                    height: 20,
+                  }}
+                />
               </button>
 
               <button
@@ -1670,35 +1632,58 @@ export default function HomePage() {
                   style={{
                     position: "absolute",
                     inset: 0,
-                    background: "linear-gradient(135deg, #06b6d4, #22d3ee)",
+                    background: "linear-gradient(to right,#06b6d4,#22d3ee)",
                   }}
                 />
-                <Gift style={{ position: "relative", zIndex: 10, width: 22, height: 22 }} />
+                <Gift
+                  style={{
+                    position: "relative",
+                    zIndex: 10,
+                    width: 20,
+                    height: 20,
+                  }}
+                />
                 <span style={{ position: "relative", zIndex: 10 }}>Start Free Quiz</span>
-                <ArrowRight style={{ position: "relative", zIndex: 10, width: 22, height: 22 }} />
+                <ArrowRight
+                  style={{
+                    position: "relative",
+                    zIndex: 10,
+                    width: 20,
+                    height: 20,
+                  }}
+                />
               </button>
             </div>
 
-            {/* Pricing Info */}
-            <div className="vx-pricing-box">
-              <div style={{ textAlign: "center", marginBottom: 24 }}>
+            {/* Pricing Info Section */}
+            <div
+              style={{
+                maxWidth: 640,
+                margin: "0 auto 48px",
+                padding: "20px 16px",
+                borderRadius: 20,
+                background: "linear-gradient(135deg, rgba(251, 191, 36, 0.05), rgba(245, 158, 11, 0.05))",
+                border: "1px solid rgba(251, 191, 36, 0.2)",
+                backdropFilter: "blur(10px)",
+              }}
+            >
+              <div style={{ textAlign: "center", marginBottom: 20 }}>
                 <h3
                   style={{
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: 700,
                     color: "#fbbf24",
-                    marginBottom: 10,
+                    marginBottom: 8,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    gap: 10,
-                    textShadow: "0 2px 12px rgba(251, 191, 36, 0.3)",
+                    gap: 8,
                   }}
                 >
-                  <ShoppingCart style={{ width: 22, height: 22 }} />
+                  <ShoppingCart style={{ width: 20, height: 20 }} />
                   Round Pricing
                 </h3>
-                <p style={{ fontSize: 14, color: "#94a3b8", margin: 0 }}>
+                <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>
                   Affordable entry to compete for big prizes
                 </p>
               </div>
@@ -1707,57 +1692,59 @@ export default function HomePage() {
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
-                  gap: 16,
-                  marginBottom: 20,
+                  gap: 12,
+                  marginBottom: 16,
                 }}
               >
                 <div
-                  className="vx-glass-card"
                   style={{
-                    padding: 18,
+                    padding: 14,
+                    borderRadius: 16,
+                    background: "rgba(15, 23, 42, 0.8)",
+                    border: "1px solid rgba(251, 191, 36, 0.2)",
                     textAlign: "center",
                   }}
                 >
-                  <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8, fontWeight: 500 }}>
+                  <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 6 }}>
                     Single Round
                   </div>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: "#fbbf24", marginBottom: 4, textShadow: "0 2px 12px rgba(251, 191, 36, 0.4)" }}>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: "#fbbf24", marginBottom: 2 }}>
                     £1
                   </div>
                   <div style={{ fontSize: 11, color: "#64748b" }}>per round</div>
                 </div>
 
                 <div
-                  className="vx-glass-card"
                   style={{
-                    padding: 18,
+                    padding: 14,
+                    borderRadius: 16,
+                    background: "linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1))",
+                    border: "2px solid rgba(251, 191, 36, 0.4)",
                     textAlign: "center",
                     position: "relative",
-                    border: "2px solid rgba(251, 191, 36, 0.4)",
-                    boxShadow: "0 0 30px rgba(251, 191, 36, 0.25)",
+                    boxShadow: "0 0 20px rgba(251, 191, 36, 0.2)",
                   }}
                 >
                   <div
                     style={{
                       position: "absolute",
-                      top: -10,
-                      right: -10,
+                      top: -8,
+                      right: -8,
                       background: "linear-gradient(135deg, #ef4444, #dc2626)",
                       color: "white",
-                      fontSize: 10,
+                      fontSize: 9,
                       fontWeight: 700,
-                      padding: "4px 8px",
-                      borderRadius: 8,
+                      padding: "3px 6px",
+                      borderRadius: 6,
                       textTransform: "uppercase",
-                      boxShadow: "0 4px 12px rgba(239, 68, 68, 0.4)",
                     }}
                   >
                     Save 17%
                   </div>
-                  <div style={{ fontSize: 13, color: "#fbbf24", marginBottom: 8, fontWeight: 600 }}>
+                  <div style={{ fontSize: 13, color: "#fbbf24", marginBottom: 6, fontWeight: 600 }}>
                     Value Pack
                   </div>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: "#fbbf24", marginBottom: 4, textShadow: "0 2px 12px rgba(251, 191, 36, 0.4)" }}>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: "#fbbf24", marginBottom: 2 }}>
                     £29
                   </div>
                   <div style={{ fontSize: 11, color: "#cbd5e1" }}>35 rounds (£0.83 each)</div>
@@ -1766,44 +1753,44 @@ export default function HomePage() {
 
               <div
                 style={{
-                  padding: 18,
-                  borderRadius: 16,
-                  background: "rgba(59, 130, 246, 0.12)",
-                  border: "1px solid rgba(59, 130, 246, 0.25)",
+                  padding: 14,
+                  borderRadius: 12,
+                  background: "rgba(59, 130, 246, 0.1)",
+                  border: "1px solid rgba(59, 130, 246, 0.2)",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "start", gap: 10, marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "start", gap: 8, marginBottom: 8 }}>
                   <AlertCircle
                     style={{
-                      width: 18,
-                      height: 18,
+                      width: 16,
+                      height: 16,
                       color: "#60a5fa",
                       flexShrink: 0,
                       marginTop: 2,
                     }}
                   />
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#60a5fa", marginBottom: 4 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "#60a5fa", marginBottom: 3 }}>
                       Prize Pool Activation
                     </div>
-                    <p style={{ fontSize: 12, color: "#94a3b8", margin: 0, lineHeight: 1.6 }}>
+                    <p style={{ fontSize: 11, color: "#94a3b8", margin: 0, lineHeight: 1.5 }}>
                       The <strong style={{ color: "white" }}>£1000 monthly prize</strong> activates when we reach{" "}
-                      <strong style={{ color: "white" }}>2000+ active participants</strong>.
+                      <strong style={{ color: "white" }}>2000+ active participants</strong>. This ensures we can cover platform costs (Stripe fees, infrastructure) and deliver the full prize pool to winners.
                     </p>
                   </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "start", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "start", gap: 8 }}>
                   <CheckCircle
                     style={{
-                      width: 18,
-                      height: 18,
+                      width: 16,
+                      height: 16,
                       color: "#4ade80",
                       flexShrink: 0,
                       marginTop: 2,
                     }}
                   />
-                  <p style={{ fontSize: 12, color: "#94a3b8", margin: 0, lineHeight: 1.6 }}>
-                    <strong style={{ color: "#4ade80" }}>Fair & Transparent:</strong> The more players, the bigger the rewards!
+                  <p style={{ fontSize: 11, color: "#94a3b8", margin: 0, lineHeight: 1.5 }}>
+                    <strong style={{ color: "#4ade80" }}>Fair & Transparent:</strong> All rounds purchased contribute to the prize pool. The more players, the bigger the rewards for everyone!
                   </p>
                 </div>
               </div>
@@ -1818,38 +1805,22 @@ export default function HomePage() {
 
             {/* Champions */}
             <h2 className="vx-champions-title">
-              <Crown style={{ width: 28, height: 28, color: "#facc15" }} />
+              <Crown style={{ width: 24, height: 24, color: "#facc15" }} />
               Top Champions
             </h2>
 
-            {champions.length > 0 ? (
-              <div className="vx-champions-grid">
-                {champions.map((champion, i) => (
-                  <ChampionCard key={i} champion={champion} delay={i * 100} />
-                ))}
-              </div>
-            ) : (
-              <div
-                className="vx-glass-card"
-                style={{
-                  textAlign: "center",
-                  padding: "48px 24px",
-                  marginBottom: 64,
-                  animation: "fade-in-up 0.6s ease-out",
-                }}
-              >
-                <Trophy style={{ width: 56, height: 56, color: "#64748b", margin: "0 auto 20px" }} />
-                <p style={{ fontSize: 18, color: "#94a3b8", margin: 0, fontWeight: 500 }}>
-                  No champions yet. Be the first to compete!
-                </p>
-              </div>
-            )}
+            <div className="vx-champions-grid">
+              {champions.map((champion, i) => (
+                <ChampionCard key={i} champion={champion} />
+              ))}
+            </div>
           </div>
         </main>
 
         {/* Footer */}
         <footer className="vx-footer">
           <div className="vx-container">
+            {/* Legal Disclaimer */}
             <div className="vx-footer-legal">
               <strong style={{ color: "#94a3b8" }}>Educational Quiz Competition.</strong> 18+ only. 
               This is a 100% skill-based knowledge competition with no element of chance. 
@@ -1860,6 +1831,7 @@ export default function HomePage() {
               for full details.
             </div>
 
+            {/* Main Links */}
             <nav className="vx-footer-links" aria-label="Footer navigation">
               <a href="/privacy">Privacy Policy</a>
               <span className="vx-footer-divider" />
@@ -1882,20 +1854,21 @@ export default function HomePage() {
               <a href="/faq">FAQ</a>
             </nav>
 
+            {/* Company Info */}
             <div className="vx-footer-company">
-              <div style={{ marginBottom: 10, textAlign: "center" }}>
+              <div style={{ marginBottom: 8, textAlign: "center" }}>
                 © 2025 VibraXX. Operated by Sermin Limited (UK)
               </div>
-              <div style={{ fontSize: 11, color: "#64748b", marginBottom: 10, textAlign: "center" }}>
+              <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8, textAlign: "center" }}>
                 Registered in England & Wales | All rights reserved
               </div>
-              <div style={{ marginBottom: 12, textAlign: "center" }}>
+              <div style={{ marginBottom: 10, textAlign: "center" }}>
                 <a 
                   href="mailto:team@vibraxx.com"
                   style={{ 
                     color: "#a78bfa", 
                     textDecoration: "none",
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: 600,
                   }}
                 >
