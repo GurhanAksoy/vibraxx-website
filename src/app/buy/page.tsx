@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { createClient } from "@supabase/supabase-js";
 import {
   Crown,
@@ -299,7 +300,7 @@ export default function BuyPage() {
           justifyContent: "space-between",
           height: "80px",
         }}>
-          {/* Logo */}
+          {/* Logo - WITH NEXT.JS IMAGE */}
           <div
             onClick={() => router.push("/")}
             style={{
@@ -321,8 +322,17 @@ export default function BuyPage() {
               alignItems: "center",
               justifyContent: "center",
               boxShadow: "0 0 30px rgba(139, 92, 246, 0.6)",
+              position: "relative",
+              overflow: "hidden",
             }}>
-              <img src="/images/logo.png" alt="VibraXX" style={{ width: "30px", height: "30px" }} />
+              <Image 
+                src="/images/logo.png" 
+                alt="VibraXX Logo" 
+                width={30}
+                height={30}
+                style={{ objectFit: "contain" }}
+                priority
+              />
             </div>
             <div className="mobile-hide">
               <div style={{ fontSize: "18px", fontWeight: 700 }}>VIBRAXX</div>
@@ -512,10 +522,10 @@ export default function BuyPage() {
           </div>
         </div>
 
-        {/* Pricing Cards - Corporate Premium */}
+        {/* Pricing Cards - CLEAN PROFESSIONAL DESIGN */}
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
           gap: "clamp(24px, 4vw, 32px)",
           marginBottom: "clamp(40px, 6vw, 50px)",
           maxWidth: "900px",
@@ -534,15 +544,13 @@ export default function BuyPage() {
                   animationDelay: `${index * 0.15}s`,
                 }}
               >
-                {/* Popular Badge */}
+                {/* Popular Ribbon */}
                 {pkg.popular && (
                   <div style={{
                     position: "absolute",
-                    top: "-12px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    padding: "6px 16px",
-                    borderRadius: "16px",
+                    top: "16px",
+                    right: "-8px",
+                    padding: "6px 16px 6px 20px",
                     background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
                     fontSize: "11px",
                     fontWeight: 900,
@@ -551,296 +559,306 @@ export default function BuyPage() {
                     letterSpacing: "0.05em",
                     boxShadow: "0 4px 12px rgba(251, 191, 36, 0.6)",
                     zIndex: 10,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
+                    clipPath: "polygon(0 0, 100% 0, 100% 100%, 8px 100%, 0 50%)",
                   }}>
-                    <Crown style={{ width: "14px", height: "14px" }} />
                     BEST VALUE
                   </div>
                 )}
 
                 <div style={{
-                  background: pkg.popular 
-                    ? "linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(217, 70, 239, 0.1))"
-                    : "rgba(15, 23, 42, 0.6)",
-                  borderRadius: "24px",
+                  background: "linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 27, 75, 0.95) 100%)",
+                  borderRadius: "20px",
                   border: pkg.popular 
                     ? "2px solid rgba(139, 92, 246, 0.6)" 
-                    : "2px solid rgba(139, 92, 246, 0.25)",
-                  padding: "clamp(28px, 5vw, 36px)",
+                    : "2px solid rgba(100, 116, 139, 0.3)",
+                  overflow: "hidden",
                   backdropFilter: "blur(20px)",
                   boxShadow: pkg.popular 
-                    ? "0 20px 60px rgba(139, 92, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)" 
-                    : "0 10px 30px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)",
-                  transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+                    ? "0 20px 60px rgba(139, 92, 246, 0.4)" 
+                    : "0 10px 40px rgba(0, 0, 0, 0.4)",
+                  transition: "all 0.3s ease",
                   height: "100%",
                   display: "flex",
                   flexDirection: "column",
-                  position: "relative",
-                  overflow: "hidden",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-8px)";
+                  e.currentTarget.style.transform = "translateY(-6px)";
                   e.currentTarget.style.boxShadow = pkg.popular
-                    ? "0 30px 80px rgba(139, 92, 246, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15)"
-                    : "0 20px 50px rgba(139, 92, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)";
+                    ? "0 30px 80px rgba(139, 92, 246, 0.5)"
+                    : "0 20px 60px rgba(100, 116, 139, 0.4)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = "translateY(0)";
                   e.currentTarget.style.boxShadow = pkg.popular
-                    ? "0 20px 60px rgba(139, 92, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)"
-                    : "0 10px 30px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)";
+                    ? "0 20px 60px rgba(139, 92, 246, 0.4)"
+                    : "0 10px 40px rgba(0, 0, 0, 0.4)";
                 }}
                 >
-                  {/* Shimmer Effect */}
-                  {pkg.popular && (
-                    <div className="shimmer" style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: "100%",
-                      pointerEvents: "none",
-                    }} />
-                  )}
-
-                  {/* Header with Icon */}
+                  {/* Card Header */}
                   <div style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: "16px",
-                    marginBottom: "24px",
+                    padding: "28px 28px 24px",
+                    borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+                    background: pkg.popular 
+                      ? "linear-gradient(135deg, rgba(139, 92, 246, 0.15), transparent)" 
+                      : "transparent",
                   }}>
                     <div style={{
-                      width: "56px",
-                      height: "56px",
-                      borderRadius: "16px",
-                      background: `linear-gradient(135deg, ${pkg.color})`,
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "center",
-                      boxShadow: `0 8px 24px ${pkg.bgGlow}`,
-                      flexShrink: 0,
-                    }}>
-                      <Icon style={{ width: "28px", height: "28px", color: "white" }} />
-                    </div>
-                    
-                    <div style={{ flex: 1 }}>
-                      <h3 style={{
-                        fontSize: "clamp(18px, 4vw, 22px)",
-                        fontWeight: 900,
-                        marginBottom: "4px",
-                        lineHeight: 1.2,
-                      }}>
-                        {pkg.name}
-                      </h3>
-                      <p style={{
-                        fontSize: "13px",
-                        color: "#94a3b8",
-                        margin: 0,
-                      }}>
-                        {pkg.description}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* PRICE - VERY PROMINENT */}
-                  <div style={{ 
-                    marginBottom: "24px",
-                    padding: "24px",
-                    borderRadius: "16px",
-                    background: pkg.popular 
-                      ? "linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(217, 70, 239, 0.15))" 
-                      : "rgba(15, 23, 42, 0.5)",
-                    border: `2px solid ${pkg.popular ? 'rgba(139, 92, 246, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
-                    textAlign: "center",
-                    position: "relative",
-                  }}>
-                    {/* Savings Badge */}
-                    {pkg.savings > 0 && (
-                      <div style={{
-                        position: "absolute",
-                        top: "-10px",
-                        right: "12px",
-                        padding: "4px 12px",
-                        borderRadius: "12px",
-                        background: "linear-gradient(135deg, #22c55e, #16a34a)",
-                        fontSize: "11px",
-                        fontWeight: 900,
-                        color: "white",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "4px",
-                        boxShadow: "0 4px 12px rgba(34, 197, 94, 0.4)",
-                      }}>
-                        <Percent style={{ width: "12px", height: "12px" }} />
-                        SAVE {pkg.savings}%
-                      </div>
-                    )}
-
-                    {/* Main Price - SUPER VISIBLE */}
-                    <div style={{
+                      gap: "14px",
                       marginBottom: "16px",
                     }}>
+                      <div style={{
+                        width: "52px",
+                        height: "52px",
+                        borderRadius: "14px",
+                        background: `linear-gradient(135deg, ${pkg.color})`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: `0 8px 24px ${pkg.bgGlow}`,
+                        flexShrink: 0,
+                      }}>
+                        <Icon style={{ width: "26px", height: "26px", color: "white" }} />
+                      </div>
+                      
+                      <div>
+                        <h3 style={{
+                          fontSize: "20px",
+                          fontWeight: 900,
+                          marginBottom: "4px",
+                          lineHeight: 1.2,
+                          color: "white",
+                        }}>
+                          {pkg.name}
+                        </h3>
+                        <p style={{
+                          fontSize: "13px",
+                          color: "#94a3b8",
+                          margin: 0,
+                        }}>
+                          {pkg.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* PRICE SECTION - SUPER CLEAN */}
+                    <div style={{
+                      background: pkg.popular
+                        ? "linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(217, 70, 239, 0.15))"
+                        : "rgba(15, 23, 42, 0.6)",
+                      padding: "20px",
+                      borderRadius: "14px",
+                      border: pkg.popular 
+                        ? "1px solid rgba(139, 92, 246, 0.3)" 
+                        : "1px solid rgba(255, 255, 255, 0.06)",
+                      textAlign: "center",
+                      position: "relative",
+                    }}>
+                      {/* Savings Tag */}
+                      {pkg.savings > 0 && (
+                        <div style={{
+                          position: "absolute",
+                          top: "-10px",
+                          right: "12px",
+                          padding: "5px 12px",
+                          borderRadius: "10px",
+                          background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                          fontSize: "11px",
+                          fontWeight: 900,
+                          color: "white",
+                          boxShadow: "0 4px 12px rgba(34, 197, 94, 0.4)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}>
+                          <Percent style={{ width: "11px", height: "11px" }} />
+                          {pkg.savings}% OFF
+                        </div>
+                      )}
+
+                      {/* Price Display */}
                       <div style={{
                         display: "flex",
                         alignItems: "flex-start",
                         justifyContent: "center",
-                        gap: "6px",
-                        marginBottom: "8px",
+                        gap: "4px",
+                        marginBottom: "12px",
                       }}>
                         <span style={{
-                          fontSize: "clamp(28px, 6vw, 36px)",
+                          fontSize: "32px",
                           fontWeight: 900,
                           color: pkg.popular ? "#a78bfa" : "#94a3b8",
                           lineHeight: 1,
-                          marginTop: "8px",
+                          marginTop: "4px",
                         }}>
                           £
                         </span>
                         <span style={{
-                          fontSize: "clamp(56px, 12vw, 72px)",
+                          fontSize: "clamp(60px, 12vw, 72px)",
                           fontWeight: 900,
                           color: "white",
-                          lineHeight: 1,
+                          lineHeight: 0.9,
                           letterSpacing: "-0.03em",
-                          textShadow: pkg.popular 
-                            ? "0 0 40px rgba(139, 92, 246, 0.8)" 
-                            : "0 0 20px rgba(100, 116, 139, 0.5)",
                         }}>
                           {pkg.price}
                         </span>
                       </div>
+
                       <div style={{
-                        fontSize: "13px",
+                        fontSize: "12px",
                         color: "#64748b",
                         fontWeight: 600,
                         textTransform: "uppercase",
-                        letterSpacing: "0.05em",
+                        letterSpacing: "0.08em",
+                        marginBottom: "12px",
                       }}>
                         One-time payment
                       </div>
-                    </div>
 
-                    {/* Details */}
-                    <div style={{
-                      fontSize: "14px",
-                      color: "#cbd5e1",
-                      fontWeight: 600,
-                      marginBottom: "8px",
-                    }}>
-                      {pkg.rounds} Quiz Round{pkg.rounds > 1 ? "s" : ""}
-                    </div>
-                    <div style={{
-                      fontSize: "13px",
-                      color: "#64748b",
-                    }}>
-                      £{pkg.pricePerRound.toFixed(2)} per round
+                      <div style={{
+                        padding: "10px 16px",
+                        background: "rgba(0, 0, 0, 0.3)",
+                        borderRadius: "8px",
+                        border: "1px solid rgba(255, 255, 255, 0.05)",
+                      }}>
+                        <div style={{
+                          fontSize: "15px",
+                          color: "#e2e8f0",
+                          fontWeight: 700,
+                          marginBottom: "4px",
+                        }}>
+                          {pkg.rounds} Quiz Round{pkg.rounds > 1 ? "s" : ""}
+                        </div>
+                        <div style={{
+                          fontSize: "12px",
+                          color: "#94a3b8",
+                        }}>
+                          £{pkg.pricePerRound.toFixed(2)} per round
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Features */}
-                  <ul style={{
-                    listStyle: "none",
-                    padding: 0,
-                    margin: "0 0 24px 0",
+                  {/* Features Section */}
+                  <div style={{
+                    padding: "24px 28px",
                     flex: 1,
                   }}>
-                    {pkg.features.map((feature, i) => (
-                      <li
-                        key={i}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "12px",
-                          marginBottom: "12px",
-                          fontSize: "14px",
-                          color: "#e2e8f0",
-                          fontWeight: 500,
-                        }}
-                      >
-                        <div style={{
-                          width: "20px",
-                          height: "20px",
-                          borderRadius: "50%",
-                          background: "linear-gradient(135deg, #22c55e, #16a34a)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                          boxShadow: "0 2px 8px rgba(34, 197, 94, 0.3)",
-                        }}>
-                          <Check style={{ width: "12px", height: "12px", color: "white", strokeWidth: 3 }} />
-                        </div>
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-
-                  {/* Buy Button - Corporate */}
-                  <button
-                    onClick={() => handlePurchase(pkg)}
-                    disabled={isProcessing}
-                    style={{
-                      width: "100%",
-                      padding: "16px",
-                      borderRadius: "14px",
-                      border: "none",
-                      background: pkg.popular
-                        ? "linear-gradient(135deg, #8b5cf6, #d946ef)"
-                        : "linear-gradient(135deg, #475569, #64748b)",
-                      color: "white",
-                      fontSize: "16px",
-                      fontWeight: 800,
-                      cursor: isProcessing ? "not-allowed" : "pointer",
-                      transition: "all 0.3s",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "10px",
-                      boxShadow: pkg.popular
-                        ? "0 10px 30px rgba(139, 92, 246, 0.4)"
-                        : "0 6px 20px rgba(0, 0, 0, 0.3)",
-                      opacity: isProcessing ? 0.6 : 1,
-                      letterSpacing: "0.02em",
+                    <div style={{
+                      fontSize: "12px",
+                      color: "#94a3b8",
+                      fontWeight: 700,
                       textTransform: "uppercase",
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isProcessing) {
-                        e.currentTarget.style.transform = "translateY(-2px)";
+                      letterSpacing: "0.08em",
+                      marginBottom: "16px",
+                    }}>
+                      What's Included
+                    </div>
+                    <ul style={{
+                      listStyle: "none",
+                      padding: 0,
+                      margin: 0,
+                    }}>
+                      {pkg.features.map((feature, i) => (
+                        <li
+                          key={i}
+                          style={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: "12px",
+                            marginBottom: "12px",
+                            fontSize: "14px",
+                            color: "#cbd5e1",
+                            fontWeight: 500,
+                          }}
+                        >
+                          <div style={{
+                            width: "20px",
+                            height: "20px",
+                            borderRadius: "50%",
+                            background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                            marginTop: "2px",
+                          }}>
+                            <Check style={{ width: "12px", height: "12px", color: "white", strokeWidth: 3 }} />
+                          </div>
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* CTA Button */}
+                  <div style={{
+                    padding: "0 28px 28px",
+                  }}>
+                    <button
+                      onClick={() => handlePurchase(pkg)}
+                      disabled={isProcessing}
+                      style={{
+                        width: "100%",
+                        padding: "16px",
+                        borderRadius: "12px",
+                        border: "none",
+                        background: pkg.popular
+                          ? "linear-gradient(135deg, #8b5cf6, #d946ef)"
+                          : "linear-gradient(135deg, #475569, #64748b)",
+                        color: "white",
+                        fontSize: "15px",
+                        fontWeight: 800,
+                        cursor: isProcessing ? "not-allowed" : "pointer",
+                        transition: "all 0.3s",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "10px",
+                        boxShadow: pkg.popular
+                          ? "0 10px 30px rgba(139, 92, 246, 0.4)"
+                          : "0 6px 20px rgba(0, 0, 0, 0.3)",
+                        opacity: isProcessing ? 0.6 : 1,
+                        letterSpacing: "0.02em",
+                        textTransform: "uppercase",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isProcessing) {
+                          e.currentTarget.style.transform = "translateY(-2px)";
+                          e.currentTarget.style.boxShadow = pkg.popular
+                            ? "0 15px 40px rgba(139, 92, 246, 0.6)"
+                            : "0 10px 30px rgba(100, 116, 139, 0.5)";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = "translateY(0)";
                         e.currentTarget.style.boxShadow = pkg.popular
-                          ? "0 15px 40px rgba(139, 92, 246, 0.6)"
-                          : "0 10px 30px rgba(100, 116, 139, 0.5)";
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = pkg.popular
-                        ? "0 10px 30px rgba(139, 92, 246, 0.4)"
-                        : "0 6px 20px rgba(0, 0, 0, 0.3)";
-                    }}
-                  >
-                    {isProcessing ? (
-                      <>
-                        <div style={{
-                          width: "18px",
-                          height: "18px",
-                          border: "2px solid rgba(255, 255, 255, 0.3)",
-                          borderTopColor: "white",
-                          borderRadius: "50%",
-                          animation: "spin 1s linear infinite",
-                        }} />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <ShoppingCart style={{ width: "20px", height: "20px" }} />
-                        Purchase Now
-                        <ArrowRight style={{ width: "18px", height: "18px" }} />
-                      </>
-                    )}
-                  </button>
+                          ? "0 10px 30px rgba(139, 92, 246, 0.4)"
+                          : "0 6px 20px rgba(0, 0, 0, 0.3)";
+                      }}
+                    >
+                      {isProcessing ? (
+                        <>
+                          <div style={{
+                            width: "18px",
+                            height: "18px",
+                            border: "2px solid rgba(255, 255, 255, 0.3)",
+                            borderTopColor: "white",
+                            borderRadius: "50%",
+                            animation: "spin 1s linear infinite",
+                          }} />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <ShoppingCart style={{ width: "20px", height: "20px" }} />
+                          Get Started Now
+                          <ArrowRight style={{ width: "18px", height: "18px" }} />
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             );
