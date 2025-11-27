@@ -247,6 +247,22 @@ export default function BuyPage() {
           .mobile-hide { display: none !important; }
           .mobile-stack { flex-direction: column !important; }
         }
+
+        @media (max-width: 640px) {
+          /* Footer links stack on very small screens */
+          nav span[style*="color: rgba(148, 163, 184, 0.3)"] {
+            display: none;
+          }
+        }
+
+        /* Ensure no horizontal scroll */
+        * {
+          box-sizing: border-box;
+        }
+        
+        body {
+          overflow-x: hidden;
+        }
       `}</style>
 
       {/* Background Effects */}
@@ -438,9 +454,11 @@ export default function BuyPage() {
         {/* Pricing Cards */}
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-          gap: "clamp(24px, 4vw, 32px)",
-          marginBottom: "clamp(40px, 8vw, 60px)",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+          gap: "clamp(20px, 3vw, 24px)",
+          marginBottom: "clamp(40px, 6vw, 50px)",
+          maxWidth: "800px",
+          margin: "0 auto clamp(40px, 6vw, 50px)",
         }}>
           {packages.map((pkg, index) => {
             const Icon = pkg.icon;
@@ -452,11 +470,6 @@ export default function BuyPage() {
                 className="animate-pop-in"
                 style={{
                   position: "relative",
-                  padding: pkg.popular ? "4px" : "0",
-                  borderRadius: "24px",
-                  background: pkg.popular 
-                    ? "linear-gradient(135deg, #8b5cf6, #d946ef)" 
-                    : "transparent",
                   animationDelay: `${index * 0.1}s`,
                 }}
               >
@@ -464,109 +477,122 @@ export default function BuyPage() {
                 {pkg.popular && (
                   <div style={{
                     position: "absolute",
-                    top: "-12px",
+                    top: "-10px",
                     left: "50%",
                     transform: "translateX(-50%)",
-                    padding: "6px 16px",
-                    borderRadius: "20px",
+                    padding: "4px 12px",
+                    borderRadius: "12px",
                     background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
-                    fontSize: "11px",
+                    fontSize: "10px",
                     fontWeight: 800,
                     color: "#0f172a",
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
                     boxShadow: "0 4px 12px rgba(251, 191, 36, 0.5)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
                     zIndex: 10,
                   }}>
-                    <Crown style={{ width: "14px", height: "14px" }} />
-                    Most Popular
+                    BEST VALUE
                   </div>
                 )}
 
                 <div style={{
-                  background: "linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 27, 75, 0.98))",
+                  background: pkg.popular 
+                    ? "linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(217, 70, 239, 0.15))"
+                    : "rgba(15, 23, 42, 0.6)",
                   borderRadius: "20px",
                   border: pkg.popular 
-                    ? "none" 
-                    : "2px solid rgba(139, 92, 246, 0.3)",
-                  padding: "clamp(24px, 5vw, 32px)",
-                  height: "100%",
-                  display: "flex",
-                  flexDirection: "column",
+                    ? "2px solid rgba(139, 92, 246, 0.5)" 
+                    : "2px solid rgba(139, 92, 246, 0.2)",
+                  padding: "clamp(20px, 4vw, 24px)",
                   backdropFilter: "blur(20px)",
                   boxShadow: pkg.popular 
                     ? "0 20px 60px rgba(139, 92, 246, 0.4)" 
-                    : "0 10px 40px rgba(0, 0, 0, 0.3)",
+                    : "0 10px 30px rgba(0, 0, 0, 0.3)",
                   transition: "all 0.3s",
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-8px)";
+                  e.currentTarget.style.transform = "translateY(-6px)";
                   e.currentTarget.style.boxShadow = pkg.popular
-                    ? "0 30px 80px rgba(139, 92, 246, 0.6)"
-                    : "0 20px 60px rgba(139, 92, 246, 0.4)";
+                    ? "0 25px 70px rgba(139, 92, 246, 0.5)"
+                    : "0 15px 50px rgba(139, 92, 246, 0.4)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = "translateY(0)";
                   e.currentTarget.style.boxShadow = pkg.popular
                     ? "0 20px 60px rgba(139, 92, 246, 0.4)"
-                    : "0 10px 40px rgba(0, 0, 0, 0.3)";
+                    : "0 10px 30px rgba(0, 0, 0, 0.3)";
                 }}
                 >
-                  {/* Icon */}
+                  {/* Header */}
                   <div style={{
-                    width: "60px",
-                    height: "60px",
-                    borderRadius: "16px",
-                    background: `linear-gradient(135deg, ${pkg.color})`,
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
-                    marginBottom: "20px",
-                    boxShadow: `0 0 30px ${pkg.bgGlow}`,
+                    gap: "12px",
+                    marginBottom: "16px",
                   }}>
-                    <Icon style={{ width: "30px", height: "30px", color: "white" }} />
+                    <div style={{
+                      width: "48px",
+                      height: "48px",
+                      borderRadius: "12px",
+                      background: `linear-gradient(135deg, ${pkg.color})`,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      boxShadow: `0 0 20px ${pkg.bgGlow}`,
+                      flexShrink: 0,
+                    }}>
+                      <Icon style={{ width: "24px", height: "24px", color: "white" }} />
+                    </div>
+                    
+                    <div style={{ flex: 1 }}>
+                      <h3 style={{
+                        fontSize: "clamp(16px, 3vw, 18px)",
+                        fontWeight: 800,
+                        marginBottom: "2px",
+                        lineHeight: 1.2,
+                      }}>
+                        {pkg.name}
+                      </h3>
+                      <p style={{
+                        fontSize: "12px",
+                        color: "#94a3b8",
+                        margin: 0,
+                      }}>
+                        {pkg.description}
+                      </p>
+                    </div>
                   </div>
 
-                  {/* Package Name */}
-                  <h3 style={{
-                    fontSize: "clamp(20px, 4vw, 24px)",
-                    fontWeight: 800,
-                    marginBottom: "8px",
-                  }}>
-                    {pkg.name}
-                  </h3>
-
-                  {/* Description */}
-                  <p style={{
-                    fontSize: "14px",
-                    color: "#94a3b8",
-                    marginBottom: "20px",
-                  }}>
-                    {pkg.description}
-                  </p>
-
                   {/* Price */}
-                  <div style={{ marginBottom: "20px" }}>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: "4px" }}>
+                  <div style={{ 
+                    marginBottom: "16px",
+                    padding: "16px",
+                    borderRadius: "12px",
+                    background: pkg.popular 
+                      ? "rgba(139, 92, 246, 0.1)" 
+                      : "rgba(15, 23, 42, 0.4)",
+                    border: `1px solid ${pkg.popular ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255, 255, 255, 0.05)'}`,
+                  }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: "4px", marginBottom: "4px" }}>
                       <span style={{
-                        fontSize: "clamp(40px, 8vw, 56px)",
+                        fontSize: "clamp(32px, 7vw, 40px)",
                         fontWeight: 900,
                         background: `linear-gradient(135deg, ${pkg.color})`,
                         WebkitBackgroundClip: "text",
                         WebkitTextFillColor: "transparent",
+                        lineHeight: 1,
                       }}>
                         {pkg.currency}{pkg.price}
                       </span>
                     </div>
                     <div style={{
-                      fontSize: "14px",
+                      fontSize: "12px",
                       color: "#64748b",
-                      marginTop: "4px",
                     }}>
-                      {pkg.rounds} round{pkg.rounds > 1 ? "s" : ""} • £{pkg.pricePerRound.toFixed(2)} per round
+                      {pkg.rounds} round{pkg.rounds > 1 ? "s" : ""} • £{pkg.pricePerRound.toFixed(2)} each
                     </div>
                     {pkg.savings > 0 && (
                       <div style={{
@@ -574,15 +600,15 @@ export default function BuyPage() {
                         alignItems: "center",
                         gap: "4px",
                         marginTop: "8px",
-                        padding: "4px 12px",
-                        borderRadius: "12px",
+                        padding: "4px 10px",
+                        borderRadius: "8px",
                         background: "rgba(34, 197, 94, 0.2)",
-                        border: "1px solid rgba(34, 197, 94, 0.5)",
-                        fontSize: "12px",
+                        border: "1px solid rgba(34, 197, 94, 0.4)",
+                        fontSize: "11px",
                         fontWeight: 700,
                         color: "#22c55e",
                       }}>
-                        <TrendingUp style={{ width: "14px", height: "14px" }} />
+                        <TrendingUp style={{ width: "12px", height: "12px" }} />
                         Save {pkg.savings}%
                       </div>
                     )}
@@ -592,7 +618,7 @@ export default function BuyPage() {
                   <ul style={{
                     listStyle: "none",
                     padding: 0,
-                    margin: "0 0 24px 0",
+                    margin: "0 0 20px 0",
                     flex: 1,
                   }}>
                     {pkg.features.map((feature, i) => (
@@ -601,15 +627,15 @@ export default function BuyPage() {
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          gap: "12px",
-                          marginBottom: "12px",
-                          fontSize: "14px",
+                          gap: "10px",
+                          marginBottom: "10px",
+                          fontSize: "13px",
                           color: "#cbd5e1",
                         }}
                       >
                         <div style={{
-                          width: "20px",
-                          height: "20px",
+                          width: "18px",
+                          height: "18px",
                           borderRadius: "50%",
                           background: "rgba(34, 197, 94, 0.2)",
                           display: "flex",
@@ -617,7 +643,7 @@ export default function BuyPage() {
                           justifyContent: "center",
                           flexShrink: 0,
                         }}>
-                          <Check style={{ width: "12px", height: "12px", color: "#22c55e" }} />
+                          <Check style={{ width: "10px", height: "10px", color: "#22c55e" }} />
                         </div>
                         {feature}
                       </li>
@@ -630,14 +656,14 @@ export default function BuyPage() {
                     disabled={isProcessing}
                     style={{
                       width: "100%",
-                      padding: "16px",
+                      padding: "14px",
                       borderRadius: "12px",
                       border: "none",
                       background: pkg.popular
                         ? "linear-gradient(135deg, #8b5cf6, #d946ef)"
                         : "linear-gradient(135deg, #1e293b, #334155)",
                       color: "white",
-                      fontSize: "16px",
+                      fontSize: "15px",
                       fontWeight: 700,
                       cursor: isProcessing ? "not-allowed" : "pointer",
                       transition: "all 0.3s",
@@ -646,7 +672,7 @@ export default function BuyPage() {
                       justifyContent: "center",
                       gap: "8px",
                       boxShadow: pkg.popular
-                        ? "0 10px 30px rgba(139, 92, 246, 0.4)"
+                        ? "0 8px 20px rgba(139, 92, 246, 0.4)"
                         : "0 4px 12px rgba(0, 0, 0, 0.3)",
                       opacity: isProcessing ? 0.6 : 1,
                     }}
@@ -654,14 +680,14 @@ export default function BuyPage() {
                       if (!isProcessing) {
                         e.currentTarget.style.transform = "translateY(-2px)";
                         e.currentTarget.style.boxShadow = pkg.popular
-                          ? "0 15px 40px rgba(139, 92, 246, 0.6)"
+                          ? "0 12px 30px rgba(139, 92, 246, 0.6)"
                           : "0 8px 20px rgba(139, 92, 246, 0.4)";
                       }
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = "translateY(0)";
                       e.currentTarget.style.boxShadow = pkg.popular
-                        ? "0 10px 30px rgba(139, 92, 246, 0.4)"
+                        ? "0 8px 20px rgba(139, 92, 246, 0.4)"
                         : "0 4px 12px rgba(0, 0, 0, 0.3)";
                     }}
                   >
@@ -679,7 +705,7 @@ export default function BuyPage() {
                       </>
                     ) : (
                       <>
-                        <ShoppingCart style={{ width: "20px", height: "20px" }} />
+                        <ShoppingCart style={{ width: "18px", height: "18px" }} />
                         Buy Now
                         <ArrowRight style={{ width: "16px", height: "16px" }} />
                       </>
@@ -691,19 +717,19 @@ export default function BuyPage() {
           })}
         </div>
 
-        {/* Benefits Section */}
+        {/* Benefits Section - Compact */}
         <div className="animate-slide-up" style={{
-          padding: "clamp(32px, 6vw, 48px)",
-          borderRadius: "24px",
+          padding: "clamp(24px, 5vw, 32px)",
+          borderRadius: "20px",
           background: "rgba(15, 23, 42, 0.6)",
           border: "2px solid rgba(139, 92, 246, 0.3)",
           backdropFilter: "blur(20px)",
-          marginBottom: "clamp(40px, 8vw, 60px)",
+          marginBottom: "clamp(30px, 6vw, 40px)",
         }}>
           <h2 style={{
-            fontSize: "clamp(24px, 5vw, 32px)",
+            fontSize: "clamp(20px, 4vw, 24px)",
             fontWeight: 900,
-            marginBottom: "32px",
+            marginBottom: "20px",
             textAlign: "center",
           }}>
             Why Choose VibraXX?
@@ -711,32 +737,32 @@ export default function BuyPage() {
 
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-            gap: "24px",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
+            gap: "16px",
           }}>
             {[
               {
                 icon: Trophy,
-                title: "£1,000 Prize Pool",
-                description: "Monthly prize activated at 2000+ participants",
+                title: "£1,000 Prize",
+                description: "Monthly prize at 2000+ players",
                 color: "#fbbf24",
               },
               {
                 icon: Zap,
                 title: "Instant Play",
-                description: "Start playing immediately after purchase",
+                description: "Start immediately after purchase",
                 color: "#06b6d4",
               },
               {
                 icon: Users,
-                title: "Global Competition",
-                description: "Compete with players from around the world",
+                title: "Global Ranks",
+                description: "Compete worldwide",
                 color: "#8b5cf6",
               },
               {
                 icon: Target,
-                title: "Track Progress",
-                description: "Detailed stats and leaderboard rankings",
+                title: "Track Stats",
+                description: "Detailed progress & rankings",
                 color: "#ec4899",
               },
             ].map((benefit, index) => {
@@ -745,11 +771,12 @@ export default function BuyPage() {
                 <div
                   key={index}
                   style={{
-                    padding: "24px",
-                    borderRadius: "16px",
+                    padding: "16px",
+                    borderRadius: "12px",
                     background: "rgba(255, 255, 255, 0.03)",
                     border: "1px solid rgba(255, 255, 255, 0.1)",
                     transition: "all 0.3s",
+                    textAlign: "center",
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = "rgba(139, 92, 246, 0.1)";
@@ -762,29 +789,19 @@ export default function BuyPage() {
                     e.currentTarget.style.transform = "translateY(0)";
                   }}
                 >
-                  <div style={{
-                    width: "48px",
-                    height: "48px",
-                    borderRadius: "12px",
-                    background: `${benefit.color}20`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginBottom: "16px",
-                  }}>
-                    <Icon style={{ width: "24px", height: "24px", color: benefit.color }} />
-                  </div>
+                  <Icon style={{ width: "28px", height: "28px", color: benefit.color, margin: "0 auto 8px" }} />
                   <h3 style={{
-                    fontSize: "18px",
+                    fontSize: "15px",
                     fontWeight: 700,
-                    marginBottom: "8px",
+                    marginBottom: "4px",
                   }}>
                     {benefit.title}
                   </h3>
                   <p style={{
-                    fontSize: "14px",
+                    fontSize: "12px",
                     color: "#94a3b8",
-                    lineHeight: 1.6,
+                    margin: 0,
+                    lineHeight: 1.4,
                   }}>
                     {benefit.description}
                   </p>
@@ -794,85 +811,228 @@ export default function BuyPage() {
           </div>
         </div>
 
-        {/* FAQ Section */}
-        <div className="animate-slide-up" style={{
-          textAlign: "center",
-        }}>
-          <h2 style={{
-            fontSize: "clamp(24px, 5vw, 32px)",
-            fontWeight: 900,
-            marginBottom: "16px",
-          }}>
-            Questions?
-          </h2>
-          <p style={{
-            fontSize: "16px",
-            color: "#94a3b8",
-            marginBottom: "24px",
-          }}>
-            Check our{" "}
-            <a
-              href="/faq"
-              style={{
-                color: "#a78bfa",
-                textDecoration: "underline",
-                fontWeight: 600,
-              }}
-            >
-              FAQ
-            </a>
-            {" "}or{" "}
-            <a
-              href="/contact"
-              style={{
-                color: "#a78bfa",
-                textDecoration: "underline",
-                fontWeight: 600,
-              }}
-            >
-              contact support
-            </a>
-          </p>
-        </div>
       </main>
 
-      {/* Footer */}
+      {/* Footer - Home Page Style */}
       <footer style={{
         position: "relative",
         zIndex: 10,
         borderTop: "1px solid rgba(255, 255, 255, 0.1)",
-        padding: "32px 0",
-        background: "rgba(15, 23, 42, 0.8)",
+        background: "rgba(15, 23, 42, 0.9)",
         backdropFilter: "blur(20px)",
+        padding: "clamp(30px, 5vw, 50px) 0",
       }}>
         <div style={{
           maxWidth: "1200px",
           margin: "0 auto",
           padding: "0 clamp(16px, 4vw, 24px)",
-          textAlign: "center",
         }}>
+          
+          {/* Legal Disclaimer */}
           <div style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "8px",
-            marginBottom: "16px",
-            fontSize: "14px",
-            color: "#64748b",
-          }}>
-            <Lock style={{ width: "16px", height: "16px" }} />
-            Secure payment powered by Stripe
-          </div>
-          <p style={{
-            fontSize: "12px",
-            color: "#64748b",
+            background: "rgba(139, 92, 246, 0.1)",
+            border: "1px solid rgba(139, 92, 246, 0.2)",
+            borderRadius: "12px",
+            padding: "clamp(16px, 3vw, 20px)",
+            marginBottom: "clamp(24px, 4vw, 32px)",
+            fontSize: "clamp(11px, 2vw, 13px)",
             lineHeight: 1.6,
+            color: "#cbd5e1",
+            textAlign: "center",
           }}>
-            All purchases are non-refundable. Prize pool activates with 2000+ monthly participants.{" "}
+            <strong style={{ color: "#94a3b8" }}>Educational Quiz Competition.</strong> 18+ only. 
+            This is a 100% skill-based knowledge competition with no element of chance. 
+            Entry fees apply. Prize pool activates with 2000+ monthly participants. See{" "}
             <a href="/terms" style={{ color: "#a78bfa", textDecoration: "underline" }}>
               Terms & Conditions
+            </a>{" "}
+            for full details.
+          </div>
+
+          {/* Main Links */}
+          <nav style={{
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: "clamp(8px, 2vw, 12px)",
+            marginBottom: "clamp(24px, 4vw, 32px)",
+          }}>
+            <a href="/privacy" style={{
+              color: "#94a3b8",
+              textDecoration: "none",
+              fontSize: "clamp(11px, 2vw, 13px)",
+              fontWeight: 500,
+              transition: "color 0.3s",
+              whiteSpace: "nowrap",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
+            onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
+            >
+              Privacy Policy
             </a>
-          </p>
+            <span style={{ color: "rgba(148, 163, 184, 0.3)", fontSize: "clamp(10px, 2vw, 12px)" }}>•</span>
+            <a href="/terms" style={{
+              color: "#94a3b8",
+              textDecoration: "none",
+              fontSize: "clamp(11px, 2vw, 13px)",
+              fontWeight: 500,
+              transition: "color 0.3s",
+              whiteSpace: "nowrap",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
+            onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
+            >
+              Terms & Conditions
+            </a>
+            <span style={{ color: "rgba(148, 163, 184, 0.3)", fontSize: "clamp(10px, 2vw, 12px)" }}>•</span>
+            <a href="/cookies" style={{
+              color: "#94a3b8",
+              textDecoration: "none",
+              fontSize: "clamp(11px, 2vw, 13px)",
+              fontWeight: 500,
+              transition: "color 0.3s",
+              whiteSpace: "nowrap",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
+            onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
+            >
+              Cookie Policy
+            </a>
+            <span style={{ color: "rgba(148, 163, 184, 0.3)", fontSize: "clamp(10px, 2vw, 12px)" }}>•</span>
+            <a href="/how-it-works" style={{
+              color: "#94a3b8",
+              textDecoration: "none",
+              fontSize: "clamp(11px, 2vw, 13px)",
+              fontWeight: 500,
+              transition: "color 0.3s",
+              whiteSpace: "nowrap",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
+            onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
+            >
+              How It Works
+            </a>
+            <span style={{ color: "rgba(148, 163, 184, 0.3)", fontSize: "clamp(10px, 2vw, 12px)" }}>•</span>
+            <a href="/rules" style={{
+              color: "#94a3b8",
+              textDecoration: "none",
+              fontSize: "clamp(11px, 2vw, 13px)",
+              fontWeight: 500,
+              transition: "color 0.3s",
+              whiteSpace: "nowrap",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
+            onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
+            >
+              Quiz Rules
+            </a>
+            <span style={{ color: "rgba(148, 163, 184, 0.3)", fontSize: "clamp(10px, 2vw, 12px)" }}>•</span>
+            <a href="/complaints" style={{
+              color: "#94a3b8",
+              textDecoration: "none",
+              fontSize: "clamp(11px, 2vw, 13px)",
+              fontWeight: 500,
+              transition: "color 0.3s",
+              whiteSpace: "nowrap",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
+            onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
+            >
+              Complaints
+            </a>
+            <span style={{ color: "rgba(148, 163, 184, 0.3)", fontSize: "clamp(10px, 2vw, 12px)" }}>•</span>
+            <a href="/refunds" style={{
+              color: "#94a3b8",
+              textDecoration: "none",
+              fontSize: "clamp(11px, 2vw, 13px)",
+              fontWeight: 500,
+              transition: "color 0.3s",
+              whiteSpace: "nowrap",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
+            onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
+            >
+              Refund Policy
+            </a>
+            <span style={{ color: "rgba(148, 163, 184, 0.3)", fontSize: "clamp(10px, 2vw, 12px)" }}>•</span>
+            <a href="/about" style={{
+              color: "#94a3b8",
+              textDecoration: "none",
+              fontSize: "clamp(11px, 2vw, 13px)",
+              fontWeight: 500,
+              transition: "color 0.3s",
+              whiteSpace: "nowrap",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
+            onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
+            >
+              About Us
+            </a>
+            <span style={{ color: "rgba(148, 163, 184, 0.3)", fontSize: "clamp(10px, 2vw, 12px)" }}>•</span>
+            <a href="/contact" style={{
+              color: "#94a3b8",
+              textDecoration: "none",
+              fontSize: "clamp(11px, 2vw, 13px)",
+              fontWeight: 500,
+              transition: "color 0.3s",
+              whiteSpace: "nowrap",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
+            onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
+            >
+              Contact
+            </a>
+            <span style={{ color: "rgba(148, 163, 184, 0.3)", fontSize: "clamp(10px, 2vw, 12px)" }}>•</span>
+            <a href="/faq" style={{
+              color: "#94a3b8",
+              textDecoration: "none",
+              fontSize: "clamp(11px, 2vw, 13px)",
+              fontWeight: 500,
+              transition: "color 0.3s",
+              whiteSpace: "nowrap",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
+            onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
+            >
+              FAQ
+            </a>
+          </nav>
+
+          {/* Company Info */}
+          <div style={{ color: "#64748b", fontSize: "clamp(11px, 2vw, 13px)", lineHeight: 1.6 }}>
+            <div style={{ marginBottom: "8px", textAlign: "center" }}>
+              © 2025 VibraXX. Operated by Sermin Limited (UK)
+            </div>
+            <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "8px", textAlign: "center" }}>
+              Registered in England & Wales | All rights reserved
+            </div>
+            <div style={{ marginBottom: "10px", textAlign: "center" }}>
+              <a 
+                href="mailto:team@vibraxx.com"
+                style={{ 
+                  color: "#a78bfa", 
+                  textDecoration: "none",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                }}
+              >
+                team@vibraxx.com
+              </a>
+            </div>
+            <div style={{ fontSize: "11px", textAlign: "center" }}>
+              Payment processing by{" "}
+              <a 
+                href="https://stripe.com" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                style={{ color: "#a78bfa", textDecoration: "none" }}
+              >
+                Stripe
+              </a>
+              {" "}| Secure SSL encryption | Skill-based competition - Not gambling
+            </div>
+          </div>
         </div>
       </footer>
 
