@@ -238,19 +238,20 @@ export default function BuyPage() {
         .vx-buy-logo:hover { transform: scale(1.05); }
 
         .vx-buy-logo-circle {
-          width: 50px;
-          height: 50px;
+          width: 60px;
+          height: 60px;
           border-radius: 50%;
-          background: linear-gradient(135deg, #7c3aed, #d946ef);
+          background: linear-gradient(135deg, #1e1b4b, #0f172a);
           display: flex;
           align-items: center;
           justify-content: center;
           box-shadow: 0 0 30px rgba(139, 92, 246, 0.6);
+          border: 2px solid rgba(139, 92, 246, 0.5);
         }
 
         .vx-buy-logo-img {
-          width: 30px;
-          height: 30px;
+          width: 36px;
+          height: 36px;
           object-fit: contain;
         }
 
