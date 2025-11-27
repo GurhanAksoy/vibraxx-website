@@ -679,25 +679,48 @@ export default function BuyPage() {
                       </div>
                     )}
 
-                    {/* Main Price */}
+                    {/* Main Price - SUPER VISIBLE */}
                     <div style={{
-                      display: "flex",
-                      alignItems: "baseline",
-                      justifyContent: "center",
-                      gap: "4px",
-                      marginBottom: "12px",
+                      marginBottom: "16px",
                     }}>
-                      <span style={{
-                        fontSize: "clamp(48px, 10vw, 64px)",
-                        fontWeight: 900,
-                        background: `linear-gradient(135deg, ${pkg.color})`,
-                        WebkitBackgroundClip: "text",
-                        WebkitTextFillColor: "transparent",
-                        lineHeight: 1,
-                        letterSpacing: "-0.02em",
+                      <div style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        justifyContent: "center",
+                        gap: "6px",
+                        marginBottom: "8px",
                       }}>
-                        {pkg.currency}{pkg.price}
-                      </span>
+                        <span style={{
+                          fontSize: "clamp(28px, 6vw, 36px)",
+                          fontWeight: 900,
+                          color: pkg.popular ? "#a78bfa" : "#94a3b8",
+                          lineHeight: 1,
+                          marginTop: "8px",
+                        }}>
+                          £
+                        </span>
+                        <span style={{
+                          fontSize: "clamp(56px, 12vw, 72px)",
+                          fontWeight: 900,
+                          color: "white",
+                          lineHeight: 1,
+                          letterSpacing: "-0.03em",
+                          textShadow: pkg.popular 
+                            ? "0 0 40px rgba(139, 92, 246, 0.8)" 
+                            : "0 0 20px rgba(100, 116, 139, 0.5)",
+                        }}>
+                          {pkg.price}
+                        </span>
+                      </div>
+                      <div style={{
+                        fontSize: "13px",
+                        color: "#64748b",
+                        fontWeight: 600,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                      }}>
+                        One-time payment
+                      </div>
                     </div>
 
                     {/* Details */}
