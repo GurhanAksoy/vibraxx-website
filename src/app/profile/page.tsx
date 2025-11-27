@@ -65,6 +65,26 @@ interface UserProfile {
   created_at: string;
 }
 
+interface DetailedStats {
+  today: {
+    rounds_played: number;
+    total_questions: number;
+    correct: number;
+    wrong: number;
+    accuracy: number;
+    total_score: number;
+  };
+  thisMonth: {
+    rounds_played: number;
+    total_questions: number;
+    correct: number;
+    wrong: number;
+    accuracy: number;
+    total_score: number;
+  };
+  lastRound: QuizHistory | null;
+}
+
 export default function ProfilePage() {
   const router = useRouter();
 
@@ -72,7 +92,9 @@ export default function ProfilePage() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [history, setHistory] = useState<QuizHistory[]>([]);
+  const [detailedStats, setDetailedStats] = useState<DetailedStats | null>(null);
   const [userRounds, setUserRounds] = useState(0);
+  const [totalPurchasedRounds, setTotalPurchasedRounds] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
@@ -123,24 +145,71 @@ export default function ProfilePage() {
         // Fetch user rounds
         const { data: roundsData, error: roundsError } = await supabase
           .from("user_rounds")
-          .select("available_rounds")
+          .select("available_rounds, total_purchased_rounds")
           .eq("user_id", authUser.id)
           .single();
 
         if (!roundsError && roundsData) {
           setUserRounds(roundsData.available_rounds || 0);
+          setTotalPurchasedRounds(roundsData.total_purchased_rounds || 0);
         }
 
-        // Fetch quiz history (last 10 rounds)
+        // Fetch quiz history (last 50 for calculations)
         const { data: historyData, error: historyError } = await supabase
           .from("quiz_history")
           .select("*")
           .eq("user_id", authUser.id)
           .order("completed_at", { ascending: false })
-          .limit(10);
+          .limit(50);
 
         if (!historyError && historyData) {
-          setHistory(historyData);
+          setHistory(historyData.slice(0, 10)); // Show only last 10
+
+          // Calculate detailed stats
+          const now = new Date();
+          const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+          // Today's stats
+          const todayRounds = historyData.filter(
+            (r) => new Date(r.completed_at) >= todayStart
+          );
+          const todayCorrect = todayRounds.reduce((sum, r) => sum + r.correct_count, 0);
+          const todayWrong = todayRounds.reduce((sum, r) => sum + r.wrong_count, 0);
+          const todayTotal = todayCorrect + todayWrong;
+          const todayScore = todayRounds.reduce((sum, r) => sum + r.score, 0);
+
+          // This month's stats
+          const monthRounds = historyData.filter(
+            (r) => new Date(r.completed_at) >= monthStart
+          );
+          const monthCorrect = monthRounds.reduce((sum, r) => sum + r.correct_count, 0);
+          const monthWrong = monthRounds.reduce((sum, r) => sum + r.wrong_count, 0);
+          const monthTotal = monthCorrect + monthWrong;
+          const monthScore = monthRounds.reduce((sum, r) => sum + r.score, 0);
+
+          // Last round
+          const lastRound = historyData.length > 0 ? historyData[0] : null;
+
+          setDetailedStats({
+            today: {
+              rounds_played: todayRounds.length,
+              total_questions: todayTotal,
+              correct: todayCorrect,
+              wrong: todayWrong,
+              accuracy: todayTotal > 0 ? (todayCorrect / todayTotal) * 100 : 0,
+              total_score: todayScore,
+            },
+            thisMonth: {
+              rounds_played: monthRounds.length,
+              total_questions: monthTotal,
+              correct: monthCorrect,
+              wrong: monthWrong,
+              accuracy: monthTotal > 0 ? (monthCorrect / monthTotal) * 100 : 0,
+              total_score: monthScore,
+            },
+            lastRound,
+          });
         }
 
       } catch (err) {
@@ -275,8 +344,20 @@ export default function ProfilePage() {
 
         @media (max-width: 768px) {
           .mobile-hide { display: none !important; }
-          .mobile-grid { grid-template-columns: 1fr !important; }
+          .mobile-grid { 
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
+          }
           .mobile-stack { flex-direction: column !important; }
+          .detailed-stats-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .stats-grid-item {
+            min-width: 100% !important;
+          }
         }
       `}</style>
 
@@ -735,6 +816,293 @@ export default function ProfilePage() {
             </div>
           )}
 
+          {/* Detailed Stats - Last Round, Today, This Month */}
+          {detailedStats && (
+            <div className="animate-slide-up" style={{
+              padding: "clamp(20px, 4vw, 24px)",
+              borderRadius: "clamp(16px, 3vw, 20px)",
+              border: "2px solid rgba(56,189,248,0.5)",
+              background: "linear-gradient(135deg, rgba(8,47,73,0.98), rgba(6,8,20,0.98))",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(56,189,248,0.4)",
+              backdropFilter: "blur(20px)",
+              marginBottom: "clamp(20px, 4vw, 24px)",
+            }}>
+              
+              <h2 style={{
+                fontSize: "clamp(18px, 4vw, 22px)",
+                fontWeight: 900,
+                marginBottom: "clamp(16px, 3vw, 20px)",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                color: "#7dd3fc",
+              }}>
+                <TrendingUp style={{
+                  width: "clamp(20px, 4vw, 24px)",
+                  height: "clamp(20px, 4vw, 24px)",
+                }} />
+                Detailed Statistics
+              </h2>
+
+              <div className="mobile-grid detailed-stats-grid" style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                gap: "clamp(16px, 3vw, 20px)",
+              }}>
+                
+                {/* Last Round */}
+                {detailedStats.lastRound && (
+                  <div style={{
+                    padding: "clamp(16px, 3vw, 20px)",
+                    borderRadius: "14px",
+                    background: "rgba(217,70,239,0.15)",
+                    border: "2px solid rgba(217,70,239,0.5)",
+                  }}>
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      marginBottom: "12px",
+                    }}>
+                      <Zap style={{ width: "20px", height: "20px", color: "#e879f9" }} />
+                      <h3 style={{
+                        fontSize: "16px",
+                        fontWeight: 800,
+                        color: "#e879f9",
+                        textTransform: "uppercase",
+                      }}>
+                        Last Round
+                      </h3>
+                    </div>
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "12px",
+                    }}>
+                      <div>
+                        <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Score</div>
+                        <div style={{ fontSize: "20px", fontWeight: 900, color: "#fbbf24" }}>
+                          {detailedStats.lastRound.score}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Accuracy</div>
+                        <div style={{ fontSize: "20px", fontWeight: 900, color: "#a78bfa" }}>
+                          {detailedStats.lastRound.accuracy.toFixed(0)}%
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Correct</div>
+                        <div style={{ fontSize: "20px", fontWeight: 900, color: "#22c55e" }}>
+                          {detailedStats.lastRound.correct_count}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Wrong</div>
+                        <div style={{ fontSize: "20px", fontWeight: 900, color: "#ef4444" }}>
+                          {detailedStats.lastRound.wrong_count}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{
+                      marginTop: "12px",
+                      paddingTop: "12px",
+                      borderTop: "1px solid rgba(217,70,239,0.3)",
+                      fontSize: "11px",
+                      color: "#94a3b8",
+                    }}>
+                      {new Date(detailedStats.lastRound.completed_at).toLocaleString()}
+                    </div>
+                  </div>
+                )}
+
+                {/* Today */}
+                <div style={{
+                  padding: "clamp(16px, 3vw, 20px)",
+                  borderRadius: "14px",
+                  background: "rgba(34,197,94,0.15)",
+                  border: "2px solid rgba(34,197,94,0.5)",
+                }}>
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    marginBottom: "12px",
+                  }}>
+                    <Clock style={{ width: "20px", height: "20px", color: "#22c55e" }} />
+                    <h3 style={{
+                      fontSize: "16px",
+                      fontWeight: 800,
+                      color: "#22c55e",
+                      textTransform: "uppercase",
+                    }}>
+                      Today
+                    </h3>
+                  </div>
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "12px",
+                  }}>
+                    <div>
+                      <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Rounds</div>
+                      <div style={{ fontSize: "20px", fontWeight: 900, color: "#fbbf24" }}>
+                        {detailedStats.today.rounds_played}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Score</div>
+                      <div style={{ fontSize: "20px", fontWeight: 900, color: "#fbbf24" }}>
+                        {detailedStats.today.total_score}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Correct</div>
+                      <div style={{ fontSize: "20px", fontWeight: 900, color: "#22c55e" }}>
+                        {detailedStats.today.correct}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Wrong</div>
+                      <div style={{ fontSize: "20px", fontWeight: 900, color: "#ef4444" }}>
+                        {detailedStats.today.wrong}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{
+                    marginTop: "12px",
+                    paddingTop: "12px",
+                    borderTop: "1px solid rgba(34,197,94,0.3)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}>
+                    <span style={{ fontSize: "11px", color: "#94a3b8" }}>Accuracy</span>
+                    <span style={{ fontSize: "16px", fontWeight: 900, color: "#a78bfa" }}>
+                      {detailedStats.today.accuracy.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* This Month */}
+                <div style={{
+                  padding: "clamp(16px, 3vw, 20px)",
+                  borderRadius: "14px",
+                  background: "rgba(56,189,248,0.15)",
+                  border: "2px solid rgba(56,189,248,0.5)",
+                }}>
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    marginBottom: "12px",
+                  }}>
+                    <Calendar style={{ width: "20px", height: "20px", color: "#7dd3fc" }} />
+                    <h3 style={{
+                      fontSize: "16px",
+                      fontWeight: 800,
+                      color: "#7dd3fc",
+                      textTransform: "uppercase",
+                    }}>
+                      This Month
+                    </h3>
+                  </div>
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "12px",
+                  }}>
+                    <div>
+                      <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Rounds</div>
+                      <div style={{ fontSize: "20px", fontWeight: 900, color: "#fbbf24" }}>
+                        {detailedStats.thisMonth.rounds_played}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Score</div>
+                      <div style={{ fontSize: "20px", fontWeight: 900, color: "#fbbf24" }}>
+                        {detailedStats.thisMonth.total_score}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Correct</div>
+                      <div style={{ fontSize: "20px", fontWeight: 900, color: "#22c55e" }}>
+                        {detailedStats.thisMonth.correct}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Wrong</div>
+                      <div style={{ fontSize: "20px", fontWeight: 900, color: "#ef4444" }}>
+                        {detailedStats.thisMonth.wrong}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{
+                    marginTop: "12px",
+                    paddingTop: "12px",
+                    borderTop: "1px solid rgba(56,189,248,0.3)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}>
+                    <span style={{ fontSize: "11px", color: "#94a3b8" }}>Accuracy</span>
+                    <span style={{ fontSize: "16px", fontWeight: 900, color: "#a78bfa" }}>
+                      {detailedStats.thisMonth.accuracy.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Round Info */}
+              <div style={{
+                marginTop: "clamp(16px, 3vw, 20px)",
+                padding: "clamp(14px, 3vw, 16px)",
+                borderRadius: "12px",
+                background: "rgba(251,191,36,0.15)",
+                border: "1px solid rgba(251,191,36,0.3)",
+              }}>
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "12px",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <Shield style={{ width: "18px", height: "18px", color: "#fbbf24" }} />
+                    <span style={{ fontSize: "clamp(13px, 3vw, 14px)", fontWeight: 700, color: "#fcd34d" }}>
+                      Round Status
+                    </span>
+                  </div>
+                  <div style={{
+                    display: "flex",
+                    gap: "clamp(12px, 3vw, 20px)",
+                    flexWrap: "wrap",
+                  }}>
+                    <div>
+                      <span style={{ fontSize: "clamp(10px, 2vw, 11px)", color: "#94a3b8" }}>Available: </span>
+                      <span style={{ fontSize: "clamp(14px, 3vw, 16px)", fontWeight: 900, color: "#22c55e" }}>
+                        {userRounds}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: "clamp(10px, 2vw, 11px)", color: "#94a3b8" }}>Purchased: </span>
+                      <span style={{ fontSize: "clamp(14px, 3vw, 16px)", fontWeight: 900, color: "#a78bfa" }}>
+                        {totalPurchasedRounds}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: "clamp(10px, 2vw, 11px)", color: "#94a3b8" }}>Used: </span>
+                      <span style={{ fontSize: "clamp(14px, 3vw, 16px)", fontWeight: 900, color: "#fb923c" }}>
+                        {totalPurchasedRounds - userRounds}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Quiz History */}
           {history.length > 0 && (
             <div className="animate-slide-up" style={{
@@ -775,26 +1143,50 @@ export default function ProfilePage() {
                       borderRadius: "12px",
                       background: "rgba(15,23,42,0.8)",
                       border: "1px solid rgba(139,92,246,0.3)",
-                      display: "grid",
-                      gridTemplateColumns: "auto 1fr auto",
-                      gap: "clamp(12px, 3vw, 16px)",
-                      alignItems: "center",
-                    }}>
-                    
-                    {/* Date */}
-                    <div style={{
                       display: "flex",
                       flexDirection: "column",
-                      alignItems: "center",
-                      padding: "8px 12px",
-                      borderRadius: "8px",
-                      background: "rgba(139,92,246,0.15)",
-                      border: "1px solid rgba(139,92,246,0.3)",
+                      gap: "12px",
                     }}>
-                      <Clock style={{ width: "16px", height: "16px", color: "#a78bfa", marginBottom: "4px" }} />
-                      <span style={{ fontSize: "10px", color: "#94a3b8" }}>
-                        {new Date(round.completed_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                      </span>
+                    
+                    <div style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "12px",
+                      flexWrap: "wrap",
+                    }}>
+                      {/* Date */}
+                      <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        padding: "6px 10px",
+                        borderRadius: "8px",
+                        background: "rgba(139,92,246,0.15)",
+                        border: "1px solid rgba(139,92,246,0.3)",
+                      }}>
+                        <Clock style={{ width: "14px", height: "14px", color: "#a78bfa" }} />
+                        <span style={{ fontSize: "clamp(10px, 2vw, 11px)", color: "#cbd5e1", whiteSpace: "nowrap" }}>
+                          {new Date(round.completed_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </span>
+                      </div>
+
+                      {/* Streak Badge */}
+                      <div style={{
+                        padding: "6px 10px",
+                        borderRadius: "8px",
+                        background: "linear-gradient(90deg, rgba(249,115,22,0.2), rgba(234,88,12,0.15))",
+                        border: "1px solid rgba(249,115,22,0.5)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        whiteSpace: "nowrap",
+                      }}>
+                        <Flame style={{ width: "14px", height: "14px", color: "#fb923c" }} />
+                        <span style={{ fontSize: "clamp(11px, 2.2vw, 12px)", fontWeight: 700, color: "#fb923c" }}>
+                          {round.max_streak}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Stats */}
@@ -804,40 +1196,23 @@ export default function ProfilePage() {
                       gap: "8px",
                     }}>
                       <div>
-                        <div style={{ fontSize: "16px", fontWeight: 900, color: "#fbbf24" }}>
+                        <div style={{ fontSize: "clamp(14px, 3vw, 16px)", fontWeight: 900, color: "#fbbf24" }}>
                           {round.score}
                         </div>
-                        <div style={{ fontSize: "10px", color: "#94a3b8" }}>Score</div>
+                        <div style={{ fontSize: "clamp(9px, 2vw, 10px)", color: "#94a3b8" }}>Score</div>
                       </div>
                       <div>
-                        <div style={{ fontSize: "16px", fontWeight: 900, color: "#22c55e" }}>
+                        <div style={{ fontSize: "clamp(14px, 3vw, 16px)", fontWeight: 900, color: "#22c55e" }}>
                           {round.correct_count}
                         </div>
-                        <div style={{ fontSize: "10px", color: "#94a3b8" }}>Correct</div>
+                        <div style={{ fontSize: "clamp(9px, 2vw, 10px)", color: "#94a3b8" }}>Correct</div>
                       </div>
                       <div>
-                        <div style={{ fontSize: "16px", fontWeight: 900, color: "#a78bfa" }}>
+                        <div style={{ fontSize: "clamp(14px, 3vw, 16px)", fontWeight: 900, color: "#a78bfa" }}>
                           {round.accuracy.toFixed(0)}%
                         </div>
-                        <div style={{ fontSize: "10px", color: "#94a3b8" }}>Accuracy</div>
+                        <div style={{ fontSize: "clamp(9px, 2vw, 10px)", color: "#94a3b8" }}>Accuracy</div>
                       </div>
-                    </div>
-
-                    {/* Streak Badge */}
-                    <div style={{
-                      padding: "6px 10px",
-                      borderRadius: "8px",
-                      background: "linear-gradient(90deg, rgba(249,115,22,0.2), rgba(234,88,12,0.15))",
-                      border: "1px solid rgba(249,115,22,0.5)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                      whiteSpace: "nowrap",
-                    }}>
-                      <Flame style={{ width: "14px", height: "14px", color: "#fb923c" }} />
-                      <span style={{ fontSize: "12px", fontWeight: 700, color: "#fb923c" }}>
-                        {round.max_streak}
-                      </span>
                     </div>
                   </div>
                 ))}
