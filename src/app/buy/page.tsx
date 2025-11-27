@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { createClient } from "@supabase/supabase-js";
 import {
   Crown,
@@ -300,7 +299,7 @@ export default function BuyPage() {
           justifyContent: "space-between",
           height: "80px",
         }}>
-          {/* Logo - WITH NEXT.JS IMAGE */}
+          {/* Logo - SIMPLE IMG TAG */}
           <div
             onClick={() => router.push("/")}
             style={{
@@ -322,16 +321,17 @@ export default function BuyPage() {
               alignItems: "center",
               justifyContent: "center",
               boxShadow: "0 0 30px rgba(139, 92, 246, 0.6)",
-              position: "relative",
               overflow: "hidden",
             }}>
-              <Image 
+              <img 
                 src="/images/logo.png" 
                 alt="VibraXX Logo" 
-                width={30}
-                height={30}
-                style={{ objectFit: "contain" }}
-                priority
+                width="30"
+                height="30"
+                style={{ 
+                  objectFit: "contain",
+                  display: "block",
+                }}
               />
             </div>
             <div className="mobile-hide">
