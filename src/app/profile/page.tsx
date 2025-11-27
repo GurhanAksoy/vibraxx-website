@@ -1,1224 +1,1083 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { 
-  User, Crown, Trophy, Target, Calendar, CheckCircle, XCircle, 
-  Zap, TrendingUp, Mail, Send, Package, Home, BarChart3,
-  Clock, Flame, Award, Star, Volume2, VolumeX
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { createClient } from "@supabase/supabase-js";
+import {
+  User,
+  Mail,
+  Trophy,
+  Target,
+  Flame,
+  TrendingUp,
+  Calendar,
+  Award,
+  Star,
+  Crown,
+  LogOut,
+  Edit,
+  Save,
+  X,
+  Send,
+  CheckCircle,
+  XCircle,
+  BarChart3,
+  Clock,
+  Zap,
+  Shield,
+  Gift,
+  Settings,
+  ChevronRight,
 } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
 
-export default function ProfilePage() {
-  const [user, setUser] = useState({
-    name: "",
-    email: "",
-    avatar: "",
-    joinedDate: ""
-  });
+// Initialize Supabase
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
-  const [stats, setStats] = useState({
-    lastRound: { correct: 0, wrong: 0, score: 0, rank: 0 },
-    today: { correct: 0, wrong: 0, score: 0, rounds: 0 },
-    monthly: { correct: 0, wrong: 0, score: 0, rounds: 0 },
-    rounds: { purchased: 0, used: 0, remaining: 0 }
-  });
-
-  const [message, setMessage] = useState("");
-  const [sending, setSending] = useState(false);
-  const [messageSent, setMessageSent] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  
-  const audioRef = useRef(null);
-
-  // Fetch user data (profile, stats, rounds)
-useEffect(() => {
-  const fetchUserData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Get logged-in user
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-if (sessionError) throw sessionError;
-
-if (!session) {
-  window.location.href = "/login";
-  return;
+interface UserStats {
+  total_questions_answered: number;
+  correct_answers: number;
+  wrong_answers: number;
+  accuracy_percentage: number;
+  max_streak: number;
+  last_round_score: number;
+  total_score: number;
 }
 
-const authUser = session.user;
-console.log("AUTH USER METADATA:", JSON.stringify(authUser.user_metadata, null, 2));
+interface QuizHistory {
+  id: number;
+  score: number;
+  correct_count: number;
+  wrong_count: number;
+  accuracy: number;
+  max_streak: number;
+  completed_at: string;
+}
 
+interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  avatar_url: string;
+  created_at: string;
+}
 
-      //
-      // 1) Fetch Profile
-      //
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .single();
+export default function ProfilePage() {
+  const router = useRouter();
 
-      if (profileError && profileError.code !== 'PGRST116') {
-        console.error("Profile fetch error:", profileError);
-      }
+  // State
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [history, setHistory] = useState<QuizHistory[]>([]);
+  const [userRounds, setUserRounds] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Contact form
+  const [showContactForm, setShowContactForm] = useState(false);
+  const [contactMessage, setContactMessage] = useState("");
+  const [contactSubject, setContactSubject] = useState("");
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<"idle" | "success" | "error">("idle");
 
-     setUser({
-  name: profile?.name 
-        || profile?.full_name 
-        || authUser.user_metadata?.full_name
-        || authUser.email?.split("@")[0] 
-        || "User",
-
-  email: authUser.email || "",
-
-  avatar:
-    profile?.avatar ||
-    authUser.user_metadata?.avatar_url ||
-    authUser.user_metadata?.picture ||
-    authUser.user_metadata?.full_picture ||
-    `https://api.dicebear.com/7.x/avataaars/svg?seed=${authUser.id}`,
-
-  joinedDate: authUser.created_at || new Date().toISOString(),
-});
-
-
-      //
-      // 2) Fetch user_stats (lastRound, today, monthly)
-      //
-      const { data: statsData, error: statsError } = await supabase
-        .from("user_stats")
-        .select("*")
-        .eq("user_id", authUser.id)
-        .single();
-
-      if (!statsError && statsData) {
-        setStats(prev => ({
-          ...prev,
-          lastRound: statsData.last_round || prev.lastRound,
-          today: statsData.today || prev.today,
-          monthly: statsData.monthly || prev.monthly,
-        }));
-      } else if (statsError && statsError.code !== "PGRST116") {
-        console.error("Stats error:", statsError);
-      }
-
-      //
-      // 3) Fetch user_rounds (purchased, used, remaining)
-      //
-      const { data: roundsData, error: roundsError } = await supabase
-        .from("user_rounds")
-        .select("*")
-        .eq("user_id", authUser.id)
-        .single();
-
-      if (!roundsError && roundsData) {
-        setStats(prev => ({
-          ...prev,
-          rounds: {
-            purchased: roundsData.purchased || 0,
-            used: roundsData.used || 0,
-            remaining: roundsData.remaining || 0,
-          },
-        }));
-      } else if (roundsError && roundsError.code !== "PGRST116") {
-        console.error("Rounds fetch error:", roundsError);
-      }
-
-    } catch (error) {
-      console.error("Error fetching user data:", error);
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  fetchUserData();
-}, []);
-
-  // Audio control
-  const toggleAudio = useCallback(() => {
-    if (audioRef.current) {
-      if (isMuted) {
-        audioRef.current.muted = false;
-        audioRef.current.play().catch(e => console.log('Audio play failed:', e));
-      } else {
-        audioRef.current.muted = true;
-        audioRef.current.pause();
-      }
-      setIsMuted(!isMuted);
-    }
-  }, [isMuted]);
-
-  // Initialize audio
+  // Fetch user data
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = 0.5;
-      audioRef.current.loop = true;
-      audioRef.current.muted = true;
-    }
-  }, []);
+    const fetchUserData = async () => {
+      setIsLoading(true);
 
-  const handleSendMessage = async () => {
-    if (!message.trim()) return;
-    
-    setSending(true);
-    
-    try {
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !authUser) {
-        alert('Please log in to send messages');
-        return;
-      }
-      
-      const { error } = await supabase
-        .from('support_messages')
-        .insert({
-          user_id: authUser.id,
-          user_email: authUser.email,
-          message: message.trim(),
-          status: 'pending',
-          created_at: new Date().toISOString()
+      try {
+        // Get authenticated user
+        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError || !authUser) {
+          router.push("/");
+          return;
+        }
+
+        // Set user profile
+        setUser({
+          id: authUser.id,
+          email: authUser.email || "",
+          full_name: authUser.user_metadata?.full_name || "User",
+          avatar_url: authUser.user_metadata?.avatar_url || "",
+          created_at: authUser.created_at,
         });
-      
-      if (error) throw error;
-      
-      setMessageSent(true);
-      setMessage("");
-      setTimeout(() => setMessageSent(false), 3000);
-    } catch (error) {
-      console.error('Error sending message:', error);
-      alert('Failed to send message. Please try again.');
+        setEditName(authUser.user_metadata?.full_name || "User");
+
+        // Fetch user stats
+        const { data: statsData, error: statsError } = await supabase
+          .from("user_stats")
+          .select("*")
+          .eq("user_id", authUser.id)
+          .single();
+
+        if (!statsError && statsData) {
+          setStats(statsData);
+        }
+
+        // Fetch user rounds
+        const { data: roundsData, error: roundsError } = await supabase
+          .from("user_rounds")
+          .select("available_rounds")
+          .eq("user_id", authUser.id)
+          .single();
+
+        if (!roundsError && roundsData) {
+          setUserRounds(roundsData.available_rounds || 0);
+        }
+
+        // Fetch quiz history (last 10 rounds)
+        const { data: historyData, error: historyError } = await supabase
+          .from("quiz_history")
+          .select("*")
+          .eq("user_id", authUser.id)
+          .order("completed_at", { ascending: false })
+          .limit(10);
+
+        if (!historyError && historyData) {
+          setHistory(historyData);
+        }
+
+      } catch (err) {
+        console.error("Error fetching user data:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, [router]);
+
+  // Save profile changes
+  const handleSaveProfile = async () => {
+    if (!user || !editName.trim()) return;
+
+    setIsSaving(true);
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: { full_name: editName.trim() }
+      });
+
+      if (!error) {
+        setUser({ ...user, full_name: editName.trim() });
+        setIsEditing(false);
+      }
+    } catch (err) {
+      console.error("Error updating profile:", err);
     } finally {
-      setSending(false);
+      setIsSaving(false);
     }
   };
 
-  const calculateAccuracy = useCallback((correct, wrong) => {
-    const total = correct + wrong;
-    return total > 0 ? Math.round((correct / total) * 100) : 0;
-  }, []);
+  // Send contact email
+  const handleSendEmail = async () => {
+    if (!user || !contactSubject.trim() || !contactMessage.trim()) return;
 
-  const formatDate = useCallback((dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-  }, []);
+    setIsSendingEmail(true);
+    setEmailStatus("idle");
+
+    try {
+      // Send email via API route
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from_email: user.email,
+          from_name: user.full_name,
+          subject: contactSubject,
+          message: contactMessage,
+          user_id: user.id,
+        }),
+      });
+
+      if (response.ok) {
+        setEmailStatus("success");
+        setContactMessage("");
+        setContactSubject("");
+        setTimeout(() => {
+          setShowContactForm(false);
+          setEmailStatus("idle");
+        }, 2000);
+      } else {
+        setEmailStatus("error");
+      }
+    } catch (err) {
+      console.error("Error sending email:", err);
+      setEmailStatus("error");
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
+  // Logout
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/");
+  };
+
+  // Loading screen
+  if (isLoading) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}>
+        <div className="animate-pulse" style={{
+          width: "80px",
+          height: "80px",
+          borderRadius: "50%",
+          border: "4px solid rgba(139,92,246,0.3)",
+          borderTopColor: "#a78bfa",
+          animation: "spin 1s linear infinite",
+        }} />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  const memberSince = new Date(user.created_at).toLocaleDateString("en-US", {
+    month: "short",
+    year: "numeric",
+  });
 
   return (
     <>
-      <audio 
-        ref={audioRef} 
-        src="/sounds/vibraxx.mp3"
-        aria-label="Background music"
-        preload="none"
-      />
-
       <style jsx global>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-10px); }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
         }
         @keyframes shimmer {
           0% { background-position: -200% center; }
           100% { background-position: 200% center; }
         }
-        @keyframes pulse-glow {
-          0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.3); }
-          50% { box-shadow: 0 0 40px rgba(217, 70, 239, 0.6); }
-        }
         @keyframes slideUp {
           from { transform: translateY(20px); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
         }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.8; }
         }
-        @keyframes neonPulse {
-          0%, 100% { 
-            box-shadow: 0 0 10px rgba(139, 92, 246, 0.5),
-                        0 0 20px rgba(139, 92, 246, 0.3);
-          }
-          50% { 
-            box-shadow: 0 0 20px rgba(217, 70, 239, 0.8),
-                        0 0 40px rgba(217, 70, 239, 0.5);
-          }
-        }
-        .animate-float { animation: float 3s ease-in-out infinite; }
-        .animate-shimmer {
-          background-size: 200% 100%;
-          animation: shimmer 3s linear infinite;
-        }
-        .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
-        .animate-slide-up { animation: slideUp 0.5s ease-out; }
-        .animate-spin { animation: spin 1s linear infinite; }
-        .neon-border { animation: neonPulse 2s ease-in-out infinite; }
-
-        *:focus-visible {
-          outline: 3px solid #a78bfa;
-          outline-offset: 2px;
-        }
-
-        html {
-          scroll-behavior: smooth;
-        }
-
-        body {
-          overflow-x: hidden;
-        }
-
-        * {
-          box-sizing: border-box;
-        }
+        .animate-slide-up { animation: slideUp 0.4s ease-out; }
+        .animate-pulse { animation: pulse 2s ease-in-out infinite; }
 
         @media (max-width: 768px) {
-          .mobile-stack { grid-template-columns: 1fr !important; }
-        }
-
-        @media (max-width: 640px) {
-          .mobile-2-col { grid-template-columns: 1fr !important; }
-        }
-
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
-        ::-webkit-scrollbar-thumb { 
-          background: linear-gradient(to bottom, #7c3aed, #d946ef);
-          border-radius: 4px;
-        }
-
-        .vx-footer {
-          position: relative;
-          z-index: 10;
-          border-top: 1px solid rgba(255, 255, 255, 0.1);
-          background: rgba(15, 23, 42, 0.9);
-          backdrop-filter: blur(20px);
-          margin-top: clamp(40px, 6vw, 60px);
-          padding: clamp(30px, 5vw, 50px) 0;
-        }
-
-        .vx-container {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 0 clamp(16px, 4vw, 24px);
-        }
-
-        .vx-footer-legal {
-          background: rgba(139, 92, 246, 0.1);
-          border: 1px solid rgba(139, 92, 246, 0.2);
-          border-radius: 12px;
-          padding: clamp(16px, 3vw, 20px);
-          margin-bottom: clamp(24px, 4vw, 32px);
-          font-size: clamp(11px, 2vw, 13px);
-          line-height: 1.6;
-          color: #cbd5e1;
-          text-align: center;
-        }
-
-        .vx-footer-legal a {
-          color: #a78bfa;
-          text-decoration: underline;
-          transition: color 0.3s;
-        }
-
-        .vx-footer-legal a:hover {
-          color: #c4b5fd;
-        }
-
-        .vx-footer-links {
-          display: flex;
-          flex-wrap: wrap;
-          justify-content: center;
-          align-items: center;
-          gap: clamp(8px, 2vw, 12px);
-          margin-bottom: clamp(24px, 4vw, 32px);
-        }
-
-        .vx-footer-links a {
-          color: #94a3b8;
-          text-decoration: none;
-          font-size: clamp(11px, 2vw, 13px);
-          font-weight: 500;
-          transition: color 0.3s;
-          white-space: nowrap;
-        }
-
-        .vx-footer-links a:hover {
-          color: #a78bfa;
-        }
-
-        .vx-footer-divider {
-          color: rgba(148, 163, 184, 0.3);
-          font-size: clamp(10px, 2vw, 12px);
-        }
-
-        .vx-footer-company {
-          color: #64748b;
-          font-size: clamp(11px, 2vw, 13px);
-          line-height: 1.6;
-        }
-
-        .vx-footer-company a {
-          color: #a78bfa;
-          text-decoration: none;
-          transition: color 0.3s;
-        }
-
-        .vx-footer-company a:hover {
-          color: #c4b5fd;
-        }
-
-        @media (max-width: 640px) {
-          .vx-footer-divider {
-            display: none;
-          }
-          
-          .vx-footer-links {
-            flex-direction: column;
-            gap: 12px;
-          }
+          .mobile-hide { display: none !important; }
+          .mobile-grid { grid-template-columns: 1fr !important; }
+          .mobile-stack { flex-direction: column !important; }
         }
       `}</style>
 
       <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(to bottom right, #0f172a, #1e1b4b, #0f172a)',
-        color: 'white',
-        position: 'relative',
-        overflow: 'hidden',
-        width: '100%',
-        maxWidth: '100vw'
-      }}
-      role="main"
-      aria-label="Profile page">
-        {/* Animated Background */}
-        <div className="animate-float" style={{
-          position: 'fixed',
-          top: '10%',
-          left: '5%',
-          width: '500px',
-          height: '500px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, #7c3aed 0%, transparent 70%)',
-          opacity: 0.2,
-          filter: 'blur(100px)',
-          zIndex: 0,
-          pointerEvents: 'none'
-        }}
-        aria-hidden="true"></div>
-        <div className="animate-float" style={{
-          position: 'fixed',
-          bottom: '10%',
-          right: '5%',
-          width: '600px',
-          height: '600px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, #d946ef 0%, transparent 70%)',
-          opacity: 0.15,
-          filter: 'blur(100px)',
-          zIndex: 0,
-          animationDelay: '1.5s',
-          pointerEvents: 'none'
-        }}
-        aria-hidden="true"></div>
-
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 25%, #312e81 50%, #1e1b4b 75%, #0f172a 100%)",
+        backgroundSize: "400% 400%",
+        animation: "shimmer 15s ease infinite",
+        color: "white",
+        padding: "clamp(20px, 5vw, 40px) clamp(16px, 4vw, 24px)",
+      }}>
+        
         {/* Header */}
         <header style={{
-          position: 'relative',
-          zIndex: 50,
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(20px)',
-          background: 'rgba(15, 23, 42, 0.8)'
-        }}
-        role="banner">
-          <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 clamp(12px, 3vw, 24px)', width: '100%' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '70px', gap: 'clamp(8px, 2vw, 16px)' }}>
-              
-              {/* Home Button */}
-              <button
-                onClick={() => window.location.href = '/'}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: 'clamp(6px, 2vw, 10px) clamp(8px, 2.5vw, 16px)',
-                  borderRadius: '10px',
-                  border: '2px solid rgba(139, 92, 246, 0.3)',
-                  background: 'rgba(139, 92, 246, 0.1)',
-                  color: 'white',
-                  fontSize: 'clamp(11px, 2.2vw, 14px)',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.3s',
-                  flexShrink: 0,
-                  whiteSpace: 'nowrap'
-                }}
-                aria-label="Go to homepage"
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)';
-                  e.currentTarget.style.transform = 'scale(1.05)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
-                  e.currentTarget.style.transform = 'scale(1)';
-                }}
-              >
-                <Home style={{ width: 'clamp(12px, 2.8vw, 18px)', height: 'clamp(12px, 2.8vw, 18px)', color: '#a78bfa' }} aria-hidden="true" />
-                <span style={{ display: 'inline' }}>Home</span>
-              </button>
+          maxWidth: "1200px",
+          margin: "0 auto clamp(24px, 5vw, 40px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "16px",
+          flexWrap: "wrap",
+        }}>
+          <button
+            onClick={() => router.push("/")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "10px 16px",
+              borderRadius: "12px",
+              border: "2px solid rgba(139,92,246,0.5)",
+              background: "rgba(15,23,42,0.8)",
+              color: "white",
+              fontSize: "14px",
+              fontWeight: 700,
+              cursor: "pointer",
+              transition: "all 0.3s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = "#a78bfa";
+              e.currentTarget.style.background = "rgba(139,92,246,0.2)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = "rgba(139,92,246,0.5)";
+              e.currentTarget.style.background = "rgba(15,23,42,0.8)";
+            }}>
+            <ChevronRight style={{ width: "18px", height: "18px", transform: "rotate(180deg)" }} />
+            <span>Back to Home</span>
+          </button>
 
-              {/* Title */}
-              <h1 className="animate-shimmer" style={{ 
-                fontSize: 'clamp(14px, 3.2vw, 28px)',
-                fontWeight: 900,
-                background: 'linear-gradient(90deg, #7c3aed, #d946ef, #f0abfc, #d946ef, #7c3aed)',
-                backgroundSize: '200% 100%',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                textTransform: 'uppercase',
-                letterSpacing: '0.03em',
-                textAlign: 'center',
-                margin: 0,
-                flex: 1,
-                minWidth: 0,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
-              }}>
-                My Profile
-              </h1>
-
-              {/* Audio Button */}
-              <button
-                onClick={toggleAudio}
-                style={{
-                  width: 'clamp(34px, 7vw, 44px)',
-                  height: 'clamp(34px, 7vw, 44px)',
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(217, 70, 239, 0.1))',
-                  border: '2px solid rgba(139, 92, 246, 0.3)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#a78bfa',
-                  transition: 'all 0.3s',
-                  boxShadow: '0 0 15px rgba(139, 92, 246, 0.3)',
-                  flexShrink: 0,
-                  padding: 0
-                }}
-                className="neon-border"
-                aria-label={isMuted ? 'Unmute audio' : 'Mute audio'}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'scale(1.1)';
-                  e.currentTarget.style.boxShadow = '0 0 25px rgba(139, 92, 246, 0.5)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.boxShadow = '0 0 15px rgba(139, 92, 246, 0.3)';
-                }}
-              >
-                {isMuted ? 
-                  <VolumeX style={{ width: 'clamp(14px, 3vw, 20px)', height: 'clamp(14px, 3vw, 20px)' }} /> : 
-                  <Volume2 style={{ width: 'clamp(14px, 3vw, 20px)', height: 'clamp(14px, 3vw, 20px)' }} />
-                }
-              </button>
-            </div>
-          </div>
+          <button
+            onClick={handleLogout}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "10px 16px",
+              borderRadius: "12px",
+              border: "2px solid rgba(239,68,68,0.5)",
+              background: "rgba(15,23,42,0.8)",
+              color: "#fca5a5",
+              fontSize: "14px",
+              fontWeight: 700,
+              cursor: "pointer",
+              transition: "all 0.3s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = "#ef4444";
+              e.currentTarget.style.background = "rgba(239,68,68,0.2)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = "rgba(239,68,68,0.5)";
+              e.currentTarget.style.background = "rgba(15,23,42,0.8)";
+            }}>
+            <LogOut style={{ width: "18px", height: "18px" }} />
+            <span className="mobile-hide">Logout</span>
+          </button>
         </header>
 
-        {/* Main Content */}
-        <main style={{ position: 'relative', zIndex: 10, padding: 'clamp(20px, 4vw, 50px) clamp(12px, 3vw, 24px)' }}>
-          <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+        <main style={{
+          maxWidth: "1200px",
+          margin: "0 auto",
+        }}>
+          
+          {/* Profile Card */}
+          <div className="animate-slide-up" style={{
+            padding: "clamp(24px, 5vw, 32px)",
+            borderRadius: "clamp(20px, 4vw, 24px)",
+            border: "2px solid rgba(139,92,246,0.5)",
+            background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(139,92,246,0.4)",
+            backdropFilter: "blur(20px)",
+            marginBottom: "clamp(20px, 4vw, 24px)",
+          }}>
             
-            {/* Loading State */}
-            {loading ? (
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'center', 
-                alignItems: 'center', 
-                minHeight: '400px',
-                flexDirection: 'column',
-                gap: '20px'
-              }}>
-                <div className="animate-spin" style={{
-                  width: '60px',
-                  height: '60px',
-                  border: '4px solid rgba(139, 92, 246, 0.2)',
-                  borderTopColor: '#a78bfa',
-                  borderRadius: '50%'
-                }}
-                aria-hidden="true"></div>
-                <p style={{ color: '#94a3b8', fontSize: '18px' }}>Loading your profile...</p>
-              </div>
-            ) : (
-              <>
-            
-            {/* Profile Card */}
-            <article className="animate-slide-up animate-pulse-glow" style={{
-              padding: 'clamp(20px, 4vw, 48px)',
-              borderRadius: 'clamp(20px, 4vw, 32px)',
-              border: '2px solid rgba(139, 92, 246, 0.3)',
-              background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 27, 75, 0.8))',
-              backdropFilter: 'blur(20px)',
-              marginBottom: 'clamp(20px, 4vw, 40px)',
-              position: 'relative',
-              overflow: 'hidden'
-            }}
-            aria-label="User profile information">
-              <div style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: '4px',
-                background: 'linear-gradient(90deg, #7c3aed, #d946ef, #f0abfc)',
-                backgroundSize: '200% 100%',
-                animation: 'shimmer 3s linear infinite'
-              }}
-              aria-hidden="true"></div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(16px, 3vw, 32px)', flexWrap: 'wrap', justifyContent: 'center' }}>
-                <div style={{ position: 'relative', flexShrink: 0 }}>
-                  <div className="animate-pulse-glow" style={{
-                    width: 'clamp(80px, 16vw, 140px)',
-                    height: 'clamp(80px, 16vw, 140px)',
-                    borderRadius: '50%',
-                    padding: '5px',
-                    background: 'linear-gradient(135deg, #7c3aed, #d946ef)',
-                  }}>
-                    <img 
-                      src={user.avatar} 
-                      alt={`${user.name}'s avatar`}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        borderRadius: '50%',
-                        border: '4px solid rgba(15, 23, 42, 0.9)'
-                      }}
-                      loading="lazy"
-                    />
-                  </div>
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '5px',
-                    right: '5px',
-                    width: 'clamp(20px, 4vw, 32px)',
-                    height: 'clamp(20px, 4vw, 32px)',
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #22c55e, #16a34a)',
-                    border: '3px solid rgba(15, 23, 42, 0.9)',
-                    boxShadow: '0 0 20px #22c55e'
-                  }}
-                  aria-label="Online"
-                  title="Online"></div>
-                </div>
-
-                <div style={{ flex: 1, minWidth: '200px', textAlign: 'center' }}>
-                  <h2 style={{ fontSize: 'clamp(20px, 4vw, 36px)', fontWeight: 900, marginBottom: '6px', wordBreak: 'break-word' }}>
-                    {user.name}
-                  </h2>
-                  <p style={{ fontSize: 'clamp(12px, 2.5vw, 16px)', color: '#94a3b8', marginBottom: '10px', wordBreak: 'break-all' }}>
-                    {user.email}
-                  </p>
-                  <div style={{ display: 'flex', gap: 'clamp(10px, 2vw, 16px)', flexWrap: 'wrap', justifyContent: 'center' }}>
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '6px',
-                      padding: 'clamp(6px, 1.5vw, 8px) clamp(12px, 2.5vw, 16px)',
-                      borderRadius: '8px',
-                      background: 'rgba(139, 92, 246, 0.2)',
-                      border: '1px solid rgba(139, 92, 246, 0.3)'
-                    }}>
-                      <Calendar style={{ width: 'clamp(14px, 2.8vw, 16px)', height: 'clamp(14px, 2.8vw, 16px)', color: '#a78bfa' }} aria-hidden="true" />
-                      <span style={{ fontSize: 'clamp(11px, 2.2vw, 14px)', color: '#c4b5fd' }}>
-                        Joined {formatDate(user.joinedDate)}
-                      </span>
-                    </div>
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '6px',
-                      padding: 'clamp(6px, 1.5vw, 8px) clamp(12px, 2.5vw, 16px)',
-                      borderRadius: '8px',
-                      background: 'rgba(234, 179, 8, 0.2)',
-                      border: '1px solid rgba(234, 179, 8, 0.3)'
-                    }}>
-                      <Crown style={{ width: 'clamp(14px, 2.8vw, 16px)', height: 'clamp(14px, 2.8vw, 16px)', color: '#facc15' }} aria-hidden="true" />
-                      <span style={{ fontSize: 'clamp(11px, 2.2vw, 14px)', color: '#fef08a' }}>
-                        Premium Member
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </article>
-
-            {/* Stats Grid */}
-            <section className="mobile-stack" style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', 
-              gap: 'clamp(16px, 3vw, 32px)',
-              marginBottom: 'clamp(20px, 4vw, 40px)'
-            }}
-            aria-label="Performance statistics">
+            <div style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "clamp(20px, 4vw, 24px)",
+            }}>
               
-              {/* Last Round */}
-              <article className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
+              {/* Profile Header */}
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "clamp(16px, 3vw, 20px)",
+                flexWrap: "wrap",
+              }}>
+                
+                {/* Avatar */}
                 <div style={{
-                  padding: 'clamp(20px, 3.5vw, 32px)',
-                  borderRadius: 'clamp(16px, 3vw, 24px)',
-                  border: '2px solid rgba(139, 92, 246, 0.2)',
-                  background: 'rgba(15, 23, 42, 0.6)',
-                  backdropFilter: 'blur(20px)',
-                  height: '100%'
+                  position: "relative",
+                  width: "clamp(80px, 15vw, 100px)",
+                  height: "clamp(80px, 15vw, 100px)",
+                  borderRadius: "50%",
+                  padding: "4px",
+                  background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+                  boxShadow: "0 0 30px rgba(124,58,237,0.6)",
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 'clamp(16px, 3vw, 20px)' }}>
-                    <div style={{
-                      width: 'clamp(40px, 8vw, 48px)',
-                      height: 'clamp(40px, 8vw, 48px)',
-                      borderRadius: '10px',
-                      background: 'linear-gradient(135deg, #7c3aed, #d946ef)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 0 20px rgba(139, 92, 246, 0.5)'
-                    }}>
-                      <Target style={{ width: 'clamp(20px, 4vw, 24px)', height: 'clamp(20px, 4vw, 24px)' }} aria-hidden="true" />
-                    </div>
-                    <div>
-                      <h3 style={{ fontSize: 'clamp(14px, 2.8vw, 18px)', fontWeight: 700, margin: 0 }}>Last Round</h3>
-                      <p style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#94a3b8', margin: 0 }}>Most Recent Performance</p>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'clamp(12px, 2.5vw, 16px)', marginBottom: 'clamp(16px, 3vw, 20px)' }}>
-                    <div style={{
-                      padding: 'clamp(12px, 2.5vw, 16px)',
-                      borderRadius: '10px',
-                      background: 'rgba(34, 197, 94, 0.1)',
-                      border: '1px solid rgba(34, 197, 94, 0.2)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                        <CheckCircle style={{ width: 'clamp(14px, 2.8vw, 18px)', height: 'clamp(14px, 2.8vw, 18px)', color: '#22c55e' }} aria-hidden="true" />
-                        <span style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#94a3b8' }}>Correct</span>
-                      </div>
-                      <div style={{ fontSize: 'clamp(22px, 4.5vw, 28px)', fontWeight: 900, color: '#22c55e' }}>{stats.lastRound.correct}</div>
-                    </div>
-                    <div style={{
-                      padding: 'clamp(12px, 2.5vw, 16px)',
-                      borderRadius: '10px',
-                      background: 'rgba(239, 68, 68, 0.1)',
-                      border: '1px solid rgba(239, 68, 68, 0.2)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                        <XCircle style={{ width: 'clamp(14px, 2.8vw, 18px)', height: 'clamp(14px, 2.8vw, 18px)', color: '#ef4444' }} aria-hidden="true" />
-                        <span style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#94a3b8' }}>Wrong</span>
-                      </div>
-                      <div style={{ fontSize: 'clamp(22px, 4.5vw, 28px)', fontWeight: 900, color: '#ef4444' }}>{stats.lastRound.wrong}</div>
-                    </div>
-                  </div>
-
                   <div style={{
-                    padding: 'clamp(16px, 3vw, 20px)',
-                    borderRadius: '14px',
-                    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(217, 70, 239, 0.1))',
-                    border: '1px solid rgba(139, 92, 246, 0.3)',
-                    textAlign: 'center'
+                    width: "100%",
+                    height: "100%",
+                    borderRadius: "50%",
+                    background: "#020817",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    overflow: "hidden",
                   }}>
-                    <div style={{ fontSize: 'clamp(12px, 2.4vw, 14px)', color: '#94a3b8', marginBottom: '6px' }}>Score</div>
-                    <div style={{ 
-                      fontSize: 'clamp(28px, 5.5vw, 36px)', 
-                      fontWeight: 900,
-                      background: 'linear-gradient(to right, #a78bfa, #f0abfc)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text'
-                    }}>
-                      {stats.lastRound.score.toLocaleString()}
-                    </div>
-                    {stats.lastRound.rank > 0 && (
-                      <div style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#64748b', marginTop: '4px' }}>
-                        Rank #{stats.lastRound.rank}
-                      </div>
+                    {user.avatar_url ? (
+                      <Image
+                        src={user.avatar_url}
+                        alt={user.full_name}
+                        fill
+                        style={{ objectFit: "cover" }}
+                      />
+                    ) : (
+                      <User style={{ width: "50%", height: "50%", color: "#a78bfa" }} />
                     )}
                   </div>
                 </div>
-              </article>
 
-              {/* Today's Stats */}
-              <article className="animate-slide-up" style={{ animationDelay: '0.2s' }}>
-                <div style={{
-                  padding: 'clamp(20px, 3.5vw, 32px)',
-                  borderRadius: 'clamp(16px, 3vw, 24px)',
-                  border: '2px solid rgba(234, 179, 8, 0.2)',
-                  background: 'rgba(15, 23, 42, 0.6)',
-                  backdropFilter: 'blur(20px)',
-                  height: '100%'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 'clamp(16px, 3vw, 20px)' }}>
+                {/* Name & Email */}
+                <div style={{ flex: 1, minWidth: "200px" }}>
+                  {isEditing ? (
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        style={{
+                          flex: 1,
+                          padding: "8px 12px",
+                          borderRadius: "8px",
+                          border: "2px solid rgba(139,92,246,0.5)",
+                          background: "rgba(15,23,42,0.9)",
+                          color: "white",
+                          fontSize: "16px",
+                          fontWeight: 700,
+                        }}
+                        placeholder="Enter your name"
+                      />
+                      <button
+                        onClick={handleSaveProfile}
+                        disabled={isSaving}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: "8px",
+                          border: "none",
+                          background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                          color: "white",
+                          cursor: isSaving ? "not-allowed" : "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}>
+                        <Save style={{ width: "16px", height: "16px" }} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsEditing(false);
+                          setEditName(user.full_name);
+                        }}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: "8px",
+                          border: "none",
+                          background: "rgba(239,68,68,0.2)",
+                          color: "#fca5a5",
+                          cursor: "pointer",
+                        }}>
+                        <X style={{ width: "16px", height: "16px" }} />
+                      </button>
+                    </div>
+                  ) : (
                     <div style={{
-                      width: 'clamp(40px, 8vw, 48px)',
-                      height: 'clamp(40px, 8vw, 48px)',
-                      borderRadius: '10px',
-                      background: 'linear-gradient(135deg, #eab308, #f59e0b)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 0 20px rgba(234, 179, 8, 0.5)'
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      marginBottom: "8px",
                     }}>
-                      <Clock style={{ width: 'clamp(20px, 4vw, 24px)', height: 'clamp(20px, 4vw, 24px)' }} aria-hidden="true" />
+                      <h1 style={{
+                        fontSize: "clamp(20px, 4vw, 28px)",
+                        fontWeight: 900,
+                        background: "linear-gradient(90deg, #fbbf24, #f59e0b)",
+                        backgroundClip: "text",
+                        WebkitBackgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                      }}>
+                        {user.full_name}
+                      </h1>
+                      <button
+                        onClick={() => setIsEditing(true)}
+                        style={{
+                          padding: "6px",
+                          borderRadius: "8px",
+                          border: "none",
+                          background: "rgba(139,92,246,0.2)",
+                          color: "#a78bfa",
+                          cursor: "pointer",
+                        }}>
+                        <Edit style={{ width: "16px", height: "16px" }} />
+                      </button>
                     </div>
-                    <div>
-                      <h3 style={{ fontSize: 'clamp(14px, 2.8vw, 18px)', fontWeight: 700, margin: 0 }}>Today</h3>
-                      <p style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#94a3b8', margin: 0 }}>{stats.today.rounds} Rounds Played</p>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'clamp(12px, 2.5vw, 16px)', marginBottom: 'clamp(16px, 3vw, 20px)' }}>
-                    <div style={{
-                      padding: 'clamp(12px, 2.5vw, 16px)',
-                      borderRadius: '10px',
-                      background: 'rgba(34, 197, 94, 0.1)',
-                      border: '1px solid rgba(34, 197, 94, 0.2)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                        <CheckCircle style={{ width: 'clamp(14px, 2.8vw, 18px)', height: 'clamp(14px, 2.8vw, 18px)', color: '#22c55e' }} aria-hidden="true" />
-                        <span style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#94a3b8' }}>Correct</span>
-                      </div>
-                      <div style={{ fontSize: 'clamp(22px, 4.5vw, 28px)', fontWeight: 900, color: '#22c55e' }}>{stats.today.correct}</div>
-                    </div>
-                    <div style={{
-                      padding: 'clamp(12px, 2.5vw, 16px)',
-                      borderRadius: '10px',
-                      background: 'rgba(239, 68, 68, 0.1)',
-                      border: '1px solid rgba(239, 68, 68, 0.2)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                        <XCircle style={{ width: 'clamp(14px, 2.8vw, 18px)', height: 'clamp(14px, 2.8vw, 18px)', color: '#ef4444' }} aria-hidden="true" />
-                        <span style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#94a3b8' }}>Wrong</span>
-                      </div>
-                      <div style={{ fontSize: 'clamp(22px, 4.5vw, 28px)', fontWeight: 900, color: '#ef4444' }}>{stats.today.wrong}</div>
-                    </div>
+                  )}
+                  
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    marginBottom: "4px",
+                  }}>
+                    <Mail style={{ width: "16px", height: "16px", color: "#94a3b8" }} />
+                    <span style={{ fontSize: "14px", color: "#cbd5e1" }}>{user.email}</span>
                   </div>
 
                   <div style={{
-                    padding: 'clamp(16px, 3vw, 20px)',
-                    borderRadius: '14px',
-                    background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.2), rgba(202, 138, 4, 0.1))',
-                    border: '1px solid rgba(234, 179, 8, 0.3)',
-                    textAlign: 'center'
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
                   }}>
-                    <div style={{ fontSize: 'clamp(12px, 2.4vw, 14px)', color: '#94a3b8', marginBottom: '6px' }}>Total Score</div>
-                    <div style={{ fontSize: 'clamp(28px, 5.5vw, 36px)', fontWeight: 900, color: '#facc15' }}>
-                      {stats.today.score.toLocaleString()}
-                    </div>
-                    <div style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#64748b', marginTop: '4px' }}>
-                      Accuracy: {calculateAccuracy(stats.today.correct, stats.today.wrong)}%
-                    </div>
+                    <Calendar style={{ width: "16px", height: "16px", color: "#94a3b8" }} />
+                    <span style={{ fontSize: "14px", color: "#94a3b8" }}>
+                      Member since {memberSince}
+                    </span>
                   </div>
                 </div>
-              </article>
 
-              {/* Monthly Stats */}
-              <article className="animate-slide-up" style={{ animationDelay: '0.3s' }}>
+                {/* Rounds Badge */}
                 <div style={{
-                  padding: 'clamp(20px, 3.5vw, 32px)',
-                  borderRadius: 'clamp(16px, 3vw, 24px)',
-                  border: '2px solid rgba(236, 72, 153, 0.2)',
-                  background: 'rgba(15, 23, 42, 0.6)',
-                  backdropFilter: 'blur(20px)',
-                  height: '100%'
+                  padding: "clamp(12px, 2.5vw, 16px) clamp(16px, 3vw, 20px)",
+                  borderRadius: "clamp(12px, 2.5vw, 16px)",
+                  background: "linear-gradient(135deg, rgba(251,191,36,0.2), rgba(245,158,11,0.15))",
+                  border: "2px solid rgba(251,191,36,0.5)",
+                  textAlign: "center",
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 'clamp(16px, 3vw, 20px)' }}>
-                    <div style={{
-                      width: 'clamp(40px, 8vw, 48px)',
-                      height: 'clamp(40px, 8vw, 48px)',
-                      borderRadius: '10px',
-                      background: 'linear-gradient(135deg, #ec4899, #d946ef)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 0 20px rgba(236, 72, 153, 0.5)'
-                    }}>
-                      <BarChart3 style={{ width: 'clamp(20px, 4vw, 24px)', height: 'clamp(20px, 4vw, 24px)' }} aria-hidden="true" />
-                    </div>
-                    <div>
-                      <h3 style={{ fontSize: 'clamp(14px, 2.8vw, 18px)', fontWeight: 700, margin: 0 }}>This Month</h3>
-                      <p style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#94a3b8', margin: 0 }}>{stats.monthly.rounds} Total Rounds</p>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'clamp(12px, 2.5vw, 16px)', marginBottom: 'clamp(16px, 3vw, 20px)' }}>
-                    <div style={{
-                      padding: 'clamp(12px, 2.5vw, 16px)',
-                      borderRadius: '10px',
-                      background: 'rgba(34, 197, 94, 0.1)',
-                      border: '1px solid rgba(34, 197, 94, 0.2)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                        <CheckCircle style={{ width: 'clamp(14px, 2.8vw, 18px)', height: 'clamp(14px, 2.8vw, 18px)', color: '#22c55e' }} aria-hidden="true" />
-                        <span style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#94a3b8' }}>Correct</span>
-                      </div>
-                      <div style={{ fontSize: 'clamp(22px, 4.5vw, 28px)', fontWeight: 900, color: '#22c55e' }}>{stats.monthly.correct}</div>
-                    </div>
-                    <div style={{
-                      padding: 'clamp(12px, 2.5vw, 16px)',
-                      borderRadius: '10px',
-                      background: 'rgba(239, 68, 68, 0.1)',
-                      border: '1px solid rgba(239, 68, 68, 0.2)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                        <XCircle style={{ width: 'clamp(14px, 2.8vw, 18px)', height: 'clamp(14px, 2.8vw, 18px)', color: '#ef4444' }} aria-hidden="true" />
-                        <span style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#94a3b8' }}>Wrong</span>
-                      </div>
-                      <div style={{ fontSize: 'clamp(22px, 4.5vw, 28px)', fontWeight: 900, color: '#ef4444' }}>{stats.monthly.wrong}</div>
-                    </div>
-                  </div>
-
+                  <Gift style={{
+                    width: "clamp(24px, 5vw, 32px)",
+                    height: "clamp(24px, 5vw, 32px)",
+                    color: "#fbbf24",
+                    margin: "0 auto 4px",
+                  }} />
                   <div style={{
-                    padding: 'clamp(16px, 3vw, 20px)',
-                    borderRadius: '14px',
-                    background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.2), rgba(217, 70, 239, 0.1))',
-                    border: '1px solid rgba(236, 72, 153, 0.3)',
-                    textAlign: 'center'
+                    fontSize: "clamp(24px, 5vw, 32px)",
+                    fontWeight: 900,
+                    color: "#fbbf24",
+                    lineHeight: 1,
                   }}>
-                    <div style={{ fontSize: 'clamp(12px, 2.4vw, 14px)', color: '#94a3b8', marginBottom: '6px' }}>Total Score</div>
-                    <div style={{ fontSize: 'clamp(28px, 5.5vw, 36px)', fontWeight: 900, color: '#f0abfc' }}>
-                      {stats.monthly.score.toLocaleString()}
-                    </div>
-                    <div style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#64748b', marginTop: '4px' }}>
-                      Accuracy: {calculateAccuracy(stats.monthly.correct, stats.monthly.wrong)}%
-                    </div>
+                    {userRounds}
+                  </div>
+                  <div style={{
+                    fontSize: "clamp(11px, 2.2vw, 12px)",
+                    color: "#fcd34d",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    marginTop: "4px",
+                  }}>
+                    Rounds Left
                   </div>
                 </div>
-              </article>
-            </section>
+              </div>
 
-            {/* Rounds & Contact Section */}
-            <section className="mobile-stack mobile-2-col" style={{ 
-              display: 'grid', 
-              gridTemplateColumns: '1fr 1fr', 
-              gap: 'clamp(16px, 3vw, 32px)'
-            }}
-            aria-label="Round credits and support">
+              {/* Contact Support Button */}
+              <button
+                onClick={() => setShowContactForm(true)}
+                style={{
+                  width: "100%",
+                  padding: "12px 16px",
+                  borderRadius: "12px",
+                  border: "2px solid rgba(56,189,248,0.5)",
+                  background: "rgba(8,47,73,0.5)",
+                  color: "#7dd3fc",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  transition: "all 0.3s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#0ea5e9";
+                  e.currentTarget.style.background = "rgba(56,189,248,0.15)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(56,189,248,0.5)";
+                  e.currentTarget.style.background = "rgba(8,47,73,0.5)";
+                }}>
+                <Send style={{ width: "18px", height: "18px" }} />
+                <span>Contact Support - team@vibraxx.com</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Stats Grid */}
+          {stats && (
+            <div className="mobile-grid" style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: "clamp(12px, 3vw, 16px)",
+              marginBottom: "clamp(20px, 4vw, 24px)",
+            }}>
               
-              {/* Round Credits */}
-              <article className="animate-slide-up" style={{ animationDelay: '0.4s' }}>
+              {/* Total Score */}
+              <div className="animate-slide-up" style={{
+                padding: "clamp(16px, 3vw, 20px)",
+                borderRadius: "clamp(14px, 3vw, 16px)",
+                background: "linear-gradient(135deg, rgba(251,191,36,0.2), rgba(245,158,11,0.15))",
+                border: "2px solid rgba(251,191,36,0.5)",
+                boxShadow: "0 0 20px rgba(251,191,36,0.3)",
+              }}>
+                <Trophy style={{
+                  width: "clamp(24px, 5vw, 32px)",
+                  height: "clamp(24px, 5vw, 32px)",
+                  color: "#fbbf24",
+                  marginBottom: "8px",
+                }} />
                 <div style={{
-                  padding: 'clamp(20px, 3.5vw, 32px)',
-                  borderRadius: 'clamp(16px, 3vw, 24px)',
-                  border: '2px solid rgba(6, 182, 212, 0.2)',
-                  background: 'rgba(15, 23, 42, 0.6)',
-                  backdropFilter: 'blur(20px)',
-                  height: '100%'
+                  fontSize: "clamp(24px, 5vw, 32px)",
+                  fontWeight: 900,
+                  color: "#fbbf24",
+                  lineHeight: 1,
+                  marginBottom: "4px",
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 'clamp(20px, 3.5vw, 24px)' }}>
-                    <div style={{
-                      width: 'clamp(40px, 8vw, 48px)',
-                      height: 'clamp(40px, 8vw, 48px)',
-                      borderRadius: '10px',
-                      background: 'linear-gradient(135deg, #06b6d4, #0891b2)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 0 20px rgba(6, 182, 212, 0.5)'
-                    }}>
-                      <Package style={{ width: 'clamp(20px, 4vw, 24px)', height: 'clamp(20px, 4vw, 24px)' }} aria-hidden="true" />
-                    </div>
-                    <div>
-                      <h3 style={{ fontSize: 'clamp(14px, 2.8vw, 18px)', fontWeight: 700, margin: 0 }}>Round Credits</h3>
-                      <p style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#94a3b8', margin: 0 }}>Your Subscription</p>
-                    </div>
-                  </div>
+                  {stats.total_score}
+                </div>
+                <div style={{
+                  fontSize: "clamp(11px, 2.2vw, 12px)",
+                  color: "#fcd34d",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                }}>
+                  Total Score
+                </div>
+              </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'clamp(10px, 2vw, 12px)', marginBottom: 'clamp(16px, 3vw, 20px)' }}>
-                    <div style={{
-                      padding: 'clamp(12px, 2.5vw, 16px)',
-                      borderRadius: '10px',
-                      background: 'rgba(34, 197, 94, 0.1)',
-                      border: '1px solid rgba(34, 197, 94, 0.2)',
-                      textAlign: 'center'
-                    }}>
-                      <div style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#94a3b8', marginBottom: '6px' }}>Purchased</div>
-                      <div style={{ fontSize: 'clamp(20px, 4vw, 24px)', fontWeight: 900, color: '#22c55e' }}>{stats.rounds.purchased}</div>
-                    </div>
-                    <div style={{
-                      padding: 'clamp(12px, 2.5vw, 16px)',
-                      borderRadius: '10px',
-                      background: 'rgba(139, 92, 246, 0.1)',
-                      border: '1px solid rgba(139, 92, 246, 0.2)',
-                      textAlign: 'center'
-                    }}>
-                      <div style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#94a3b8', marginBottom: '6px' }}>Used</div>
-                      <div style={{ fontSize: 'clamp(20px, 4vw, 24px)', fontWeight: 900, color: '#a78bfa' }}>{stats.rounds.used}</div>
-                    </div>
-                    <div style={{
-                      padding: 'clamp(12px, 2.5vw, 16px)',
-                      borderRadius: '10px',
-                      background: 'rgba(6, 182, 212, 0.1)',
-                      border: '1px solid rgba(6, 182, 212, 0.2)',
-                      textAlign: 'center'
-                    }}>
-                      <div style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#94a3b8', marginBottom: '6px' }}>Remaining</div>
-                      <div style={{ fontSize: 'clamp(20px, 4vw, 24px)', fontWeight: 900, color: '#22d3ee' }}>{stats.rounds.remaining}</div>
-                    </div>
-                  </div>
+              {/* Accuracy */}
+              <div className="animate-slide-up" style={{
+                padding: "clamp(16px, 3vw, 20px)",
+                borderRadius: "clamp(14px, 3vw, 16px)",
+                background: "linear-gradient(135deg, rgba(139,92,246,0.2), rgba(124,58,237,0.15))",
+                border: "2px solid rgba(139,92,246,0.5)",
+                boxShadow: "0 0 20px rgba(139,92,246,0.3)",
+              }}>
+                <Target style={{
+                  width: "clamp(24px, 5vw, 32px)",
+                  height: "clamp(24px, 5vw, 32px)",
+                  color: "#a78bfa",
+                  marginBottom: "8px",
+                }} />
+                <div style={{
+                  fontSize: "clamp(24px, 5vw, 32px)",
+                  fontWeight: 900,
+                  color: "#a78bfa",
+                  lineHeight: 1,
+                  marginBottom: "4px",
+                }}>
+                  {stats.accuracy_percentage.toFixed(1)}%
+                </div>
+                <div style={{
+                  fontSize: "clamp(11px, 2.2vw, 12px)",
+                  color: "#c4b5fd",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                }}>
+                  Accuracy
+                </div>
+              </div>
 
-                  <div style={{
-                    padding: 'clamp(16px, 3vw, 20px)',
-                    borderRadius: '14px',
-                    background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(8, 145, 178, 0.1))',
-                    border: '1px solid rgba(6, 182, 212, 0.3)'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                      <span style={{ fontSize: 'clamp(12px, 2.4vw, 14px)', color: '#94a3b8' }}>Usage</span>
-                      <span style={{ fontSize: 'clamp(12px, 2.4vw, 14px)', fontWeight: 700, color: '#22d3ee' }}>
-                        {stats.rounds.purchased > 0 ? Math.round((stats.rounds.used / stats.rounds.purchased) * 100) : 0}%
+              {/* Max Streak */}
+              <div className="animate-slide-up" style={{
+                padding: "clamp(16px, 3vw, 20px)",
+                borderRadius: "clamp(14px, 3vw, 16px)",
+                background: "linear-gradient(135deg, rgba(249,115,22,0.2), rgba(234,88,12,0.15))",
+                border: "2px solid rgba(249,115,22,0.5)",
+                boxShadow: "0 0 20px rgba(249,115,22,0.3)",
+              }}>
+                <Flame style={{
+                  width: "clamp(24px, 5vw, 32px)",
+                  height: "clamp(24px, 5vw, 32px)",
+                  color: "#fb923c",
+                  marginBottom: "8px",
+                }} />
+                <div style={{
+                  fontSize: "clamp(24px, 5vw, 32px)",
+                  fontWeight: 900,
+                  color: "#fb923c",
+                  lineHeight: 1,
+                  marginBottom: "4px",
+                }}>
+                  {stats.max_streak}
+                </div>
+                <div style={{
+                  fontSize: "clamp(11px, 2.2vw, 12px)",
+                  color: "#fdba74",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                }}>
+                  Max Streak
+                </div>
+              </div>
+
+              {/* Total Questions */}
+              <div className="animate-slide-up" style={{
+                padding: "clamp(16px, 3vw, 20px)",
+                borderRadius: "clamp(14px, 3vw, 16px)",
+                background: "linear-gradient(135deg, rgba(34,197,94,0.2), rgba(21,128,61,0.15))",
+                border: "2px solid rgba(34,197,94,0.5)",
+                boxShadow: "0 0 20px rgba(34,197,94,0.3)",
+              }}>
+                <CheckCircle style={{
+                  width: "clamp(24px, 5vw, 32px)",
+                  height: "clamp(24px, 5vw, 32px)",
+                  color: "#22c55e",
+                  marginBottom: "8px",
+                }} />
+                <div style={{
+                  fontSize: "clamp(24px, 5vw, 32px)",
+                  fontWeight: 900,
+                  color: "#22c55e",
+                  lineHeight: 1,
+                  marginBottom: "4px",
+                }}>
+                  {stats.correct_answers}
+                </div>
+                <div style={{
+                  fontSize: "clamp(11px, 2.2vw, 12px)",
+                  color: "#86efac",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                }}>
+                  Correct Answers
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Quiz History */}
+          {history.length > 0 && (
+            <div className="animate-slide-up" style={{
+              padding: "clamp(20px, 4vw, 24px)",
+              borderRadius: "clamp(16px, 3vw, 20px)",
+              border: "2px solid rgba(139,92,246,0.5)",
+              background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+              backdropFilter: "blur(20px)",
+            }}>
+              
+              <h2 style={{
+                fontSize: "clamp(18px, 4vw, 22px)",
+                fontWeight: 900,
+                marginBottom: "clamp(16px, 3vw, 20px)",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+              }}>
+                <BarChart3 style={{
+                  width: "clamp(20px, 4vw, 24px)",
+                  height: "clamp(20px, 4vw, 24px)",
+                  color: "#a78bfa",
+                }} />
+                Recent Quiz History
+              </h2>
+
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "12px",
+              }}>
+                {history.map((round) => (
+                  <div
+                    key={round.id}
+                    style={{
+                      padding: "clamp(12px, 2.5vw, 16px)",
+                      borderRadius: "12px",
+                      background: "rgba(15,23,42,0.8)",
+                      border: "1px solid rgba(139,92,246,0.3)",
+                      display: "grid",
+                      gridTemplateColumns: "auto 1fr auto",
+                      gap: "clamp(12px, 3vw, 16px)",
+                      alignItems: "center",
+                    }}>
+                    
+                    {/* Date */}
+                    <div style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      background: "rgba(139,92,246,0.15)",
+                      border: "1px solid rgba(139,92,246,0.3)",
+                    }}>
+                      <Clock style={{ width: "16px", height: "16px", color: "#a78bfa", marginBottom: "4px" }} />
+                      <span style={{ fontSize: "10px", color: "#94a3b8" }}>
+                        {new Date(round.completed_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                       </span>
                     </div>
-                    <div style={{ width: '100%', height: '8px', borderRadius: '9999px', background: 'rgba(0, 0, 0, 0.3)', overflow: 'hidden' }}>
-                      <div style={{
-                        width: `${stats.rounds.purchased > 0 ? (stats.rounds.used / stats.rounds.purchased) * 100 : 0}%`,
-                        height: '100%',
-                        background: 'linear-gradient(to right, #06b6d4, #0891b2)',
-                        borderRadius: '9999px',
-                        transition: 'width 0.3s'
-                      }}></div>
-                    </div>
-                  </div>
 
-                  <button
-                    onClick={() => window.location.href = '/pricing'}
-                    style={{
-                      width: '100%',
-                      marginTop: 'clamp(16px, 3vw, 20px)',
-                      padding: 'clamp(12px, 2.5vw, 16px)',
-                      borderRadius: '12px',
-                      border: 'none',
-                      background: 'linear-gradient(135deg, #06b6d4, #0891b2)',
-                      color: 'white',
-                      fontSize: 'clamp(13px, 2.6vw, 16px)',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      transition: 'all 0.3s'
-                    }}
-                    aria-label="Purchase more rounds"
-                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                  >
-                    Buy More Rounds
-                  </button>
-                </div>
-              </article>
-
-              {/* Contact Form */}
-              <article className="animate-slide-up" style={{ animationDelay: '0.5s' }}>
-                <div style={{
-                  padding: 'clamp(20px, 3.5vw, 32px)',
-                  borderRadius: 'clamp(16px, 3vw, 24px)',
-                  border: '2px solid rgba(139, 92, 246, 0.2)',
-                  background: 'rgba(15, 23, 42, 0.6)',
-                  backdropFilter: 'blur(20px)',
-                  height: '100%'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 'clamp(20px, 3.5vw, 24px)' }}>
+                    {/* Stats */}
                     <div style={{
-                      width: 'clamp(40px, 8vw, 48px)',
-                      height: 'clamp(40px, 8vw, 48px)',
-                      borderRadius: '10px',
-                      background: 'linear-gradient(135deg, #7c3aed, #d946ef)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 0 20px rgba(139, 92, 246, 0.5)'
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(60px, 1fr))",
+                      gap: "8px",
                     }}>
-                      <Mail style={{ width: 'clamp(20px, 4vw, 24px)', height: 'clamp(20px, 4vw, 24px)' }} aria-hidden="true" />
+                      <div>
+                        <div style={{ fontSize: "16px", fontWeight: 900, color: "#fbbf24" }}>
+                          {round.score}
+                        </div>
+                        <div style={{ fontSize: "10px", color: "#94a3b8" }}>Score</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: "16px", fontWeight: 900, color: "#22c55e" }}>
+                          {round.correct_count}
+                        </div>
+                        <div style={{ fontSize: "10px", color: "#94a3b8" }}>Correct</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: "16px", fontWeight: 900, color: "#a78bfa" }}>
+                          {round.accuracy.toFixed(0)}%
+                        </div>
+                        <div style={{ fontSize: "10px", color: "#94a3b8" }}>Accuracy</div>
+                      </div>
                     </div>
-                    <div>
-                      <h3 style={{ fontSize: 'clamp(14px, 2.8vw, 18px)', fontWeight: 700, margin: 0 }}>Contact Support</h3>
-                      <p style={{ fontSize: 'clamp(10px, 2vw, 12px)', color: '#94a3b8', margin: 0 }}>We're here to help</p>
+
+                    {/* Streak Badge */}
+                    <div style={{
+                      padding: "6px 10px",
+                      borderRadius: "8px",
+                      background: "linear-gradient(90deg, rgba(249,115,22,0.2), rgba(234,88,12,0.15))",
+                      border: "1px solid rgba(249,115,22,0.5)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      whiteSpace: "nowrap",
+                    }}>
+                      <Flame style={{ width: "14px", height: "14px", color: "#fb923c" }} />
+                      <span style={{ fontSize: "12px", fontWeight: 700, color: "#fb923c" }}>
+                        {round.max_streak}
+                      </span>
                     </div>
                   </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </main>
 
-                  <textarea
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder="Type your message here..."
-                    disabled={sending}
-                    aria-label="Support message"
-                    maxLength={1000}
-                    style={{
-                      width: '100%',
-                      minHeight: 'clamp(150px, 30vw, 200px)',
-                      padding: 'clamp(12px, 2.5vw, 16px)',
-                      borderRadius: '12px',
-                      border: '1px solid rgba(139, 92, 246, 0.2)',
-                      background: 'rgba(0, 0, 0, 0.3)',
-                      color: 'white',
-                      fontSize: 'clamp(12px, 2.4vw, 14px)',
-                      resize: 'vertical',
-                      fontFamily: 'inherit',
-                      marginBottom: 'clamp(12px, 2.5vw, 16px)',
-                      transition: 'all 0.3s'
-                    }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.5)';
-                      e.currentTarget.style.boxShadow = '0 0 20px rgba(139, 92, 246, 0.2)';
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.2)';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
-                  />
+        {/* Contact Form Modal */}
+        {showContactForm && (
+          <div style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.85)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 100,
+            padding: "20px",
+          }}>
+            <div className="animate-slide-up" style={{
+              width: "min(500px, 100%)",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              padding: "clamp(24px, 5vw, 32px)",
+              borderRadius: "clamp(16px, 3vw, 20px)",
+              background: "linear-gradient(135deg, rgba(30,27,75,0.98), rgba(15,23,42,0.98))",
+              border: "2px solid rgba(139,92,246,0.5)",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.8), 0 0 40px rgba(139,92,246,0.4)",
+              backdropFilter: "blur(20px)",
+            }}>
+              
+              {/* Header */}
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "20px",
+              }}>
+                <h3 style={{
+                  fontSize: "clamp(18px, 4vw, 22px)",
+                  fontWeight: 900,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                }}>
+                  <Send style={{ width: "24px", height: "24px", color: "#7dd3fc" }} />
+                  Contact Support
+                </h3>
+                <button
+                  onClick={() => setShowContactForm(false)}
+                  style={{
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "8px",
+                    border: "none",
+                    background: "rgba(239,68,68,0.2)",
+                    color: "#fca5a5",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}>
+                  <X style={{ width: "20px", height: "20px" }} />
+                </button>
+              </div>
 
-                  {messageSent && (
+              {/* Contact Info */}
+              <div style={{
+                padding: "12px 16px",
+                borderRadius: "12px",
+                background: "rgba(56,189,248,0.1)",
+                border: "1px solid rgba(56,189,248,0.3)",
+                marginBottom: "20px",
+              }}>
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "4px",
+                }}>
+                  <Mail style={{ width: "16px", height: "16px", color: "#7dd3fc" }} />
+                  <span style={{ fontSize: "14px", fontWeight: 700, color: "#7dd3fc" }}>
+                    team@vibraxx.com
+                  </span>
+                </div>
+                <p style={{ fontSize: "12px", color: "#94a3b8", marginLeft: "24px" }}>
+                  We typically respond within 24 hours
+                </p>
+              </div>
+
+              {/* Form */}
+              {emailStatus === "success" ? (
+                <div style={{
+                  padding: "32px",
+                  textAlign: "center",
+                }}>
+                  <CheckCircle style={{
+                    width: "48px",
+                    height: "48px",
+                    color: "#22c55e",
+                    margin: "0 auto 16px",
+                  }} />
+                  <h4 style={{
+                    fontSize: "18px",
+                    fontWeight: 700,
+                    color: "#22c55e",
+                    marginBottom: "8px",
+                  }}>
+                    Message Sent!
+                  </h4>
+                  <p style={{ fontSize: "14px", color: "#94a3b8" }}>
+                    We'll get back to you soon.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Subject */}
+                  <div style={{ marginBottom: "16px" }}>
+                    <label style={{
+                      display: "block",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      color: "#cbd5e1",
+                      marginBottom: "8px",
+                    }}>
+                      Subject
+                    </label>
+                    <input
+                      type="text"
+                      value={contactSubject}
+                      onChange={(e) => setContactSubject(e.target.value)}
+                      placeholder="What can we help you with?"
+                      style={{
+                        width: "100%",
+                        padding: "12px 14px",
+                        borderRadius: "10px",
+                        border: "2px solid rgba(139,92,246,0.5)",
+                        background: "rgba(15,23,42,0.9)",
+                        color: "white",
+                        fontSize: "14px",
+                      }}
+                    />
+                  </div>
+
+                  {/* Message */}
+                  <div style={{ marginBottom: "20px" }}>
+                    <label style={{
+                      display: "block",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      color: "#cbd5e1",
+                      marginBottom: "8px",
+                    }}>
+                      Message
+                    </label>
+                    <textarea
+                      value={contactMessage}
+                      onChange={(e) => setContactMessage(e.target.value)}
+                      placeholder="Tell us more..."
+                      rows={6}
+                      style={{
+                        width: "100%",
+                        padding: "12px 14px",
+                        borderRadius: "10px",
+                        border: "2px solid rgba(139,92,246,0.5)",
+                        background: "rgba(15,23,42,0.9)",
+                        color: "white",
+                        fontSize: "14px",
+                        resize: "vertical",
+                      }}
+                    />
+                  </div>
+
+                  {/* Error */}
+                  {emailStatus === "error" && (
                     <div style={{
-                      padding: 'clamp(10px, 2vw, 12px) clamp(12px, 2.5vw, 16px)',
-                      borderRadius: '8px',
-                      background: 'rgba(34, 197, 94, 0.2)',
-                      border: '1px solid rgba(34, 197, 94, 0.3)',
-                      color: '#22c55e',
-                      fontSize: 'clamp(12px, 2.4vw, 14px)',
-                      marginBottom: 'clamp(12px, 2.5vw, 16px)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
-                    role="status"
-                    aria-live="polite">
-                      <CheckCircle style={{ width: 'clamp(16px, 3vw, 18px)', height: 'clamp(16px, 3vw, 18px)' }} aria-hidden="true" />
-                      Message sent successfully!
+                      padding: "12px 14px",
+                      borderRadius: "10px",
+                      background: "rgba(239,68,68,0.15)",
+                      border: "1px solid rgba(239,68,68,0.4)",
+                      marginBottom: "16px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}>
+                      <XCircle style={{ width: "16px", height: "16px", color: "#ef4444" }} />
+                      <span style={{ fontSize: "13px", color: "#fca5a5" }}>
+                        Failed to send. Please try again or email us directly.
+                      </span>
                     </div>
                   )}
 
+                  {/* Send Button */}
                   <button
-                    onClick={handleSendMessage}
-                    disabled={sending || !message.trim()}
-                    aria-label="Send message to support"
+                    onClick={handleSendEmail}
+                    disabled={isSendingEmail || !contactSubject.trim() || !contactMessage.trim()}
                     style={{
-                      width: '100%',
-                      padding: 'clamp(12px, 2.5vw, 16px)',
-                      borderRadius: '12px',
-                      border: 'none',
-                      background: sending || !message.trim() 
-                        ? 'rgba(139, 92, 246, 0.3)' 
-                        : 'linear-gradient(135deg, #7c3aed, #d946ef)',
-                      color: 'white',
-                      fontSize: 'clamp(13px, 2.6vw, 16px)',
-                      fontWeight: 700,
-                      cursor: sending || !message.trim() ? 'not-allowed' : 'pointer',
-                      transition: 'all 0.3s',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '10px',
-                      opacity: sending || !message.trim() ? 0.6 : 1
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!sending && message.trim()) {
-                        e.currentTarget.style.transform = 'scale(1.02)';
-                      }
-                    }}
-                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                  >
-                    {sending ? (
+                      width: "100%",
+                      padding: "14px",
+                      borderRadius: "12px",
+                      border: "none",
+                      background: (!contactSubject.trim() || !contactMessage.trim())
+                        ? "rgba(139,92,246,0.3)"
+                        : "linear-gradient(135deg, #7c3aed, #d946ef)",
+                      color: "white",
+                      fontSize: "15px",
+                      fontWeight: 800,
+                      cursor: (!contactSubject.trim() || !contactMessage.trim()) ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      transition: "all 0.3s",
+                    }}>
+                    {isSendingEmail ? (
                       <>
-                        <div className="animate-spin" style={{
-                          width: 'clamp(16px, 3vw, 20px)',
-                          height: 'clamp(16px, 3vw, 20px)',
-                          border: '3px solid rgba(255, 255, 255, 0.3)',
-                          borderTopColor: 'white',
-                          borderRadius: '50%'
-                        }}
-                        aria-hidden="true"></div>
+                        <div className="animate-pulse" style={{
+                          width: "16px",
+                          height: "16px",
+                          borderRadius: "50%",
+                          border: "2px solid rgba(255,255,255,0.3)",
+                          borderTopColor: "white",
+                          animation: "spin 0.8s linear infinite",
+                        }} />
                         Sending...
                       </>
                     ) : (
                       <>
-                        <Send style={{ width: 'clamp(16px, 3vw, 20px)', height: 'clamp(16px, 3vw, 20px)' }} aria-hidden="true" />
+                        <Send style={{ width: "18px", height: "18px" }} />
                         Send Message
                       </>
                     )}
                   </button>
-                </div>
-              </article>
-            </section>
-              </>
-            )}
-          </div>
-        </main>
-
-        {/* Footer */}
-        <footer className="vx-footer">
-          <div className="vx-container">
-            <div className="vx-footer-legal">
-              <strong style={{ color: "#94a3b8" }}>Educational Quiz Competition.</strong> 18+ only. 
-              This is a 100% skill-based knowledge competition with no element of chance. 
-              Entry fees apply. Prize pool activates with 2000+ monthly participants. See{" "}
-              <a href="/terms">Terms & Conditions</a> for full details.
-            </div>
-
-            <nav className="vx-footer-links" aria-label="Footer navigation">
-              <a href="/privacy">Privacy Policy</a>
-              <span className="vx-footer-divider">•</span>
-              <a href="/terms">Terms & Conditions</a>
-              <span className="vx-footer-divider">•</span>
-              <a href="/cookies">Cookie Policy</a>
-              <span className="vx-footer-divider">•</span>
-              <a href="/how-it-works">How It Works</a>
-              <span className="vx-footer-divider">•</span>
-              <a href="/rules">Quiz Rules</a>
-              <span className="vx-footer-divider">•</span>
-              <a href="/complaints">Complaints</a>
-              <span className="vx-footer-divider">•</span>
-              <a href="/refunds">Refund Policy</a>
-              <span className="vx-footer-divider">•</span>
-              <a href="/about">About Us</a>
-              <span className="vx-footer-divider">•</span>
-              <a href="/contact">Contact</a>
-              <span className="vx-footer-divider">•</span>
-              <a href="/faq">FAQ</a>
-            </nav>
-
-            <div className="vx-footer-company">
-              <div style={{ marginBottom: 8, textAlign: "center" }}>
-                © 2025 VibraXX. Operated by Sermin Limited (UK)
-              </div>
-              <div style={{ fontSize: 'clamp(10px, 2vw, 11px)', color: "#64748b", marginBottom: 8, textAlign: "center" }}>
-                Registered in England & Wales | All rights reserved
-              </div>
-              <div style={{ marginBottom: 10, textAlign: "center" }}>
-                <a 
-                  href="mailto:team@vibraxx.com"
-                  style={{ 
-                    color: "#a78bfa", 
-                    textDecoration: "none",
-                    fontSize: 'clamp(11px, 2.2vw, 12px)',
-                    fontWeight: 600,
-                  }}
-                >
-                  team@vibraxx.com
-                </a>
-              </div>
-              <div style={{ fontSize: 'clamp(10px, 2vw, 11px)', textAlign: "center" }}>
-                Payment processing by{" "}
-                <a 
-                  href="https://stripe.com" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  style={{ color: "#a78bfa", textDecoration: "none" }}
-                >
-                  Stripe
-                </a>
-                {" "}| Secure SSL encryption | Skill-based competition - Not gambling
-              </div>
+                </>
+              )}
             </div>
           </div>
-        </footer>
+        )}
       </div>
     </>
   );

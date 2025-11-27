@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
-
+import Image from "next/image";
+import { createClient } from '@supabase/supabase-js';
 import {
   Trophy,
   Clock,
@@ -18,9 +18,10 @@ import {
   TrendingUp,
   Star,
   Sparkles,
+  Gift,
 } from "lucide-react";
 
-// ❗ Tek satırlık supabase tanımı — EN ÜSTE ve İNDETSİZ
+// Initialize Supabase Client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -30,7 +31,7 @@ const supabase = createClient(
 const TOTAL_QUESTIONS = 50;
 const QUESTION_DURATION = 6; // seconds
 const EXPLANATION_DURATION = 5; // seconds
-const FINAL_SCORE_DURATION = 5; // seconds
+const FINAL_SCORE_DURATION = 10; // seconds - 10 seconds for user to see results and choose action
 
 type OptionId = "A" | "B" | "C" | "D";
 type AnswerStatus = "none" | "correct" | "wrong";
@@ -43,13 +44,82 @@ interface Question {
   explanation: string;
 }
 
+// === SAMPLE QUESTIONS ===
+const baseQuestions: Omit<Question, "id">[] = [
+  {
+    question: "Which planet is known as the Red Planet?",
+    options: [
+      { id: "A", text: "Mars" },
+      { id: "B", text: "Venus" },
+      { id: "C", text: "Jupiter" },
+      { id: "D", text: "Mercury" },
+    ],
+    correctAnswer: "A",
+    explanation: "Mars is often called the Red Planet due to its iron oxide-rich surface, which gives it a reddish appearance.",
+  },
+  {
+    question: "What is the chemical symbol for Gold?",
+    options: [
+      { id: "A", text: "Ag" },
+      { id: "B", text: "Au" },
+      { id: "C", text: "Gd" },
+      { id: "D", text: "Go" },
+    ],
+    correctAnswer: "B",
+    explanation: "The symbol Au comes from the Latin word 'Aurum', meaning 'shining dawn'.",
+  },
+  {
+    question: "Which ocean is the largest by surface area?",
+    options: [
+      { id: "A", text: "Atlantic Ocean" },
+      { id: "B", text: "Indian Ocean" },
+      { id: "C", text: "Pacific Ocean" },
+      { id: "D", text: "Arctic Ocean" },
+    ],
+    correctAnswer: "C",
+    explanation: "The Pacific Ocean covers more than 30% of the Earth's surface, making it the largest ocean.",
+  },
+  {
+    question: "Who developed the theory of general relativity?",
+    options: [
+      { id: "A", text: "Isaac Newton" },
+      { id: "B", text: "Albert Einstein" },
+      { id: "C", text: "Niels Bohr" },
+      { id: "D", text: "Galileo Galilei" },
+    ],
+    correctAnswer: "B",
+    explanation: "Albert Einstein published the theory of general relativity in 1915, changing our understanding of gravity.",
+  },
+  {
+    question: "Which is the smallest prime number?",
+    options: [
+      { id: "A", text: "0" },
+      { id: "B", text: "1" },
+      { id: "C", text: "2" },
+      { id: "D", text: "3" },
+    ],
+    correctAnswer: "C",
+    explanation: "2 is the smallest and the only even prime number.",
+  },
+];
+
+const questions: Question[] = Array.from({ length: TOTAL_QUESTIONS }, (_, i) => {
+  const base = baseQuestions[i % baseQuestions.length];
+  return {
+    id: i + 1,
+    question: `Q${i + 1}: ${base.question}`,
+    options: base.options,
+    correctAnswer: base.correctAnswer,
+    explanation: base.explanation,
+  };
+});
 
 export default function QuizGamePage() {
   const router = useRouter();
 
   // === STATE ===
   const [questions, setQuestions] = useState<Question[]>([]);
-
+  const [isLoading, setIsLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(QUESTION_DURATION);
   const [selectedAnswer, setSelectedAnswer] = useState<OptionId | null>(null);
@@ -71,6 +141,7 @@ export default function QuizGamePage() {
 
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [userRounds, setUserRounds] = useState(0);
 
   // === AUDIO REFS ===
   const correctSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -80,71 +151,176 @@ export default function QuizGamePage() {
   const whooshSoundRef = useRef<HTMLAudioElement | null>(null);
   const tickSoundRef = useRef<HTMLAudioElement | null>(null);
 
-  const currentQ = questions[currentIndex] ?? null;
+  const currentQ = questions[currentIndex];
 
-    // Fetch questions from Supabase
-
+  // === FETCH QUESTIONS FROM SUPABASE ===
   useEffect(() => {
-  const fetchQuestions = async () => {
-    const { data, error } = await supabase
-      .from('questions')
-      .select('*')
-      .eq('active', true)
-      .order('order_index', { ascending: true })
-      .limit(TOTAL_QUESTIONS);
+    const fetchQuestions = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('questions')
+          .select('*')
+          .eq('active', true)
+          .order('order_index', { ascending: true })
+          .limit(TOTAL_QUESTIONS);
+        
+        if (error) throw error;
 
-    if (!error && data) {
-      const formattedQuestions: Question[] = data.map((q, idx) => ({
-        id: q.id,
-        question: `Q${idx + 1}: ${q.question_text}`,
-        options: [
-          { id: "A", text: q.option_a },
-          { id: "B", text: q.option_b },
-          { id: "C", text: q.option_c },
-          { id: "D", text: q.option_d },
-        ],
-        correctAnswer: q.correct_answer,
-        explanation: q.explanation,
-      }));
+        if (data && data.length > 0) {
+          const formattedQuestions: Question[] = data.map((q) => ({
+            id: q.id,
+            question: q.question_text,
+            options: [
+              { id: "A", text: q.option_a },
+              { id: "B", text: q.option_b },
+              { id: "C", text: q.option_c },
+              { id: "D", text: q.option_d },
+            ],
+            correctAnswer: q.correct_answer as OptionId,
+            explanation: q.explanation,
+          }));
+          setQuestions(formattedQuestions);
+        } else {
+          // Fallback to mock data
+          const mockQuestions: Question[] = Array.from({ length: TOTAL_QUESTIONS }, (_, i) => {
+            const base = baseQuestions[i % baseQuestions.length];
+            return {
+              id: i + 1,
+              question: `Q${i + 1}: ${base.question}`,
+              options: base.options,
+              correctAnswer: base.correctAnswer,
+              explanation: base.explanation,
+            };
+          });
+          setQuestions(mockQuestions);
+        }
+      } catch (err) {
+        console.error('Error fetching questions:', err);
+        // Fallback to mock data
+        const mockQuestions: Question[] = Array.from({ length: TOTAL_QUESTIONS }, (_, i) => {
+          const base = baseQuestions[i % baseQuestions.length];
+          return {
+            id: i + 1,
+            question: `Q${i + 1}: ${base.question}`,
+            options: base.options,
+            correctAnswer: base.correctAnswer,
+            explanation: base.explanation,
+          };
+        });
+        setQuestions(mockQuestions);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-      setQuestions(formattedQuestions); // 🔥 ARTIK SET EDİYOR
+    fetchQuestions();
+  }, []);
+
+  // === FETCH USER ROUNDS ===
+  useEffect(() => {
+    const fetchUserRounds = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setUserRounds(0);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('user_rounds')
+          .select('available_rounds')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching user rounds:', error);
+          setUserRounds(0);
+          return;
+        }
+
+        setUserRounds(data?.available_rounds || 0);
+      } catch (err) {
+        console.error('Error fetching user rounds:', err);
+        setUserRounds(0);
+      }
+    };
+
+    fetchUserRounds();
+  }, []);
+
+  // === SAVE ANSWER TO SUPABASE ===
+  const saveAnswer = async (questionId: number, answer: OptionId, isCorrect: boolean) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      await supabase.from('user_answers').insert({
+        user_id: user.id,
+        question_id: questionId,
+        selected_answer: answer,
+        is_correct: isCorrect,
+        time_taken: QUESTION_DURATION - timeLeft,
+        answered_at: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('Error saving answer:', err);
     }
   };
 
-  fetchQuestions();
-}, []);
-
-  
-  // Update user stats after quiz
+  // === UPDATE USER STATS ===
   const updateUserStats = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    
-    const score = correctCount * 2;
-    
-    await supabase.from('user_stats').upsert({
-      user_id: user.id,
-      total_questions: TOTAL_QUESTIONS,
-      correct_answers: correctCount,
-      wrong_answers: wrongCount,
-      accuracy_percentage: accuracy,
-      max_streak: maxStreak,
-      last_round_score: score,
-      updated_at: new Date().toISOString()
-    }, {
-      onConflict: 'user_id'
-    });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const accuracy = TOTAL_QUESTIONS > 0 ? Math.round((correctCount / TOTAL_QUESTIONS) * 100) : 0;
+      const score = correctCount * 2;
+      
+      // Update user_stats
+      await supabase.from('user_stats').upsert({
+        user_id: user.id,
+        total_questions_answered: TOTAL_QUESTIONS,
+        correct_answers: correctCount,
+        wrong_answers: wrongCount,
+        accuracy_percentage: accuracy,
+        max_streak: maxStreak,
+        last_round_score: score,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'user_id'
+      });
 
-    // Save to quiz_history
-    await supabase.from('quiz_history').insert({
-      user_id: user.id,
-      score: score,
-      correct_count: correctCount,
-      wrong_count: wrongCount,
-      accuracy: accuracy,
-      max_streak: maxStreak,
-      completed_at: new Date().toISOString()
-    });
+      // Save to quiz_history
+      await supabase.from('quiz_history').insert({
+        user_id: user.id,
+        score: score,
+        correct_count: correctCount,
+        wrong_count: wrongCount,
+        accuracy: accuracy,
+        max_streak: maxStreak,
+        completed_at: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('Error updating user stats:', err);
+    }
+  };
+
+  // === DECREASE USER ROUND ===
+  const decreaseUserRound = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const { error } = await supabase.rpc('decrease_user_round', {
+        p_user_id: user.id
+      });
+
+      if (error) {
+        console.error('Error decreasing round:', error);
+      }
+    } catch (err) {
+      console.error('Error decreasing round:', err);
+    }
   };
 
   // === SOUND HELPERS ===
@@ -250,32 +426,32 @@ export default function QuizGamePage() {
   }, [showExplanation, currentIndex, showFinalScore, isSoundEnabled]);
 
   // === FINAL SCORE COUNTDOWN ===
-useEffect(() => {
-  if (!showFinalScore) return;
+  useEffect(() => {
+    if (!showFinalScore) return;
 
-  stopTick();
-  playSound(gameoverSoundRef.current);
+    stopTick();
+    playSound(gameoverSoundRef.current);
 
-  updateUserStats(); // 🔥 BURAYA EKLE — TEK SATIR
+    // Update user stats in Supabase
+    updateUserStats();
 
-  let remaining = FINAL_SCORE_DURATION;
-  setFinalCountdown(remaining);
+    let remaining = FINAL_SCORE_DURATION;
+    setFinalCountdown(remaining);
 
-  const interval = setInterval(() => {
-    setFinalCountdown((prev) => Math.max(0, prev - 1));
-  }, 1000);
+    const interval = setInterval(() => {
+      setFinalCountdown((prev) => Math.max(0, prev - 1));
+    }, 1000);
 
-  const timeout = setTimeout(() => {
-    clearInterval(interval);
-    router.push("/lobby");
-  }, FINAL_SCORE_DURATION * 1000);
+    const timeout = setTimeout(() => {
+      clearInterval(interval);
+      router.push("/"); // Redirect to home after 10 seconds
+    }, FINAL_SCORE_DURATION * 1000);
 
-  return () => {
-    clearInterval(interval);
-    clearTimeout(timeout);
-  };
-}, [showFinalScore, router]);
-
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [showFinalScore, router]);
 
   // Sound toggle effect
   useEffect(() => {
@@ -295,55 +471,39 @@ useEffect(() => {
     }
   }, [showFinalScore, showExplanation, timeLeft]);
 
-// === SUPABASE: Save each answer ===
-const saveAnswer = async (questionId: number, answer: OptionId, isCorrect: boolean) => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-
-  await supabase.from('user_answers').insert({
-    user_id: user.id,
-    question_id: questionId,
-    selected_answer: answer,
-    is_correct: isCorrect,
-    time_taken: QUESTION_DURATION - timeLeft,
-    answered_at: new Date().toISOString()
-  });
-};
-
-
   // === HANDLERS ===
-const handleAnswerClick = async (optionId: OptionId) => {
-  if (isAnswerLocked || showExplanation || showFinalScore) return;
+  const handleAnswerClick = (optionId: OptionId) => {
+    if (isAnswerLocked || showExplanation || showFinalScore) return;
 
-  playClick();
-  setSelectedAnswer(optionId);
-  setIsAnswerLocked(true);
+    playClick();
+    setSelectedAnswer(optionId);
+    setIsAnswerLocked(true);
 
-  const correct = optionId === currentQ.correctAnswer;
-  setIsCorrect(correct);
+    const correct = optionId === currentQ.correctAnswer;
+    setIsCorrect(correct);
 
-  setAnswers((prev) => {
-    const next = [...prev];
-    next[currentIndex] = correct ? "correct" : "wrong";
-    return next;
-  });
+    setAnswers((prev) => {
+      const next = [...prev];
+      next[currentIndex] = correct ? "correct" : "wrong";
+      return next;
+    });
 
-  if (correct) {
-    setCorrectCount((c) => c + 1);
-    const newStreak = streak + 1;
-    setStreak(newStreak);
-    setMaxStreak((max) => Math.max(max, newStreak));
-    playSound(correctSoundRef.current);
-  } else {
-    setWrongCount((w) => w + 1);
-    setStreak(0);
-    playSound(wrongSoundRef.current);
-  }
+    if (correct) {
+      setCorrectCount((c) => c + 1);
+      const newStreak = streak + 1;
+      setStreak(newStreak);
+      setMaxStreak((max) => Math.max(max, newStreak));
+      playSound(correctSoundRef.current);
+    } else {
+      setWrongCount((w) => w + 1);
+      setStreak(0);
+      playSound(wrongSoundRef.current);
+    }
 
-  // 🔥 SUPABASE: kullanıcının cevabını kaydet
-  await saveAnswer(currentQ.id, optionId, correct);
+    // Save answer to Supabase
+    saveAnswer(currentQ.id, optionId, correct);
   };
-  
+
   const handleExitClick = () => {
     if (showFinalScore) return;
     playClick();
@@ -375,25 +535,93 @@ const handleAnswerClick = async (optionId: OptionId) => {
   };
 
   const accuracy = TOTAL_QUESTIONS > 0 ? Math.round((correctCount / TOTAL_QUESTIONS) * 100) : 0;
-  const score = correctCount * 2;
+  const score = correctCount * 2; // 2 points per correct answer (50 questions = 100 points max)
 
-  // Sorular yüklenmeden ekranı gösterme
-if (!currentQ) {
-  return (
-    <div
-      style={{
-        color: "white",
+  // === LOADING SCREEN ===
+  if (isLoading) {
+    return (
+      <div style={{
         minHeight: "100vh",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
         display: "flex",
-        justifyContent: "center",
         alignItems: "center",
-        fontSize: "24px"
-      }}
-    >
-      Loading questions...
-    </div>
-  );
-}
+        justifyContent: "center",
+        color: "white",
+      }}>
+        <div style={{ textAlign: "center" }}>
+          <div className="animate-pulse" style={{
+            width: "80px",
+            height: "80px",
+            margin: "0 auto 20px",
+            borderRadius: "50%",
+            border: "4px solid rgba(139,92,246,0.3)",
+            borderTopColor: "#a78bfa",
+            animation: "spin 1s linear infinite",
+          }} />
+          <p style={{
+            fontSize: "18px",
+            fontWeight: 600,
+            color: "#cbd5e1",
+          }}>
+            Loading questions...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // === NO QUESTIONS FALLBACK ===
+  if (!currentQ) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "white",
+        padding: "20px",
+      }}>
+        <div style={{ textAlign: "center", maxWidth: "400px" }}>
+          <XCircle style={{
+            width: "64px",
+            height: "64px",
+            color: "#ef4444",
+            margin: "0 auto 20px",
+          }} />
+          <h2 style={{
+            fontSize: "24px",
+            fontWeight: 900,
+            marginBottom: "12px",
+          }}>
+            No Questions Available
+          </h2>
+          <p style={{
+            fontSize: "16px",
+            color: "#94a3b8",
+            marginBottom: "24px",
+          }}>
+            Unable to load quiz questions. Please try again later.
+          </p>
+          <button
+            onClick={() => router.push("/")}
+            style={{
+              padding: "12px 24px",
+              borderRadius: "12px",
+              border: "none",
+              background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+              color: "white",
+              fontSize: "16px",
+              fontWeight: 700,
+              cursor: "pointer",
+            }}>
+            Go Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <style jsx global>{`
@@ -442,6 +670,10 @@ if (!currentQ) {
           100% { background-position: 200% center; }
         }
 
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+
         .animate-float { animation: float 6s ease-in-out infinite; }
         .animate-pulse { animation: pulse 2s ease-in-out infinite; }
         .animate-slide-up { animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
@@ -454,12 +686,19 @@ if (!currentQ) {
           border-radius: 8px;
         }
 
+        @media (min-width: 769px) {
+          .brand-text {
+            display: block !important;
+          }
+        }
+
         @media (max-width: 768px) {
+          .brand-text {
+            display: block !important;
+          }
           .header-wrap {
-            flex-direction: column !important;
-            align-items: stretch !important;
+            grid-template-columns: 1fr !important;
             gap: 12px !important;
-            padding: 12px 0 !important;
           }
           .header-center {
             order: -1;
@@ -469,6 +708,13 @@ if (!currentQ) {
           }
           .question-grid {
             grid-template-columns: 1fr !important;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .score-pills {
+            flex-wrap: wrap;
+            justify-content: center;
           }
           .mobile-hide {
             display: none !important;
@@ -572,41 +818,53 @@ if (!currentQ) {
             <div
               className="header-wrap"
               style={{
-                display: "flex",
+                display: "grid",
+                gridTemplateColumns: "auto 1fr auto",
                 alignItems: "center",
-                justifyContent: "space-between",
-                minHeight: "80px",
-                gap: "16px",
-                padding: "8px 0",
+                minHeight: "clamp(70px, 15vw, 80px)",
+                gap: "clamp(12px, 3vw, 16px)",
+                padding: "clamp(8px, 2vw, 12px) 0",
               }}>
               
               {/* Logo & Brand */}
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
-                <div
-                  className="glow-icon"
-                  style={{
-                    width: "clamp(48px, 10vw, 64px)",
-                    height: "clamp(48px, 10vw, 64px)",
+              <div style={{ display: "flex", alignItems: "center", gap: "clamp(10px, 2.5vw, 12px)", flexShrink: 0 }}>
+                {/* Logo with Image */}
+                <div style={{
+                  position: "relative",
+                  width: "clamp(62px, 13vw, 78px)",
+                  height: "clamp(62px, 13vw, 78px)",
+                  borderRadius: "50%",
+                  padding: 2,
+                  background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+                  boxShadow: "0 0 20px rgba(124, 58, 237, 0.7)",
+                  flexShrink: 0,
+                }}>
+                  <div style={{
+                    position: "relative",
+                    width: "100%",
+                    height: "100%",
                     borderRadius: "50%",
-                    background: "linear-gradient(135deg, #1e1b4b, #0f172a)",
-                    border: "3px solid rgba(168,85,247,0.8)",
-                    padding: "8px",
+                    backgroundColor: "#020817",
+                    overflow: "hidden",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    position: "relative",
-                    overflow: "hidden",
                   }}>
-                  <div style={{
-                    position: "absolute",
-                    inset: 0,
-                    borderRadius: "50%",
-                    background: "conic-gradient(from 0deg, rgba(168,85,247,0.3), rgba(217,70,239,0.3), rgba(168,85,247,0.3))",
-                    animation: "spin 4s linear infinite",
-                  }} />
-                  <Sparkles style={{ width: "60%", height: "60%", color: "#a78bfa", position: "relative", zIndex: 1 }} />
+                    <Image
+                      src="/images/logo.png"
+                      alt="VibraXX"
+                      fill
+                      sizes="78px"
+                      style={{ objectFit: "contain", padding: "4px" }}
+                      priority
+                    />
+                  </div>
                 </div>
-                <div>
+
+                {/* Brand Text - Hidden on mobile */}
+                <div className="brand-text" style={{
+                  display: "none",
+                }}>
                   <div style={{
                     fontSize: "clamp(10px, 2.2vw, 13px)",
                     letterSpacing: "0.2em",
@@ -618,10 +876,10 @@ if (!currentQ) {
                     WebkitTextFillColor: "transparent",
                     animation: "shimmer 3s linear infinite",
                   }}>
-                    VibraXX Live
+                    LIVE QUIZ
                   </div>
                   <div style={{ fontSize: "clamp(9px, 2vw, 11px)", color: "#94a3b8", fontWeight: 600 }}>
-                    Global Quiz Championship
+                    Global Championship
                   </div>
                 </div>
               </div>
@@ -631,12 +889,11 @@ if (!currentQ) {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                gap: "6px",
-                flex: 1,
-                maxWidth: "300px",
+                gap: "clamp(4px, 1.5vw, 6px)",
+                justifySelf: "center",
               }}>
                 <div style={{
-                  fontSize: "clamp(14px, 3vw, 20px)",
+                  fontSize: "clamp(14px, 3.5vw, 20px)",
                   fontWeight: 900,
                   letterSpacing: "0.15em",
                   textTransform: "uppercase",
@@ -646,22 +903,23 @@ if (!currentQ) {
                   WebkitTextFillColor: "transparent",
                   animation: "shimmer 2s linear infinite",
                   textAlign: "center",
+                  whiteSpace: "nowrap",
                 }}>
-                  Question {currentIndex + 1}/{TOTAL_QUESTIONS}
+                  Q {currentIndex + 1}/{TOTAL_QUESTIONS}
                 </div>
                 {streak > 1 && (
                   <div style={{
                     display: "flex",
                     alignItems: "center",
                     gap: "4px",
-                    padding: "4px 10px",
+                    padding: "3px 8px",
                     borderRadius: "999px",
                     background: "linear-gradient(90deg, rgba(239,68,68,0.2), rgba(249,115,22,0.2))",
                     border: "1px solid rgba(239,68,68,0.5)",
                   }}>
-                    <Flame style={{ width: "14px", height: "14px", color: "#fb923c" }} />
-                    <span style={{ fontSize: "11px", fontWeight: 800, color: "#fbbf24" }}>
-                      {streak} Streak!
+                    <Flame style={{ width: "12px", height: "12px", color: "#fb923c" }} />
+                    <span style={{ fontSize: "10px", fontWeight: 800, color: "#fbbf24" }}>
+                      {streak}
                     </span>
                   </div>
                 )}
@@ -671,36 +929,36 @@ if (!currentQ) {
               <div className="header-right" style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "10px",
+                gap: "clamp(6px, 2vw, 10px)",
                 flexShrink: 0,
               }}>
                 {/* Score Pills */}
-                <div style={{ display: "flex", gap: "6px" }}>
+                <div className="score-pills" style={{ display: "flex", gap: "clamp(4px, 1.5vw, 6px)" }}>
                   <div style={{
-                    padding: "6px 12px",
+                    padding: "clamp(4px, 1.5vw, 6px) clamp(8px, 2.5vw, 12px)",
                     borderRadius: "999px",
                     background: "linear-gradient(135deg, rgba(22,163,74,0.15), rgba(21,128,61,0.15))",
                     border: "2px solid rgba(34,197,94,0.5)",
                     display: "flex",
                     alignItems: "center",
-                    gap: "6px",
+                    gap: "4px",
                     boxShadow: "0 0 15px rgba(34,197,94,0.3)",
                   }}>
-                    <CheckCircle style={{ width: "16px", height: "16px", color: "#22c55e" }} />
-                    <span style={{ fontSize: "13px", fontWeight: 900, color: "#22c55e" }}>{correctCount}</span>
+                    <CheckCircle style={{ width: "clamp(12px, 3vw, 16px)", height: "clamp(12px, 3vw, 16px)", color: "#22c55e" }} />
+                    <span style={{ fontSize: "clamp(11px, 2.5vw, 13px)", fontWeight: 900, color: "#22c55e" }}>{correctCount}</span>
                   </div>
                   <div style={{
-                    padding: "6px 12px",
+                    padding: "clamp(4px, 1.5vw, 6px) clamp(8px, 2.5vw, 12px)",
                     borderRadius: "999px",
                     background: "linear-gradient(135deg, rgba(220,38,38,0.15), rgba(185,28,28,0.15))",
                     border: "2px solid rgba(239,68,68,0.5)",
                     display: "flex",
                     alignItems: "center",
-                    gap: "6px",
+                    gap: "4px",
                     boxShadow: "0 0 15px rgba(239,68,68,0.3)",
                   }}>
-                    <XCircle style={{ width: "16px", height: "16px", color: "#ef4444" }} />
-                    <span style={{ fontSize: "13px", fontWeight: 900, color: "#ef4444" }}>{wrongCount}</span>
+                    <XCircle style={{ width: "clamp(12px, 3vw, 16px)", height: "clamp(12px, 3vw, 16px)", color: "#ef4444" }} />
+                    <span style={{ fontSize: "clamp(11px, 2.5vw, 13px)", fontWeight: 900, color: "#ef4444" }}>{wrongCount}</span>
                   </div>
                 </div>
 
@@ -709,8 +967,8 @@ if (!currentQ) {
                   onClick={handleSoundToggle}
                   className={isSoundEnabled ? "neon-border" : ""}
                   style={{
-                    width: "44px",
-                    height: "44px",
+                    width: "clamp(36px, 10vw, 44px)",
+                    height: "clamp(36px, 10vw, 44px)",
                     borderRadius: "12px",
                     border: "2px solid rgba(167,139,250,0.6)",
                     background: isSoundEnabled 
@@ -721,11 +979,12 @@ if (!currentQ) {
                     justifyContent: "center",
                     cursor: "pointer",
                     transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                    flexShrink: 0,
                   }}>
                   {isSoundEnabled ? (
-                    <Volume2 style={{ width: "20px", height: "20px", color: "#a78bfa" }} />
+                    <Volume2 style={{ width: "clamp(16px, 4vw, 20px)", height: "clamp(16px, 4vw, 20px)", color: "#a78bfa" }} />
                   ) : (
-                    <VolumeX style={{ width: "20px", height: "20px", color: "#6b7280" }} />
+                    <VolumeX style={{ width: "clamp(16px, 4vw, 20px)", height: "clamp(16px, 4vw, 20px)", color: "#6b7280" }} />
                   )}
                 </button>
 
@@ -735,20 +994,21 @@ if (!currentQ) {
                     onClick={handleExitClick}
                     className="neon-border"
                     style={{
-                      padding: "10px 20px",
+                      padding: "clamp(8px, 2.5vw, 10px) clamp(12px, 4vw, 20px)",
                       borderRadius: "999px",
                       border: "2px solid rgba(239,68,68,0.6)",
                       background: "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))",
                       color: "white",
-                      fontSize: "12px",
+                      fontSize: "clamp(10px, 2.5vw, 12px)",
                       fontWeight: 800,
                       textTransform: "uppercase",
                       letterSpacing: "0.1em",
                       display: "flex",
                       alignItems: "center",
-                      gap: "8px",
+                      gap: "6px",
                       cursor: "pointer",
                       transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                      flexShrink: 0,
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.transform = "translateY(-2px)";
@@ -758,8 +1018,8 @@ if (!currentQ) {
                       e.currentTarget.style.transform = "translateY(0)";
                       e.currentTarget.style.boxShadow = "none";
                     }}>
-                    <Zap style={{ width: "16px", height: "16px" }} />
-                    <span className="mobile-hide">Exit</span>
+                    <Zap style={{ width: "clamp(12px, 3vw, 16px)", height: "clamp(12px, 3vw, 16px)" }} />
+                    <span>Exit</span>
                   </button>
                 )}
               </div>
@@ -844,82 +1104,83 @@ if (!currentQ) {
           {/* FINAL SCORE SCREEN */}
           {showFinalScore ? (
             <article className="animate-slide-up" style={{
-              padding: "clamp(32px, 6vw, 48px) clamp(24px, 5vw, 32px)",
-              borderRadius: "clamp(24px, 5vw, 32px)",
-              border: "2px solid rgba(139,92,246,0.4)",
-              background: "linear-gradient(135deg, rgba(30,27,75,0.95) 0%, rgba(15,23,42,0.95) 100%)",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(139,92,246,0.3)",
+              padding: "clamp(24px, 5vw, 32px)",
+              borderRadius: "clamp(20px, 4vw, 24px)",
+              border: "2px solid rgba(139,92,246,0.5)",
+              background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(139,92,246,0.4)",
               textAlign: "center",
               backdropFilter: "blur(20px)",
+              position: "relative",
+              overflow: "hidden",
             }}>
               
               {/* Trophy Icon */}
-              <div className="glow-icon" style={{ display: "inline-block", marginBottom: "20px" }}>
+              <div style={{ 
+                display: "inline-block", 
+                marginBottom: "clamp(16px, 3vw, 20px)",
+              }}>
                 <Trophy style={{
-                  width: "clamp(64px, 12vw, 80px)",
-                  height: "clamp(64px, 12vw, 80px)",
+                  width: "clamp(48px, 10vw, 64px)",
+                  height: "clamp(48px, 10vw, 64px)",
                   color: "#fbbf24",
                   filter: "drop-shadow(0 0 20px #fbbf24)",
                 }} />
               </div>
 
+              {/* Title */}
               <h1 style={{
-                fontSize: "clamp(24px, 5vw, 32px)",
+                fontSize: "clamp(20px, 4.5vw, 28px)",
                 fontWeight: 900,
-                marginBottom: "12px",
-                background: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)",
+                marginBottom: "clamp(20px, 4vw, 28px)",
+                backgroundImage: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)",
                 backgroundSize: "200% auto",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
                 animation: "shimmer 3s linear infinite",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
               }}>
-                Quiz Complete!
+                Round Complete!
               </h1>
 
-              <p style={{
-                fontSize: "clamp(13px, 2.8vw, 16px)",
-                color: "#94a3b8",
-                marginBottom: "32px",
-                fontWeight: 500,
-              }}>
-                Your performance in this round
-              </p>
-
-              {/* Stats Grid */}
-              <div className="stats-grid" style={{
+              {/* Stats Grid - Correct & Wrong */}
+              <div style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(3, 1fr)",
-                gap: "16px",
-                marginBottom: "24px",
+                gridTemplateColumns: "repeat(2, 1fr)",
+                gap: "clamp(12px, 3vw, 16px)",
+                marginBottom: "clamp(20px, 4vw, 24px)",
               }}>
                 {/* Correct */}
                 <div style={{
-                  padding: "20px 16px",
-                  borderRadius: "20px",
-                  background: "linear-gradient(135deg, rgba(22,163,74,0.2), rgba(21,128,61,0.1))",
+                  padding: "clamp(16px, 3.5vw, 20px)",
+                  borderRadius: "clamp(14px, 3vw, 16px)",
+                  background: "linear-gradient(135deg, rgba(22,163,74,0.2), rgba(21,128,61,0.15))",
                   border: "2px solid rgba(34,197,94,0.5)",
-                  boxShadow: "0 0 20px rgba(34,197,94,0.2)",
+                  boxShadow: "0 0 20px rgba(34,197,94,0.3)",
                 }}>
                   <CheckCircle style={{
-                    width: "32px",
-                    height: "32px",
+                    width: "clamp(28px, 6vw, 36px)",
+                    height: "clamp(28px, 6vw, 36px)",
                     color: "#22c55e",
-                    marginBottom: "8px",
+                    marginBottom: "clamp(6px, 1.5vw, 8px)",
                     filter: "drop-shadow(0 0 10px #22c55e)",
                   }} />
                   <div style={{
-                    fontSize: "clamp(28px, 5vw, 36px)",
+                    fontSize: "clamp(32px, 7vw, 48px)",
                     fontWeight: 900,
                     color: "#22c55e",
                     lineHeight: 1,
-                    marginBottom: "6px",
+                    marginBottom: "clamp(4px, 1vw, 6px)",
+                    textShadow: "0 0 15px rgba(34,197,94,0.6)",
                   }}>
                     {correctCount}
                   </div>
                   <div style={{
-                    fontSize: "clamp(11px, 2.2vw, 13px)",
+                    fontSize: "clamp(11px, 2.5vw, 13px)",
                     color: "#86efac",
-                    fontWeight: 600,
+                    fontWeight: 700,
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
                   }}>
@@ -929,136 +1190,203 @@ if (!currentQ) {
 
                 {/* Wrong */}
                 <div style={{
-                  padding: "20px 16px",
-                  borderRadius: "20px",
-                  background: "linear-gradient(135deg, rgba(220,38,38,0.2), rgba(185,28,28,0.1))",
+                  padding: "clamp(16px, 3.5vw, 20px)",
+                  borderRadius: "clamp(14px, 3vw, 16px)",
+                  background: "linear-gradient(135deg, rgba(220,38,38,0.2), rgba(185,28,28,0.15))",
                   border: "2px solid rgba(239,68,68,0.5)",
-                  boxShadow: "0 0 20px rgba(239,68,68,0.2)",
+                  boxShadow: "0 0 20px rgba(239,68,68,0.3)",
                 }}>
                   <XCircle style={{
-                    width: "32px",
-                    height: "32px",
+                    width: "clamp(28px, 6vw, 36px)",
+                    height: "clamp(28px, 6vw, 36px)",
                     color: "#ef4444",
-                    marginBottom: "8px",
+                    marginBottom: "clamp(6px, 1.5vw, 8px)",
                     filter: "drop-shadow(0 0 10px #ef4444)",
                   }} />
                   <div style={{
-                    fontSize: "clamp(28px, 5vw, 36px)",
+                    fontSize: "clamp(32px, 7vw, 48px)",
                     fontWeight: 900,
                     color: "#ef4444",
                     lineHeight: 1,
-                    marginBottom: "6px",
+                    marginBottom: "clamp(4px, 1vw, 6px)",
+                    textShadow: "0 0 15px rgba(239,68,68,0.6)",
                   }}>
                     {wrongCount}
                   </div>
                   <div style={{
-                    fontSize: "clamp(11px, 2.2vw, 13px)",
+                    fontSize: "clamp(11px, 2.5vw, 13px)",
                     color: "#fca5a5",
-                    fontWeight: 600,
+                    fontWeight: 700,
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
                   }}>
                     Wrong
                   </div>
                 </div>
-
-                {/* Accuracy */}
-                <div style={{
-                  padding: "20px 16px",
-                  borderRadius: "20px",
-                  background: "linear-gradient(135deg, rgba(124,58,237,0.2), rgba(79,70,229,0.1))",
-                  border: "2px solid rgba(139,92,246,0.5)",
-                  boxShadow: "0 0 20px rgba(139,92,246,0.2)",
-                }}>
-                  <TrendingUp style={{
-                    width: "32px",
-                    height: "32px",
-                    color: "#a78bfa",
-                    marginBottom: "8px",
-                    filter: "drop-shadow(0 0 10px #a78bfa)",
-                  }} />
-                  <div style={{
-                    fontSize: "clamp(28px, 5vw, 36px)",
-                    fontWeight: 900,
-                    color: "#a78bfa",
-                    lineHeight: 1,
-                    marginBottom: "6px",
-                  }}>
-                    {accuracy}%
-                  </div>
-                  <div style={{
-                    fontSize: "clamp(11px, 2.2vw, 13px)",
-                    color: "#c4b5fd",
-                    fontWeight: 600,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                  }}>
-                    Accuracy
-                  </div>
-                </div>
               </div>
 
-              {/* Score & Streak */}
+              {/* Rounds Remaining Info */}
+              <div style={{
+                padding: "clamp(12px, 2.5vw, 14px) clamp(16px, 3.5vw, 20px)",
+                borderRadius: "clamp(12px, 2.5vw, 14px)",
+                background: "rgba(124,58,237,0.15)",
+                border: "1px solid rgba(139,92,246,0.4)",
+                marginBottom: "clamp(20px, 4vw, 24px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+              }}>
+                <span style={{
+                  fontSize: "clamp(13px, 3vw, 15px)",
+                  color: "#cbd5e1",
+                  fontWeight: 600,
+                }}>
+                  You have
+                </span>
+                <span style={{
+                  fontSize: "clamp(18px, 4vw, 22px)",
+                  fontWeight: 900,
+                  color: "#a78bfa",
+                  textShadow: "0 0 10px rgba(167,139,250,0.6)",
+                }}>
+                  {userRounds}
+                </span>
+                <span style={{
+                  fontSize: "clamp(13px, 3vw, 15px)",
+                  color: "#cbd5e1",
+                  fontWeight: 600,
+                }}>
+                  rounds left
+                </span>
+              </div>
+
+              {/* Action Buttons */}
               <div style={{
                 display: "flex",
-                justifyContent: "center",
-                gap: "16px",
-                flexWrap: "wrap",
-                marginBottom: "24px",
+                flexDirection: "column",
+                gap: "clamp(10px, 2.5vw, 12px)",
+                marginBottom: "clamp(16px, 3.5vw, 20px)",
               }}>
-                <div style={{
-                  padding: "12px 24px",
-                  borderRadius: "999px",
-                  background: "linear-gradient(90deg, rgba(251,191,36,0.2), rgba(245,158,11,0.2))",
-                  border: "2px solid rgba(251,191,36,0.5)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                }}>
-                  <Star style={{ width: "20px", height: "20px", color: "#fbbf24" }} />
-                  <span style={{ fontSize: "14px", fontWeight: 800, color: "#fbbf24" }}>
-                    Score: {score}
-                  </span>
-                </div>
-                {maxStreak > 0 && (
-                  <div style={{
-                    padding: "12px 24px",
-                    borderRadius: "999px",
-                    background: "linear-gradient(90deg, rgba(249,115,22,0.2), rgba(234,88,12,0.2))",
-                    border: "2px solid rgba(249,115,22,0.5)",
+                {/* NEW ROUND / BUY ROUNDS Button */}
+                <button
+                  onClick={async () => {
+                    playClick();
+                    if (userRounds > 0) {
+                      await decreaseUserRound(); // Decrease round in Supabase
+                      router.push("/lobby");
+                    } else {
+                      router.push("/buy");
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "clamp(12px, 3vw, 14px) clamp(20px, 4vw, 24px)",
+                    borderRadius: "clamp(12px, 2.5vw, 14px)",
+                    border: "none",
+                    background: userRounds > 0
+                      ? "linear-gradient(135deg, #7c3aed, #d946ef)"
+                      : "linear-gradient(135deg, #f59e0b, #fbbf24)",
+                    color: "white",
+                    fontSize: "clamp(14px, 3.2vw, 16px)",
+                    fontWeight: 800,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
+                    justifyContent: "center",
                     gap: "8px",
+                    boxShadow: userRounds > 0
+                      ? "0 8px 25px rgba(139,92,246,0.4)"
+                      : "0 8px 25px rgba(251,191,36,0.4)",
+                    transition: "all 0.3s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                    e.currentTarget.style.boxShadow = userRounds > 0
+                      ? "0 12px 35px rgba(139,92,246,0.6)"
+                      : "0 12px 35px rgba(251,191,36,0.6)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow = userRounds > 0
+                      ? "0 8px 25px rgba(139,92,246,0.4)"
+                      : "0 8px 25px rgba(251,191,36,0.4)";
                   }}>
-                    <Flame style={{ width: "20px", height: "20px", color: "#fb923c" }} />
-                    <span style={{ fontSize: "14px", fontWeight: 800, color: "#fb923c" }}>
-                      Best Streak: {maxStreak}
-                    </span>
-                  </div>
-                )}
+                  {userRounds > 0 ? (
+                    <>
+                      <Zap style={{ width: "18px", height: "18px" }} />
+                      New Round
+                    </>
+                  ) : (
+                    <>
+                      <Star style={{ width: "18px", height: "18px" }} />
+                      Buy Rounds
+                    </>
+                  )}
+                </button>
+
+                {/* EXIT Button */}
+                <button
+                  onClick={() => {
+                    playClick();
+                    router.push("/");
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "clamp(12px, 3vw, 14px) clamp(20px, 4vw, 24px)",
+                    borderRadius: "clamp(12px, 2.5vw, 14px)",
+                    border: "2px solid rgba(148,163,253,0.4)",
+                    background: "rgba(15,23,42,0.6)",
+                    color: "white",
+                    fontSize: "clamp(14px, 3.2vw, 16px)",
+                    fontWeight: 800,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    transition: "all 0.3s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                    e.currentTarget.style.borderColor = "rgba(139,92,246,0.6)";
+                    e.currentTarget.style.background = "rgba(139,92,246,0.15)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.borderColor = "rgba(148,163,253,0.4)";
+                    e.currentTarget.style.background = "rgba(15,23,42,0.6)";
+                  }}>
+                  <Star style={{ width: "18px", height: "18px" }} />
+                  Exit Quiz
+                </button>
               </div>
 
-              {/* Redirect Message */}
+              {/* Redirect Countdown */}
               <div style={{
-                padding: "16px",
-                borderRadius: "16px",
-                background: "rgba(15,23,42,0.8)",
+                padding: "clamp(10px, 2vw, 12px) clamp(14px, 3vw, 16px)",
+                borderRadius: "clamp(10px, 2vw, 12px)",
+                background: "rgba(139,92,246,0.1)",
                 border: "1px solid rgba(139,92,246,0.3)",
               }}>
                 <p style={{
-                  fontSize: "clamp(12px, 2.5vw, 14px)",
+                  fontSize: "clamp(11px, 2.5vw, 13px)",
                   color: "#94a3b8",
                   fontWeight: 600,
                 }}>
-                  Returning to lobby in{" "}
+                  Redirecting to home in{" "}
                   <span style={{
                     color: "#a78bfa",
                     fontWeight: 900,
-                    fontSize: "clamp(14px, 3vw, 18px)",
+                    fontSize: "clamp(13px, 3vw, 16px)",
                   }}>
                     {finalCountdown}
                   </span>
-                  {" "}seconds...
+                  s
                 </p>
               </div>
             </article>
