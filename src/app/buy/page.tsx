@@ -376,6 +376,21 @@ export default function BuyPage() {
           letter-spacing: -0.02em;
         }
 
+        .vx-buy-title-gradient {
+          display: inline-block;
+          background: linear-gradient(90deg, #7c3aed, #22d3ee, #f97316, #d946ef, #7c3aed);
+          background-size: 250% 100%;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          animation: shimmer 4s linear infinite;
+        }
+
+        @keyframes shimmer {
+          0% { background-position: 0% center; }
+          100% { background-position: 250% center; }
+        }
+
         .vx-buy-subtitle {
           font-size: clamp(16px, 3vw, 20px);
           color: #94a3b8;
@@ -805,7 +820,7 @@ export default function BuyPage() {
                 </div>
               </div>
               <div className="vx-buy-logo-text mobile-hide">
-                <span className="vx-buy-logo-label">Premium Plans</span>
+                <span className="vx-buy-logo-label">Live Quiz</span>
               </div>
             </div>
 
@@ -831,7 +846,9 @@ export default function BuyPage() {
               LIMITED TIME OFFER
             </div>
 
-            <h1 className="vx-buy-title">Choose Your Plan</h1>
+            <h1 className="vx-buy-title">
+              <span className="vx-buy-title-gradient">Choose Your Plan</span>
+            </h1>
 
             <p className="vx-buy-subtitle">
               Compete for the <strong style={{ color: "#fbbf24" }}>£1,000 monthly prize</strong> when we reach 2000+ active participants
