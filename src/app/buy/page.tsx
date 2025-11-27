@@ -6,7 +6,6 @@ import { createClient } from "@supabase/supabase-js";
 import {
   Crown,
   Zap,
-  Gift,
   Check,
   TrendingUp,
   Users,
@@ -231,28 +230,71 @@ export default function BuyPage() {
         .vx-buy-logo {
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 10px;
           cursor: pointer;
           transition: transform 0.3s;
+          min-width: 0;
         }
         .vx-buy-logo:hover { transform: scale(1.05); }
 
+        .vx-buy-logo-outer {
+          position: relative;
+          width: 90px;
+          height: 90px;
+          border-radius: 9999px;
+          padding: 4px;
+          background: radial-gradient(circle at 0 0, #7c3aed, #d946ef);
+          box-shadow: 0 0 30px rgba(124, 58, 237, 0.6);
+          flex-shrink: 0;
+        }
+
+        .vx-buy-logo-glow {
+          position: absolute;
+          inset: -5px;
+          border-radius: 9999px;
+          background: radial-gradient(circle, #a855f7, transparent);
+          opacity: 0.4;
+          filter: blur(10px);
+          pointer-events: none;
+          animation: glow 2s ease-in-out infinite;
+        }
+
         .vx-buy-logo-circle {
-          width: 60px;
-          height: 60px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #1e1b4b, #0f172a);
+          position: relative;
+          width: 100%;
+          height: 100%;
+          border-radius: 9999px;
+          background-color: #020817;
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: 0 0 30px rgba(139, 92, 246, 0.6);
-          border: 2px solid rgba(139, 92, 246, 0.5);
+          overflow: hidden;
         }
 
         .vx-buy-logo-img {
-          width: 36px;
-          height: 36px;
+          width: 100%;
+          height: 100%;
           object-fit: contain;
+          padding: 10px;
+        }
+
+        .vx-buy-logo-text {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .vx-buy-logo-label {
+          font-size: 13px;
+          color: #c4b5fd;
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+          white-space: nowrap;
+        }
+
+        @keyframes glow {
+          0%, 100% { opacity: 0.4; }
+          50% { opacity: 0.6; }
         }
 
         .vx-buy-right {
@@ -277,17 +319,6 @@ export default function BuyPage() {
         .vx-buy-audio-btn:hover {
           background: rgba(139, 92, 246, 0.4);
           transform: scale(1.05);
-        }
-
-        .vx-buy-rounds {
-          padding: 8px 16px;
-          border-radius: 12px;
-          background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.15));
-          border: 2px solid rgba(251, 191, 36, 0.5);
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
         }
 
         .vx-buy-back-btn {
@@ -767,12 +798,14 @@ export default function BuyPage() {
         <header className="vx-buy-header">
           <div className="vx-buy-header-inner">
             <div className="vx-buy-logo" onClick={() => router.push("/")}>
-              <div className="vx-buy-logo-circle">
-                <img src="/images/logo.png" alt="VibraXX" className="vx-buy-logo-img" />
+              <div className="vx-buy-logo-outer">
+                <div className="vx-buy-logo-glow" />
+                <div className="vx-buy-logo-circle">
+                  <img src="/images/logo.png" alt="VibraXX Logo" className="vx-buy-logo-img" />
+                </div>
               </div>
-              <div className="mobile-hide">
-                <div style={{ fontSize: 18, fontWeight: 700 }}>VIBRAXX</div>
-                <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.05em" }}>PREMIUM PLANS</div>
+              <div className="vx-buy-logo-text mobile-hide">
+                <span className="vx-buy-logo-label">Premium Plans</span>
               </div>
             </div>
 
@@ -781,15 +814,9 @@ export default function BuyPage() {
                 {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
               </button>
 
-              <div className="vx-buy-rounds">
-                <Gift size={20} color="#fbbf24" />
-                <span style={{ fontSize: 16, fontWeight: 900, color: "#fbbf24" }}>{userRounds}</span>
-                <span className="mobile-hide" style={{ fontSize: 12, color: "#fcd34d" }}>rounds</span>
-              </div>
-
               <button className="vx-buy-back-btn" onClick={() => router.push("/")}>
                 <ChevronRight size={16} style={{ transform: "rotate(180deg)" }} />
-                <span className="mobile-hide">Back</span>
+                <span className="mobile-hide">Back to Home</span>
               </button>
             </div>
           </div>
