@@ -23,10 +23,8 @@ import {
   VolumeX,
   Shield,
   Percent,
-  Clock,
 } from "lucide-react";
 
-// Initialize Supabase
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -38,46 +36,38 @@ const packages = [
     id: "single",
     name: "Single Round",
     price: 1,
-    currency: "£",
+    originalPrice: null,
     rounds: 1,
-    pricePerRound: 1.0,
     popular: false,
     savings: 0,
     icon: Zap,
-    color: "from-blue-500 to-cyan-500",
-    bgGlow: "rgba(56, 189, 248, 0.3)",
     features: [
       "1 Quiz Round",
       "50 Questions",
-      "Instant Play",
+      "Instant Access",
       "Leaderboard Entry",
       "Score Tracking",
     ],
-    description: "Try it out",
-    stripePriceId: "price_single_round",
+    description: "Perfect for trying out",
   },
   {
     id: "bundle",
     name: "Champion Bundle",
     price: 29,
-    currency: "£",
+    originalPrice: 35,
     rounds: 35,
-    pricePerRound: 0.83,
     popular: true,
     savings: 17,
     icon: Crown,
-    color: "from-purple-500 to-pink-500",
-    bgGlow: "rgba(168, 85, 247, 0.4)",
     features: [
       "35 Quiz Rounds",
-      "1,750 Questions",
-      "17% Savings (£6 off)",
+      "1,750 Questions", 
+      "17% Savings (Save £6)",
       "Priority Support",
-      "Extended Stats",
+      "Extended Statistics",
       "Champion Badge",
     ],
-    description: "Best value",
-    stripePriceId: "price_champion_bundle",
+    description: "Best value for champions",
   },
 ];
 
@@ -88,52 +78,43 @@ export default function BuyPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [processingPackageId, setProcessingPackageId] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(true);
-  const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
 
-  // Audio setup
+  // Audio
   useEffect(() => {
-    const bgAudio = new Audio("/sounds/vibraxx.mp3");
-    bgAudio.loop = true;
-    bgAudio.volume = 0.3;
-    setAudio(bgAudio);
+    const audio = new Audio("/sounds/vibraxx.mp3");
+    audio.loop = true;
+    audio.volume = 0.3;
+    
+    if (!isMuted) {
+      audio.play().catch(console.error);
+    }
 
     return () => {
-      bgAudio.pause();
+      audio.pause();
     };
-  }, []);
+  }, [isMuted]);
 
-  const toggleMute = () => {
-    if (audio) {
-      if (isMuted) {
-        audio.play().catch(console.error);
-      } else {
-        audio.pause();
-      }
-      setIsMuted(!isMuted);
-    }
-  };
-
-  // Fetch user and rounds
+  // Fetch user
   useEffect(() => {
     const loadUser = async () => {
       setIsLoading(true);
       
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      const { data: { user: authUser } } = await supabase.auth.getUser();
 
-      if (authError || !authUser) {
+      if (!authUser) {
         router.push("/");
         return;
       }
 
       setUser(authUser);
 
-      const { data: roundsData, error: roundsError } = await supabase
+      const { data: roundsData } = await supabase
         .from("user_rounds")
         .select("available_rounds")
         .eq("user_id", authUser.id)
         .single();
 
-      if (!roundsError && roundsData) {
+      if (roundsData) {
         setUserRounds(roundsData.available_rounds || 0);
       }
 
@@ -154,11 +135,9 @@ export default function BuyPage() {
     try {
       const response = await fetch("/api/create-checkout-session", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          priceId: pkg.stripePriceId,
+          priceId: `price_${pkg.id}`,
           userId: user.id,
           rounds: pkg.rounds,
           packageName: pkg.name,
@@ -181,22 +160,24 @@ export default function BuyPage() {
 
   if (isLoading) {
     return (
-      <div style={{
-        minHeight: "100vh",
-        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}>
-        <div style={{
-          width: "60px",
-          height: "60px",
-          border: "4px solid rgba(139, 92, 246, 0.3)",
-          borderTopColor: "#8b5cf6",
-          borderRadius: "50%",
-          animation: "spin 1s linear infinite",
-        }} />
+      <div className="vx-loading">
+        <div className="vx-spinner" />
         <style jsx>{`
+          .vx-loading {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            display: flex;
+            align-items: center;
+            justifyContent: center;
+          }
+          .vx-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(139, 92, 246, 0.3);
+            border-top-color: #8b5cf6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+          }
           @keyframes spin {
             to { transform: rotate(360deg); }
           }
@@ -206,585 +187,713 @@ export default function BuyPage() {
   }
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
-      position: "relative",
-      overflow: "hidden",
-      color: "white",
-    }}>
-      
+    <>
       <style jsx global>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-20px); }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow-x: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+        
+        .vx-buy-container {
+          min-height: 100vh;
+          background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+          color: white;
+          position: relative;
         }
-        @keyframes slideUp {
-          from { transform: translateY(30px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
+
+        .vx-buy-bg-grid {
+          position: absolute;
+          inset: 0;
+          background-image: 
+            linear-gradient(rgba(139, 92, 246, 0.05) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(139, 92, 246, 0.05) 1px, transparent 1px);
+          background-size: 50px 50px;
+          opacity: 0.5;
+          pointer-events: none;
         }
-        @keyframes popIn {
-          0% { transform: scale(0.9); opacity: 0; }
-          100% { transform: scale(1); opacity: 1; }
+
+        .vx-buy-header {
+          position: relative;
+          z-index: 10;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(20px);
+          background: rgba(15, 23, 42, 0.8);
         }
-        @keyframes shimmer {
-          0% { background-position: -200% center; }
-          100% { background-position: 200% center; }
+
+        .vx-buy-header-inner {
+          max-width: 1400px;
+          margin: 0 auto;
+          padding: 0 clamp(16px, 4vw, 24px);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          height: 80px;
         }
-        .animate-float {
-          animation: float 3s ease-in-out infinite;
+
+        .vx-buy-logo {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          cursor: pointer;
+          transition: transform 0.3s;
         }
-        .animate-slide-up {
-          animation: slideUp 0.6s ease-out;
+        .vx-buy-logo:hover { transform: scale(1.05); }
+
+        .vx-buy-logo-circle {
+          width: 50px;
+          height: 50px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #7c3aed, #d946ef);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 0 30px rgba(139, 92, 246, 0.6);
         }
-        .animate-pop-in {
-          animation: popIn 0.5s ease-out;
+
+        .vx-buy-logo-img {
+          width: 30px;
+          height: 30px;
+          object-fit: contain;
         }
-        .shimmer {
-          background: linear-gradient(
-            90deg,
-            transparent,
-            rgba(255, 255, 255, 0.1),
-            transparent
-          );
-          background-size: 200% 100%;
-          animation: shimmer 3s infinite;
+
+        .vx-buy-right {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .vx-buy-audio-btn {
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+          border: 2px solid rgba(139, 92, 246, 0.5);
+          background: rgba(139, 92, 246, 0.2);
+          color: white;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.3s;
+        }
+        .vx-buy-audio-btn:hover {
+          background: rgba(139, 92, 246, 0.4);
+          transform: scale(1.05);
+        }
+
+        .vx-buy-rounds {
+          padding: 8px 16px;
+          border-radius: 12px;
+          background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.15));
+          border: 2px solid rgba(251, 191, 36, 0.5);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
+        }
+
+        .vx-buy-back-btn {
+          padding: 10px 20px;
+          border-radius: 12px;
+          border: 2px solid rgba(139, 92, 246, 0.5);
+          background: rgba(139, 92, 246, 0.2);
+          color: white;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .vx-buy-back-btn:hover {
+          background: rgba(139, 92, 246, 0.4);
+          transform: translateY(-2px);
+        }
+
+        .vx-buy-main {
+          position: relative;
+          z-index: 1;
+          max-width: 1200px;
+          margin: 0 auto;
+          padding: clamp(40px, 8vw, 80px) clamp(16px, 4vw, 24px);
+        }
+
+        .vx-buy-hero {
+          text-align: center;
+          margin-bottom: clamp(40px, 8vw, 60px);
+        }
+
+        .vx-buy-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 20px;
+          border-radius: 20px;
+          background: rgba(251, 191, 36, 0.15);
+          border: 1px solid rgba(251, 191, 36, 0.4);
+          margin-bottom: 24px;
+          font-size: 12px;
+          font-weight: 700;
+          color: #fbbf24;
+          letter-spacing: 0.05em;
+        }
+
+        .vx-buy-title {
+          font-size: clamp(36px, 8vw, 56px);
+          font-weight: 900;
+          margin-bottom: 16px;
+          line-height: 1.2;
+          letter-spacing: -0.02em;
+        }
+
+        .vx-buy-subtitle {
+          font-size: clamp(16px, 3vw, 20px);
+          color: #94a3b8;
+          max-width: 700px;
+          margin: 0 auto 24px;
+          line-height: 1.6;
+        }
+
+        .vx-buy-trust {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-wrap: wrap;
+          gap: 16px;
+          margin-top: 24px;
+        }
+
+        .vx-buy-trust-badge {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          border-radius: 8px;
+          background: rgba(34, 197, 94, 0.1);
+          border: 1px solid rgba(34, 197, 94, 0.3);
+          font-size: 12px;
+          color: #4ade80;
+          font-weight: 600;
+        }
+
+        .vx-buy-cards {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+          gap: clamp(24px, 4vw, 32px);
+          margin-bottom: clamp(40px, 6vw, 50px);
+          max-width: 900px;
+          margin-left: auto;
+          margin-right: auto;
+        }
+
+        .vx-buy-card {
+          background: linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 27, 75, 0.95) 100%);
+          border-radius: 20px;
+          border: 2px solid rgba(100, 116, 139, 0.3);
+          overflow: hidden;
+          backdrop-filter: blur(20px);
+          transition: all 0.3s ease;
+          position: relative;
+        }
+
+        .vx-buy-card.popular {
+          border-color: rgba(139, 92, 246, 0.6);
+          box-shadow: 0 20px 60px rgba(139, 92, 246, 0.4);
+        }
+
+        .vx-buy-card:hover {
+          transform: translateY(-6px);
+          box-shadow: 0 30px 80px rgba(139, 92, 246, 0.5);
+        }
+
+        .vx-buy-ribbon {
+          position: absolute;
+          top: 16px;
+          right: -8px;
+          padding: 6px 16px 6px 20px;
+          background: linear-gradient(135deg, #fbbf24, #f59e0b);
+          font-size: 11px;
+          font-weight: 900;
+          color: #0f172a;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          box-shadow: 0 4px 12px rgba(251, 191, 36, 0.6);
+          z-index: 10;
+          clip-path: polygon(0 0, 100% 0, 100% 100%, 8px 100%, 0 50%);
+        }
+
+        .vx-buy-card-header {
+          padding: 28px 28px 24px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .vx-buy-card.popular .vx-buy-card-header {
+          background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), transparent);
+        }
+
+        .vx-buy-card-top {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          margin-bottom: 20px;
+        }
+
+        .vx-buy-icon {
+          width: 52px;
+          height: 52px;
+          border-radius: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+
+        .vx-buy-card-name {
+          font-size: 20px;
+          font-weight: 900;
+          margin-bottom: 4px;
+          line-height: 1.2;
+        }
+
+        .vx-buy-card-desc {
+          font-size: 13px;
+          color: #94a3b8;
+        }
+
+        .vx-buy-price-box {
+          background: rgba(15, 23, 42, 0.6);
+          padding: 24px 20px;
+          border-radius: 14px;
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          text-align: center;
+          position: relative;
+        }
+
+        .vx-buy-card.popular .vx-buy-price-box {
+          background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(217, 70, 239, 0.15));
+          border-color: rgba(139, 92, 246, 0.3);
+        }
+
+        .vx-buy-savings {
+          position: absolute;
+          top: -10px;
+          right: 12px;
+          padding: 5px 12px;
+          border-radius: 10px;
+          background: linear-gradient(135deg, #22c55e, #16a34a);
+          font-size: 11px;
+          font-weight: 900;
+          color: white;
+          box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .vx-buy-price {
+          display: flex;
+          align-items: flex-start;
+          justify-content: center;
+          gap: 4px;
+          margin-bottom: 12px;
+        }
+
+        .vx-buy-currency {
+          font-size: 32px;
+          font-weight: 900;
+          color: #a78bfa;
+          line-height: 1;
+          margin-top: 4px;
+        }
+
+        .vx-buy-card.popular .vx-buy-currency {
+          color: #c4b5fd;
+        }
+
+        .vx-buy-amount {
+          font-size: clamp(56px, 12vw, 68px);
+          font-weight: 900;
+          color: white;
+          line-height: 0.9;
+          letter-spacing: -0.03em;
+        }
+
+        .vx-buy-label {
+          font-size: 12px;
+          color: #64748b;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          margin-bottom: 12px;
+        }
+
+        .vx-buy-rounds-info {
+          padding: 12px 16px;
+          background: rgba(0, 0, 0, 0.3);
+          border-radius: 8px;
+          border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .vx-buy-rounds-count {
+          font-size: 15px;
+          color: #e2e8f0;
+          font-weight: 700;
+          margin-bottom: 4px;
+        }
+
+        .vx-buy-per-round {
+          font-size: 12px;
+          color: #94a3b8;
+        }
+
+        .vx-buy-card-content {
+          padding: 24px 28px;
+        }
+
+        .vx-buy-features-title {
+          font-size: 12px;
+          color: #94a3b8;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          margin-bottom: 16px;
+        }
+
+        .vx-buy-features {
+          list-style: none;
+        }
+
+        .vx-buy-feature {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          margin-bottom: 12px;
+          font-size: 14px;
+          color: #cbd5e1;
+          font-weight: 500;
+        }
+
+        .vx-buy-check {
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #22c55e, #16a34a);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          margin-top: 2px;
+        }
+
+        .vx-buy-card-footer {
+          padding: 0 28px 28px;
+        }
+
+        .vx-buy-btn {
+          width: 100%;
+          padding: 16px;
+          border-radius: 12px;
+          border: none;
+          background: linear-gradient(135deg, #475569, #64748b);
+          color: white;
+          font-size: 15px;
+          font-weight: 800;
+          cursor: pointer;
+          transition: all 0.3s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          letter-spacing: 0.02em;
+          text-transform: uppercase;
+        }
+
+        .vx-buy-card.popular .vx-buy-btn {
+          background: linear-gradient(135deg, #8b5cf6, #d946ef);
+          box-shadow: 0 10px 30px rgba(139, 92, 246, 0.4);
+        }
+
+        .vx-buy-btn:hover {
+          transform: translateY(-2px);
+        }
+
+        .vx-buy-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .vx-buy-benefits {
+          padding: clamp(32px, 6vw, 40px);
+          border-radius: 24px;
+          background: linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(30, 27, 75, 0.6));
+          border: 2px solid rgba(139, 92, 246, 0.3);
+          backdrop-filter: blur(20px);
+          margin-bottom: clamp(30px, 6vw, 40px);
+        }
+
+        .vx-buy-benefits-title {
+          font-size: clamp(24px, 5vw, 32px);
+          font-weight: 900;
+          margin-bottom: 12px;
+          text-align: center;
+        }
+
+        .vx-buy-benefits-subtitle {
+          font-size: 15px;
+          color: #94a3b8;
+          text-align: center;
+          margin-bottom: 32px;
+        }
+
+        .vx-buy-benefits-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+          gap: 20px;
+        }
+
+        .vx-buy-benefit {
+          padding: 20px;
+          border-radius: 16px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          transition: all 0.3s;
+          text-align: center;
+        }
+
+        .vx-buy-benefit:hover {
+          background: rgba(139, 92, 246, 0.1);
+          border-color: rgba(139, 92, 246, 0.4);
+          transform: translateY(-4px);
+        }
+
+        .vx-buy-benefit-icon {
+          width: 48px;
+          height: 48px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto 12px;
+        }
+
+        .vx-buy-benefit-title {
+          font-size: 16px;
+          font-weight: 700;
+          margin-bottom: 6px;
+        }
+
+        .vx-buy-benefit-text {
+          font-size: 13px;
+          color: #94a3b8;
+          line-height: 1.5;
+        }
+
+        .vx-buy-footer {
+          position: relative;
+          z-index: 10;
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+          background: rgba(15, 23, 42, 0.9);
+          backdrop-filter: blur(20px);
+          padding: clamp(30px, 5vw, 50px) 0;
+        }
+
+        .vx-buy-footer-inner {
+          max-width: 1200px;
+          margin: 0 auto;
+          padding: 0 clamp(16px, 4vw, 24px);
+        }
+
+        .vx-buy-footer-disclaimer {
+          background: rgba(139, 92, 246, 0.1);
+          border: 1px solid rgba(139, 92, 246, 0.2);
+          border-radius: 12px;
+          padding: clamp(16px, 3vw, 20px);
+          margin-bottom: clamp(24px, 4vw, 32px);
+          font-size: clamp(11px, 2vw, 13px);
+          line-height: 1.6;
+          color: #cbd5e1;
+          text-align: center;
+        }
+
+        .vx-buy-footer-links {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          align-items: center;
+          gap: clamp(8px, 2vw, 12px);
+          margin-bottom: clamp(24px, 4vw, 32px);
+        }
+
+        .vx-buy-footer-link {
+          color: #94a3b8;
+          text-decoration: none;
+          font-size: clamp(11px, 2vw, 13px);
+          font-weight: 500;
+          transition: color 0.3s;
+          white-space: nowrap;
+        }
+
+        .vx-buy-footer-link:hover {
+          color: #a78bfa;
+        }
+
+        .vx-buy-footer-sep {
+          color: rgba(148, 163, 184, 0.3);
+          font-size: clamp(10px, 2vw, 12px);
+        }
+
+        .vx-buy-footer-company {
+          color: #64748b;
+          font-size: clamp(11px, 2vw, 13px);
+          line-height: 1.6;
+          text-align: center;
+        }
+
+        .vx-buy-footer-email {
+          color: #a78bfa;
+          text-decoration: none;
+          font-size: 12px;
+          font-weight: 600;
         }
 
         @media (max-width: 768px) {
           .mobile-hide { display: none !important; }
         }
-
-        * {
-          box-sizing: border-box;
-        }
-        
-        body {
-          overflow-x: hidden;
-        }
       `}</style>
 
-      {/* Background Effects */}
-      <div style={{
-        position: "absolute",
-        inset: 0,
-        background: "radial-gradient(circle at 20% 50%, rgba(139, 92, 246, 0.15) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(217, 70, 239, 0.15) 0%, transparent 50%)",
-        pointerEvents: "none",
-      }} />
+      <div className="vx-buy-container">
+        <div className="vx-buy-bg-grid" />
 
-      {/* Animated Grid Pattern */}
-      <div style={{
-        position: "absolute",
-        inset: 0,
-        backgroundImage: "linear-gradient(rgba(139, 92, 246, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(139, 92, 246, 0.05) 1px, transparent 1px)",
-        backgroundSize: "50px 50px",
-        opacity: 0.5,
-        pointerEvents: "none",
-      }} />
-
-      {/* Header */}
-      <header style={{
-        position: "relative",
-        zIndex: 10,
-        borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
-        backdropFilter: "blur(20px)",
-        background: "rgba(15, 23, 42, 0.8)",
-      }}>
-        <div style={{
-          maxWidth: "1400px",
-          margin: "0 auto",
-          padding: "0 clamp(16px, 4vw, 24px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          height: "80px",
-        }}>
-          {/* Logo - SIMPLE IMG TAG */}
-          <div
-            onClick={() => router.push("/")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              cursor: "pointer",
-              transition: "transform 0.3s",
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.05)"}
-            onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
-          >
-            <div style={{
-              width: "50px",
-              height: "50px",
-              borderRadius: "50%",
-              background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 0 30px rgba(139, 92, 246, 0.6)",
-              overflow: "hidden",
-            }}>
-              <img 
-                src="/images/logo.png" 
-                alt="VibraXX Logo" 
-                width="30"
-                height="30"
-                style={{ 
-                  objectFit: "contain",
-                  display: "block",
-                }}
-              />
+        {/* Header */}
+        <header className="vx-buy-header">
+          <div className="vx-buy-header-inner">
+            <div className="vx-buy-logo" onClick={() => router.push("/")}>
+              <div className="vx-buy-logo-circle">
+                <img src="/images/logo.png" alt="VibraXX" className="vx-buy-logo-img" />
+              </div>
+              <div className="mobile-hide">
+                <div style={{ fontSize: 18, fontWeight: 700 }}>VIBRAXX</div>
+                <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.05em" }}>PREMIUM PLANS</div>
+              </div>
             </div>
-            <div className="mobile-hide">
-              <div style={{ fontSize: "18px", fontWeight: 700 }}>VIBRAXX</div>
-              <div style={{ fontSize: "10px", color: "#94a3b8", letterSpacing: "0.05em" }}>PREMIUM PLANS</div>
+
+            <div className="vx-buy-right">
+              <button className="vx-buy-audio-btn" onClick={() => setIsMuted(!isMuted)}>
+                {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+              </button>
+
+              <div className="vx-buy-rounds">
+                <Gift size={20} color="#fbbf24" />
+                <span style={{ fontSize: 16, fontWeight: 900, color: "#fbbf24" }}>{userRounds}</span>
+                <span className="mobile-hide" style={{ fontSize: 12, color: "#fcd34d" }}>rounds</span>
+              </div>
+
+              <button className="vx-buy-back-btn" onClick={() => router.push("/")}>
+                <ChevronRight size={16} style={{ transform: "rotate(180deg)" }} />
+                <span className="mobile-hide">Back</span>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Main */}
+        <main className="vx-buy-main">
+          {/* Hero */}
+          <div className="vx-buy-hero">
+            <div className="vx-buy-badge">
+              <Sparkles size={16} />
+              LIMITED TIME OFFER
+            </div>
+
+            <h1 className="vx-buy-title">Choose Your Plan</h1>
+
+            <p className="vx-buy-subtitle">
+              Compete for the <strong style={{ color: "#fbbf24" }}>£1,000 monthly prize</strong> when we reach 2000+ active participants
+            </p>
+
+            <div className="vx-buy-trust">
+              <div className="vx-buy-trust-badge">
+                <Shield size={14} />
+                Secure Payment
+              </div>
+              <div className="vx-buy-trust-badge">
+                <Lock size={14} />
+                SSL Encrypted
+              </div>
+              <div className="vx-buy-trust-badge">
+                <CheckCircle2 size={14} />
+                Instant Access
+              </div>
             </div>
           </div>
 
-          {/* Right Side */}
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-          }}>
-            {/* Audio Toggle */}
-            <button
-              onClick={toggleMute}
-              style={{
-                width: "44px",
-                height: "44px",
-                borderRadius: "12px",
-                border: "2px solid rgba(139, 92, 246, 0.5)",
-                background: "rgba(139, 92, 246, 0.2)",
-                color: "white",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                transition: "all 0.3s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(139, 92, 246, 0.4)";
-                e.currentTarget.style.transform = "scale(1.05)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
-                e.currentTarget.style.transform = "scale(1)";
-              }}
-            >
-              {isMuted ? (
-                <VolumeX style={{ width: "20px", height: "20px" }} />
-              ) : (
-                <Volume2 style={{ width: "20px", height: "20px" }} />
-              )}
-            </button>
+          {/* Cards */}
+          <div className="vx-buy-cards">
+            {packages.map((pkg) => {
+              const Icon = pkg.icon;
+              const isProcessing = processingPackageId === pkg.id;
 
-            {/* User Rounds */}
-            <div style={{
-              padding: "8px 16px",
-              borderRadius: "12px",
-              background: "linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.15))",
-              border: "2px solid rgba(251, 191, 36, 0.5)",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              boxShadow: "0 0 20px rgba(251, 191, 36, 0.3)",
-            }}>
-              <Gift style={{ width: "20px", height: "20px", color: "#fbbf24" }} />
-              <span style={{ fontSize: "16px", fontWeight: 900, color: "#fbbf24" }}>
-                {userRounds}
-              </span>
-              <span className="mobile-hide" style={{ fontSize: "12px", color: "#fcd34d" }}>
-                rounds
-              </span>
-            </div>
-
-            {/* Back Button */}
-            <button
-              onClick={() => router.push("/")}
-              style={{
-                padding: "10px 20px",
-                borderRadius: "12px",
-                border: "2px solid rgba(139, 92, 246, 0.5)",
-                background: "rgba(139, 92, 246, 0.2)",
-                color: "white",
-                fontSize: "14px",
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "all 0.3s",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(139, 92, 246, 0.4)";
-                e.currentTarget.style.transform = "translateY(-2px)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
-            >
-              <ChevronRight style={{ width: "16px", height: "16px", transform: "rotate(180deg)" }} />
-              <span className="mobile-hide">Back</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main style={{
-        position: "relative",
-        zIndex: 1,
-        maxWidth: "1200px",
-        margin: "0 auto",
-        padding: "clamp(40px, 8vw, 80px) clamp(16px, 4vw, 24px)",
-      }}>
-        
-        {/* Hero Section - Corporate */}
-        <div className="animate-slide-up" style={{
-          textAlign: "center",
-          marginBottom: "clamp(40px, 8vw, 60px)",
-        }}>
-          <div style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "8px",
-            padding: "8px 20px",
-            borderRadius: "20px",
-            background: "rgba(251, 191, 36, 0.15)",
-            border: "1px solid rgba(251, 191, 36, 0.4)",
-            marginBottom: "24px",
-            fontSize: "12px",
-            fontWeight: 700,
-            color: "#fbbf24",
-            letterSpacing: "0.05em",
-          }}>
-            <Sparkles style={{ width: "16px", height: "16px" }} />
-            LIMITED TIME OFFER
-          </div>
-
-          <h1 style={{
-            fontSize: "clamp(36px, 8vw, 56px)",
-            fontWeight: 900,
-            marginBottom: "16px",
-            background: "linear-gradient(135deg, #ffffff, #c4b5fd)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            lineHeight: 1.2,
-            letterSpacing: "-0.02em",
-          }}>
-            Choose Your Plan
-          </h1>
-
-          <p style={{
-            fontSize: "clamp(16px, 3vw, 20px)",
-            color: "#94a3b8",
-            maxWidth: "700px",
-            margin: "0 auto 24px",
-            lineHeight: 1.6,
-          }}>
-            Compete for the <span style={{ color: "#fbbf24", fontWeight: 700 }}>£1,000 monthly prize</span> when we reach 2000+ active participants
-          </p>
-
-          {/* Trust Badges */}
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexWrap: "wrap",
-            gap: "16px",
-            marginTop: "24px",
-          }}>
-            {[
-              { icon: Shield, text: "Secure Payment" },
-              { icon: Lock, text: "SSL Encrypted" },
-              { icon: CheckCircle2, text: "Instant Access" },
-            ].map((badge, i) => {
-              const Icon = badge.icon;
               return (
-                <div key={i} style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  padding: "6px 12px",
-                  borderRadius: "8px",
-                  background: "rgba(34, 197, 94, 0.1)",
-                  border: "1px solid rgba(34, 197, 94, 0.3)",
-                  fontSize: "12px",
-                  color: "#4ade80",
-                  fontWeight: 600,
-                }}>
-                  <Icon style={{ width: "14px", height: "14px" }} />
-                  {badge.text}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                <div key={pkg.id} className={`vx-buy-card ${pkg.popular ? "popular" : ""}`}>
+                  {pkg.popular && (
+                    <div className="vx-buy-ribbon">
+                      BEST VALUE
+                    </div>
+                  )}
 
-        {/* Pricing Cards - CLEAN PROFESSIONAL DESIGN */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
-          gap: "clamp(24px, 4vw, 32px)",
-          marginBottom: "clamp(40px, 6vw, 50px)",
-          maxWidth: "900px",
-          margin: "0 auto clamp(40px, 6vw, 50px)",
-        }}>
-          {packages.map((pkg, index) => {
-            const Icon = pkg.icon;
-            const isProcessing = processingPackageId === pkg.id;
-
-            return (
-              <div
-                key={pkg.id}
-                className="animate-pop-in"
-                style={{
-                  position: "relative",
-                  animationDelay: `${index * 0.15}s`,
-                }}
-              >
-                {/* Popular Ribbon */}
-                {pkg.popular && (
-                  <div style={{
-                    position: "absolute",
-                    top: "16px",
-                    right: "-8px",
-                    padding: "6px 16px 6px 20px",
-                    background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
-                    fontSize: "11px",
-                    fontWeight: 900,
-                    color: "#0f172a",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    boxShadow: "0 4px 12px rgba(251, 191, 36, 0.6)",
-                    zIndex: 10,
-                    clipPath: "polygon(0 0, 100% 0, 100% 100%, 8px 100%, 0 50%)",
-                  }}>
-                    BEST VALUE
-                  </div>
-                )}
-
-                <div style={{
-                  background: "linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 27, 75, 0.95) 100%)",
-                  borderRadius: "20px",
-                  border: pkg.popular 
-                    ? "2px solid rgba(139, 92, 246, 0.6)" 
-                    : "2px solid rgba(100, 116, 139, 0.3)",
-                  overflow: "hidden",
-                  backdropFilter: "blur(20px)",
-                  boxShadow: pkg.popular 
-                    ? "0 20px 60px rgba(139, 92, 246, 0.4)" 
-                    : "0 10px 40px rgba(0, 0, 0, 0.4)",
-                  transition: "all 0.3s ease",
-                  height: "100%",
-                  display: "flex",
-                  flexDirection: "column",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-6px)";
-                  e.currentTarget.style.boxShadow = pkg.popular
-                    ? "0 30px 80px rgba(139, 92, 246, 0.5)"
-                    : "0 20px 60px rgba(100, 116, 139, 0.4)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = pkg.popular
-                    ? "0 20px 60px rgba(139, 92, 246, 0.4)"
-                    : "0 10px 40px rgba(0, 0, 0, 0.4)";
-                }}
-                >
-                  {/* Card Header */}
-                  <div style={{
-                    padding: "28px 28px 24px",
-                    borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-                    background: pkg.popular 
-                      ? "linear-gradient(135deg, rgba(139, 92, 246, 0.15), transparent)" 
-                      : "transparent",
-                  }}>
-                    <div style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "14px",
-                      marginBottom: "16px",
-                    }}>
-                      <div style={{
-                        width: "52px",
-                        height: "52px",
-                        borderRadius: "14px",
-                        background: `linear-gradient(135deg, ${pkg.color})`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        boxShadow: `0 8px 24px ${pkg.bgGlow}`,
-                        flexShrink: 0,
-                      }}>
-                        <Icon style={{ width: "26px", height: "26px", color: "white" }} />
+                  <div className="vx-buy-card-header">
+                    <div className="vx-buy-card-top">
+                      <div
+                        className="vx-buy-icon"
+                        style={{
+                          background: pkg.popular
+                            ? "linear-gradient(135deg, #8b5cf6, #d946ef)"
+                            : "linear-gradient(135deg, #3b82f6, #06b6d4)",
+                          boxShadow: pkg.popular
+                            ? "0 8px 24px rgba(139, 92, 246, 0.4)"
+                            : "0 8px 24px rgba(59, 130, 246, 0.4)",
+                        }}
+                      >
+                        <Icon size={26} color="white" />
                       </div>
-                      
+
                       <div>
-                        <h3 style={{
-                          fontSize: "20px",
-                          fontWeight: 900,
-                          marginBottom: "4px",
-                          lineHeight: 1.2,
-                          color: "white",
-                        }}>
-                          {pkg.name}
-                        </h3>
-                        <p style={{
-                          fontSize: "13px",
-                          color: "#94a3b8",
-                          margin: 0,
-                        }}>
-                          {pkg.description}
-                        </p>
+                        <div className="vx-buy-card-name">{pkg.name}</div>
+                        <div className="vx-buy-card-desc">{pkg.description}</div>
                       </div>
                     </div>
 
-                    {/* PRICE SECTION - SUPER CLEAN */}
-                    <div style={{
-                      background: pkg.popular
-                        ? "linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(217, 70, 239, 0.15))"
-                        : "rgba(15, 23, 42, 0.6)",
-                      padding: "20px",
-                      borderRadius: "14px",
-                      border: pkg.popular 
-                        ? "1px solid rgba(139, 92, 246, 0.3)" 
-                        : "1px solid rgba(255, 255, 255, 0.06)",
-                      textAlign: "center",
-                      position: "relative",
-                    }}>
-                      {/* Savings Tag */}
+                    <div className="vx-buy-price-box">
                       {pkg.savings > 0 && (
-                        <div style={{
-                          position: "absolute",
-                          top: "-10px",
-                          right: "12px",
-                          padding: "5px 12px",
-                          borderRadius: "10px",
-                          background: "linear-gradient(135deg, #22c55e, #16a34a)",
-                          fontSize: "11px",
-                          fontWeight: 900,
-                          color: "white",
-                          boxShadow: "0 4px 12px rgba(34, 197, 94, 0.4)",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "4px",
-                        }}>
-                          <Percent style={{ width: "11px", height: "11px" }} />
+                        <div className="vx-buy-savings">
+                          <Percent size={11} />
                           {pkg.savings}% OFF
                         </div>
                       )}
 
-                      {/* Price Display */}
-                      <div style={{
-                        display: "flex",
-                        alignItems: "flex-start",
-                        justifyContent: "center",
-                        gap: "4px",
-                        marginBottom: "12px",
-                      }}>
-                        <span style={{
-                          fontSize: "32px",
-                          fontWeight: 900,
-                          color: pkg.popular ? "#a78bfa" : "#94a3b8",
-                          lineHeight: 1,
-                          marginTop: "4px",
-                        }}>
-                          £
-                        </span>
-                        <span style={{
-                          fontSize: "clamp(60px, 12vw, 72px)",
-                          fontWeight: 900,
-                          color: "white",
-                          lineHeight: 0.9,
-                          letterSpacing: "-0.03em",
-                        }}>
-                          {pkg.price}
-                        </span>
+                      <div className="vx-buy-price">
+                        <span className="vx-buy-currency">£</span>
+                        <span className="vx-buy-amount">{pkg.price}</span>
                       </div>
 
-                      <div style={{
-                        fontSize: "12px",
-                        color: "#64748b",
-                        fontWeight: 600,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.08em",
-                        marginBottom: "12px",
-                      }}>
-                        One-time payment
-                      </div>
+                      <div className="vx-buy-label">One-time payment</div>
 
-                      <div style={{
-                        padding: "10px 16px",
-                        background: "rgba(0, 0, 0, 0.3)",
-                        borderRadius: "8px",
-                        border: "1px solid rgba(255, 255, 255, 0.05)",
-                      }}>
-                        <div style={{
-                          fontSize: "15px",
-                          color: "#e2e8f0",
-                          fontWeight: 700,
-                          marginBottom: "4px",
-                        }}>
+                      <div className="vx-buy-rounds-info">
+                        <div className="vx-buy-rounds-count">
                           {pkg.rounds} Quiz Round{pkg.rounds > 1 ? "s" : ""}
                         </div>
-                        <div style={{
-                          fontSize: "12px",
-                          color: "#94a3b8",
-                        }}>
-                          £{pkg.pricePerRound.toFixed(2)} per round
+                        <div className="vx-buy-per-round">
+                          £{(pkg.price / pkg.rounds).toFixed(2)} per round
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Features Section */}
-                  <div style={{
-                    padding: "24px 28px",
-                    flex: 1,
-                  }}>
-                    <div style={{
-                      fontSize: "12px",
-                      color: "#94a3b8",
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                      marginBottom: "16px",
-                    }}>
-                      What's Included
-                    </div>
-                    <ul style={{
-                      listStyle: "none",
-                      padding: 0,
-                      margin: 0,
-                    }}>
+                  <div className="vx-buy-card-content">
+                    <div className="vx-buy-features-title">What's Included</div>
+                    <ul className="vx-buy-features">
                       {pkg.features.map((feature, i) => (
-                        <li
-                          key={i}
-                          style={{
-                            display: "flex",
-                            alignItems: "flex-start",
-                            gap: "12px",
-                            marginBottom: "12px",
-                            fontSize: "14px",
-                            color: "#cbd5e1",
-                            fontWeight: 500,
-                          }}
-                        >
-                          <div style={{
-                            width: "20px",
-                            height: "20px",
-                            borderRadius: "50%",
-                            background: "linear-gradient(135deg, #22c55e, #16a34a)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            flexShrink: 0,
-                            marginTop: "2px",
-                          }}>
-                            <Check style={{ width: "12px", height: "12px", color: "white", strokeWidth: 3 }} />
+                        <li key={i} className="vx-buy-feature">
+                          <div className="vx-buy-check">
+                            <Check size={12} color="white" strokeWidth={3} />
                           </div>
                           {feature}
                         </li>
@@ -792,317 +901,99 @@ export default function BuyPage() {
                     </ul>
                   </div>
 
-                  {/* CTA Button */}
-                  <div style={{
-                    padding: "0 28px 28px",
-                  }}>
+                  <div className="vx-buy-card-footer">
                     <button
+                      className="vx-buy-btn"
                       onClick={() => handlePurchase(pkg)}
                       disabled={isProcessing}
-                      style={{
-                        width: "100%",
-                        padding: "16px",
-                        borderRadius: "12px",
-                        border: "none",
-                        background: pkg.popular
-                          ? "linear-gradient(135deg, #8b5cf6, #d946ef)"
-                          : "linear-gradient(135deg, #475569, #64748b)",
-                        color: "white",
-                        fontSize: "15px",
-                        fontWeight: 800,
-                        cursor: isProcessing ? "not-allowed" : "pointer",
-                        transition: "all 0.3s",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "10px",
-                        boxShadow: pkg.popular
-                          ? "0 10px 30px rgba(139, 92, 246, 0.4)"
-                          : "0 6px 20px rgba(0, 0, 0, 0.3)",
-                        opacity: isProcessing ? 0.6 : 1,
-                        letterSpacing: "0.02em",
-                        textTransform: "uppercase",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isProcessing) {
-                          e.currentTarget.style.transform = "translateY(-2px)";
-                          e.currentTarget.style.boxShadow = pkg.popular
-                            ? "0 15px 40px rgba(139, 92, 246, 0.6)"
-                            : "0 10px 30px rgba(100, 116, 139, 0.5)";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = pkg.popular
-                          ? "0 10px 30px rgba(139, 92, 246, 0.4)"
-                          : "0 6px 20px rgba(0, 0, 0, 0.3)";
-                      }}
                     >
                       {isProcessing ? (
-                        <>
-                          <div style={{
-                            width: "18px",
-                            height: "18px",
-                            border: "2px solid rgba(255, 255, 255, 0.3)",
-                            borderTopColor: "white",
-                            borderRadius: "50%",
-                            animation: "spin 1s linear infinite",
-                          }} />
-                          Processing...
-                        </>
+                        <>Processing...</>
                       ) : (
                         <>
-                          <ShoppingCart style={{ width: "20px", height: "20px" }} />
+                          <ShoppingCart size={20} />
                           Get Started Now
-                          <ArrowRight style={{ width: "18px", height: "18px" }} />
+                          <ArrowRight size={18} />
                         </>
                       )}
                     </button>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Benefits Section - Compact Corporate */}
-        <div className="animate-slide-up" style={{
-          padding: "clamp(32px, 6vw, 40px)",
-          borderRadius: "24px",
-          background: "linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(30, 27, 75, 0.6))",
-          border: "2px solid rgba(139, 92, 246, 0.3)",
-          backdropFilter: "blur(20px)",
-          marginBottom: "clamp(30px, 6vw, 40px)",
-          boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)",
-        }}>
-          <div style={{
-            textAlign: "center",
-            marginBottom: "32px",
-          }}>
-            <h2 style={{
-              fontSize: "clamp(24px, 5vw, 32px)",
-              fontWeight: 900,
-              marginBottom: "12px",
-              background: "linear-gradient(135deg, #ffffff, #c4b5fd)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}>
-              Why VibraXX?
-            </h2>
-            <p style={{
-              fontSize: "15px",
-              color: "#94a3b8",
-            }}>
-              Professional quiz platform with premium features
-            </p>
-          </div>
-
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
-            gap: "20px",
-          }}>
-            {[
-              {
-                icon: Trophy,
-                title: "£1,000 Prize Pool",
-                description: "Monthly rewards at 2000+ players",
-                color: "#fbbf24",
-              },
-              {
-                icon: Zap,
-                title: "Instant Access",
-                description: "Play immediately after purchase",
-                color: "#06b6d4",
-              },
-              {
-                icon: Users,
-                title: "Global Leaderboard",
-                description: "Compete with players worldwide",
-                color: "#8b5cf6",
-              },
-              {
-                icon: Target,
-                title: "Detailed Analytics",
-                description: "Track your progress & rankings",
-                color: "#ec4899",
-              },
-            ].map((benefit, index) => {
-              const Icon = benefit.icon;
-              return (
-                <div
-                  key={index}
-                  style={{
-                    padding: "20px",
-                    borderRadius: "16px",
-                    background: "rgba(255, 255, 255, 0.03)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
-                    transition: "all 0.3s",
-                    textAlign: "center",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(139, 92, 246, 0.1)";
-                    e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.4)";
-                    e.currentTarget.style.transform = "translateY(-4px)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)";
-                    e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)";
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
-                >
-                  <div style={{
-                    width: "48px",
-                    height: "48px",
-                    borderRadius: "12px",
-                    background: `${benefit.color}20`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    margin: "0 auto 12px",
-                    border: `1px solid ${benefit.color}40`,
-                  }}>
-                    <Icon style={{ width: "24px", height: "24px", color: benefit.color }} />
-                  </div>
-                  <h3 style={{
-                    fontSize: "16px",
-                    fontWeight: 700,
-                    marginBottom: "6px",
-                  }}>
-                    {benefit.title}
-                  </h3>
-                  <p style={{
-                    fontSize: "13px",
-                    color: "#94a3b8",
-                    margin: 0,
-                    lineHeight: 1.5,
-                  }}>
-                    {benefit.description}
-                  </p>
-                </div>
               );
             })}
           </div>
-        </div>
-      </main>
 
-      {/* Footer - Home Page Style */}
-      <footer style={{
-        position: "relative",
-        zIndex: 10,
-        borderTop: "1px solid rgba(255, 255, 255, 0.1)",
-        background: "rgba(15, 23, 42, 0.9)",
-        backdropFilter: "blur(20px)",
-        padding: "clamp(30px, 5vw, 50px) 0",
-      }}>
-        <div style={{
-          maxWidth: "1200px",
-          margin: "0 auto",
-          padding: "0 clamp(16px, 4vw, 24px)",
-        }}>
-          
-          {/* Legal Disclaimer */}
-          <div style={{
-            background: "rgba(139, 92, 246, 0.1)",
-            border: "1px solid rgba(139, 92, 246, 0.2)",
-            borderRadius: "12px",
-            padding: "clamp(16px, 3vw, 20px)",
-            marginBottom: "clamp(24px, 4vw, 32px)",
-            fontSize: "clamp(11px, 2vw, 13px)",
-            lineHeight: 1.6,
-            color: "#cbd5e1",
-            textAlign: "center",
-          }}>
-            <strong style={{ color: "#94a3b8" }}>Educational Quiz Competition.</strong> 18+ only. 
-            This is a 100% skill-based knowledge competition with no element of chance. 
-            Entry fees apply. Prize pool activates with 2000+ monthly participants. See{" "}
-            <a href="/terms" style={{ color: "#a78bfa", textDecoration: "underline" }}>
-              Terms & Conditions
-            </a>{" "}
-            for full details.
-          </div>
+          {/* Benefits */}
+          <div className="vx-buy-benefits">
+            <h2 className="vx-buy-benefits-title">Why VibraXX?</h2>
+            <p className="vx-buy-benefits-subtitle">Professional quiz platform with premium features</p>
 
-          {/* Main Links */}
-          <nav style={{
-            display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "center",
-            alignItems: "center",
-            gap: "clamp(8px, 2vw, 12px)",
-            marginBottom: "clamp(24px, 4vw, 32px)",
-          }}>
-            {[
-              { href: "/privacy", text: "Privacy Policy" },
-              { href: "/terms", text: "Terms & Conditions" },
-              { href: "/cookies", text: "Cookie Policy" },
-              { href: "/how-it-works", text: "How It Works" },
-              { href: "/rules", text: "Quiz Rules" },
-              { href: "/complaints", text: "Complaints" },
-              { href: "/refunds", text: "Refund Policy" },
-              { href: "/about", text: "About Us" },
-              { href: "/contact", text: "Contact" },
-              { href: "/faq", text: "FAQ" },
-            ].map((link, i, arr) => (
-              <>
-                <a
-                  key={link.href}
-                  href={link.href}
-                  style={{
-                    color: "#94a3b8",
-                    textDecoration: "none",
-                    fontSize: "clamp(11px, 2vw, 13px)",
-                    fontWeight: 500,
-                    transition: "color 0.3s",
-                    whiteSpace: "nowrap",
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
-                  onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
-                >
-                  {link.text}
-                </a>
-                {i < arr.length - 1 && (
-                  <span style={{ color: "rgba(148, 163, 184, 0.3)", fontSize: "clamp(10px, 2vw, 12px)" }}>•</span>
-                )}
-              </>
-            ))}
-          </nav>
-
-          {/* Company Info */}
-          <div style={{ color: "#64748b", fontSize: "clamp(11px, 2vw, 13px)", lineHeight: 1.6 }}>
-            <div style={{ marginBottom: "8px", textAlign: "center" }}>
-              © 2025 VibraXX. Operated by Sermin Limited (UK)
-            </div>
-            <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "8px", textAlign: "center" }}>
-              Registered in England & Wales | All rights reserved
-            </div>
-            <div style={{ marginBottom: "10px", textAlign: "center" }}>
-              <a 
-                href="mailto:team@vibraxx.com"
-                style={{ 
-                  color: "#a78bfa", 
-                  textDecoration: "none",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                }}
-              >
-                team@vibraxx.com
-              </a>
-            </div>
-            <div style={{ fontSize: "11px", textAlign: "center" }}>
-              Payment processing by{" "}
-              <a 
-                href="https://stripe.com" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                style={{ color: "#a78bfa", textDecoration: "none" }}
-              >
-                Stripe
-              </a>
-              {" "}| Secure SSL encryption | Skill-based competition - Not gambling
+            <div className="vx-buy-benefits-grid">
+              {[
+                { icon: Trophy, title: "£1,000 Prize Pool", text: "Monthly rewards at 2000+ players", color: "#fbbf24" },
+                { icon: Zap, title: "Instant Access", text: "Play immediately after purchase", color: "#06b6d4" },
+                { icon: Users, title: "Global Leaderboard", text: "Compete with players worldwide", color: "#8b5cf6" },
+                { icon: Target, title: "Detailed Analytics", text: "Track your progress & rankings", color: "#ec4899" },
+              ].map((benefit, i) => {
+                const Icon = benefit.icon;
+                return (
+                  <div key={i} className="vx-buy-benefit">
+                    <div className="vx-buy-benefit-icon" style={{ background: `${benefit.color}20`, border: `1px solid ${benefit.color}40` }}>
+                      <Icon size={24} color={benefit.color} />
+                    </div>
+                    <div className="vx-buy-benefit-title">{benefit.title}</div>
+                    <div className="vx-buy-benefit-text">{benefit.text}</div>
+                  </div>
+                );
+              })}
             </div>
           </div>
-        </div>
-      </footer>
-    </div>
+        </main>
+
+        {/* Footer */}
+        <footer className="vx-buy-footer">
+          <div className="vx-buy-footer-inner">
+            <div className="vx-buy-footer-disclaimer">
+              <strong style={{ color: "#94a3b8" }}>Educational Quiz Competition.</strong> 18+ only. 
+              This is a 100% skill-based knowledge competition with no element of chance. 
+              Entry fees apply. Prize pool activates with 2000+ monthly participants. See{" "}
+              <a href="/terms" style={{ color: "#a78bfa", textDecoration: "underline" }}>Terms & Conditions</a> for full details.
+            </div>
+
+            <nav className="vx-buy-footer-links">
+              {[
+                { href: "/privacy", text: "Privacy Policy" },
+                { href: "/terms", text: "Terms & Conditions" },
+                { href: "/cookies", text: "Cookie Policy" },
+                { href: "/how-it-works", text: "How It Works" },
+                { href: "/rules", text: "Quiz Rules" },
+                { href: "/complaints", text: "Complaints" },
+                { href: "/refunds", text: "Refund Policy" },
+                { href: "/about", text: "About Us" },
+                { href: "/contact", text: "Contact" },
+                { href: "/faq", text: "FAQ" },
+              ].map((link, i, arr) => (
+                <>
+                  <a key={link.href} href={link.href} className="vx-buy-footer-link">{link.text}</a>
+                  {i < arr.length - 1 && <span className="vx-buy-footer-sep">•</span>}
+                </>
+              ))}
+            </nav>
+
+            <div className="vx-buy-footer-company">
+              <div style={{ marginBottom: 8 }}>© 2025 VibraXX. Operated by Sermin Limited (UK)</div>
+              <div style={{ fontSize: 11, marginBottom: 8 }}>Registered in England & Wales | All rights reserved</div>
+              <div style={{ marginBottom: 10 }}>
+                <a href="mailto:team@vibraxx.com" className="vx-buy-footer-email">team@vibraxx.com</a>
+              </div>
+              <div style={{ fontSize: 11 }}>
+                Payment processing by <a href="https://stripe.com" target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa", textDecoration: "none" }}>Stripe</a>
+                {" "}| Secure SSL encryption | Skill-based competition - Not gambling
+              </div>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </>
   );
 }
