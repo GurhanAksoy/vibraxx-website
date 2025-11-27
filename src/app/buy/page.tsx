@@ -13,17 +13,17 @@ import {
   Trophy,
   Sparkles,
   Lock,
-  Unlock,
   ChevronRight,
-  CreditCard,
   Rocket,
-  Star,
   ShoppingCart,
-  AlertCircle,
   CheckCircle2,
   ArrowRight,
-  Flame,
   Target,
+  Volume2,
+  VolumeX,
+  Shield,
+  Percent,
+  Clock,
 } from "lucide-react";
 
 // Initialize Supabase
@@ -53,8 +53,8 @@ const packages = [
       "Leaderboard Entry",
       "Score Tracking",
     ],
-    description: "Perfect for trying it out",
-    stripePriceId: "price_single_round", // Replace with actual Stripe Price ID
+    description: "Try it out",
+    stripePriceId: "price_single_round",
   },
   {
     id: "bundle",
@@ -71,13 +71,13 @@ const packages = [
     features: [
       "35 Quiz Rounds",
       "1,750 Questions",
-      "17% Savings",
-      "Priority Entry",
+      "17% Savings (£6 off)",
+      "Priority Support",
       "Extended Stats",
-      "Badge: Champion",
+      "Champion Badge",
     ],
-    description: "Best value for champions",
-    stripePriceId: "price_champion_bundle", // Replace with actual Stripe Price ID
+    description: "Best value",
+    stripePriceId: "price_champion_bundle",
   },
 ];
 
@@ -87,26 +87,46 @@ export default function BuyPage() {
   const [userRounds, setUserRounds] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [processingPackageId, setProcessingPackageId] = useState<string | null>(null);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [purchasedRounds, setPurchasedRounds] = useState(0);
+  const [isMuted, setIsMuted] = useState(true);
+  const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
+
+  // Audio setup
+  useEffect(() => {
+    const bgAudio = new Audio("/sounds/vibraxx.mp3");
+    bgAudio.loop = true;
+    bgAudio.volume = 0.3;
+    setAudio(bgAudio);
+
+    return () => {
+      bgAudio.pause();
+    };
+  }, []);
+
+  const toggleMute = () => {
+    if (audio) {
+      if (isMuted) {
+        audio.play().catch(console.error);
+      } else {
+        audio.pause();
+      }
+      setIsMuted(!isMuted);
+    }
+  };
 
   // Fetch user and rounds
   useEffect(() => {
     const loadUser = async () => {
       setIsLoading(true);
       
-      // Get authenticated user
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
       if (authError || !authUser) {
-        // Redirect to home if not authenticated
         router.push("/");
         return;
       }
 
       setUser(authUser);
 
-      // Fetch user's available rounds
       const { data: roundsData, error: roundsError } = await supabase
         .from("user_rounds")
         .select("available_rounds")
@@ -123,7 +143,6 @@ export default function BuyPage() {
     loadUser();
   }, [router]);
 
-  // Handle purchase with Stripe
   const handlePurchase = async (pkg: typeof packages[0]) => {
     if (!user) {
       router.push("/");
@@ -133,7 +152,6 @@ export default function BuyPage() {
     setProcessingPackageId(pkg.id);
 
     try {
-      // Call your backend API to create Stripe Checkout Session
       const response = await fetch("/api/create-checkout-session", {
         method: "POST",
         headers: {
@@ -150,7 +168,6 @@ export default function BuyPage() {
       const data = await response.json();
 
       if (data.url) {
-        // Redirect to Stripe Checkout
         window.location.href = data.url;
       } else {
         throw new Error("Failed to create checkout session");
@@ -198,43 +215,24 @@ export default function BuyPage() {
     }}>
       
       <style jsx global>{`
-        @keyframes shimmer {
-          0% { background-position: -200% center; }
-          100% { background-position: 200% center; }
-        }
         @keyframes float {
           0%, 100% { transform: translateY(0px); }
           50% { transform: translateY(-20px); }
-        }
-        @keyframes glow {
-          0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.5); }
-          50% { box-shadow: 0 0 40px rgba(217, 70, 239, 0.8); }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.6; }
         }
         @keyframes slideUp {
           from { transform: translateY(30px); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
         }
         @keyframes popIn {
-          0% { transform: scale(0.8); opacity: 0; }
-          50% { transform: scale(1.05); }
+          0% { transform: scale(0.9); opacity: 0; }
           100% { transform: scale(1); opacity: 1; }
         }
-        .animate-shimmer {
-          background-size: 200% 100%;
-          animation: shimmer 3s linear infinite;
+        @keyframes shimmer {
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
         }
         .animate-float {
           animation: float 3s ease-in-out infinite;
-        }
-        .animate-glow {
-          animation: glow 2s ease-in-out infinite;
-        }
-        .animate-pulse {
-          animation: pulse 2s ease-in-out infinite;
         }
         .animate-slide-up {
           animation: slideUp 0.6s ease-out;
@@ -242,20 +240,21 @@ export default function BuyPage() {
         .animate-pop-in {
           animation: popIn 0.5s ease-out;
         }
+        .shimmer {
+          background: linear-gradient(
+            90deg,
+            transparent,
+            rgba(255, 255, 255, 0.1),
+            transparent
+          );
+          background-size: 200% 100%;
+          animation: shimmer 3s infinite;
+        }
 
         @media (max-width: 768px) {
           .mobile-hide { display: none !important; }
-          .mobile-stack { flex-direction: column !important; }
         }
 
-        @media (max-width: 640px) {
-          /* Footer links stack on very small screens */
-          nav span[style*="color: rgba(148, 163, 184, 0.3)"] {
-            display: none;
-          }
-        }
-
-        /* Ensure no horizontal scroll */
         * {
           box-sizing: border-box;
         }
@@ -273,24 +272,15 @@ export default function BuyPage() {
         pointerEvents: "none",
       }} />
 
-      {/* Animated particles */}
-      {[...Array(15)].map((_, i) => (
-        <div
-          key={i}
-          style={{
-            position: "absolute",
-            width: "4px",
-            height: "4px",
-            borderRadius: "50%",
-            background: i % 3 === 0 ? "#8b5cf6" : i % 3 === 1 ? "#d946ef" : "#06b6d4",
-            top: `${Math.random() * 100}%`,
-            left: `${Math.random() * 100}%`,
-            animation: `float ${3 + Math.random() * 2}s ease-in-out infinite`,
-            animationDelay: `${Math.random() * 2}s`,
-            opacity: 0.6,
-          }}
-        />
-      ))}
+      {/* Animated Grid Pattern */}
+      <div style={{
+        position: "absolute",
+        inset: 0,
+        backgroundImage: "linear-gradient(rgba(139, 92, 246, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(139, 92, 246, 0.05) 1px, transparent 1px)",
+        backgroundSize: "50px 50px",
+        opacity: 0.5,
+        pointerEvents: "none",
+      }} />
 
       {/* Header */}
       <header style={{
@@ -336,16 +326,49 @@ export default function BuyPage() {
             </div>
             <div className="mobile-hide">
               <div style={{ fontSize: "18px", fontWeight: 700 }}>VIBRAXX</div>
-              <div style={{ fontSize: "10px", color: "#94a3b8" }}>BUY ROUNDS</div>
+              <div style={{ fontSize: "10px", color: "#94a3b8", letterSpacing: "0.05em" }}>PREMIUM PLANS</div>
             </div>
           </div>
 
-          {/* User Rounds Display */}
+          {/* Right Side */}
           <div style={{
             display: "flex",
             alignItems: "center",
-            gap: "16px",
+            gap: "12px",
           }}>
+            {/* Audio Toggle */}
+            <button
+              onClick={toggleMute}
+              style={{
+                width: "44px",
+                height: "44px",
+                borderRadius: "12px",
+                border: "2px solid rgba(139, 92, 246, 0.5)",
+                background: "rgba(139, 92, 246, 0.2)",
+                color: "white",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "all 0.3s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(139, 92, 246, 0.4)";
+                e.currentTarget.style.transform = "scale(1.05)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+            >
+              {isMuted ? (
+                <VolumeX style={{ width: "20px", height: "20px" }} />
+              ) : (
+                <Volume2 style={{ width: "20px", height: "20px" }} />
+              )}
+            </button>
+
+            {/* User Rounds */}
             <div style={{
               padding: "8px 16px",
               borderRadius: "12px",
@@ -365,6 +388,7 @@ export default function BuyPage() {
               </span>
             </div>
 
+            {/* Back Button */}
             <button
               onClick={() => router.push("/")}
               style={{
@@ -391,7 +415,7 @@ export default function BuyPage() {
               }}
             >
               <ChevronRight style={{ width: "16px", height: "16px", transform: "rotate(180deg)" }} />
-              <span className="mobile-hide">Back to Home</span>
+              <span className="mobile-hide">Back</span>
             </button>
           </div>
         </div>
@@ -406,7 +430,7 @@ export default function BuyPage() {
         padding: "clamp(40px, 8vw, 80px) clamp(16px, 4vw, 24px)",
       }}>
         
-        {/* Hero Section */}
+        {/* Hero Section - Corporate */}
         <div className="animate-slide-up" style={{
           textAlign: "center",
           marginBottom: "clamp(40px, 8vw, 60px)",
@@ -415,27 +439,29 @@ export default function BuyPage() {
             display: "inline-flex",
             alignItems: "center",
             gap: "8px",
-            padding: "8px 16px",
+            padding: "8px 20px",
             borderRadius: "20px",
-            background: "rgba(139, 92, 246, 0.2)",
-            border: "1px solid rgba(139, 92, 246, 0.5)",
-            marginBottom: "20px",
+            background: "rgba(251, 191, 36, 0.15)",
+            border: "1px solid rgba(251, 191, 36, 0.4)",
+            marginBottom: "24px",
             fontSize: "12px",
-            fontWeight: 600,
-            color: "#c4b5fd",
+            fontWeight: 700,
+            color: "#fbbf24",
+            letterSpacing: "0.05em",
           }}>
             <Sparkles style={{ width: "16px", height: "16px" }} />
-            SPECIAL OFFER
+            LIMITED TIME OFFER
           </div>
 
           <h1 style={{
-            fontSize: "clamp(32px, 8vw, 56px)",
+            fontSize: "clamp(36px, 8vw, 56px)",
             fontWeight: 900,
             marginBottom: "16px",
-            background: "linear-gradient(135deg, #ffffff, #d4d4d8)",
+            background: "linear-gradient(135deg, #ffffff, #c4b5fd)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             lineHeight: 1.2,
+            letterSpacing: "-0.02em",
           }}>
             Choose Your Plan
           </h1>
@@ -443,21 +469,56 @@ export default function BuyPage() {
           <p style={{
             fontSize: "clamp(16px, 3vw, 20px)",
             color: "#94a3b8",
-            maxWidth: "600px",
-            margin: "0 auto",
+            maxWidth: "700px",
+            margin: "0 auto 24px",
             lineHeight: 1.6,
           }}>
-            Compete for the <span style={{ color: "#fbbf24", fontWeight: 700 }}>£1,000 monthly prize</span> with 2000+ participants
+            Compete for the <span style={{ color: "#fbbf24", fontWeight: 700 }}>£1,000 monthly prize</span> when we reach 2000+ active participants
           </p>
+
+          {/* Trust Badges */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexWrap: "wrap",
+            gap: "16px",
+            marginTop: "24px",
+          }}>
+            {[
+              { icon: Shield, text: "Secure Payment" },
+              { icon: Lock, text: "SSL Encrypted" },
+              { icon: CheckCircle2, text: "Instant Access" },
+            ].map((badge, i) => {
+              const Icon = badge.icon;
+              return (
+                <div key={i} style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "6px 12px",
+                  borderRadius: "8px",
+                  background: "rgba(34, 197, 94, 0.1)",
+                  border: "1px solid rgba(34, 197, 94, 0.3)",
+                  fontSize: "12px",
+                  color: "#4ade80",
+                  fontWeight: 600,
+                }}>
+                  <Icon style={{ width: "14px", height: "14px" }} />
+                  {badge.text}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Pricing Cards */}
+        {/* Pricing Cards - Corporate Premium */}
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
-          gap: "clamp(20px, 3vw, 24px)",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
+          gap: "clamp(24px, 4vw, 32px)",
           marginBottom: "clamp(40px, 6vw, 50px)",
-          maxWidth: "800px",
+          maxWidth: "900px",
           margin: "0 auto clamp(40px, 6vw, 50px)",
         }}>
           {packages.map((pkg, index) => {
@@ -470,94 +531,112 @@ export default function BuyPage() {
                 className="animate-pop-in"
                 style={{
                   position: "relative",
-                  animationDelay: `${index * 0.1}s`,
+                  animationDelay: `${index * 0.15}s`,
                 }}
               >
                 {/* Popular Badge */}
                 {pkg.popular && (
                   <div style={{
                     position: "absolute",
-                    top: "-10px",
+                    top: "-12px",
                     left: "50%",
                     transform: "translateX(-50%)",
-                    padding: "4px 12px",
-                    borderRadius: "12px",
+                    padding: "6px 16px",
+                    borderRadius: "16px",
                     background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
-                    fontSize: "10px",
-                    fontWeight: 800,
+                    fontSize: "11px",
+                    fontWeight: 900,
                     color: "#0f172a",
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
-                    boxShadow: "0 4px 12px rgba(251, 191, 36, 0.5)",
+                    boxShadow: "0 4px 12px rgba(251, 191, 36, 0.6)",
                     zIndex: 10,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
                   }}>
+                    <Crown style={{ width: "14px", height: "14px" }} />
                     BEST VALUE
                   </div>
                 )}
 
                 <div style={{
                   background: pkg.popular 
-                    ? "linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(217, 70, 239, 0.15))"
+                    ? "linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(217, 70, 239, 0.1))"
                     : "rgba(15, 23, 42, 0.6)",
-                  borderRadius: "20px",
+                  borderRadius: "24px",
                   border: pkg.popular 
-                    ? "2px solid rgba(139, 92, 246, 0.5)" 
-                    : "2px solid rgba(139, 92, 246, 0.2)",
-                  padding: "clamp(20px, 4vw, 24px)",
+                    ? "2px solid rgba(139, 92, 246, 0.6)" 
+                    : "2px solid rgba(139, 92, 246, 0.25)",
+                  padding: "clamp(28px, 5vw, 36px)",
                   backdropFilter: "blur(20px)",
                   boxShadow: pkg.popular 
-                    ? "0 20px 60px rgba(139, 92, 246, 0.4)" 
-                    : "0 10px 30px rgba(0, 0, 0, 0.3)",
-                  transition: "all 0.3s",
+                    ? "0 20px 60px rgba(139, 92, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)" 
+                    : "0 10px 30px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)",
+                  transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
                   height: "100%",
                   display: "flex",
                   flexDirection: "column",
+                  position: "relative",
+                  overflow: "hidden",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-6px)";
+                  e.currentTarget.style.transform = "translateY(-8px)";
                   e.currentTarget.style.boxShadow = pkg.popular
-                    ? "0 25px 70px rgba(139, 92, 246, 0.5)"
-                    : "0 15px 50px rgba(139, 92, 246, 0.4)";
+                    ? "0 30px 80px rgba(139, 92, 246, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15)"
+                    : "0 20px 50px rgba(139, 92, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = "translateY(0)";
                   e.currentTarget.style.boxShadow = pkg.popular
-                    ? "0 20px 60px rgba(139, 92, 246, 0.4)"
-                    : "0 10px 30px rgba(0, 0, 0, 0.3)";
+                    ? "0 20px 60px rgba(139, 92, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)"
+                    : "0 10px 30px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)";
                 }}
                 >
-                  {/* Header */}
+                  {/* Shimmer Effect */}
+                  {pkg.popular && (
+                    <div className="shimmer" style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: "100%",
+                      pointerEvents: "none",
+                    }} />
+                  )}
+
+                  {/* Header with Icon */}
                   <div style={{
                     display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    marginBottom: "16px",
+                    alignItems: "flex-start",
+                    gap: "16px",
+                    marginBottom: "24px",
                   }}>
                     <div style={{
-                      width: "48px",
-                      height: "48px",
-                      borderRadius: "12px",
+                      width: "56px",
+                      height: "56px",
+                      borderRadius: "16px",
                       background: `linear-gradient(135deg, ${pkg.color})`,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      boxShadow: `0 0 20px ${pkg.bgGlow}`,
+                      boxShadow: `0 8px 24px ${pkg.bgGlow}`,
                       flexShrink: 0,
                     }}>
-                      <Icon style={{ width: "24px", height: "24px", color: "white" }} />
+                      <Icon style={{ width: "28px", height: "28px", color: "white" }} />
                     </div>
                     
                     <div style={{ flex: 1 }}>
                       <h3 style={{
-                        fontSize: "clamp(16px, 3vw, 18px)",
-                        fontWeight: 800,
-                        marginBottom: "2px",
+                        fontSize: "clamp(18px, 4vw, 22px)",
+                        fontWeight: 900,
+                        marginBottom: "4px",
                         lineHeight: 1.2,
                       }}>
                         {pkg.name}
                       </h3>
                       <p style={{
-                        fontSize: "12px",
+                        fontSize: "13px",
                         color: "#94a3b8",
                         margin: 0,
                       }}>
@@ -566,59 +645,83 @@ export default function BuyPage() {
                     </div>
                   </div>
 
-                  {/* Price */}
+                  {/* PRICE - VERY PROMINENT */}
                   <div style={{ 
-                    marginBottom: "16px",
-                    padding: "16px",
-                    borderRadius: "12px",
+                    marginBottom: "24px",
+                    padding: "24px",
+                    borderRadius: "16px",
                     background: pkg.popular 
-                      ? "rgba(139, 92, 246, 0.1)" 
-                      : "rgba(15, 23, 42, 0.4)",
-                    border: `1px solid ${pkg.popular ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255, 255, 255, 0.05)'}`,
+                      ? "linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(217, 70, 239, 0.15))" 
+                      : "rgba(15, 23, 42, 0.5)",
+                    border: `2px solid ${pkg.popular ? 'rgba(139, 92, 246, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
+                    textAlign: "center",
+                    position: "relative",
                   }}>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: "4px", marginBottom: "4px" }}>
+                    {/* Savings Badge */}
+                    {pkg.savings > 0 && (
+                      <div style={{
+                        position: "absolute",
+                        top: "-10px",
+                        right: "12px",
+                        padding: "4px 12px",
+                        borderRadius: "12px",
+                        background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                        fontSize: "11px",
+                        fontWeight: 900,
+                        color: "white",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        boxShadow: "0 4px 12px rgba(34, 197, 94, 0.4)",
+                      }}>
+                        <Percent style={{ width: "12px", height: "12px" }} />
+                        SAVE {pkg.savings}%
+                      </div>
+                    )}
+
+                    {/* Main Price */}
+                    <div style={{
+                      display: "flex",
+                      alignItems: "baseline",
+                      justifyContent: "center",
+                      gap: "4px",
+                      marginBottom: "12px",
+                    }}>
                       <span style={{
-                        fontSize: "clamp(32px, 7vw, 40px)",
+                        fontSize: "clamp(48px, 10vw, 64px)",
                         fontWeight: 900,
                         background: `linear-gradient(135deg, ${pkg.color})`,
                         WebkitBackgroundClip: "text",
                         WebkitTextFillColor: "transparent",
                         lineHeight: 1,
+                        letterSpacing: "-0.02em",
                       }}>
                         {pkg.currency}{pkg.price}
                       </span>
                     </div>
+
+                    {/* Details */}
                     <div style={{
-                      fontSize: "12px",
+                      fontSize: "14px",
+                      color: "#cbd5e1",
+                      fontWeight: 600,
+                      marginBottom: "8px",
+                    }}>
+                      {pkg.rounds} Quiz Round{pkg.rounds > 1 ? "s" : ""}
+                    </div>
+                    <div style={{
+                      fontSize: "13px",
                       color: "#64748b",
                     }}>
-                      {pkg.rounds} round{pkg.rounds > 1 ? "s" : ""} • £{pkg.pricePerRound.toFixed(2)} each
+                      £{pkg.pricePerRound.toFixed(2)} per round
                     </div>
-                    {pkg.savings > 0 && (
-                      <div style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "4px",
-                        marginTop: "8px",
-                        padding: "4px 10px",
-                        borderRadius: "8px",
-                        background: "rgba(34, 197, 94, 0.2)",
-                        border: "1px solid rgba(34, 197, 94, 0.4)",
-                        fontSize: "11px",
-                        fontWeight: 700,
-                        color: "#22c55e",
-                      }}>
-                        <TrendingUp style={{ width: "12px", height: "12px" }} />
-                        Save {pkg.savings}%
-                      </div>
-                    )}
                   </div>
 
                   {/* Features */}
                   <ul style={{
                     listStyle: "none",
                     padding: 0,
-                    margin: "0 0 20px 0",
+                    margin: "0 0 24px 0",
                     flex: 1,
                   }}>
                     {pkg.features.map((feature, i) => (
@@ -627,75 +730,79 @@ export default function BuyPage() {
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          gap: "10px",
-                          marginBottom: "10px",
-                          fontSize: "13px",
-                          color: "#cbd5e1",
+                          gap: "12px",
+                          marginBottom: "12px",
+                          fontSize: "14px",
+                          color: "#e2e8f0",
+                          fontWeight: 500,
                         }}
                       >
                         <div style={{
-                          width: "18px",
-                          height: "18px",
+                          width: "20px",
+                          height: "20px",
                           borderRadius: "50%",
-                          background: "rgba(34, 197, 94, 0.2)",
+                          background: "linear-gradient(135deg, #22c55e, #16a34a)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
                           flexShrink: 0,
+                          boxShadow: "0 2px 8px rgba(34, 197, 94, 0.3)",
                         }}>
-                          <Check style={{ width: "10px", height: "10px", color: "#22c55e" }} />
+                          <Check style={{ width: "12px", height: "12px", color: "white", strokeWidth: 3 }} />
                         </div>
                         {feature}
                       </li>
                     ))}
                   </ul>
 
-                  {/* Buy Button */}
+                  {/* Buy Button - Corporate */}
                   <button
                     onClick={() => handlePurchase(pkg)}
                     disabled={isProcessing}
                     style={{
                       width: "100%",
-                      padding: "14px",
-                      borderRadius: "12px",
+                      padding: "16px",
+                      borderRadius: "14px",
                       border: "none",
                       background: pkg.popular
                         ? "linear-gradient(135deg, #8b5cf6, #d946ef)"
-                        : "linear-gradient(135deg, #1e293b, #334155)",
+                        : "linear-gradient(135deg, #475569, #64748b)",
                       color: "white",
-                      fontSize: "15px",
-                      fontWeight: 700,
+                      fontSize: "16px",
+                      fontWeight: 800,
                       cursor: isProcessing ? "not-allowed" : "pointer",
                       transition: "all 0.3s",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      gap: "8px",
+                      gap: "10px",
                       boxShadow: pkg.popular
-                        ? "0 8px 20px rgba(139, 92, 246, 0.4)"
-                        : "0 4px 12px rgba(0, 0, 0, 0.3)",
+                        ? "0 10px 30px rgba(139, 92, 246, 0.4)"
+                        : "0 6px 20px rgba(0, 0, 0, 0.3)",
                       opacity: isProcessing ? 0.6 : 1,
+                      letterSpacing: "0.02em",
+                      textTransform: "uppercase",
                     }}
                     onMouseEnter={(e) => {
                       if (!isProcessing) {
                         e.currentTarget.style.transform = "translateY(-2px)";
                         e.currentTarget.style.boxShadow = pkg.popular
-                          ? "0 12px 30px rgba(139, 92, 246, 0.6)"
-                          : "0 8px 20px rgba(139, 92, 246, 0.4)";
+                          ? "0 15px 40px rgba(139, 92, 246, 0.6)"
+                          : "0 10px 30px rgba(100, 116, 139, 0.5)";
                       }
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = "translateY(0)";
                       e.currentTarget.style.boxShadow = pkg.popular
-                        ? "0 8px 20px rgba(139, 92, 246, 0.4)"
-                        : "0 4px 12px rgba(0, 0, 0, 0.3)";
+                        ? "0 10px 30px rgba(139, 92, 246, 0.4)"
+                        : "0 6px 20px rgba(0, 0, 0, 0.3)";
                     }}
                   >
                     {isProcessing ? (
                       <>
                         <div style={{
-                          width: "16px",
-                          height: "16px",
+                          width: "18px",
+                          height: "18px",
                           border: "2px solid rgba(255, 255, 255, 0.3)",
                           borderTopColor: "white",
                           borderRadius: "50%",
@@ -705,9 +812,9 @@ export default function BuyPage() {
                       </>
                     ) : (
                       <>
-                        <ShoppingCart style={{ width: "18px", height: "18px" }} />
-                        Buy Now
-                        <ArrowRight style={{ width: "16px", height: "16px" }} />
+                        <ShoppingCart style={{ width: "20px", height: "20px" }} />
+                        Purchase Now
+                        <ArrowRight style={{ width: "18px", height: "18px" }} />
                       </>
                     )}
                   </button>
@@ -717,52 +824,66 @@ export default function BuyPage() {
           })}
         </div>
 
-        {/* Benefits Section - Compact */}
+        {/* Benefits Section - Compact Corporate */}
         <div className="animate-slide-up" style={{
-          padding: "clamp(24px, 5vw, 32px)",
-          borderRadius: "20px",
-          background: "rgba(15, 23, 42, 0.6)",
+          padding: "clamp(32px, 6vw, 40px)",
+          borderRadius: "24px",
+          background: "linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(30, 27, 75, 0.6))",
           border: "2px solid rgba(139, 92, 246, 0.3)",
           backdropFilter: "blur(20px)",
           marginBottom: "clamp(30px, 6vw, 40px)",
+          boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)",
         }}>
-          <h2 style={{
-            fontSize: "clamp(20px, 4vw, 24px)",
-            fontWeight: 900,
-            marginBottom: "20px",
+          <div style={{
             textAlign: "center",
+            marginBottom: "32px",
           }}>
-            Why Choose VibraXX?
-          </h2>
+            <h2 style={{
+              fontSize: "clamp(24px, 5vw, 32px)",
+              fontWeight: 900,
+              marginBottom: "12px",
+              background: "linear-gradient(135deg, #ffffff, #c4b5fd)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}>
+              Why VibraXX?
+            </h2>
+            <p style={{
+              fontSize: "15px",
+              color: "#94a3b8",
+            }}>
+              Professional quiz platform with premium features
+            </p>
+          </div>
 
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
-            gap: "16px",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+            gap: "20px",
           }}>
             {[
               {
                 icon: Trophy,
-                title: "£1,000 Prize",
-                description: "Monthly prize at 2000+ players",
+                title: "£1,000 Prize Pool",
+                description: "Monthly rewards at 2000+ players",
                 color: "#fbbf24",
               },
               {
                 icon: Zap,
-                title: "Instant Play",
-                description: "Start immediately after purchase",
+                title: "Instant Access",
+                description: "Play immediately after purchase",
                 color: "#06b6d4",
               },
               {
                 icon: Users,
-                title: "Global Ranks",
-                description: "Compete worldwide",
+                title: "Global Leaderboard",
+                description: "Compete with players worldwide",
                 color: "#8b5cf6",
               },
               {
                 icon: Target,
-                title: "Track Stats",
-                description: "Detailed progress & rankings",
+                title: "Detailed Analytics",
+                description: "Track your progress & rankings",
                 color: "#ec4899",
               },
             ].map((benefit, index) => {
@@ -771,37 +892,49 @@ export default function BuyPage() {
                 <div
                   key={index}
                   style={{
-                    padding: "16px",
-                    borderRadius: "12px",
+                    padding: "20px",
+                    borderRadius: "16px",
                     background: "rgba(255, 255, 255, 0.03)",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
                     transition: "all 0.3s",
                     textAlign: "center",
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = "rgba(139, 92, 246, 0.1)";
-                    e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.5)";
+                    e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.4)";
                     e.currentTarget.style.transform = "translateY(-4px)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)";
-                    e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.1)";
+                    e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)";
                     e.currentTarget.style.transform = "translateY(0)";
                   }}
                 >
-                  <Icon style={{ width: "28px", height: "28px", color: benefit.color, margin: "0 auto 8px" }} />
+                  <div style={{
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "12px",
+                    background: `${benefit.color}20`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "0 auto 12px",
+                    border: `1px solid ${benefit.color}40`,
+                  }}>
+                    <Icon style={{ width: "24px", height: "24px", color: benefit.color }} />
+                  </div>
                   <h3 style={{
-                    fontSize: "15px",
+                    fontSize: "16px",
                     fontWeight: 700,
-                    marginBottom: "4px",
+                    marginBottom: "6px",
                   }}>
                     {benefit.title}
                   </h3>
                   <p style={{
-                    fontSize: "12px",
+                    fontSize: "13px",
                     color: "#94a3b8",
                     margin: 0,
-                    lineHeight: 1.4,
+                    lineHeight: 1.5,
                   }}>
                     {benefit.description}
                   </p>
@@ -810,7 +943,6 @@ export default function BuyPage() {
             })}
           </div>
         </div>
-
       </main>
 
       {/* Footer - Home Page Style */}
@@ -858,145 +990,40 @@ export default function BuyPage() {
             gap: "clamp(8px, 2vw, 12px)",
             marginBottom: "clamp(24px, 4vw, 32px)",
           }}>
-            <a href="/privacy" style={{
-              color: "#94a3b8",
-              textDecoration: "none",
-              fontSize: "clamp(11px, 2vw, 13px)",
-              fontWeight: 500,
-              transition: "color 0.3s",
-              whiteSpace: "nowrap",
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
-            onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
-            >
-              Privacy Policy
-            </a>
-            <span style={{ color: "rgba(148, 163, 184, 0.3)", fontSize: "clamp(10px, 2vw, 12px)" }}>•</span>
-            <a href="/terms" style={{
-              color: "#94a3b8",
-              textDecoration: "none",
-              fontSize: "clamp(11px, 2vw, 13px)",
-              fontWeight: 500,
-              transition: "color 0.3s",
-              whiteSpace: "nowrap",
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
-            onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
-            >
-              Terms & Conditions
-            </a>
-            <span style={{ color: "rgba(148, 163, 184, 0.3)", fontSize: "clamp(10px, 2vw, 12px)" }}>•</span>
-            <a href="/cookies" style={{
-              color: "#94a3b8",
-              textDecoration: "none",
-              fontSize: "clamp(11px, 2vw, 13px)",
-              fontWeight: 500,
-              transition: "color 0.3s",
-              whiteSpace: "nowrap",
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
-            onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
-            >
-              Cookie Policy
-            </a>
-            <span style={{ color: "rgba(148, 163, 184, 0.3)", fontSize: "clamp(10px, 2vw, 12px)" }}>•</span>
-            <a href="/how-it-works" style={{
-              color: "#94a3b8",
-              textDecoration: "none",
-              fontSize: "clamp(11px, 2vw, 13px)",
-              fontWeight: 500,
-              transition: "color 0.3s",
-              whiteSpace: "nowrap",
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
-            onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
-            >
-              How It Works
-            </a>
-            <span style={{ color: "rgba(148, 163, 184, 0.3)", fontSize: "clamp(10px, 2vw, 12px)" }}>•</span>
-            <a href="/rules" style={{
-              color: "#94a3b8",
-              textDecoration: "none",
-              fontSize: "clamp(11px, 2vw, 13px)",
-              fontWeight: 500,
-              transition: "color 0.3s",
-              whiteSpace: "nowrap",
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
-            onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
-            >
-              Quiz Rules
-            </a>
-            <span style={{ color: "rgba(148, 163, 184, 0.3)", fontSize: "clamp(10px, 2vw, 12px)" }}>•</span>
-            <a href="/complaints" style={{
-              color: "#94a3b8",
-              textDecoration: "none",
-              fontSize: "clamp(11px, 2vw, 13px)",
-              fontWeight: 500,
-              transition: "color 0.3s",
-              whiteSpace: "nowrap",
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
-            onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
-            >
-              Complaints
-            </a>
-            <span style={{ color: "rgba(148, 163, 184, 0.3)", fontSize: "clamp(10px, 2vw, 12px)" }}>•</span>
-            <a href="/refunds" style={{
-              color: "#94a3b8",
-              textDecoration: "none",
-              fontSize: "clamp(11px, 2vw, 13px)",
-              fontWeight: 500,
-              transition: "color 0.3s",
-              whiteSpace: "nowrap",
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
-            onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
-            >
-              Refund Policy
-            </a>
-            <span style={{ color: "rgba(148, 163, 184, 0.3)", fontSize: "clamp(10px, 2vw, 12px)" }}>•</span>
-            <a href="/about" style={{
-              color: "#94a3b8",
-              textDecoration: "none",
-              fontSize: "clamp(11px, 2vw, 13px)",
-              fontWeight: 500,
-              transition: "color 0.3s",
-              whiteSpace: "nowrap",
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
-            onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
-            >
-              About Us
-            </a>
-            <span style={{ color: "rgba(148, 163, 184, 0.3)", fontSize: "clamp(10px, 2vw, 12px)" }}>•</span>
-            <a href="/contact" style={{
-              color: "#94a3b8",
-              textDecoration: "none",
-              fontSize: "clamp(11px, 2vw, 13px)",
-              fontWeight: 500,
-              transition: "color 0.3s",
-              whiteSpace: "nowrap",
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
-            onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
-            >
-              Contact
-            </a>
-            <span style={{ color: "rgba(148, 163, 184, 0.3)", fontSize: "clamp(10px, 2vw, 12px)" }}>•</span>
-            <a href="/faq" style={{
-              color: "#94a3b8",
-              textDecoration: "none",
-              fontSize: "clamp(11px, 2vw, 13px)",
-              fontWeight: 500,
-              transition: "color 0.3s",
-              whiteSpace: "nowrap",
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
-            onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
-            >
-              FAQ
-            </a>
+            {[
+              { href: "/privacy", text: "Privacy Policy" },
+              { href: "/terms", text: "Terms & Conditions" },
+              { href: "/cookies", text: "Cookie Policy" },
+              { href: "/how-it-works", text: "How It Works" },
+              { href: "/rules", text: "Quiz Rules" },
+              { href: "/complaints", text: "Complaints" },
+              { href: "/refunds", text: "Refund Policy" },
+              { href: "/about", text: "About Us" },
+              { href: "/contact", text: "Contact" },
+              { href: "/faq", text: "FAQ" },
+            ].map((link, i, arr) => (
+              <>
+                <a
+                  key={link.href}
+                  href={link.href}
+                  style={{
+                    color: "#94a3b8",
+                    textDecoration: "none",
+                    fontSize: "clamp(11px, 2vw, 13px)",
+                    fontWeight: 500,
+                    transition: "color 0.3s",
+                    whiteSpace: "nowrap",
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = "#a78bfa"}
+                  onMouseLeave={(e) => e.currentTarget.style.color = "#94a3b8"}
+                >
+                  {link.text}
+                </a>
+                {i < arr.length - 1 && (
+                  <span style={{ color: "rgba(148, 163, 184, 0.3)", fontSize: "clamp(10px, 2vw, 12px)" }}>•</span>
+                )}
+              </>
+            ))}
           </nav>
 
           {/* Company Info */}
@@ -1035,87 +1062,6 @@ export default function BuyPage() {
           </div>
         </div>
       </footer>
-
-      {/* Success Modal */}
-      {showSuccessModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.8)",
-            backdropFilter: "blur(8px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 100,
-            padding: "20px",
-          }}
-          onClick={() => setShowSuccessModal(false)}
-        >
-          <div
-            className="animate-pop-in"
-            style={{
-              background: "linear-gradient(135deg, #1e293b, #0f172a)",
-              borderRadius: "24px",
-              border: "2px solid rgba(34, 197, 94, 0.5)",
-              padding: "40px",
-              maxWidth: "400px",
-              textAlign: "center",
-              boxShadow: "0 20px 60px rgba(34, 197, 94, 0.3)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{
-              width: "80px",
-              height: "80px",
-              borderRadius: "50%",
-              background: "linear-gradient(135deg, #22c55e, #16a34a)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              margin: "0 auto 24px",
-              boxShadow: "0 0 40px rgba(34, 197, 94, 0.5)",
-            }}>
-              <CheckCircle2 style={{ width: "40px", height: "40px", color: "white" }} />
-            </div>
-            <h3 style={{
-              fontSize: "24px",
-              fontWeight: 900,
-              marginBottom: "12px",
-            }}>
-              Purchase Successful!
-            </h3>
-            <p style={{
-              fontSize: "16px",
-              color: "#94a3b8",
-              marginBottom: "24px",
-            }}>
-              {purchasedRounds} rounds added to your account
-            </p>
-            <button
-              onClick={() => router.push("/lobby")}
-              style={{
-                width: "100%",
-                padding: "14px",
-                borderRadius: "12px",
-                border: "none",
-                background: "linear-gradient(135deg, #22c55e, #16a34a)",
-                color: "white",
-                fontSize: "16px",
-                fontWeight: 700,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "8px",
-              }}
-            >
-              Start Playing
-              <Rocket style={{ width: "20px", height: "20px" }} />
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
