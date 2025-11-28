@@ -1417,22 +1417,26 @@ export default function HomePage() {
             onBuyRounds={async () => {
               setShowNoRoundsModal(false);
               
-              // ✅ GİRİŞ KONTROLÜ
+              // ✅ ÖNCE LOGIN KONTROLÜ
               if (!user) {
-                // ✅ Kullanıcı giriş yapmamış - Google login aç
+                // ❌ GİRİŞ YAPMAMIŞSA
+                // Kullanıcıya bilgi ver
+                alert("Round satın almak için önce Google ile giriş yapmalısınız. Giriş sayfasına yönlendiriliyorsunuz...");
+                
+                // Pending action kaydet
                 sessionStorage.setItem('pendingBuyRounds', 'true');
                 
-                // Google ile giriş yap
+                // Google login'e yönlendir
                 await supabase.auth.signInWithOAuth({
                   provider: "google",
                   options: {
                     redirectTo: `${window.location.origin}/auth/callback`,
                   },
                 });
-                return; // ✅ Burada dur, login olsun
+                return;
               }
               
-              // ✅ Giriş yapmış - buy sayfasına git
+              // ✅ GİRİŞ YAPMIŞ - direkt buy sayfasına git
               router.push("/buy");
             }}
             onCancel={() => setShowNoRoundsModal(false)}
