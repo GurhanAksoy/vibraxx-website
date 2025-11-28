@@ -194,6 +194,23 @@ export default function QuizGamePage() {
         setSecurityPassed(true);
         setIsVerifying(false);
 
+        // 🔥 ATOMIC ROUND DEDUCTION - Tüket hakkı!
+        const today = new Date().toISOString().split('T')[0];
+        const { error: deductError } = await supabase
+          .from("user_rounds")
+          .update({ 
+            free_quiz_available: 0,
+            last_free_quiz_date: today
+          })
+          .eq("user_id", authUser.id)
+          .gt("free_quiz_available", 0);
+
+        if (deductError) {
+          console.error("❌ Free Quiz Security: Deduction failed", deductError);
+        } else {
+          console.log("✅ Free Quiz Security: Free quiz consumed (1 → 0)");
+        }
+
       } catch (error) {
         console.error("❌ Free Quiz Security: Verification error", error);
         router.push("/");
