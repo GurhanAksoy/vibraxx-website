@@ -623,15 +623,33 @@ export default function HomePage() {
     const loadUser = async () => {
       const { data } = await supabase.auth.getUser();
       setUser(data.user || null);
+      
+      // ✅ Check for pending buy action after login
+      if (data.user) {
+        const pendingBuy = localStorage.getItem('vibraxx_pending_buy');
+        if (pendingBuy === 'true') {
+          localStorage.removeItem('vibraxx_pending_buy');
+          router.push('/buy');
+        }
+      }
     };
     loadUser();
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
+      
+      // ✅ Check for pending buy action when user logs in
+      if (session?.user) {
+        const pendingBuy = localStorage.getItem('vibraxx_pending_buy');
+        if (pendingBuy === 'true') {
+          localStorage.removeItem('vibraxx_pending_buy');
+          router.push('/buy');
+        }
+      }
     });
 
     return () => sub.subscription.unsubscribe();
-  }, []);
+  }, [router]);
 
   // Music Toggle
   const toggleMusic = useCallback(() => {
@@ -1401,8 +1419,16 @@ export default function HomePage() {
               
               // ✅ FIX: Check if user is logged in
               if (!user) {
-                // Not logged in - sign in and redirect to /buy page
-                await handleSignIn('/buy');
+                // Save pending action
+                localStorage.setItem('vibraxx_pending_buy', 'true');
+                
+                // Sign in with Google - will redirect to /auth/callback
+                await supabase.auth.signInWithOAuth({
+                  provider: "google",
+                  options: {
+                    redirectTo: `${window.location.origin}/auth/callback`,
+                  },
+                });
                 return;
               }
               
