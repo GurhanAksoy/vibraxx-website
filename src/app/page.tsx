@@ -1787,25 +1787,40 @@ export default function HomePage() {
               style={{
                 margin: "24px auto 28px",
                 maxWidth: 380,
-                padding: "18px 24px",
-                borderRadius: 16,
+                padding: "20px 26px",
+                borderRadius: 18,
                 background: "linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
+                border: "2px solid rgba(255, 255, 255, 0.15)",
                 backdropFilter: "blur(20px)",
-                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)",
+                boxShadow: "0 12px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05), inset 0 2px 0 rgba(255, 255, 255, 0.08)",
                 position: "relative",
                 overflow: "hidden",
               }}
             >
-              {/* Premium shine effect */}
+              {/* Premium shine effect - top */}
               <div
                 style={{
                   position: "absolute",
                   top: 0,
                   left: -100,
                   right: -100,
-                  height: 1,
-                  background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
+                  height: 1.5,
+                  background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)",
+                }}
+              />
+              
+              {/* Premium glow - bottom */}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 0,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: "80%",
+                  height: 40,
+                  background: "radial-gradient(ellipse, rgba(124, 58, 237, 0.15), transparent)",
+                  filter: "blur(20px)",
+                  pointerEvents: "none",
                 }}
               />
               
@@ -1816,7 +1831,7 @@ export default function HomePage() {
                     fontSize: 11,
                     fontWeight: 600,
                     color: "#9ca3af",
-                    marginBottom: 10,
+                    marginBottom: 12,
                     textTransform: "uppercase",
                     letterSpacing: "0.15em",
                     textAlign: "center",
@@ -1825,59 +1840,69 @@ export default function HomePage() {
                   Next Round
                 </div>
                 
-                {/* Timer display */}
+                {/* Timer display - SADECE RAKAM */}
                 <div
                   style={{
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    gap: 12,
-                    marginBottom: 10,
+                    marginBottom: 14,
                   }}
                 >
                   {/* Time value */}
                   <div
                     style={{
-                      fontSize: 38,
+                      fontSize: 42,
                       fontWeight: 800,
                       color: "#ffffff",
                       fontFamily: "ui-monospace, monospace",
                       letterSpacing: "0.02em",
-                      textShadow: "0 2px 8px rgba(0, 0, 0, 0.5)",
+                      textShadow: "0 2px 12px rgba(0, 0, 0, 0.6), 0 0 30px rgba(255, 255, 255, 0.1)",
                       lineHeight: 1,
                     }}
                   >
                     {formatTime(nextRound)}
                   </div>
-                  
-                  {/* Live indicator */}
+                </div>
+                
+                {/* LIVE badge - ALTA ORTALA */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 12,
+                  }}
+                >
                   <div
                     style={{
-                      display: "flex",
+                      display: "inline-flex",
                       alignItems: "center",
-                      gap: 6,
-                      padding: "4px 10px",
-                      borderRadius: 8,
+                      gap: 7,
+                      padding: "6px 14px",
+                      borderRadius: 10,
                       background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
-                      boxShadow: "0 0 20px rgba(34, 197, 94, 0.4)",
+                      boxShadow: "0 0 24px rgba(34, 197, 94, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3)",
+                      border: "1px solid rgba(255, 255, 255, 0.2)",
                     }}
                   >
                     <div
                       className="animate-pulse-slow"
                       style={{
-                        width: 6,
-                        height: 6,
+                        width: 7,
+                        height: 7,
                         borderRadius: "50%",
                         background: "#ffffff",
-                        boxShadow: "0 0 8px #ffffff",
+                        boxShadow: "0 0 10px #ffffff, 0 0 20px rgba(255, 255, 255, 0.5)",
                       }}
                     />
                     <span
                       style={{
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: 700,
                         color: "#ffffff",
-                        letterSpacing: "0.05em",
+                        letterSpacing: "0.1em",
+                        textShadow: "0 1px 2px rgba(0, 0, 0, 0.3)",
                       }}
                     >
                       LIVE
