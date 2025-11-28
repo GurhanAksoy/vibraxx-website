@@ -181,6 +181,7 @@ function SuccessContent() {
   }
 
   // === LOADING ROUNDS SCREEN ===
+  if (isLoading) {
     return (
       <div style={{
         minHeight: '100vh',
