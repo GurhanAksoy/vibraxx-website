@@ -1000,6 +1000,31 @@ export default function HomePage() {
           .vx-hero-subtitle { font-size: 18px; margin-bottom: 40px; }
         }
 
+        /* ✅ PREMIUM: Countdown Timer with Hover */
+        .vx-countdown-panel {
+          margin: 24px auto 28px;
+          max-width: 380px;
+          padding: 20px 26px;
+          border-radius: 18px;
+          background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+          border: 2px solid rgba(255, 255, 255, 0.15);
+          backdrop-filter: blur(20px);
+          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05), inset 0 2px 0 rgba(255, 255, 255, 0.08);
+          position: relative;
+          overflow: hidden;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .vx-countdown-panel:hover {
+          transform: translateY(-4px);
+          border-color: rgba(255, 255, 255, 0.25);
+          box-shadow: 
+            0 20px 60px rgba(0, 0, 0, 0.6),
+            0 0 0 1px rgba(255, 255, 255, 0.1),
+            inset 0 2px 0 rgba(255, 255, 255, 0.12),
+            0 0 40px rgba(124, 58, 237, 0.3);
+        }
+
         .vx-cta-wrap {
           display: flex;
           flex-direction: column;
@@ -1783,20 +1808,7 @@ export default function HomePage() {
             </p>
 
             {/* ✅ PREMIUM: Compact Countdown Timer */}
-            <div
-              style={{
-                margin: "24px auto 28px",
-                maxWidth: 380,
-                padding: "20px 26px",
-                borderRadius: 18,
-                background: "linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)",
-                border: "2px solid rgba(255, 255, 255, 0.15)",
-                backdropFilter: "blur(20px)",
-                boxShadow: "0 12px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05), inset 0 2px 0 rgba(255, 255, 255, 0.08)",
-                position: "relative",
-                overflow: "hidden",
-              }}
-            >
+            <div className="vx-countdown-panel">
               {/* Premium shine effect - top */}
               <div
                 style={{
