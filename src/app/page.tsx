@@ -622,43 +622,23 @@ export default function HomePage() {
   useEffect(() => {
     const loadUser = async () => {
       const { data } = await supabase.auth.getUser();
-      console.log('👤 Auth: loadUser called, user:', data.user ? 'EXISTS' : 'NULL');
       setUser(data.user || null);
       
-      // ✅ REAL FIX: Check for redirect after login
-      if (data.user && typeof window !== 'undefined') {
-        const redirectPath = sessionStorage.getItem('vibraxx_redirect_after_login');
-        console.log('🔍 Checking sessionStorage for redirect:', redirectPath);
-        if (redirectPath) {
-          console.log('🎯 Found redirect path, navigating to:', redirectPath);
-          sessionStorage.removeItem('vibraxx_redirect_after_login');
-          // Small delay to ensure auth is fully loaded
-          setTimeout(() => {
-            console.log('🚀 Executing router.push:', redirectPath);
-            router.push(redirectPath);
-          }, 100);
-        }
+      // ✅ Login olduktan sonra pending buy rounds var mı?
+      if (data.user && sessionStorage.getItem('pendingBuyRounds') === 'true') {
+        sessionStorage.removeItem('pendingBuyRounds');
+        router.push('/buy');
       }
     };
     loadUser();
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('🔔 Auth state changed, event:', event, 'user:', session?.user ? 'EXISTS' : 'NULL');
       setUser(session?.user || null);
       
-      // ✅ REAL FIX: Check for redirect when auth state changes
-      if (session?.user && typeof window !== 'undefined') {
-        const redirectPath = sessionStorage.getItem('vibraxx_redirect_after_login');
-        console.log('🔍 Auth change - checking sessionStorage:', redirectPath);
-        if (redirectPath) {
-          console.log('🎯 Found redirect path on auth change:', redirectPath);
-          sessionStorage.removeItem('vibraxx_redirect_after_login');
-          // Small delay to ensure auth is fully loaded
-          setTimeout(() => {
-            console.log('🚀 Executing router.push after auth change:', redirectPath);
-            router.push(redirectPath);
-          }, 100);
-        }
+      // ✅ Auth değiştiğinde de kontrol et
+      if (session?.user && sessionStorage.getItem('pendingBuyRounds') === 'true') {
+        sessionStorage.removeItem('pendingBuyRounds');
+        router.push('/buy');
       }
     });
 
@@ -1428,39 +1408,22 @@ export default function HomePage() {
         {/* No Rounds Modal */}
         {showNoRoundsModal && (
           <NoRoundsModal
-            onBuyRounds={() => {
-              console.log('🛒 Buy Rounds clicked');
-              console.log('👤 User:', user ? 'Logged in' : 'NOT logged in');
-              
+            onBuyRounds={async () => {
               setShowNoRoundsModal(false);
               
-              // ✅ REAL FIX: Check if user is logged in
               if (!user) {
-                console.log('🔐 Not logged in - triggering Google OAuth');
+                // ✅ BASIT: Kullanıcı buy rounds istedi, flag set et
+                sessionStorage.setItem('pendingBuyRounds', 'true');
                 
-                // ✅ Save where we want to go after login
-                if (typeof window !== 'undefined') {
-                  sessionStorage.setItem('vibraxx_redirect_after_login', '/buy');
-                  console.log('💾 Saved redirect to sessionStorage: /buy');
-                }
-                
-                // ✅ Trigger Google sign in - will redirect away from this page
-                console.log('🚀 Calling signInWithOAuth...');
-                supabase.auth.signInWithOAuth({
+                // Google login'e yönlendir
+                await supabase.auth.signInWithOAuth({
                   provider: "google",
                   options: {
                     redirectTo: `${window.location.origin}/auth/callback`,
                   },
-                }).then(() => {
-                  console.log('✅ OAuth initiated');
-                }).catch((err) => {
-                  console.error('❌ OAuth error:', err);
                 });
-                
-                // Don't return - let OAuth redirect happen
               } else {
-                console.log('✅ Already logged in - redirecting to /buy');
-                // Already logged in - go to buy page
+                // Zaten giriş yapmış
                 router.push("/buy");
               }
             }}
