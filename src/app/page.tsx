@@ -622,28 +622,42 @@ export default function HomePage() {
   useEffect(() => {
     const loadUser = async () => {
       const { data } = await supabase.auth.getUser();
+      console.log('👤 Auth: loadUser called, user:', data.user ? 'EXISTS' : 'NULL');
       setUser(data.user || null);
       
-      // ✅ Check for pending buy action after login
-      if (data.user) {
-        const pendingBuy = localStorage.getItem('vibraxx_pending_buy');
-        if (pendingBuy === 'true') {
-          localStorage.removeItem('vibraxx_pending_buy');
-          router.push('/buy');
+      // ✅ REAL FIX: Check for redirect after login
+      if (data.user && typeof window !== 'undefined') {
+        const redirectPath = sessionStorage.getItem('vibraxx_redirect_after_login');
+        console.log('🔍 Checking sessionStorage for redirect:', redirectPath);
+        if (redirectPath) {
+          console.log('🎯 Found redirect path, navigating to:', redirectPath);
+          sessionStorage.removeItem('vibraxx_redirect_after_login');
+          // Small delay to ensure auth is fully loaded
+          setTimeout(() => {
+            console.log('🚀 Executing router.push:', redirectPath);
+            router.push(redirectPath);
+          }, 100);
         }
       }
     };
     loadUser();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔔 Auth state changed, event:', event, 'user:', session?.user ? 'EXISTS' : 'NULL');
       setUser(session?.user || null);
       
-      // ✅ Check for pending buy action when user logs in
-      if (session?.user) {
-        const pendingBuy = localStorage.getItem('vibraxx_pending_buy');
-        if (pendingBuy === 'true') {
-          localStorage.removeItem('vibraxx_pending_buy');
-          router.push('/buy');
+      // ✅ REAL FIX: Check for redirect when auth state changes
+      if (session?.user && typeof window !== 'undefined') {
+        const redirectPath = sessionStorage.getItem('vibraxx_redirect_after_login');
+        console.log('🔍 Auth change - checking sessionStorage:', redirectPath);
+        if (redirectPath) {
+          console.log('🎯 Found redirect path on auth change:', redirectPath);
+          sessionStorage.removeItem('vibraxx_redirect_after_login');
+          // Small delay to ensure auth is fully loaded
+          setTimeout(() => {
+            console.log('🚀 Executing router.push after auth change:', redirectPath);
+            router.push(redirectPath);
+          }, 100);
         }
       }
     });
@@ -1414,26 +1428,41 @@ export default function HomePage() {
         {/* No Rounds Modal */}
         {showNoRoundsModal && (
           <NoRoundsModal
-            onBuyRounds={async () => {
+            onBuyRounds={() => {
+              console.log('🛒 Buy Rounds clicked');
+              console.log('👤 User:', user ? 'Logged in' : 'NOT logged in');
+              
               setShowNoRoundsModal(false);
               
-              // ✅ FIX: Check if user is logged in
+              // ✅ REAL FIX: Check if user is logged in
               if (!user) {
-                // Save pending action
-                localStorage.setItem('vibraxx_pending_buy', 'true');
+                console.log('🔐 Not logged in - triggering Google OAuth');
                 
-                // Sign in with Google - will redirect to /auth/callback
-                await supabase.auth.signInWithOAuth({
+                // ✅ Save where we want to go after login
+                if (typeof window !== 'undefined') {
+                  sessionStorage.setItem('vibraxx_redirect_after_login', '/buy');
+                  console.log('💾 Saved redirect to sessionStorage: /buy');
+                }
+                
+                // ✅ Trigger Google sign in - will redirect away from this page
+                console.log('🚀 Calling signInWithOAuth...');
+                supabase.auth.signInWithOAuth({
                   provider: "google",
                   options: {
                     redirectTo: `${window.location.origin}/auth/callback`,
                   },
+                }).then(() => {
+                  console.log('✅ OAuth initiated');
+                }).catch((err) => {
+                  console.error('❌ OAuth error:', err);
                 });
-                return;
+                
+                // Don't return - let OAuth redirect happen
+              } else {
+                console.log('✅ Already logged in - redirecting to /buy');
+                // Already logged in - go to buy page
+                router.push("/buy");
               }
-              
-              // Already logged in - go to buy page
-              router.push("/buy");
             }}
             onCancel={() => setShowNoRoundsModal(false)}
           />
