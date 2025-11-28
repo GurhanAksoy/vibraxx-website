@@ -28,7 +28,7 @@ const supabase = createClient(
 );
 
 // 🔧 DEVELOPMENT MODE - Set to true for local testing without auth
-const DEV_MODE = true; // ⚠️ Set to FALSE in production!
+const DEV_MODE = false; // ✅ PRODUCTION MODE - Security enabled!
 
 interface LobbyPlayer {
   id: string;
@@ -97,7 +97,7 @@ export default function LobbyPage() {
     }
   }, [isPlaying]);
 
-  // === AUTH CHECK & ROUND VERIFICATION ===
+  // 🔐 === SECURITY: AUTH CHECK & ROUND VERIFICATION ===
   useEffect(() => {
     const checkAuth = async () => {
       setIsLoading(true);
@@ -113,12 +113,16 @@ export default function LobbyPage() {
 
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
       
+      
       if (authError || !authUser) {
+        console.log("❌ Lobby Security: Not authenticated");
         router.push("/");
         return;
       }
 
       setUser(authUser);
+      console.log("✅ Lobby Security: User authenticated -", authUser.id);
+
 
       const { data: roundsData, error: roundsError } = await supabase
         .from("user_rounds")
@@ -127,11 +131,14 @@ export default function LobbyPage() {
         .single();
 
       if (roundsError || !roundsData || roundsData.available_rounds <= 0) {
+        console.log("❌ Lobby Security: No available rounds");
         router.push("/buy");
         return;
       }
 
       setUserRounds(roundsData.available_rounds);
+      console.log("✅ Lobby Security: Available rounds -", roundsData.available_rounds);
+      console.log("✅ Lobby Security: All checks passed!");
       setIsLoading(false);
     };
 

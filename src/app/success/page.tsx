@@ -28,12 +28,66 @@ function SuccessContent() {
   const sessionId = searchParams.get("session_id");
   
   const [isLoading, setIsLoading] = useState(true);
+  const [isVerifying, setIsVerifying] = useState(true);
+  const [securityPassed, setSecurityPassed] = useState(false);
   const [userRounds, setUserRounds] = useState(0);
   const [purchasedRounds, setPurchasedRounds] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
 
+  // 🔐 === SECURITY CHECK - PAYMENT VERIFICATION ===
   useEffect(() => {
+    const verifyPayment = async () => {
+      try {
+        console.log("🔐 Success Security: Starting verification...");
+
+        // CHECK 1: Session ID exists
+        if (!sessionId) {
+          console.log("❌ Success Security: No session ID");
+          router.push("/");
+          return;
+        }
+
+        console.log("✅ Success Security: Session ID present -", sessionId);
+
+        // CHECK 2: Verify with backend (Stripe validation)
+        const response = await fetch("/api/verify-payment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+        });
+
+        if (!response.ok) {
+          console.log("❌ Success Security: API verification failed");
+          router.push("/");
+          return;
+        }
+
+        const { valid } = await response.json();
+
+        if (!valid) {
+          console.log("❌ Success Security: Invalid payment session");
+          router.push("/");
+          return;
+        }
+
+        console.log("✅ Success Security: Payment verified");
+        setSecurityPassed(true);
+        setIsVerifying(false);
+
+      } catch (error) {
+        console.error("❌ Success Security: Verification error", error);
+        router.push("/");
+      }
+    };
+
+    verifyPayment();
+  }, [sessionId, router]);
+
+  // === LOAD USER ROUNDS (After Security Check) ===
+  useEffect(() => {
+    if (!securityPassed) return; // 🔐 Wait for security
+
     const loadRounds = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       
@@ -65,7 +119,7 @@ function SuccessContent() {
     };
 
     loadRounds();
-  }, [router, sessionId]);
+  }, [securityPassed, router, sessionId]); // 🔐 Added security dependency
 
   useEffect(() => {
     const audioElement = new Audio("/sounds/vibraxx.mp3");
@@ -91,7 +145,42 @@ function SuccessContent() {
     }
   };
 
-  if (isLoading) {
+  // 🔐 === SECURITY VERIFICATION SCREEN ===
+  if (isVerifying) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '20px',
+        color: 'white',
+      }}>
+        <div style={{
+          width: '60px',
+          height: '60px',
+          border: '4px solid rgba(139, 92, 246, 0.3)',
+          borderTopColor: '#8b5cf6',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite'
+        }} />
+        <p style={{
+          color: '#a78bfa',
+          fontSize: '16px',
+          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          🔐 Verifying payment...
+        </p>
+      </div>
+    );
+  }
+
+  // === LOADING ROUNDS SCREEN ===
     return (
       <div style={{
         minHeight: '100vh',

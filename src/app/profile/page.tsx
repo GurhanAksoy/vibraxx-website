@@ -96,6 +96,8 @@ export default function ProfilePage() {
   const [userRounds, setUserRounds] = useState(0);
   const [totalPurchasedRounds, setTotalPurchasedRounds] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isVerifying, setIsVerifying] = useState(true);
+  const [securityPassed, setSecurityPassed] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -107,20 +109,47 @@ export default function ProfilePage() {
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailStatus, setEmailStatus] = useState<"idle" | "success" | "error">("idle");
 
-  // Fetch user data
+  // 🔐 === SECURITY CHECK - AUTHENTICATION ===
   useEffect(() => {
-    const fetchUserData = async () => {
-      setIsLoading(true);
-
+    const verifyAuth = async () => {
       try {
-        // Get authenticated user
+        console.log("🔐 Profile Security: Starting verification...");
+
+        // CHECK: User authentication
         const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
         
         if (authError || !authUser) {
+          console.log("❌ Profile Security: Not authenticated");
           router.push("/");
           return;
         }
 
+        console.log("✅ Profile Security: User authenticated -", authUser.id);
+        console.log("✅ Profile Security: All checks passed!");
+
+        setSecurityPassed(true);
+        setIsVerifying(false);
+
+      } catch (error) {
+        console.error("❌ Profile Security: Verification error", error);
+        router.push("/");
+      }
+    };
+
+    verifyAuth();
+  }, [router]);
+
+  // === FETCH USER DATA (After Security Check) ===
+  useEffect(() => {
+    if (!securityPassed) return; // 🔐 Wait for security
+
+    const fetchUserData = async () => {
+      setIsLoading(true);
+
+      try {
+        // Get authenticated user (already verified by security check)
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        
         // Set user profile
         setUser({
           id: authUser.id,
@@ -220,7 +249,7 @@ export default function ProfilePage() {
     };
 
     fetchUserData();
-  }, [router]);
+  }, [securityPassed, router]); // 🔐 Added security dependency
 
   // Save profile changes
   const handleSaveProfile = async () => {
@@ -289,6 +318,41 @@ export default function ProfilePage() {
     await supabase.auth.signOut();
     router.push("/");
   };
+
+  // 🔐 === SECURITY VERIFICATION SCREEN ===
+  if (isVerifying) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "20px",
+        color: "white",
+      }}>
+        <div style={{
+          width: "60px",
+          height: "60px",
+          border: "4px solid rgba(139, 92, 246, 0.3)",
+          borderTopColor: "#8b5cf6",
+          borderRadius: "50%",
+          animation: "spin 1s linear infinite"
+        }} />
+        <p style={{
+          color: "#a78bfa",
+          fontSize: "16px",
+          fontWeight: 600,
+          display: "flex",
+          alignItems: "center",
+          gap: "8px"
+        }}>
+          🔐 Verifying access...
+        </p>
+      </div>
+    );
+  }
 
   // Loading screen
   if (isLoading) {
