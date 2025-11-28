@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
 import {
   Trophy,
   Clock,
@@ -14,7 +15,13 @@ import {
   VolumeX,
 } from "lucide-react";
 
-const TOTAL_QUESTIONS = 50;
+// Initialize Supabase
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+const TOTAL_QUESTIONS = 50; // 🎮 FREE PRACTICE MODE
 const QUESTION_DURATION = 6; // saniye
 const EXPLANATION_DURATION = 5; // saniye
 const FINAL_SCORE_DURATION = 5; // saniye
@@ -107,6 +114,10 @@ const questions: Question[] = Array.from({ length: TOTAL_QUESTIONS }, (_, i) => 
 export default function QuizGamePage() {
   const router = useRouter();
 
+  // 🔐 SECURITY STATES
+  const [isVerifying, setIsVerifying] = useState(true);
+  const [securityPassed, setSecurityPassed] = useState(false);
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(QUESTION_DURATION);
   const [selectedAnswer, setSelectedAnswer] = useState<OptionId | null>(null);
@@ -140,6 +151,57 @@ export default function QuizGamePage() {
   const tickSoundRef = useRef<HTMLAudioElement | null>(null);
 
   const currentQ = questions[currentIndex];
+
+  // 🔐 === SECURITY CHECK - AUTHENTICATION & DAILY FREE ROUND ===
+  useEffect(() => {
+    const verifyAccess = async () => {
+      try {
+        console.log("🔐 Free Quiz Security: Starting verification...");
+
+        // CHECK 1: User authentication
+        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError || !authUser) {
+          console.log("❌ Free Quiz Security: Not authenticated");
+          router.push("/");
+          return;
+        }
+
+        console.log("✅ Free Quiz Security: User authenticated -", authUser.id);
+
+        // CHECK 2: Daily free round availability
+        const { data: roundsData, error: roundsError } = await supabase
+          .from("user_rounds")
+          .select("free_quiz_available")
+          .eq("user_id", authUser.id)
+          .single();
+
+        if (roundsError || !roundsData) {
+          console.log("❌ Free Quiz Security: No rounds data");
+          router.push("/");
+          return;
+        }
+
+        if (!roundsData.free_quiz_available || roundsData.free_quiz_available <= 0) {
+          console.log("❌ Free Quiz Security: No free quiz available today");
+          router.push("/?error=no_free_quiz");
+          return;
+        }
+
+        console.log("✅ Free Quiz Security: Free quiz available");
+        console.log("✅ Free Quiz Security: All checks passed!");
+
+        setSecurityPassed(true);
+        setIsVerifying(false);
+
+      } catch (error) {
+        console.error("❌ Free Quiz Security: Verification error", error);
+        router.push("/");
+      }
+    };
+
+    verifyAccess();
+  }, [router]);
 
   // Ses helper
   const playSound = (
@@ -177,6 +239,7 @@ export default function QuizGamePage() {
 
   // İlk soru: tick başlat
   useEffect(() => {
+    if (!securityPassed) return; // 🔐 Wait for security
     if (!showFinalScore && !showExplanation && timeLeft > 0) {
       startTick();
     }
@@ -448,11 +511,48 @@ export default function QuizGamePage() {
       <audio ref={whooshSoundRef} src="/sounds/whoosh.mp3" />
       <audio ref={tickSoundRef} src="/sounds/tick.mp3" />
 
-      <div
+      {/* 🔐 SECURITY VERIFICATION SCREEN */}
+      {isVerifying ? (
+        <div style={{
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #0a1628 0%, #064e3b 50%, #0f172a 100%)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '20px',
+          color: 'white',
+        }}>
+          <div style={{
+            width: '60px',
+            height: '60px',
+            border: '4px solid rgba(16, 185, 129, 0.3)',
+            borderTopColor: '#10b981',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+          }} />
+          <p style={{
+            color: '#34d399',
+            fontSize: '16px',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            🔐 Verifying daily access...
+          </p>
+          <style>{`
+            @keyframes spin {
+              to { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      ) : (
+        <div
         style={{
           minHeight: "100vh",
           background:
-            "linear-gradient(to bottom right, #020817, #0f172a, #111827)",
+            "linear-gradient(to bottom right, #0a1628, #064e3b, #0f172a)",
           color: "white",
           position: "relative",
           overflow: "hidden",
@@ -604,7 +704,7 @@ export default function QuizGamePage() {
                     textOverflow: "ellipsis",
                   }}
                 >
-                  Question {currentIndex + 1} /{" "}
+                  🎮 Practice {currentIndex + 1} /{" "}
                   {TOTAL_QUESTIONS}
                 </div>
               </div>
@@ -928,7 +1028,7 @@ export default function QuizGamePage() {
                     "transparent",
                 }}
               >
-                Round Summary
+                Practice Summary 🎮
               </h1>
               <p
                 style={{
@@ -937,7 +1037,7 @@ export default function QuizGamePage() {
                   marginBottom: 22,
                 }}
               >
-                Your personal performance for this round
+                Free practice mode • Ready for the real competition?
               </p>
 
               <div
@@ -1072,10 +1172,10 @@ export default function QuizGamePage() {
                   color: "#9ca3af",
                 }}
               >
-                Redirecting to lobby in{" "}
+                Returning to home in{" "}
                 <span
                   style={{
-                    color: "#a78bfa",
+                    color: "#10b981",
                     fontWeight: 800,
                   }}
                 >
@@ -1699,6 +1799,7 @@ export default function QuizGamePage() {
           )}
         </main>
       </div>
+      )}
     </>
   );
 }
