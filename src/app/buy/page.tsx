@@ -101,7 +101,13 @@ export default function BuyPage() {
       const { data: { user: authUser } } = await supabase.auth.getUser();
 
       if (!authUser) {
-        router.push("/");
+        // ✅ Login yoksa Google OAuth aç (ana sayfaya atma!)
+        await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: `${window.location.origin}/auth/callback?redirect=/buy`,
+          },
+        });
         return;
       }
 
