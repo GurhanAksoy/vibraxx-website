@@ -153,7 +153,7 @@ export default function QuizGamePage() {
   const currentQ = questions[currentIndex];
 
   // 🔐 === SECURITY CHECK - AUTHENTICATION & DAILY FREE ROUND ===
-  // ⚠️ DEV MODE: Security disabled for testing
+  //⚠️ DEV MODE: Security disabled for testing
   useEffect(() => {
     const verifyAccess = async () => {
       try {
