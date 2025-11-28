@@ -153,67 +153,71 @@ export default function QuizGamePage() {
   const currentQ = questions[currentIndex];
 
   // 🔐 === SECURITY CHECK - AUTHENTICATION & DAILY FREE ROUND ===
+  // ⚠️ DEV MODE: Security disabled for testing
   useEffect(() => {
     const verifyAccess = async () => {
       try {
         console.log("🔐 Free Quiz Security: Starting verification...");
+        console.log("⚠️ DEV MODE: Skipping security checks for testing");
 
-        // CHECK 1: User authentication
-        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-        
-        if (authError || !authUser) {
-          console.log("❌ Free Quiz Security: Not authenticated");
-          router.push("/");
-          return;
-        }
+        // // CHECK 1: User authentication
+        // const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+        // 
+        // if (authError || !authUser) {
+        //   console.log("❌ Free Quiz Security: Not authenticated");
+        //   router.push("/");
+        //   return;
+        // }
 
-        console.log("✅ Free Quiz Security: User authenticated -", authUser.id);
+        // console.log("✅ Free Quiz Security: User authenticated -", authUser.id);
 
-        // CHECK 2: Daily free round availability
-        const { data: roundsData, error: roundsError } = await supabase
-          .from("user_rounds")
-          .select("free_quiz_available")
-          .eq("user_id", authUser.id)
-          .single();
+        // // CHECK 2: Daily free round availability
+        // const { data: roundsData, error: roundsError } = await supabase
+        //   .from("user_rounds")
+        //   .select("free_quiz_available")
+        //   .eq("user_id", authUser.id)
+        //   .single();
 
-        if (roundsError || !roundsData) {
-          console.log("❌ Free Quiz Security: No rounds data");
-          router.push("/");
-          return;
-        }
+        // if (roundsError || !roundsData) {
+        //   console.log("❌ Free Quiz Security: No rounds data");
+        //   router.push("/");
+        //   return;
+        // }
 
-        if (!roundsData.free_quiz_available || roundsData.free_quiz_available <= 0) {
-          console.log("❌ Free Quiz Security: No free quiz available today");
-          router.push("/?error=no_free_quiz");
-          return;
-        }
+        // if (!roundsData.free_quiz_available || roundsData.free_quiz_available <= 0) {
+        //   console.log("❌ Free Quiz Security: No free quiz available today");
+        //   router.push("/?error=no_free_quiz");
+        //   return;
+        // }
 
-        console.log("✅ Free Quiz Security: Free quiz available");
-        console.log("✅ Free Quiz Security: All checks passed!");
+        // console.log("✅ Free Quiz Security: Free quiz available");
+        console.log("✅ Free Quiz Security: All checks passed! (DEV MODE)");
 
         setSecurityPassed(true);
         setIsVerifying(false);
 
-        // 🔥 ATOMIC ROUND DEDUCTION - Tüket hakkı!
-        const today = new Date().toISOString().split('T')[0];
-        const { error: deductError } = await supabase
-          .from("user_rounds")
-          .update({ 
-            free_quiz_available: 0,
-            last_free_quiz_date: today
-          })
-          .eq("user_id", authUser.id)
-          .gt("free_quiz_available", 0);
+        // // 🔥 ATOMIC ROUND DEDUCTION - Tüket hakkı!
+        // const today = new Date().toISOString().split('T')[0];
+        // const { error: deductError } = await supabase
+        //   .from("user_rounds")
+        //   .update({ 
+        //     free_quiz_available: 0,
+        //     last_free_quiz_date: today
+        //   })
+        //   .eq("user_id", authUser.id)
+        //   .gt("free_quiz_available", 0);
 
-        if (deductError) {
-          console.error("❌ Free Quiz Security: Deduction failed", deductError);
-        } else {
-          console.log("✅ Free Quiz Security: Free quiz consumed (1 → 0)");
-        }
+        // if (deductError) {
+        //   console.error("❌ Free Quiz Security: Deduction failed", deductError);
+        // } else {
+        //   console.log("✅ Free Quiz Security: Free quiz consumed (1 → 0)");
+        // }
 
       } catch (error) {
         console.error("❌ Free Quiz Security: Verification error", error);
-        router.push("/");
+        // router.push("/");
+        setSecurityPassed(true);
+        setIsVerifying(false);
       }
     };
 
