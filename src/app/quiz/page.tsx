@@ -117,6 +117,10 @@ const questions: Question[] = Array.from({ length: TOTAL_QUESTIONS }, (_, i) => 
 export default function QuizGamePage() {
   const router = useRouter();
 
+  // 🔐 === SECURITY STATE ===
+  const [isVerifying, setIsVerifying] = useState(true);
+  const [securityPassed, setSecurityPassed] = useState(false);
+
   // === STATE ===
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -153,8 +157,76 @@ export default function QuizGamePage() {
 
   const currentQ = questions[currentIndex];
 
+  // 🔐 === SECURITY CHECK - MUST RUN FIRST ===
+  useEffect(() => {
+    const verifyAccess = async () => {
+      try {
+        console.log('🔐 Starting security verification...');
+
+        // CHECK 1: User Authentication
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError || !user) {
+          console.log('❌ Security: Not authenticated');
+          router.push('/');
+          return;
+        }
+
+        console.log('✅ Security: User authenticated -', user.id);
+
+        // CHECK 2: Available Rounds
+        const { data: roundsData, error: roundsError } = await supabase
+          .from('user_rounds')
+          .select('available_rounds')
+          .eq('user_id', user.id)
+          .single();
+
+        if (roundsError || !roundsData) {
+          console.log('❌ Security: No rounds record found');
+          router.push('/buy');
+          return;
+        }
+
+        if (roundsData.available_rounds <= 0) {
+          console.log('❌ Security: No available rounds (' + roundsData.available_rounds + ')');
+          router.push('/buy');
+          return;
+        }
+
+        console.log('✅ Security: Available rounds -', roundsData.available_rounds);
+
+        // CHECK 3: Deduct One Round (Quiz Started)
+        const { error: updateError } = await supabase
+          .from('user_rounds')
+          .update({ available_rounds: roundsData.available_rounds - 1 })
+          .eq('user_id', user.id);
+
+        if (updateError) {
+          console.error('❌ Security: Failed to deduct round', updateError);
+          router.push('/lobby');
+          return;
+        }
+
+        console.log('✅ Security: Round deducted successfully');
+        console.log('✅ Security: All checks passed!');
+        
+        setSecurityPassed(true);
+        setIsVerifying(false);
+
+      } catch (error) {
+        console.error('❌ Security check failed:', error);
+        router.push('/');
+      }
+    };
+
+    verifyAccess();
+  }, [router]);
+
   // === FETCH QUESTIONS FROM SUPABASE ===
   useEffect(() => {
+    // 🔐 Don't fetch questions until security check passes
+    if (!securityPassed) return;
+
     const fetchQuestions = async () => {
       try {
         const { data, error } = await supabase
@@ -214,7 +286,7 @@ export default function QuizGamePage() {
     };
 
     fetchQuestions();
-  }, []);
+  }, [securityPassed]); // 🔐 Added security dependency
 
   // === FETCH USER ROUNDS ===
   useEffect(() => {
@@ -536,6 +608,41 @@ export default function QuizGamePage() {
 
   const accuracy = TOTAL_QUESTIONS > 0 ? Math.round((correctCount / TOTAL_QUESTIONS) * 100) : 0;
   const score = correctCount * 2; // 2 points per correct answer (50 questions = 100 points max)
+
+  // 🔐 === SECURITY VERIFICATION SCREEN ===
+  if (isVerifying) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "20px",
+        color: "white",
+      }}>
+        <div style={{
+          width: "60px",
+          height: "60px",
+          border: "4px solid rgba(139, 92, 246, 0.3)",
+          borderTopColor: "#8b5cf6",
+          borderRadius: "50%",
+          animation: "spin 1s linear infinite"
+        }} />
+        <p style={{
+          color: "#a78bfa",
+          fontSize: "16px",
+          fontWeight: 600,
+          display: "flex",
+          alignItems: "center",
+          gap: "8px"
+        }}>
+          🔐 Verifying access...
+        </p>
+      </div>
+    );
+  }
 
   // === LOADING SCREEN ===
   if (isLoading) {
