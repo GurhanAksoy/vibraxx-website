@@ -627,7 +627,10 @@ export default function HomePage() {
       // ✅ Login olduktan sonra pending buy rounds var mı?
       if (data.user && sessionStorage.getItem('pendingBuyRounds') === 'true') {
         sessionStorage.removeItem('pendingBuyRounds');
-        router.push('/buy');
+        // Küçük delay ile buy sayfasına git (auth tamamen yüklensin)
+        setTimeout(() => {
+          router.push('/buy');
+        }, 300);
       }
     };
     loadUser();
@@ -635,10 +638,13 @@ export default function HomePage() {
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null);
       
-      // ✅ Auth değiştiğinde de kontrol et
-      if (session?.user && sessionStorage.getItem('pendingBuyRounds') === 'true') {
+      // ✅ Auth değiştiğinde de kontrol et (login event'i)
+      if (event === 'SIGNED_IN' && session?.user && sessionStorage.getItem('pendingBuyRounds') === 'true') {
         sessionStorage.removeItem('pendingBuyRounds');
-        router.push('/buy');
+        // Küçük delay ile buy sayfasına git
+        setTimeout(() => {
+          router.push('/buy');
+        }, 300);
       }
     });
 
@@ -1411,21 +1417,23 @@ export default function HomePage() {
             onBuyRounds={async () => {
               setShowNoRoundsModal(false);
               
+              // ✅ GİRİŞ KONTROLÜ
               if (!user) {
-                // ✅ BASIT: Kullanıcı buy rounds istedi, flag set et
+                // ✅ Kullanıcı giriş yapmamış - Google login aç
                 sessionStorage.setItem('pendingBuyRounds', 'true');
                 
-                // Google login'e yönlendir
+                // Google ile giriş yap
                 await supabase.auth.signInWithOAuth({
                   provider: "google",
                   options: {
                     redirectTo: `${window.location.origin}/auth/callback`,
                   },
                 });
-              } else {
-                // Zaten giriş yapmış
-                router.push("/buy");
+                return; // ✅ Burada dur, login olsun
               }
+              
+              // ✅ Giriş yapmış - buy sayfasına git
+              router.push("/buy");
             }}
             onCancel={() => setShowNoRoundsModal(false)}
           />
