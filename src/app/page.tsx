@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import Head from "next/head";
+// ❌ REMOVED: import Head from "next/head"; - Use metadata in layout.tsx instead
 import {
   Crown,
   Trophy,
@@ -28,11 +28,11 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// Memoized Components
-const StatCard = memo(({ icon: Icon, value, label, color }: any) => (
+// ✅ PREMIUM: Memoized Components
+const StatCard = memo(({ icon: Icon, value, label }: any) => (
   <div className="vx-stat-card">
-    <Icon style={{ width: 22, height: 22, color, marginBottom: 4 }} />
-    <div className="vx-stat-value" style={{ color }}>{value}</div>
+    <Icon style={{ width: 20, height: 20, color: "#6b7280", marginBottom: 8 }} />
+    <div className="vx-stat-value">{value}</div>
     <div className="vx-stat-label">{label}</div>
   </div>
 ));
@@ -42,36 +42,54 @@ const ChampionCard = memo(({ champion }: any) => {
   const Icon = champion.icon;
   return (
     <div className="vx-champ-card">
+      {/* Premium icon container with subtle accent */}
       <div
         style={{
-          width: 56,
-          height: 56,
-          margin: "0 auto 18px",
-          borderRadius: 18,
-          background: champion.gradient,
+          width: 64,
+          height: 64,
+          margin: "0 auto 16px",
+          borderRadius: 16,
+          background: `linear-gradient(135deg, ${champion.color}15, ${champion.color}08)`,
+          border: `1px solid ${champion.color}30`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
         }}
       >
-        <Icon style={{ width: 26, height: 26, color: "#ffffff" }} />
+        <Icon style={{ width: 28, height: 28, color: champion.color }} />
       </div>
+      
+      {/* Period label */}
       <div
         style={{
-          fontSize: 11,
-          fontWeight: 700,
+          fontSize: 10,
+          fontWeight: 600,
           textTransform: "uppercase",
-          letterSpacing: "0.12em",
+          letterSpacing: "0.15em",
           color: "#6b7280",
-          marginBottom: 6,
+          marginBottom: 8,
         }}
       >
         {champion.period} Champion
       </div>
-      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>
+      
+      {/* Name - white */}
+      <div style={{ 
+        fontSize: 18, 
+        fontWeight: 700, 
+        marginBottom: 8,
+        color: "#ffffff",
+      }}>
         {champion.name}
       </div>
-      <div style={{ fontSize: 20, fontWeight: 800, color: champion.color }}>
+      
+      {/* Score - colored accent */}
+      <div style={{ 
+        fontSize: 24, 
+        fontWeight: 800, 
+        color: champion.color,
+        lineHeight: 1,
+      }}>
         {champion.score.toLocaleString()} pts
       </div>
     </div>
@@ -639,11 +657,15 @@ export default function HomePage() {
   }, []);
 
   // Auth Actions
-  const handleSignIn = useCallback(async () => {
+  const handleSignIn = useCallback(async (redirectPath?: string) => {
+    const redirectUrl = redirectPath 
+      ? `${window.location.origin}${redirectPath}`
+      : `${window.location.origin}/auth/callback`;
+      
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: redirectUrl,
       },
     });
   }, []);
@@ -723,26 +745,23 @@ export default function HomePage() {
     return `${m}:${s.toString().padStart(2, "0")}`;
   }, []);
 
-  // Stats Cards
+  // ✅ PREMIUM: Stats Cards (no color prop)
   const statsCards = useMemo(
     () => [
       {
         icon: Globe,
         value: `${Math.floor(activePlayers / 1000)}K+`,
         label: "Active Players",
-        color: "#a78bfa",
       },
       {
         icon: Sparkles,
         value: `${(stats.totalQuestions / 1000000).toFixed(1)}M+`,
         label: "Questions Answered",
-        color: "#f0abfc",
       },
       {
         icon: Zap,
         value: `${stats.roundsPerDay}/day`,
         label: "Live Rounds",
-        color: "#22d3ee",
       },
     ],
     [activePlayers, stats]
@@ -750,19 +769,8 @@ export default function HomePage() {
 
   return (
     <>
-      <Head>
-        <title>VibraXX - World's #1 Educational Quiz | Compete & Win</title>
-        <meta
-          name="description"
-          content="The world's number one educational and award-winning quiz! Compete globally, win prizes, and prove your knowledge."
-        />
-        <meta name="keywords" content="live quiz, educational quiz, trivia, competition, prizes, leaderboard" />
-        <meta property="og:title" content="VibraXX - World's #1 Educational Quiz" />
-        <meta property="og:description" content="The world's number one educational and award-winning quiz!" />
-        <meta property="og:type" content="website" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <link rel="canonical" href="https://vibraxx.com" />
-      </Head>
+      {/* ❌ REMOVED: <Head> component - SEO metadata moved to app/layout.tsx */}
+      {/* Add metadata export to app/layout.tsx instead */}
 
       <style jsx global>{`
         :root { 
@@ -868,10 +876,21 @@ export default function HomePage() {
 
         .vx-livebar {
           z-index: 40;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+          border-bottom: 1px solid rgba(139, 92, 246, 0.3);
+          border-top: 1px solid rgba(139, 92, 246, 0.2);
           backdrop-filter: blur(16px);
-          background: linear-gradient(90deg, rgba(139, 92, 246, 0.12), rgba(236, 72, 153, 0.08));
+          background: linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(217, 70, 239, 0.15));
           font-size: 12px;
+          animation: pulse-glow 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse-glow {
+          0%, 100% {
+            box-shadow: 0 0 0 rgba(139, 92, 246, 0);
+          }
+          50% {
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+          }
         }
 
         .vx-livebar-inner {
@@ -1031,6 +1050,7 @@ export default function HomePage() {
           }
         }
 
+        /* ✅ PREMIUM: Stats Card */
         .vx-stat-card {
           position: relative;
           display: flex;
@@ -1039,25 +1059,53 @@ export default function HomePage() {
           justify-content: center;
           text-align: center;
           border-radius: 16px;
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          background: rgba(9, 9, 13, 0.9);
-          backdrop-filter: blur(18px);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+          backdrop-filter: blur(20px);
           min-height: 120px;
           padding: 1.5rem;
-          transition: transform 0.3s;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          overflow: hidden;
         }
 
-        .vx-stat-card:hover { transform: translateY(-4px); }
+        /* Premium shine effect */
+        .vx-stat-card::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100px;
+          right: -100px;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        }
+
+        .vx-stat-card:hover { 
+          transform: translateY(-2px);
+          border-color: rgba(255, 255, 255, 0.12);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+        }
 
         @media (min-width: 640px) {
           .vx-stat-card { min-height: 150px; padding: 1.75rem; }
         }
 
-        .vx-stat-label { color: #94a3b8; font-size: 13px; }
-        .vx-stat-value { font-weight: 800; font-size: 24px; }
+        .vx-stat-label { 
+          color: #6b7280; 
+          font-size: 12px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+        }
+        
+        .vx-stat-value { 
+          font-weight: 800; 
+          font-size: 28px;
+          color: #ffffff;
+        }
 
         @media (min-width: 640px) {
-          .vx-stat-value { font-size: 28px; }
+          .vx-stat-value { font-size: 32px; }
         }
 
         .vx-champions-title {
@@ -1088,21 +1136,39 @@ export default function HomePage() {
           }
         }
 
+        /* ✅ PREMIUM: Champion Card */
         .vx-champ-card {
           position: relative;
-          padding: 22px;
-          border-radius: 22px;
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          background: rgba(9, 9, 13, 0.96);
-          backdrop-filter: blur(18px);
+          padding: 24px;
+          borderRadius: 16px;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+          backdrop-filter: blur(20px);
           text-align: center;
-          transition: transform 0.3s;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          overflow: hidden;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
         }
 
-        .vx-champ-card:hover { transform: translateY(-4px); }
+        /* Premium shine effect */
+        .vx-champ-card::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100px;
+          right: -100px;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        }
+
+        .vx-champ-card:hover { 
+          transform: translateY(-2px);
+          border-color: rgba(255, 255, 255, 0.12);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
 
         @media (min-width: 640px) {
-          .vx-champ-card { padding: 26px; }
+          .vx-champ-card { padding: 28px; }
         }
 
         /* Footer */}
@@ -1163,6 +1229,106 @@ export default function HomePage() {
         @media (min-width: 640px) {
           .vx-footer-legal { font-size: 12px; }
           .vx-footer-company { font-size: 12px; }
+        }
+
+        /* ✅ MOBILE OPTIMIZATIONS */
+        @media (max-width: 640px) {
+          .vx-hero-title {
+            font-size: 36px !important;
+            line-height: 1.2 !important;
+            padding: 0 8px;
+          }
+          
+          .vx-hero-subtitle {
+            font-size: 16px !important;
+            padding: 0 12px;
+          }
+          
+          .vx-cta-wrap {
+            flex-direction: column !important;
+            gap: 12px !important;
+            width: 100%;
+            padding: 0 4px;
+          }
+          
+          .vx-cta-btn {
+            width: 100% !important;
+            max-width: 100% !important;
+            font-size: 14px !important;
+          }
+          
+          /* Premium countdown mobile */
+          .vx-hero-countdown-container {
+            margin: 20px auto !important;
+            padding: 16px 20px !important;
+            max-width: 320px !important;
+          }
+          
+          .vx-hero-countdown-timer {
+            font-size: 32px !important; /* 38px → 32px */
+          }
+          
+          /* Live banner mobile */
+          .vx-livebar {
+            padding: 10px 0 !important;
+          }
+          
+          .vx-livebar-inner {
+            font-size: 11px !important;
+            gap: 6px !important;
+            flex-wrap: wrap;
+            justify-content: center;
+          }
+          
+          .vx-livebar-inner > div {
+            font-size: 11px !important;
+          }
+          
+          /* Stats grid mobile */
+          .vx-stats-grid {
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
+          }
+          
+          /* Champions grid mobile */
+          .vx-champions-grid {
+            grid-template-columns: 1fr !important;
+            gap: 16px !important;
+          }
+          
+          /* Footer mobile */
+          .vx-footer-links {
+            flex-direction: column !important;
+            gap: 8px !important;
+            align-items: center !important;
+          }
+          
+          .vx-footer-divider {
+            display: none !important;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .vx-hero-title {
+            font-size: 28px !important;
+          }
+          
+          .vx-hero-countdown-timer {
+            font-size: 28px !important; /* 32px → 28px */
+          }
+          
+          .vx-hero-countdown-container {
+            max-width: 280px !important;
+            padding: 14px 16px !important;
+          }
+          
+          .vx-stat-card {
+            padding: 16px !important;
+          }
+          
+          .vx-champ-card {
+            padding: 20px !important;
+          }
         }
       `}</style>
 
@@ -1230,8 +1396,17 @@ export default function HomePage() {
         {/* No Rounds Modal */}
         {showNoRoundsModal && (
           <NoRoundsModal
-            onBuyRounds={() => {
+            onBuyRounds={async () => {
               setShowNoRoundsModal(false);
+              
+              // ✅ FIX: Check if user is logged in
+              if (!user) {
+                // Not logged in - sign in and redirect to /buy page
+                await handleSignIn('/buy');
+                return;
+              }
+              
+              // Already logged in - go to buy page
               router.push("/buy");
             }}
             onCancel={() => setShowNoRoundsModal(false)}
@@ -1494,21 +1669,30 @@ export default function HomePage() {
           </div>
         </header>
 
-        {/* LIVE BANNER */}
+        {/* LIVE BANNER - Simplified */}
         <div className="vx-livebar">
           <div className="vx-container">
             <div className="vx-livebar-inner">
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                 <div
                   className="animate-pulse-slow"
                   style={{
-                    width: 8,
-                    height: 8,
+                    width: 10,
+                    height: 10,
                     borderRadius: "9999px",
-                    background: "#ef4444",
+                    background: "#22c55e",
+                    boxShadow: "0 0 12px #22c55e, 0 0 24px rgba(34, 197, 94, 0.4)",
                   }}
                 />
-                <span style={{ color: "#f97316", fontWeight: 600 }}>LIVE</span>
+                <span style={{ 
+                  color: "#22c55e", 
+                  fontWeight: 700,
+                  fontSize: 15,
+                  textShadow: "0 0 20px rgba(34, 197, 94, 0.5)",
+                  letterSpacing: "0.1em",
+                }}>
+                  LIVE
+                </span>
               </div>
 
               <div
@@ -1524,28 +1708,6 @@ export default function HomePage() {
                   {activePlayers.toLocaleString()}
                 </span>
                 <span>players online</span>
-              </div>
-
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  color: "#cbd5e1",
-                }}
-              >
-                <Sparkles style={{ width: 14, height: 14, color: "#f0abfc" }} />
-                <span>Next round</span>
-                <span
-                  style={{
-                    fontWeight: 700,
-                    background: "linear-gradient(to right,#a78bfa,#f0abfc)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                  }}
-                >
-                  {formatTime(nextRound)}
-                </span>
               </div>
             </div>
           </div>
@@ -1589,6 +1751,137 @@ export default function HomePage() {
             <p className="vx-hero-subtitle">
               The world's number one educational and award-winning quiz!
             </p>
+
+            {/* ✅ PREMIUM: Compact Countdown Timer */}
+            <div
+              style={{
+                margin: "24px auto 28px",
+                maxWidth: 380,
+                padding: "18px 24px",
+                borderRadius: 16,
+                background: "linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                backdropFilter: "blur(20px)",
+                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)",
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              {/* Premium shine effect */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: -100,
+                  right: -100,
+                  height: 1,
+                  background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
+                }}
+              />
+              
+              <div style={{ position: "relative", zIndex: 10 }}>
+                {/* Top label */}
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: "#9ca3af",
+                    marginBottom: 10,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.15em",
+                    textAlign: "center",
+                  }}
+                >
+                  Next Round
+                </div>
+                
+                {/* Timer display */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 12,
+                    marginBottom: 10,
+                  }}
+                >
+                  {/* Time value */}
+                  <div
+                    style={{
+                      fontSize: 38,
+                      fontWeight: 800,
+                      color: "#ffffff",
+                      fontFamily: "ui-monospace, monospace",
+                      letterSpacing: "0.02em",
+                      textShadow: "0 2px 8px rgba(0, 0, 0, 0.5)",
+                      lineHeight: 1,
+                    }}
+                  >
+                    {formatTime(nextRound)}
+                  </div>
+                  
+                  {/* Live indicator */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "4px 10px",
+                      borderRadius: 8,
+                      background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+                      boxShadow: "0 0 20px rgba(34, 197, 94, 0.4)",
+                    }}
+                  >
+                    <div
+                      className="animate-pulse-slow"
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: "#ffffff",
+                        boxShadow: "0 0 8px #ffffff",
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: "#ffffff",
+                        letterSpacing: "0.05em",
+                      }}
+                    >
+                      LIVE
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Bottom info */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    fontSize: 12,
+                    color: "#6b7280",
+                    fontWeight: 500,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 4,
+                      height: 4,
+                      borderRadius: "50%",
+                      background: "#22c55e",
+                    }}
+                  />
+                  <span style={{ color: "#ffffff", fontWeight: 600 }}>
+                    {activePlayers.toLocaleString()}
+                  </span>
+                  <span>players ready</span>
+                </div>
+              </div>
+            </div>
 
             {/* CTA Buttons */}
             <div className="vx-cta-wrap">
@@ -1655,143 +1948,188 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* Pricing Info Section */}
+            {/* ✅ PREMIUM: Pricing Info Section */}
             <div
               style={{
                 maxWidth: 640,
                 margin: "0 auto 48px",
-                padding: "20px 16px",
+                padding: "32px 24px",
                 borderRadius: 20,
-                background: "linear-gradient(135deg, rgba(251, 191, 36, 0.05), rgba(245, 158, 11, 0.05))",
-                border: "1px solid rgba(251, 191, 36, 0.2)",
-                backdropFilter: "blur(10px)",
+                background: "linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                backdropFilter: "blur(20px)",
+                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)",
+                position: "relative",
+                overflow: "hidden",
               }}
             >
-              <div style={{ textAlign: "center", marginBottom: 20 }}>
-                <h3
-                  style={{
-                    fontSize: 18,
-                    fontWeight: 700,
-                    color: "#fbbf24",
-                    marginBottom: 8,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 8,
-                  }}
-                >
-                  <ShoppingCart style={{ width: 20, height: 20 }} />
-                  Round Pricing
-                </h3>
-                <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>
-                  Affordable entry to compete for big prizes
-                </p>
-              </div>
-
+              {/* Premium shine effect */}
               <div
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 12,
-                  marginBottom: 16,
+                  position: "absolute",
+                  top: 0,
+                  left: -100,
+                  right: -100,
+                  height: 1,
+                  background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
                 }}
-              >
-                <div
-                  style={{
-                    padding: 14,
-                    borderRadius: 16,
-                    background: "rgba(15, 23, 42, 0.8)",
-                    border: "1px solid rgba(251, 191, 36, 0.2)",
-                    textAlign: "center",
-                  }}
-                >
-                  <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 6 }}>
-                    Single Round
-                  </div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: "#fbbf24", marginBottom: 2 }}>
-                    £1
-                  </div>
-                  <div style={{ fontSize: 11, color: "#64748b" }}>per round</div>
-                </div>
+              />
 
-                <div
-                  style={{
-                    padding: 14,
-                    borderRadius: 16,
-                    background: "linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1))",
-                    border: "2px solid rgba(251, 191, 36, 0.4)",
-                    textAlign: "center",
-                    position: "relative",
-                    boxShadow: "0 0 20px rgba(251, 191, 36, 0.2)",
-                  }}
-                >
-                  <div
+              <div style={{ position: "relative", zIndex: 10 }}>
+                <div style={{ textAlign: "center", marginBottom: 24 }}>
+                  <h3
                     style={{
-                      position: "absolute",
-                      top: -8,
-                      right: -8,
-                      background: "linear-gradient(135deg, #ef4444, #dc2626)",
-                      color: "white",
-                      fontSize: 9,
+                      fontSize: 18,
                       fontWeight: 700,
-                      padding: "3px 6px",
-                      borderRadius: 6,
-                      textTransform: "uppercase",
+                      color: "#ffffff",
+                      marginBottom: 8,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
                     }}
                   >
-                    Save 17%
-                  </div>
-                  <div style={{ fontSize: 13, color: "#fbbf24", marginBottom: 6, fontWeight: 600 }}>
-                    Value Pack
-                  </div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: "#fbbf24", marginBottom: 2 }}>
-                    £29
-                  </div>
-                  <div style={{ fontSize: 11, color: "#cbd5e1" }}>35 rounds (£0.83 each)</div>
+                    <ShoppingCart style={{ width: 20, height: 20, color: "#9ca3af" }} />
+                    Round Pricing
+                  </h3>
+                  <p style={{ fontSize: 13, color: "#6b7280", margin: 0, fontWeight: 500 }}>
+                    Affordable entry to compete for £1000 monthly prize
+                  </p>
                 </div>
-              </div>
 
-              <div
-                style={{
-                  padding: 14,
-                  borderRadius: 12,
-                  background: "rgba(59, 130, 246, 0.1)",
-                  border: "1px solid rgba(59, 130, 246, 0.2)",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "start", gap: 8, marginBottom: 8 }}>
-                  <AlertCircle
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 12,
+                    marginBottom: 20,
+                  }}
+                >
+                  {/* Single Round */}
+                  <div
                     style={{
-                      width: 16,
-                      height: 16,
-                      color: "#60a5fa",
-                      flexShrink: 0,
-                      marginTop: 2,
+                      padding: "20px 16px",
+                      borderRadius: 16,
+                      background: "rgba(255, 255, 255, 0.03)",
+                      border: "1px solid rgba(255, 255, 255, 0.08)",
+                      textAlign: "center",
+                      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                     }}
-                  />
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "#60a5fa", marginBottom: 3 }}>
-                      Prize Pool Activation
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
+                      e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)";
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)";
+                      e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)";
+                      e.currentTarget.style.transform = "translateY(0)";
+                    }}
+                  >
+                    <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 8, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                      Single Round
                     </div>
-                    <p style={{ fontSize: 11, color: "#94a3b8", margin: 0, lineHeight: 1.5 }}>
-                      The <strong style={{ color: "white" }}>£1000 monthly prize</strong> activates when we reach{" "}
-                      <strong style={{ color: "white" }}>2000+ active participants</strong>. This ensures we can cover platform costs (Stripe fees, infrastructure) and deliver the full prize pool to winners.
+                    <div style={{ fontSize: 32, fontWeight: 800, color: "#fbbf24", marginBottom: 4, lineHeight: 1 }}>
+                      £1
+                    </div>
+                    <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 500 }}>per round</div>
+                  </div>
+
+                  {/* Value Pack - Highlighted */}
+                  <div
+                    style={{
+                      padding: "20px 16px",
+                      borderRadius: 16,
+                      background: "linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.05))",
+                      border: "2px solid rgba(251, 191, 36, 0.3)",
+                      textAlign: "center",
+                      position: "relative",
+                      boxShadow: "0 0 30px rgba(251, 191, 36, 0.15)",
+                      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = "rgba(251, 191, 36, 0.5)";
+                      e.currentTarget.style.boxShadow = "0 0 40px rgba(251, 191, 36, 0.25)";
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = "rgba(251, 191, 36, 0.3)";
+                      e.currentTarget.style.boxShadow = "0 0 30px rgba(251, 191, 36, 0.15)";
+                      e.currentTarget.style.transform = "translateY(0)";
+                    }}
+                  >
+                    {/* Best Value Badge */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: -10,
+                        right: -10,
+                        background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
+                        color: "#0a0a0a",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        padding: "4px 8px",
+                        borderRadius: 6,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                        boxShadow: "0 2px 8px rgba(251, 191, 36, 0.4)",
+                      }}
+                    >
+                      Save 17%
+                    </div>
+                    <div style={{ fontSize: 12, color: "#fbbf24", marginBottom: 8, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                      Value Pack
+                    </div>
+                    <div style={{ fontSize: 32, fontWeight: 800, color: "#fbbf24", marginBottom: 4, lineHeight: 1 }}>
+                      £29
+                    </div>
+                    <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500 }}>35 rounds (£0.83 each)</div>
+                  </div>
+                </div>
+
+                {/* Premium Prize Pool Info */}
+                <div
+                  style={{
+                    padding: "16px",
+                    borderRadius: 12,
+                    background: "rgba(255, 255, 255, 0.02)",
+                    border: "1px solid rgba(255, 255, 255, 0.06)",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "start", gap: 10, marginBottom: 10 }}>
+                    <AlertCircle
+                      style={{
+                        width: 16,
+                        height: 16,
+                        color: "#9ca3af",
+                        flexShrink: 0,
+                        marginTop: 2,
+                      }}
+                    />
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#ffffff", marginBottom: 4 }}>
+                        Prize Pool Activation
+                      </div>
+                      <p style={{ fontSize: 11, color: "#6b7280", margin: 0, lineHeight: 1.6, fontWeight: 500 }}>
+                        The <strong style={{ color: "#fbbf24" }}>£1000 monthly prize</strong> activates when we reach{" "}
+                        <strong style={{ color: "#ffffff" }}>2000+ active participants</strong>. This ensures platform sustainability and full prize delivery.
+                      </p>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "start", gap: 10 }}>
+                    <CheckCircle
+                      style={{
+                        width: 16,
+                        height: 16,
+                        color: "#22c55e",
+                        flexShrink: 0,
+                        marginTop: 2,
+                      }}
+                    />
+                    <p style={{ fontSize: 11, color: "#6b7280", margin: 0, lineHeight: 1.6, fontWeight: 500 }}>
+                      <strong style={{ color: "#22c55e" }}>Fair & Transparent:</strong> All rounds contribute to the prize pool. The more players, the bigger the rewards!
                     </p>
                   </div>
-                </div>
-                <div style={{ display: "flex", alignItems: "start", gap: 8 }}>
-                  <CheckCircle
-                    style={{
-                      width: 16,
-                      height: 16,
-                      color: "#4ade80",
-                      flexShrink: 0,
-                      marginTop: 2,
-                    }}
-                  />
-                  <p style={{ fontSize: 11, color: "#94a3b8", margin: 0, lineHeight: 1.5 }}>
-                    <strong style={{ color: "#4ade80" }}>Fair & Transparent:</strong> All rounds purchased contribute to the prize pool. The more players, the bigger the rewards for everyone!
-                  </p>
                 </div>
               </div>
             </div>
@@ -1816,6 +2154,136 @@ export default function HomePage() {
             </div>
           </div>
         </main>
+
+        {/* ✅ PREMIUM: Trust Elements */}
+        <div style={{
+          borderTop: "1px solid rgba(255, 255, 255, 0.05)",
+          borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
+          background: "rgba(255, 255, 255, 0.01)",
+          padding: "32px 0",
+        }}>
+          <div className="vx-container">
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: 24,
+              maxWidth: 1024,
+              margin: "0 auto",
+            }}>
+              {/* SSL Encrypted */}
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 8,
+                padding: 16,
+              }}>
+                <div style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 10,
+                  background: "rgba(34, 197, 94, 0.1)",
+                  border: "1px solid rgba(34, 197, 94, 0.2)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}>
+                  <CheckCircle style={{ width: 20, height: 20, color: "#22c55e" }} />
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>
+                  SSL Encrypted
+                </div>
+                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>
+                  Bank-level security
+                </div>
+              </div>
+
+              {/* Stripe Verified */}
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 8,
+                padding: 16,
+              }}>
+                <div style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 10,
+                  background: "rgba(139, 92, 246, 0.1)",
+                  border: "1px solid rgba(139, 92, 246, 0.2)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}>
+                  <ShoppingCart style={{ width: 20, height: 20, color: "#8b5cf6" }} />
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>
+                  Stripe Verified
+                </div>
+                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>
+                  Secure payments
+                </div>
+              </div>
+
+              {/* 18+ Only */}
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 8,
+                padding: 16,
+              }}>
+                <div style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 10,
+                  background: "rgba(251, 191, 36, 0.1)",
+                  border: "1px solid rgba(251, 191, 36, 0.2)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}>
+                  <AlertCircle style={{ width: 20, height: 20, color: "#fbbf24" }} />
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>
+                  18+ Only
+                </div>
+                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>
+                  Age verified
+                </div>
+              </div>
+
+              {/* Global Competition */}
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 8,
+                padding: 16,
+              }}>
+                <div style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 10,
+                  background: "rgba(6, 182, 212, 0.1)",
+                  border: "1px solid rgba(6, 182, 212, 0.2)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}>
+                  <Globe style={{ width: 20, height: 20, color: "#06b6d4" }} />
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>
+                  Global Arena
+                </div>
+                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>
+                  Worldwide players
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Footer */}
         <footer className="vx-footer">
