@@ -1637,7 +1637,7 @@ export default function HomePage() {
                   </>
                 ) : (
                   <button
-                    onClick={handleSignIn}
+                    onClick={() => handleSignIn()}
                     aria-label="Sign in with Google"
                     style={{
                       position: "relative",
