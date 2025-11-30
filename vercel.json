@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "builds": [],
+  "routes": [],
+  "cron": [
+    {
+      "path": "/api/cron/round-scheduler",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/lifecycle-engine",
+      "schedule": "* * * * *"
+    }
+  ]
+}
