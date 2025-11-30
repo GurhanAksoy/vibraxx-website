@@ -2142,7 +2142,7 @@ export default function HomePage() {
                         boxShadow: "0 2px 8px rgba(251, 191, 36, 0.4)",
                       }}
                     >
-                      Save 17%
+                      Save 18%
                     </div>
                     <div style={{ fontSize: 12, color: "#fbbf24", marginBottom: 8, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>
                       Value Pack
@@ -2150,7 +2150,7 @@ export default function HomePage() {
                     <div style={{ fontSize: 32, fontWeight: 800, color: "#fbbf24", marginBottom: 4, lineHeight: 1 }}>
                       £49
                     </div>
-                    <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500 }}>30 rounds (£0.83 each)</div>
+                    <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500 }}>30 rounds (£1.63 each)</div>
                   </div>
                 </div>
 
