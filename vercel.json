@@ -1,8 +1,21 @@
 {
-  "version": 2,
   "functions": {
-    "api/cron/*": {
-      "maxDuration": 60
+    "api/cron/**/route.ts": {
+      "runtime": "nodejs18.x"
     }
-  }
+  },
+  "cron": [
+    {
+      "path": "/api/cron/round-scheduler",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/round-lifecycle",
+      "schedule": "*/1 * * * *"
+    },
+    {
+      "path": "/api/cron/supabase-check",
+      "schedule": "0 */6 * * *"
+    }
+  ]
 }
