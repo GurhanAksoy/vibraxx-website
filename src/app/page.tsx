@@ -2097,7 +2097,7 @@ export default function HomePage() {
                       Single Round
                     </div>
                     <div style={{ fontSize: 32, fontWeight: 800, color: "#fbbf24", marginBottom: 4, lineHeight: 1 }}>
-                      £1
+                      £2
                     </div>
                     <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 500 }}>per round</div>
                   </div>
@@ -2148,9 +2148,9 @@ export default function HomePage() {
                       Value Pack
                     </div>
                     <div style={{ fontSize: 32, fontWeight: 800, color: "#fbbf24", marginBottom: 4, lineHeight: 1 }}>
-                      £29
+                      £49
                     </div>
-                    <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500 }}>35 rounds (£0.83 each)</div>
+                    <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500 }}>30 rounds (£0.83 each)</div>
                   </div>
                 </div>
 
