@@ -1,1 +1,16 @@
-{}
+{
+  "crons": [
+    {
+      "path": "/api/cron/round-scheduler",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/round-lifecycle",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/supabase-check",
+      "schedule": "0 */6 * * *"
+    }
+  ]
+}
