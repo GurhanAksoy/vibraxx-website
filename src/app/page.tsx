@@ -1795,7 +1795,7 @@ export default function HomePage() {
                 }}
               >
                 <AlertCircle style={{ width: 15, height: 15 }} />
-                Prize pool activates at 2000+
+                See Terms&Conditions for full details
               </div>
             </div>
 
@@ -2179,7 +2179,7 @@ export default function HomePage() {
                       </div>
                       <p style={{ fontSize: 11, color: "#6b7280", margin: 0, lineHeight: 1.6, fontWeight: 500 }}>
                         The <strong style={{ color: "#fbbf24" }}>£1000 monthly prize</strong> activates when we reach{" "}
-                        <strong style={{ color: "#ffffff" }}>2000+ active participants</strong>. This ensures platform sustainability and full prize delivery.
+                        <strong style={{ color: "#ffffff" }}>3000+ active participants</strong>. This ensures platform sustainability and full prize delivery.
                       </p>
                     </div>
                   </div>
@@ -2359,7 +2359,7 @@ export default function HomePage() {
             <div className="vx-footer-legal">
               <strong style={{ color: "#94a3b8" }}>Educational Quiz Competition.</strong> 18+ only. 
               This is a 100% skill-based knowledge competition with no element of chance. 
-              Entry fees apply. Prize pool activates with 2000+ monthly participants. See{" "}
+              Entry fees apply. Prize pool activates with 3000+ monthly participants. See{" "}
               <a href="/terms" style={{ color: "#a78bfa", textDecoration: "underline" }}>
                 Terms & Conditions
               </a>{" "}

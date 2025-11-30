@@ -791,7 +791,7 @@ function SuccessContent() {
               <div className="vx-champ-prize-content">
                 <div className="vx-champ-prize-amount">£1,000</div>
                 <p className="vx-champ-prize-text">
-                  The prize activates when we reach 2000+ monthly participants.
+                  The prize activates when we reach 3000+ monthly participants.
                 </p>
               </div>
             </div>

@@ -857,7 +857,7 @@ export default function BuyPage() {
             </h1>
 
             <p className="vx-buy-subtitle">
-              Compete for the <strong style={{ color: "#fbbf24" }}>£1,000 monthly prize</strong> when we reach 2000+ active participants
+              Compete for the <strong style={{ color: "#fbbf24" }}>£1,000 monthly prize</strong> when we reach 3000+ active participants
             </p>
 
             <div className="vx-buy-trust">
@@ -981,7 +981,7 @@ export default function BuyPage() {
 
             <div className="vx-buy-benefits-grid">
               {[
-                { icon: Trophy, title: "£1,000 Prize Pool", text: "Monthly rewards at 2000+ players", color: "#fbbf24" },
+                { icon: Trophy, title: "£1,000 Prize Pool", text: "Monthly rewards at 3000+ players", color: "#fbbf24" },
                 { icon: Zap, title: "Instant Access", text: "Play immediately after purchase", color: "#06b6d4" },
                 { icon: Users, title: "Global Leaderboard", text: "Compete with players worldwide", color: "#8b5cf6" },
                 { icon: Target, title: "Detailed Analytics", text: "Track your progress & rankings", color: "#ec4899" },
@@ -1007,7 +1007,7 @@ export default function BuyPage() {
             <div className="vx-buy-footer-disclaimer">
               <strong style={{ color: "#94a3b8" }}>Educational Quiz Competition.</strong> 18+ only. 
               This is a 100% skill-based knowledge competition with no element of chance. 
-              Entry fees apply. Prize pool activates with 2000+ monthly participants. See{" "}
+              Entry fees apply. Prize pool activates with 3000+ monthly participants. See{" "}
               <a href="/terms" style={{ color: "#a78bfa", textDecoration: "underline" }}>Terms & Conditions</a> for full details.
             </div>
 

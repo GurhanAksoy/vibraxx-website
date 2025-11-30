@@ -695,13 +695,13 @@ export default function RefundPolicyPage() {
               <span>6. Prize Pool Threshold Not Met</span>
             </h2>
             <p>
-              If the monthly participation threshold of 2000+ active participants is not reached, ALL rounds purchased during that month are automatically refunded—regardless of whether they were used.
+              If the monthly participation threshold of 3000+ active participants is not reached, ALL rounds purchased during that month are automatically refunded—regardless of whether they were used.
             </p>
 
             <div className="highlight-box">
               <strong>Automatic Refund Process</strong>
               <p>
-                If the 2000-participant threshold is not met by month-end, refunds are automatically processed within 14 business days. No action is required from you. You will receive an email notification when the refund is initiated.
+                If the 3000-participant threshold is not met by month-end, refunds are automatically processed within 14 business days. No action is required from you. You will receive an email notification when the refund is initiated.
               </p>
             </div>
           </div>

@@ -72,8 +72,8 @@ export default function FAQPage() {
           a: "The player with the highest cumulative score for the calendar month wins £1000. You can play as many rounds as you want to increase your total. The more rounds you play correctly, the higher your score."
         },
         {
-          q: "What is the 2000 participant threshold?",
-          a: "The £1000 monthly prize activates only if 2000 or more unique participants compete during that month. This ensures the platform can sustain the prize pool. If the threshold isn't met, all entry fees are refunded within 14 days."
+          q: "What is the 3000 participant threshold?",
+          a: "The £1000 monthly prize activates only if 3000 or more unique participants compete during that month. This ensures the platform can sustain the prize pool. If the threshold isn't met, all entry fees are refunded within 14 days."
         },
         {
           q: "What happens if there's a tie for first place?",
@@ -102,7 +102,7 @@ export default function FAQPage() {
         },
         {
           q: "Can I get a refund?",
-          a: "Purchased rounds are generally non-refundable once used. However, unused rounds may be refunded within 14 days of purchase. If the monthly prize threshold (2000 participants) isn't met, all entry fees are automatically refunded. See our Refund Policy for full details."
+          a: "Purchased rounds are generally non-refundable once used. However, unused rounds may be refunded within 14 days of purchase. If the monthly prize threshold (3000 participants) isn't met, all entry fees are automatically refunded. See our Refund Policy for full details."
         },
         {
           q: "Do round credits expire?",

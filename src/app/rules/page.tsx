@@ -831,9 +831,9 @@ export default function QuizRulesPage() {
 
             <h3 className="subsection-title">Threshold Requirement</h3>
             <div className="info-box">
-              <strong>2000+ Participants Needed</strong>
+              <strong>3000+ Participants Needed</strong>
               <p>
-                Remember: The £1000 prize is only awarded if 2000 or more unique participants compete during the month. If this threshold is not reached, all entry fees are refunded.
+                Remember: The £1000 prize is only awarded if 3000 or more unique participants compete during the month. If this threshold is not reached, all entry fees are refunded.
               </p>
             </div>
           </div>

@@ -1196,7 +1196,7 @@ useEffect(() => {
             <div className="vx-footer-legal">
               <strong style={{ color: "#94a3b8" }}>Educational Quiz Competition.</strong> 18+ only. 
               This is a 100% skill-based knowledge competition with no element of chance. 
-              Entry fees apply. Prize pool activates with 2000+ monthly participants. See{" "}
+              Entry fees apply. Prize pool activates with 3000+ monthly participants. See{" "}
               <a href="/terms" style={{ color: "#a78bfa", textDecoration: "underline" }}>
                 Terms & Conditions
               </a>{" "}

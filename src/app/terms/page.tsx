@@ -750,9 +750,9 @@ export default function TermsPage() {
 
             <h3 className="subsection-title">7.2 Minimum Participation Threshold</h3>
             <div className="warning-box">
-              <strong>2000+ Participants Required</strong>
+              <strong>3000+ Participants Required</strong>
               <p>
-                The prize pool activates only if 2000 or more participants compete during the calendar month. This threshold covers platform operational costs including payment processing fees, infrastructure, security, and support services. If the threshold is not met, no prize is awarded and funds do not carry over to the next month.
+                The prize pool activates only if 3000 or more participants compete during the calendar month. This threshold covers platform operational costs including payment processing fees, infrastructure, security, and support services. If the threshold is not met, no prize is awarded and funds do not carry over to the next month.
               </p>
             </div>
 

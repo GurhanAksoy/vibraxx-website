@@ -693,9 +693,9 @@ export default function HowItWorksPage() {
 
             <h3 className="subsection-title">Important Threshold</h3>
             <div className="info-box">
-              <strong>2000+ Participants Required</strong>
+              <strong>3000+ Participants Required</strong>
               <p>
-                The £1000 prize pool activates only when 2000 or more unique participants compete during the month. This ensures platform sustainability while delivering the full prize to winners. If the threshold is not met, all entry fees are automatically refunded within 14 days.
+                The £1000 prize pool activates only when 3000 or more unique participants compete during the month. This ensures platform sustainability while delivering the full prize to winners. If the threshold is not met, all entry fees are automatically refunded within 14 days.
               </p>
             </div>
 
