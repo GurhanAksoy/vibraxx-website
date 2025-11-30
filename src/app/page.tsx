@@ -1795,7 +1795,7 @@ export default function HomePage() {
                 }}
               >
                 <AlertCircle style={{ width: 15, height: 15 }} />
-                See Terms&Conditions for full details
+                See Terms & Conditions for full details
               </div>
             </div>
 
