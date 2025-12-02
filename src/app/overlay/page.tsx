@@ -165,6 +165,7 @@ export default function OverlayPage() {
   // Faz & süre
   const [phase, setPhase] = useState<Phase>("question");
   const [timeLeft, setTimeLeft] = useState<number>(6);
+  const [questionStartAt, setQuestionStartAt] = useState<string | null>(null);
 
   // Ekranda görünen soru (mock yapısında tutuyoruz)
   const [question, setQuestion] = useState(MOCK_QUESTION);
@@ -181,116 +182,89 @@ export default function OverlayPage() {
   const [leaderboard, setLeaderboard] = useState(MOCK_LEADERBOARD);
 
   // --- SUPABASE'TEN İLK VERİYİ ÇEKME ---
+
+  // --- FETCH ACTIVE ROUND & INITIAL DATA ---
   useEffect(() => {
     let isMounted = true;
 
     const loadInitial = async () => {
       try {
-        // ROUND STATE
-        const { data: roundStateData } = await supabase
-          .from("overlay_round_state")
+        // 1️⃣ Get active round from live_rounds
+        const { data: activeRound } = await supabase
+          .from("live_rounds")
           .select("*")
-          .order("updated_at", { ascending: false })
-          .limit(1);
+          .or("phase.eq.QUESTION,phase.eq.READY")
+          .order("scheduled_start", { ascending: false })
+          .limit(1)
+          .single();
 
-        const roundState = (roundStateData?.[0] ||
-          null) as OverlayRoundStateRow | null;
+        const roundId = activeRound?.id ?? null;
+        
+        if (!isMounted || !roundId) return;
 
-        if (isMounted && roundState) {
-          if (roundState.phase) setPhase(roundState.phase);
-          if (typeof roundState.time_left === "number")
-            setTimeLeft(roundState.time_left);
-          if (typeof roundState.question_index === "number") {
-            setQuestion((prev) => ({
-              ...prev,
-              index: roundState.question_index ?? prev.index,
-            }));
-          }
-        }
+        // Set phase from live_rounds
+        const currentPhase = activeRound.phase === "QUESTION" ? "question" : "countdown";
+        setPhase(currentPhase as Phase);
+        
+        const currentIndex = activeRound.current_question_index || 0;
 
-        // CURRENT QUESTION
-        const { data: questionData } = await supabase
-          .from("overlay_current_question")
-          .select("*")
-          .order("updated_at", { ascending: false })
-          .limit(1);
+        // Store question start time for timer
+        setQuestionStartAt(activeRound.question_started_at);
 
-        const qRow = (questionData?.[0] ||
-          null) as OverlayCurrentQuestionRow | null;
+        // 2️⃣ Fetch question from live_round_questions
+        const { data: qData } = await supabase
+          .from("live_round_questions")
+          .select("position, questions(*)")
+          .eq("round_id", roundId)
+          .eq("position", currentIndex)
+          .single();
 
-        if (isMounted && qRow) {
-          setQuestion((prev) => ({
-            index: prev.index,
-            total: prev.total,
-            question: qRow.question_text ?? prev.question,
+        if (isMounted && qData?.questions) {
+          setQuestion({
+            index: currentIndex,
+            total: 50,
+            question: qData.questions.question_text || "",
             options: [
-              { id: "A", text: qRow.option_a ?? "" },
-              { id: "B", text: qRow.option_b ?? "" },
-              { id: "C", text: qRow.option_c ?? "" },
-              { id: "D", text: qRow.option_d ?? "" },
+              { id: "A", text: qData.questions.option_a || "" },
+              { id: "B", text: qData.questions.option_b || "" },
+              { id: "C", text: qData.questions.option_c || "" },
+              { id: "D", text: qData.questions.option_d || "" },
             ],
-            correctAnswer: (qRow.correct_answer as any) ?? prev.correctAnswer,
-            explanation: qRow.explanation ?? prev.explanation,
-          }));
+            correctAnswer: qData.questions.correct_answer || "A",
+            explanation: qData.questions.explanation || "",
+          });
         }
 
-        // STATS
+        // 3️⃣ Fetch overlay stats
         const { data: statsData } = await supabase
           .from("overlay_stats")
           .select("*")
+          .eq("round_id", roundId)
           .order("updated_at", { ascending: false })
           .limit(1);
 
-        const statsRow = (statsData?.[0] ||
-          null) as OverlayStatsRow | null;
-
-        if (isMounted && statsRow) {
-          setOverlayStats(statsRow);
-          if (Array.isArray(statsRow.countries)) {
-            const mapped = (statsRow.countries as any[]).map((item) => {
-              const meta =
-                MOCK_COUNTRIES.find((c) => c.code === item.code) || {
-                  code: item.code,
-                  name: item.code,
-                  flag: "🌍",
-                  count: 0,
-                };
-              return {
-                ...meta,
-                count: item.count ?? meta.count ?? 0,
-              };
-            });
-            setCountries(mapped);
+        if (isMounted && statsData?.[0]) {
+          setOverlayStats(statsData[0] as OverlayStatsRow);
+          
+          if (statsData[0].countries) {
+            setCountries(statsData[0].countries);
           }
         }
 
-        // LEADERBOARD
-        const { data: lbData } = await supabase
+        // 4️⃣ Fetch leaderboard
+        const { data: leaderboardData } = await supabase
           .from("overlay_leaderboard")
           .select("*")
+          .eq("round_id", roundId)
           .order("rank", { ascending: true })
           .limit(10);
 
-        const lbRows = (lbData || []) as OverlayLeaderboardRow[];
-
-        if (isMounted && lbRows.length > 0) {
-          const mapped = lbRows
-            .filter((row) => row.rank != null)
-            .map((row) => ({
-              rank: row.rank ?? 0,
-              username: row.username ?? "Player",
-              country: row.country ?? "US",
-              score: row.score ?? 0,
-              correct: row.correct ?? 0,
-              avgTime: row.avg_time ?? 0,
-            }))
-            .sort((a, b) => a.rank - b.rank);
-
-          setLeaderboard(mapped as any);
+        if (isMounted && leaderboardData) {
+          setLeaderboard(leaderboardData as OverlayLeaderboardRow[]);
         }
-      } catch (e) {
-        // Sessiz geçiyoruz, mock çalışmaya devam eder
-        console.error("Overlay initial load error:", e);
+
+      } catch (err) {
+        console.error("Error loading overlay data:", err);
       }
     };
 
@@ -301,112 +275,158 @@ export default function OverlayPage() {
     };
   }, []);
 
-  // --- SUPABASE REAL-TIME SUBSCRIPTIONS ---
+  // --- SERVER-SYNC TIMER (500ms polling) ---
   useEffect(() => {
-    const channel = supabase
-      .channel("overlay-updates")
-      // ROUND STATE
+    if (!questionStartAt) return;
+    
+    const interval = setInterval(() => {
+      const start = new Date(questionStartAt).getTime();
+      const now = Date.now();
+      const elapsed = Math.floor((now - start) / 1000);
+      const remaining = Math.max(0, 6 - elapsed);
+      setTimeLeft(remaining);
+    }, 500);
+    
+    return () => clearInterval(interval);
+  }, [questionStartAt]);
+
+  // --- REALTIME SUBSCRIPTIONS ---
+  useEffect(() => {
+    let currentRoundId: string | null = null;
+
+    // Get current round ID first
+    const initRealtime = async () => {
+      const { data: activeRound } = await supabase
+        .from("live_rounds")
+        .select("id")
+        .or("phase.eq.QUESTION,phase.eq.READY")
+        .order("scheduled_start", { ascending: false })
+        .limit(1)
+        .single();
+
+      currentRoundId = activeRound?.id ?? null;
+    };
+
+    initRealtime();
+
+    // Subscribe to live_rounds for phase/question updates
+    const roundsChannel = supabase
+      .channel("overlay-rounds")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "overlay_round_state" },
-        (payload) => {
-          const row = payload.new as OverlayRoundStateRow;
-          if (row.phase) setPhase(row.phase);
-          if (typeof row.time_left === "number") setTimeLeft(row.time_left);
-          if (typeof row.question_index === "number") {
-            setQuestion((prev) => ({
-              ...prev,
-              index: row.question_index ?? prev.index,
-            }));
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "live_rounds",
+        },
+        async (payload) => {
+          const row = payload.new;
+          
+          // Update current round ID
+          currentRoundId = row.id;
+          
+          // Update phase
+          if (row.phase === "QUESTION") {
+            setPhase("question");
+          } else if (row.phase === "READY") {
+            setPhase("countdown");
+          } else if (row.phase === "INTERMISSION") {
+            setPhase("explanation");
+          } else if (row.phase === "FINISHED") {
+            setPhase("reveal");
+          }
+
+          // Update question start time
+          setQuestionStartAt(row.question_started_at);
+
+          // Fetch new question
+          const newIndex = row.current_question_index || 0;
+          const { data: qData } = await supabase
+            .from("live_round_questions")
+            .select("position, questions(*)")
+            .eq("round_id", row.id)
+            .eq("position", newIndex)
+            .single();
+
+          if (qData?.questions) {
+            setQuestion({
+              index: newIndex,
+              total: 50,
+              question: qData.questions.question_text || "",
+              options: [
+                { id: "A", text: qData.questions.option_a || "" },
+                { id: "B", text: qData.questions.option_b || "" },
+                { id: "C", text: qData.questions.option_c || "" },
+                { id: "D", text: qData.questions.option_d || "" },
+              ],
+              correctAnswer: qData.questions.correct_answer || "A",
+              explanation: qData.questions.explanation || "",
+            });
           }
         }
       )
-      // CURRENT QUESTION
+      .subscribe();
+
+    // Subscribe to overlay_stats
+    const statsChannel = supabase
+      .channel("overlay-stats")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "overlay_current_question" },
-        (payload) => {
-          const row = payload.new as OverlayCurrentQuestionRow;
-          setQuestion((prev) => ({
-            index: prev.index,
-            total: prev.total,
-            question: row.question_text ?? prev.question,
-            options: [
-              { id: "A", text: row.option_a ?? "" },
-              { id: "B", text: row.option_b ?? "" },
-              { id: "C", text: row.option_c ?? "" },
-              { id: "D", text: row.option_d ?? "" },
-            ],
-            correctAnswer: (row.correct_answer as any) ?? prev.correctAnswer,
-            explanation: row.explanation ?? prev.explanation,
-          }));
-        }
-      )
-      // STATS
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "overlay_stats" },
+        {
+          event: "*",
+          schema: "public",
+          table: "overlay_stats",
+        },
         (payload) => {
           const row = payload.new as OverlayStatsRow;
-          setOverlayStats(row);
-          if (Array.isArray(row.countries)) {
-            const mapped = (row.countries as any[]).map((item) => {
-              const meta =
-                MOCK_COUNTRIES.find((c) => c.code === item.code) || {
-                  code: item.code,
-                  name: item.code,
-                  flag: "🌍",
-                  count: 0,
-                };
-              return {
-                ...meta,
-                count: item.count ?? meta.count ?? 0,
-              };
-            });
-            setCountries(mapped);
+          
+          // Only update if same round
+          if (row.round_id === currentRoundId) {
+            setOverlayStats(row);
+            if (row.countries) {
+              setCountries(row.countries);
+            }
           }
         }
       )
-      // LEADERBOARD
+      .subscribe();
+
+    // Subscribe to overlay_leaderboard
+    const leaderboardChannel = supabase
+      .channel("overlay-leaderboard")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "overlay_leaderboard" },
-        (payload) => {
-          const row = payload.new as OverlayLeaderboardRow;
-          if (!row.rank) return;
-          setLeaderboard((prev) => {
-            const updated = prev.filter((p) => p.rank !== row.rank);
-            const mapped = {
-              rank: row.rank ?? 0,
-              username: row.username ?? "Player",
-              country: row.country ?? "US",
-              score: row.score ?? 0,
-              correct: row.correct ?? 0,
-              avgTime: row.avg_time ?? 0,
-            };
-            return [...updated, mapped].sort((a, b) => a.rank - b.rank);
-          });
+        {
+          event: "*",
+          schema: "public",
+          table: "overlay_leaderboard",
+        },
+        async (payload) => {
+          const row = payload.new;
+          
+          // Only refetch if same round
+          if (row.round_id === currentRoundId) {
+            const { data } = await supabase
+              .from("overlay_leaderboard")
+              .select("*")
+              .eq("round_id", row.round_id)
+              .order("rank", { ascending: true })
+              .limit(10);
+            
+            if (data) {
+              setLeaderboard(data as OverlayLeaderboardRow[]);
+            }
+          }
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(roundsChannel);
+      supabase.removeChannel(statsChannel);
+      supabase.removeChannel(leaderboardChannel);
     };
   }, []);
-
-  // --- LOCAL TIMER (Supabase time_left'ten başlar, görsel geri sayım) ---
-  useEffect(() => {
-    if (phase === "explanation" || phase === "reveal") return;
-    if (timeLeft <= 0) return;
-
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [phase, timeLeft]);
-
   const totalPlayers =
     overlayStats?.total_players != null ? overlayStats.total_players : 688;
   const answering =
