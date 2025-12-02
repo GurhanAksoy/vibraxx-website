@@ -139,86 +139,126 @@ export default function ProfilePage() {
     verifyAuth();
   }, [router]);
 
-  // === FETCH USER DATA (After Security Check) ===
+
+  // === FETCH USER DATA (Optimized - round_scores only) ===
   useEffect(() => {
-    if (!securityPassed) return; // 🔐 Wait for security
+    if (!securityPassed) return;
 
     const fetchUserData = async () => {
       setIsLoading(true);
 
       try {
-        // Get authenticated user (already verified by security check)
+        // Get authenticated user
         const { data: { user: authUser } } = await supabase.auth.getUser();
-        
+        if (!authUser) return;
+
+        // Fetch profile from profiles table (id column, not user_id)
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("full_name, avatar_url")
+          .eq("id", authUser.id)
+          .single();
+
         // Set user profile
         setUser({
           id: authUser.id,
           email: authUser.email || "",
-          full_name: authUser.user_metadata?.full_name || "User",
-          avatar_url: authUser.user_metadata?.avatar_url || "",
+          full_name: profileData?.full_name || authUser.user_metadata?.full_name || "User",
+          avatar_url: profileData?.avatar_url || authUser.user_metadata?.avatar_url || "",
           created_at: authUser.created_at,
         });
-        setEditName(authUser.user_metadata?.full_name || "User");
-
-        // Fetch user stats
-        const { data: statsData, error: statsError } = await supabase
-          .from("user_stats")
-          .select("*")
-          .eq("user_id", authUser.id)
-          .single();
-
-        if (!statsError && statsData) {
-          setStats(statsData);
-        }
+        setEditName(profileData?.full_name || authUser.user_metadata?.full_name || "User");
 
         // Fetch user rounds
-        const { data: roundsData, error: roundsError } = await supabase
+        const { data: roundsData } = await supabase
           .from("user_rounds")
           .select("available_rounds, total_purchased_rounds")
           .eq("user_id", authUser.id)
           .single();
 
-        if (!roundsError && roundsData) {
+        if (roundsData) {
           setUserRounds(roundsData.available_rounds || 0);
           setTotalPurchasedRounds(roundsData.total_purchased_rounds || 0);
         }
 
-        // Fetch quiz history (last 50 for calculations)
-        const { data: historyData, error: historyError } = await supabase
-          .from("quiz_history")
+        // Fetch round_scores (all for aggregation)
+        const { data: scoresData, error: scoresError } = await supabase
+          .from("round_scores")
           .select("*")
           .eq("user_id", authUser.id)
-          .order("completed_at", { ascending: false })
-          .limit(50);
+          .order("created_at", { ascending: false });
 
-        if (!historyError && historyData) {
-          setHistory(historyData.slice(0, 10)); // Show only last 10
+        if (!scoresError && scoresData && scoresData.length > 0) {
+          // Calculate aggregate stats
+          const totalCorrect = scoresData.reduce((sum, r) => sum + (r.correct || 0), 0);
+          const totalWrong = scoresData.reduce((sum, r) => sum + (r.wrong || 0), 0);
+          const totalScore = scoresData.reduce((sum, r) => sum + (r.total_score || 0), 0);
+          const totalQuestions = totalCorrect + totalWrong;
+          const accuracyPercentage = totalQuestions > 0 
+            ? Math.round((totalCorrect / totalQuestions) * 100) 
+            : 0;
 
-          // Calculate detailed stats
+          // max_streak doesn't exist in round_scores
+          const maxStreak = 0;
+
+          // Set overall stats
+          setStats({
+            total_questions_answered: totalQuestions,
+            correct_answers: totalCorrect,
+            wrong_answers: totalWrong,
+            accuracy_percentage: accuracyPercentage,
+            max_streak: maxStreak,
+            last_round_score: scoresData[0]?.total_score || 0,
+            total_score: totalScore,
+          });
+
+          // Show last 10 in history
+         setHistory(scoresData.slice(0, 10).map(score => ({
+  id: score.id,
+  score: score.total_score,
+  correct_count: score.correct,
+  wrong_count: score.wrong,
+  accuracy: score.correct + score.wrong > 0 
+    ? Math.round((score.correct / (score.correct + score.wrong)) * 100)
+    : 0,
+  max_streak: 0,
+  completed_at: score.created_at,
+})));
+
+
+          // Calculate detailed stats (today, month, last round)
           const now = new Date();
           const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
           const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-          // Today's stats
-          const todayRounds = historyData.filter(
-            (r) => new Date(r.completed_at) >= todayStart
+          // Today's rounds
+          const todayRounds = scoresData.filter(
+            (r) => new Date(r.created_at) >= todayStart
           );
-          const todayCorrect = todayRounds.reduce((sum, r) => sum + r.correct_count, 0);
-          const todayWrong = todayRounds.reduce((sum, r) => sum + r.wrong_count, 0);
+          const todayCorrect = todayRounds.reduce((sum, r) => sum + (r.correct || 0), 0);
+          const todayWrong = todayRounds.reduce((sum, r) => sum + (r.wrong || 0), 0);
           const todayTotal = todayCorrect + todayWrong;
-          const todayScore = todayRounds.reduce((sum, r) => sum + r.score, 0);
+          const todayScore = todayRounds.reduce((sum, r) => sum + (r.total_score || 0), 0);
 
-          // This month's stats
-          const monthRounds = historyData.filter(
-            (r) => new Date(r.completed_at) >= monthStart
+          // This month's rounds
+          const monthRounds = scoresData.filter(
+            (r) => new Date(r.created_at) >= monthStart
           );
-          const monthCorrect = monthRounds.reduce((sum, r) => sum + r.correct_count, 0);
-          const monthWrong = monthRounds.reduce((sum, r) => sum + r.wrong_count, 0);
+          const monthCorrect = monthRounds.reduce((sum, r) => sum + (r.correct || 0), 0);
+          const monthWrong = monthRounds.reduce((sum, r) => sum + (r.wrong || 0), 0);
           const monthTotal = monthCorrect + monthWrong;
-          const monthScore = monthRounds.reduce((sum, r) => sum + r.score, 0);
+          const monthScore = monthRounds.reduce((sum, r) => sum + (r.total_score || 0), 0);
 
-          // Last round
-          const lastRound = historyData.length > 0 ? historyData[0] : null;
+          // Last round (most recent)
+          const lastRound = scoresData[0] ? {
+            id: scoresData[0].id,
+            score: scoresData[0].total_score,
+            correct_count: scoresData[0].correct,
+            wrong_count: scoresData[0].wrong,
+            accuracy: scoresData[0].accuracy,
+            max_streak: 0,
+            completed_at: scoresData[0].created_at,
+          } : null;
 
           setDetailedStats({
             today: {
@@ -239,6 +279,37 @@ export default function ProfilePage() {
             },
             lastRound,
           });
+        } else {
+          // No scores yet - set defaults
+          setStats({
+            total_questions_answered: 0,
+            correct_answers: 0,
+            wrong_answers: 0,
+            accuracy_percentage: 0,
+            max_streak: 0,
+            last_round_score: 0,
+            total_score: 0,
+          });
+          setHistory([]);
+          setDetailedStats({
+            today: {
+              rounds_played: 0,
+              total_questions: 0,
+              correct: 0,
+              wrong: 0,
+              accuracy: 0,
+              total_score: 0,
+            },
+            thisMonth: {
+              rounds_played: 0,
+              total_questions: 0,
+              correct: 0,
+              wrong: 0,
+              accuracy: 0,
+              total_score: 0,
+            },
+            lastRound: null,
+          });
         }
 
       } catch (err) {
@@ -249,8 +320,7 @@ export default function ProfilePage() {
     };
 
     fetchUserData();
-  }, [securityPassed, router]); // 🔐 Added security dependency
-
+  }, [securityPassed, router]);
   // Save profile changes
   const handleSaveProfile = async () => {
     if (!user || !editName.trim()) return;
