@@ -125,8 +125,8 @@ useEffect(() => {
           } else {
             userStats.set(userId, {
               user_id: userId,
-              name: row.profiles?.full_name || "Anonymous",
-              avatar: row.profiles?.avatar_url || null,
+              name: row.profiles?.[0]?.full_name || "Anonymous",
+avatar: row.profiles?.[0]?.avatar_url || null,
               totalScore: row.total_score,
               correct: row.correct,
               wrong: row.wrong,
