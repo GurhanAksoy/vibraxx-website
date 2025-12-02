@@ -680,8 +680,10 @@ export default function HomePage() {
         "postgres_changes",
         { event: "*", schema: "public", table: "overlay_round_state" },
         (payload) => {
-          const newData = payload.new;
-          setGlobalTimeLeft(newData.time_left);
+          const newData = payload.new as { time_left?: number };
+          if (newData.time_left !== undefined) {
+            setGlobalTimeLeft(newData.time_left);
+          }
         }
       )
       .subscribe();
