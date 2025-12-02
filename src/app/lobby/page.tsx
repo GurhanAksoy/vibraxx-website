@@ -155,7 +155,12 @@ export default function LobbyPage() {
       .limit(1)
       .single();
     if (!error && data) {
-      setGlobalTimeLeft(data.time_left);
+      setGlobalTimeLeft(
+  newData.question_started_at
+    ? Math.max(0, 6 - Math.floor((Date.now() - new Date(newData.question_started_at).getTime()) / 1000))
+    : null
+);
+
     }
   }, []);
 
