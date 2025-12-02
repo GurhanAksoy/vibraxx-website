@@ -345,9 +345,20 @@ export default function LobbyPage() {
         "postgres_changes",
         { event: "*", schema: "public", table: "overlay_round_state" },
         (payload) => {
-          const newData = payload.new as { time_left?: number | null };
-          if (typeof newData.time_left === "number") {
-            setGlobalTimeLeft(newData.time_left);
+          const newData = payload.new;
+
+const remaining =
+  newData?.question_started_at
+    ? Math.max(
+        0,
+        6 - Math.floor(
+          (Date.now() - new Date(newData.question_started_at).getTime()) / 1000
+        )
+      )
+    : null;
+
+setGlobalTimeLeft(remaining);
+
           } else {
             setGlobalTimeLeft(null);
           }
