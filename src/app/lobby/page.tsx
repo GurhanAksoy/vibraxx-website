@@ -345,9 +345,14 @@ export default function LobbyPage() {
   "postgres_changes",
   { event: "*", schema: "public", table: "overlay_round_state" },
   (payload) => {
-    const newData = payload.new;
+   // Payload tipini garanti altına alıyoruz
+const newData = payload.new as { 
+  question_started_at?: string | null; 
+};
 
-    if (newData?.question_started_at) {
+// Şimdi artık TS hata vermez
+if (newData?.question_started_at) {
+
       const remaining = Math.max(
         0,
         6 -
