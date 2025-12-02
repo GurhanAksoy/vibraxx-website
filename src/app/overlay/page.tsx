@@ -219,19 +219,19 @@ export default function OverlayPage() {
           .eq("position", currentIndex)
           .single();
 
-        if (isMounted && qData?.questions) {
+        if (isMounted && (qData as any)?.questions) {
           setQuestion({
             index: currentIndex,
             total: 50,
-            question: qData.questions.question_text || "",
+            question: (qData as any).questions.question_text || "",
             options: [
-              { id: "A", text: qData.questions.option_a || "" },
-              { id: "B", text: qData.questions.option_b || "" },
-              { id: "C", text: qData.questions.option_c || "" },
-              { id: "D", text: qData.questions.option_d || "" },
+              { id: "A", text: (qData as any).questions.option_a || "" },
+              { id: "B", text: (qData as any).questions.option_b || "" },
+              { id: "C", text: (qData as any).questions.option_c || "" },
+              { id: "D", text: (qData as any).questions.option_d || "" },
             ],
-            correctAnswer: qData.questions.correct_answer || "A",
-            explanation: qData.questions.explanation || "",
+            correctAnswer: (qData as any).questions.correct_answer || "A",
+            explanation: (qData as any).questions.explanation || "",
           });
         }
 
@@ -348,19 +348,19 @@ export default function OverlayPage() {
             .eq("position", newIndex)
             .single();
 
-          if (qData?.questions) {
+          if ((qData as any)?.questions) {
             setQuestion({
               index: newIndex,
               total: 50,
-              question: qData.questions.question_text || "",
+              question: (qData as any).questions.question_text || "",
               options: [
-                { id: "A", text: qData.questions.option_a || "" },
-                { id: "B", text: qData.questions.option_b || "" },
-                { id: "C", text: qData.questions.option_c || "" },
-                { id: "D", text: qData.questions.option_d || "" },
+                { id: "A", text: (qData as any).questions.option_a || "" },
+                { id: "B", text: (qData as any).questions.option_b || "" },
+                { id: "C", text: (qData as any).questions.option_c || "" },
+                { id: "D", text: (qData as any).questions.option_d || "" },
               ],
-              correctAnswer: qData.questions.correct_answer || "A",
-              explanation: qData.questions.explanation || "",
+              correctAnswer: (qData as any).questions.correct_answer || "A",
+              explanation: (qData as any).questions.explanation || "",
             });
           }
         }
