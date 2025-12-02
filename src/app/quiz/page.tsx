@@ -1,4 +1,4 @@
-"use client";
+ "use client\";
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -10,15 +10,11 @@ import {
   CheckCircle,
   XCircle,
   Target,
-  Award,
   Zap,
   Volume2,
   VolumeX,
   Flame,
-  TrendingUp,
   Star,
-  Sparkles,
-  Gift,
 } from "lucide-react";
 
 // Initialize Supabase Client
@@ -514,7 +510,7 @@ export default function QuizGamePage() {
     setAnswers((prev) => {
       const next = prev.length
         ? [...prev]
-        : Array(totalQuestions).fill("none") as AnswerStatus[];
+        : (Array(totalQuestions).fill("none") as AnswerStatus[]);
       if (currentIndex >= 0 && currentIndex < next.length) {
         next[currentIndex] = correctFlag ? "correct" : "wrong";
       }
@@ -547,7 +543,7 @@ export default function QuizGamePage() {
     setAnswers((prev) => {
       const next = prev.length
         ? [...prev]
-        : Array(totalQuestions).fill("none") as AnswerStatus[];
+        : (Array(totalQuestions).fill("none") as AnswerStatus[]);
       if (currentIndex >= 0 && currentIndex < next.length) {
         next[currentIndex] = "wrong";
       }
