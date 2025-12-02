@@ -680,9 +680,11 @@ export default function HomePage() {
         "postgres_changes",
         { event: "*", schema: "public", table: "overlay_round_state" },
         (payload) => {
-          const newData = payload.new as { time_left?: number };
-          if (newData.time_left !== undefined) {
+          const newData = (payload.new || {}) as { time_left?: number | null };
+          if (typeof newData.time_left === "number") {
             setGlobalTimeLeft(newData.time_left);
+          } else {
+            setGlobalTimeLeft(null);
           }
         }
       )
