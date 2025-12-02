@@ -341,30 +341,31 @@ export default function LobbyPage() {
   useEffect(() => {
     const channel = supabase
       .channel("lobby-overlay")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "overlay_round_state" },
-        (payload) => {
-          const newData = payload.new;
+     .on(
+  "postgres_changes",
+  { event: "*", schema: "public", table: "overlay_round_state" },
+  (payload) => {
+    const newData = payload.new;
 
-const remaining =
-  newData?.question_started_at
-    ? Math.max(
+    if (newData?.question_started_at) {
+      const remaining = Math.max(
         0,
-        6 - Math.floor(
-          (Date.now() - new Date(newData.question_started_at).getTime()) / 1000
-        )
-      )
-    : null;
+        6 -
+          Math.floor(
+            (Date.now() -
+              new Date(newData.question_started_at).getTime()) /
+              1000
+          )
+      );
 
-setGlobalTimeLeft(remaining);
+      setGlobalTimeLeft(remaining);
+    } else {
+      setGlobalTimeLeft(null);
+    }
+  }
+)
+.subscribe();
 
-          } else {
-            setGlobalTimeLeft(null);
-          }
-        }
-      )
-      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
