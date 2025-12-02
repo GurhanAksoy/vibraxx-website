@@ -65,66 +65,119 @@ useEffect(() => {
     };
   }, []);
 
-    // Fetch leaderboard with Supabase support
+
+  // Fetch leaderboard with Supabase support
   useEffect(() => {
     const fetchLeaderboard = async () => {
       setLoading(true);
+      
+      try {
+        // Calculate date range based on activeTab
+        const now = new Date();
+        let startDate: Date;
+        
+        switch (activeTab) {
+          case 'daily':
+            startDate = new Date(now.setHours(0, 0, 0, 0));
+            break;
+          case 'weekly':
+            const dayOfWeek = now.getDay();
+            startDate = new Date(now.setDate(now.getDate() - dayOfWeek));
+            startDate.setHours(0, 0, 0, 0);
+            break;
+          case 'monthly':
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            break;
+          case 'allTime':
+            startDate = new Date('2024-01-01');
+            break;
+        }
 
-         try {
-  const { data, error } = await supabase
-    .from("leaderboard")
-    .select("*")
-    .eq("period", activeTab)
-    .order("score", { ascending: false })
-    .limit(100);
+        // Fetch round_scores with profiles JOIN
+        const { data: scores, error } = await supabase
+          .from("round_scores")
+          .select(`
+            user_id,
+            correct,
+            wrong,
+            accuracy,
+            total_score,
+            created_at,
+            profiles:profiles (
+              full_name,
+              avatar_url
+            )
+          `)
+          .gte("created_at", startDate.toISOString());
 
-  if (error) throw error;
+        if (error) throw error;
 
-  setTopPlayers(data || []);
-} catch (error) {
-  console.error("Error fetching leaderboard:", error);
-  setTopPlayers([]);
-} finally {
-  setLoading(false);
-}
-         
+        // Aggregate data in JS
+        const userStats = new Map();
+        scores?.forEach((row) => {
+          const userId = row.user_id;
+          const existing = userStats.get(userId);
+          if (existing) {
+            existing.totalScore += row.total_score;
+            existing.correct += row.correct;
+            existing.wrong += row.wrong;
+            existing.rounds += 1;
+          } else {
+            userStats.set(userId, {
+              user_id: userId,
+              name: row.profiles?.full_name || "Anonymous",
+              avatar: row.profiles?.avatar_url || null,
+              totalScore: row.total_score,
+              correct: row.correct,
+              wrong: row.wrong,
+              rounds: 1,
+            });
+          }
+        });
+
+        // Convert to array with UI-compatible format
+        const leaderboard = Array.from(userStats.values()).map((u) => ({
+          id: u.user_id,
+          name: u.name,
+          avatar: u.avatar,
+          score: u.totalScore,  // UI expects "score"
+          correct: u.correct,
+          wrong: u.wrong,
+          rounds: u.rounds,
+          accuracy: (u.correct + u.wrong) > 0 
+            ? Math.round((u.correct / (u.correct + u.wrong)) * 100)
+            : 0,
+          streak: 0,
+          country: "🏳️",
+          isOnline: false
+        }));
+
+        // Sort by score descending
+        leaderboard.sort((a, b) => b.score - a.score);
+
+        setTopPlayers(leaderboard);
+      } catch (error) {
+        console.error("Error fetching leaderboard:", error);
+        setTopPlayers([]);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchLeaderboard();
-
-    /* --- REALTIME SUBSCRIPTION (Uncomment when Supabase is configured) ---
-    const channel = supabase
-      .channel(`leaderboard-${activeTab}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'leaderboard',
-          filter: `period=eq.${activeTab}`
-        },
-        (payload) => {
-          console.log('Realtime update:', payload);
-          fetchLeaderboard();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-    */
   }, [activeTab]);
 
+  // Helper function for rank colors
   const getRankColor = (rank: number) => {
-    if (rank === 1) return 'from-yellow-400 to-orange-500';
-    if (rank === 2) return 'from-gray-300 to-gray-500';
-    if (rank === 3) return 'from-amber-600 to-amber-800';
-    return 'from-violet-500 to-fuchsia-500';
+    if (rank === 1) return "from-yellow-400 to-yellow-500";
+    if (rank === 2) return "from-gray-300 to-gray-400";
+    if (rank === 3) return "from-amber-600 to-amber-700";
+    return "from-violet-500 to-violet-600";
   };
 
   const top3 = topPlayers.slice(0, 3);
-  const restPlayers = topPlayers.slice(3);
+const restPlayers = topPlayers.slice(3, 100);
+
 
   return (
     <>
