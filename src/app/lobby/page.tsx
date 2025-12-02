@@ -345,30 +345,16 @@ export default function LobbyPage() {
   "postgres_changes",
   { event: "*", schema: "public", table: "overlay_round_state" },
   (payload) => {
-   // Payload tipini garanti altına alıyoruz
-const newData = payload.new as { 
-  question_started_at?: string | null; 
-};
+    const newData = payload.new as { time_left?: number | null };
 
-// Şimdi artık TS hata vermez
-if (newData?.question_started_at) {
-
-      const remaining = Math.max(
-        0,
-        6 -
-          Math.floor(
-            (Date.now() -
-              new Date(newData.question_started_at).getTime()) /
-              1000
-          )
-      );
-
-      setGlobalTimeLeft(remaining);
+    if (typeof newData?.time_left === "number") {
+      setGlobalTimeLeft(newData.time_left);
     } else {
       setGlobalTimeLeft(null);
     }
   }
 )
+
 .subscribe();
 
 
