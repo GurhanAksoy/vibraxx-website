@@ -352,6 +352,7 @@ export default function HomePage() {
   const router = useRouter();
   const [isPlaying, setIsPlaying] = useState(false);
   const [nextRound, setNextRound] = useState<number | null>(null);
+  const [globalTimeLeft, setGlobalTimeLeft] = useState<number | null>(null);
   const [activePlayers, setActivePlayers] = useState(600);
   const [user, setUser] = useState<any>(null);
   const [champions, setChampions] = useState<any[]>([]);
@@ -586,6 +587,23 @@ export default function HomePage() {
     }
   }, []);
 
+  // Load initial global round state from overlay table
+  const loadGlobalRoundState = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("overlay_round_state")
+        .select("*")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .single();
+      if (!error && data) {
+        setGlobalTimeLeft(data.time_left);
+      }
+    } catch (error) {
+      console.error("Failed to load overlay state:", error);
+    }
+  }, []);
+
   // Initial Load
   useEffect(() => {
     const loadData = async () => {
@@ -595,17 +613,20 @@ export default function HomePage() {
         fetchNextRound(),
         fetchChampions(),
         fetchStats(),
+        loadGlobalRoundState(),  // Yeni eklendi
       ]);
       setIsLoading(false);
     };
     loadData();
-  }, [fetchActivePlayers, fetchNextRound, fetchChampions, fetchStats]);
+  }, [fetchActivePlayers, fetchNextRound, fetchChampions, fetchStats, loadGlobalRoundState]);
 
   // Real-time Updates
   useEffect(() => {
     const playersInterval = setInterval(fetchActivePlayers, 8000);
-    const roundInterval = setInterval(() => {
-      setNextRound((prev) => (prev !== null && prev > 0 ? prev - 1 : null));
+    const countdownInterval = setInterval(() => {
+      setGlobalTimeLeft((prev) =>
+        prev !== null && prev > 0 ? prev - 1 : prev
+      );
     }, 1000);
 
     if (nextRound === 0) {
@@ -614,7 +635,7 @@ export default function HomePage() {
 
     return () => {
       clearInterval(playersInterval);
-      clearInterval(roundInterval);
+      clearInterval(countdownInterval);
     };
   }, [fetchActivePlayers, fetchNextRound, nextRound]);
 
@@ -650,6 +671,24 @@ export default function HomePage() {
 
     return () => sub.subscription.unsubscribe();
   }, [router]);
+
+  // Realtime listener for global overlay state
+  useEffect(() => {
+    const channel = supabase
+      .channel("home-overlay")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "overlay_round_state" },
+        (payload) => {
+          const newData = payload.new;
+          setGlobalTimeLeft(newData.time_left);
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   // Music Toggle
   const toggleMusic = useCallback(() => {
@@ -1873,7 +1912,7 @@ export default function HomePage() {
                       lineHeight: 1,
                     }}
                   >
-                    {formatTime(nextRound)}
+                    {formatTime(globalTimeLeft)}
                   </div>
                 </div>
                 

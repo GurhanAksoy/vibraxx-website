@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
 import {
   Trophy,
   Clock,
@@ -30,7 +30,6 @@ const supabase = createClient(
 // === CONFIGURATION ===
 const TOTAL_QUESTIONS = 50;
 const QUESTION_DURATION = 6; // seconds
-const EXPLANATION_DURATION = 5; // seconds
 const FINAL_SCORE_DURATION = 10; // seconds - 10 seconds for user to see results and choose action
 
 type OptionId = "A" | "B" | "C" | "D";
@@ -44,76 +43,6 @@ interface Question {
   explanation: string;
 }
 
-// === SAMPLE QUESTIONS ===
-const baseQuestions: Omit<Question, "id">[] = [
-  {
-    question: "Which planet is known as the Red Planet?",
-    options: [
-      { id: "A", text: "Mars" },
-      { id: "B", text: "Venus" },
-      { id: "C", text: "Jupiter" },
-      { id: "D", text: "Mercury" },
-    ],
-    correctAnswer: "A",
-    explanation: "Mars is often called the Red Planet due to its iron oxide-rich surface, which gives it a reddish appearance.",
-  },
-  {
-    question: "What is the chemical symbol for Gold?",
-    options: [
-      { id: "A", text: "Ag" },
-      { id: "B", text: "Au" },
-      { id: "C", text: "Gd" },
-      { id: "D", text: "Go" },
-    ],
-    correctAnswer: "B",
-    explanation: "The symbol Au comes from the Latin word 'Aurum', meaning 'shining dawn'.",
-  },
-  {
-    question: "Which ocean is the largest by surface area?",
-    options: [
-      { id: "A", text: "Atlantic Ocean" },
-      { id: "B", text: "Indian Ocean" },
-      { id: "C", text: "Pacific Ocean" },
-      { id: "D", text: "Arctic Ocean" },
-    ],
-    correctAnswer: "C",
-    explanation: "The Pacific Ocean covers more than 30% of the Earth's surface, making it the largest ocean.",
-  },
-  {
-    question: "Who developed the theory of general relativity?",
-    options: [
-      { id: "A", text: "Isaac Newton" },
-      { id: "B", text: "Albert Einstein" },
-      { id: "C", text: "Niels Bohr" },
-      { id: "D", text: "Galileo Galilei" },
-    ],
-    correctAnswer: "B",
-    explanation: "Albert Einstein published the theory of general relativity in 1915, changing our understanding of gravity.",
-  },
-  {
-    question: "Which is the smallest prime number?",
-    options: [
-      { id: "A", text: "0" },
-      { id: "B", text: "1" },
-      { id: "C", text: "2" },
-      { id: "D", text: "3" },
-    ],
-    correctAnswer: "C",
-    explanation: "2 is the smallest and the only even prime number.",
-  },
-];
-
-const questions: Question[] = Array.from({ length: TOTAL_QUESTIONS }, (_, i) => {
-  const base = baseQuestions[i % baseQuestions.length];
-  return {
-    id: i + 1,
-    question: `Q${i + 1}: ${base.question}`,
-    options: base.options,
-    correctAnswer: base.correctAnswer,
-    explanation: base.explanation,
-  };
-});
-
 export default function QuizGamePage() {
   const router = useRouter();
 
@@ -123,6 +52,7 @@ export default function QuizGamePage() {
 
   // === STATE ===
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [totalQuestions, setTotalQuestions] = useState(TOTAL_QUESTIONS);
   const [isLoading, setIsLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(QUESTION_DURATION);
@@ -131,12 +61,11 @@ export default function QuizGamePage() {
   const [isCorrect, setIsCorrect] = useState(false);
 
   const [showExplanation, setShowExplanation] = useState(false);
-  const [explanationTimer, setExplanationTimer] = useState(EXPLANATION_DURATION);
 
   const [showFinalScore, setShowFinalScore] = useState(false);
   const [finalCountdown, setFinalCountdown] = useState(FINAL_SCORE_DURATION);
 
-  const [answers, setAnswers] = useState<AnswerStatus[]>(Array(TOTAL_QUESTIONS).fill("none"));
+  const [answers, setAnswers] = useState<AnswerStatus[]>([]);
 
   const [correctCount, setCorrectCount] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
@@ -146,6 +75,14 @@ export default function QuizGamePage() {
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [userRounds, setUserRounds] = useState(0);
+
+  // 🔥 NEW: Live sync state variables
+  const [phase, setPhase] = useState<string>("READY");
+  const [roundId, setRoundId] = useState<string | null>(null);
+  const [questionStart, setQuestionStart] = useState<string | null>(null);
+
+  // Stats only once guard
+  const statsSavedRef = useRef(false);
 
   // === AUDIO REFS ===
   const correctSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -161,158 +98,134 @@ export default function QuizGamePage() {
   useEffect(() => {
     const verifyAccess = async () => {
       try {
-        console.log('🔐 Starting security verification...');
+        console.log("🔐 Starting security verification...");
 
-        // CHECK 1: User Authentication
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
         if (authError || !user) {
-          console.log('❌ Security: Not authenticated');
-          router.push('/');
+          console.log("❌ Quiz Security: Not authenticated");
+          router.push("/");
           return;
         }
 
-        console.log('✅ Security: User authenticated -', user.id);
+        console.log("✅ Quiz Security: User authenticated -", user.id);
+        console.log("✅ Quiz Security: All checks passed!");
 
-        // CHECK 2: Available Rounds
-        const { data: roundsData, error: roundsError } = await supabase
-          .from('user_rounds')
-          .select('available_rounds')
-          .eq('user_id', user.id)
-          .single();
-
-        if (roundsError || !roundsData) {
-          console.log('❌ Security: No rounds record found');
-          router.push('/buy');
-          return;
-        }
-
-        if (roundsData.available_rounds <= 0) {
-          console.log('❌ Security: No available rounds (' + roundsData.available_rounds + ')');
-          router.push('/buy');
-          return;
-        }
-
-        console.log('✅ Security: Available rounds -', roundsData.available_rounds);
-
-        // CHECK 3: Deduct One Round (Quiz Started)
-        const { error: updateError } = await supabase
-          .from('user_rounds')
-          .update({ available_rounds: roundsData.available_rounds - 1 })
-          .eq('user_id', user.id);
-
-        if (updateError) {
-          console.error('❌ Security: Failed to deduct round', updateError);
-          router.push('/lobby');
-          return;
-        }
-
-        console.log('✅ Security: Round deducted successfully');
-        console.log('✅ Security: All checks passed!');
-        
         setSecurityPassed(true);
         setIsVerifying(false);
-
       } catch (error) {
-        console.error('❌ Security check failed:', error);
-        router.push('/');
+        console.error("❌ Security check failed:", error);
+        router.push("/");
       }
     };
 
     verifyAccess();
   }, [router]);
 
-  // === FETCH QUESTIONS FROM SUPABASE ===
+  // === FETCH LIVE QUESTIONS FROM LIVE_ROUNDS ===
   useEffect(() => {
-    // 🔐 Don't fetch questions until security check passes
     if (!securityPassed) return;
 
-    const fetchQuestions = async () => {
+    const fetchLiveQuestions = async () => {
       try {
-        const { data, error } = await supabase
-          .from('questions')
-          .select('*')
-          .eq('active', true)
-          .order('order_index', { ascending: true })
-          .limit(TOTAL_QUESTIONS);
-        
-        if (error) throw error;
+        // Get latest live round
+        const { data: round, error: roundError } = await supabase
+          .from("live_rounds")
+          .select("*")
+          .order("scheduled_start", { ascending: false })
+          .limit(1)
+          .single();
 
-        if (data && data.length > 0) {
-          const formattedQuestions: Question[] = data.map((q) => ({
-            id: q.id,
-            question: q.question_text,
-            options: [
-              { id: "A", text: q.option_a },
-              { id: "B", text: q.option_b },
-              { id: "C", text: q.option_c },
-              { id: "D", text: q.option_d },
-            ],
-            correctAnswer: q.correct_answer as OptionId,
-            explanation: q.explanation,
-          }));
-          setQuestions(formattedQuestions);
-        } else {
-          // Fallback to mock data
-          const mockQuestions: Question[] = Array.from({ length: TOTAL_QUESTIONS }, (_, i) => {
-            const base = baseQuestions[i % baseQuestions.length];
-            return {
-              id: i + 1,
-              question: `Q${i + 1}: ${base.question}`,
-              options: base.options,
-              correctAnswer: base.correctAnswer,
-              explanation: base.explanation,
-            };
-          });
-          setQuestions(mockQuestions);
+        if (roundError || !round) {
+          console.error("❌ No active round found:", roundError);
+          setIsLoading(false);
+          return;
         }
+
+        console.log("✅ Active round found:", round.id);
+        setRoundId(round.id);
+        setPhase(round.phase || "READY");
+
+        const safeIndex =
+          typeof round.current_question_index === "number"
+            ? Math.max(0, round.current_question_index)
+            : 0;
+        setCurrentIndex(safeIndex);
+        setQuestionStart(round.question_started_at);
+
+        // Get questions for this round
+        const { data: questionData, error: questionsError } = await supabase
+          .from("live_round_questions")
+          .select("position, questions(*)")
+          .eq("round_id", round.id)
+          .order("position");
+
+        if (questionsError || !questionData) {
+          console.error("❌ Error fetching questions:", questionsError);
+          setIsLoading(false);
+          return;
+        }
+
+        console.log(`✅ Loaded ${questionData.length} questions`);
+
+        const formattedQuestions: Question[] = questionData.map((item: any) => ({
+          id: item.questions.id,
+          question: item.questions.question_text,
+          options: [
+            { id: "A", text: item.questions.option_a },
+            { id: "B", text: item.questions.option_b },
+            { id: "C", text: item.questions.option_c },
+            { id: "D", text: item.questions.option_d },
+          ],
+          correctAnswer: item.questions.correct_answer as OptionId,
+          explanation: item.questions.explanation,
+        }));
+
+        setQuestions(formattedQuestions);
+        setTotalQuestions(formattedQuestions.length);
+
+        // answers dizisini soru sayısına göre resetle
+        setAnswers(Array(formattedQuestions.length).fill("none"));
       } catch (err) {
-        console.error('Error fetching questions:', err);
-        // Fallback to mock data
-        const mockQuestions: Question[] = Array.from({ length: TOTAL_QUESTIONS }, (_, i) => {
-          const base = baseQuestions[i % baseQuestions.length];
-          return {
-            id: i + 1,
-            question: `Q${i + 1}: ${base.question}`,
-            options: base.options,
-            correctAnswer: base.correctAnswer,
-            explanation: base.explanation,
-          };
-        });
-        setQuestions(mockQuestions);
+        console.error("❌ Error in fetchLiveQuestions:", err);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchQuestions();
-  }, [securityPassed]); // 🔐 Added security dependency
+    fetchLiveQuestions();
+  }, [securityPassed]);
 
   // === FETCH USER ROUNDS ===
   useEffect(() => {
     const fetchUserRounds = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (!user) {
           setUserRounds(0);
           return;
         }
 
         const { data, error } = await supabase
-          .from('user_rounds')
-          .select('available_rounds')
-          .eq('user_id', user.id)
+          .from("user_rounds")
+          .select("available_rounds")
+          .eq("user_id", user.id)
           .single();
 
         if (error) {
-          console.error('Error fetching user rounds:', error);
+          console.error("Error fetching user rounds:", error);
           setUserRounds(0);
           return;
         }
 
         setUserRounds(data?.available_rounds || 0);
       } catch (err) {
-        console.error('Error fetching user rounds:', err);
+        console.error("Error fetching user rounds:", err);
         setUserRounds(0);
       }
     };
@@ -321,82 +234,108 @@ export default function QuizGamePage() {
   }, []);
 
   // === SAVE ANSWER TO SUPABASE ===
-  const saveAnswer = async (questionId: number, answer: OptionId, isCorrect: boolean) => {
+  const saveAnswer = async (
+    questionId: number,
+    answer: OptionId | null,
+    isCorrectFlag: boolean
+  ) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
-      
-      await supabase.from('user_answers').insert({
+
+      await supabase.from("user_answers").insert({
         user_id: user.id,
         question_id: questionId,
         selected_answer: answer,
-        is_correct: isCorrect,
+        is_correct: isCorrectFlag,
         time_taken: QUESTION_DURATION - timeLeft,
-        answered_at: new Date().toISOString()
+        answered_at: new Date().toISOString(),
       });
     } catch (err) {
-      console.error('Error saving answer:', err);
+      console.error("Error saving answer:", err);
     }
   };
 
   // === UPDATE USER STATS ===
   const updateUserStats = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
-      
-      const accuracy = TOTAL_QUESTIONS > 0 ? Math.round((correctCount / TOTAL_QUESTIONS) * 100) : 0;
-      const score = correctCount * 2;
-      
-      // Update user_stats
-      await supabase.from('user_stats').upsert({
-        user_id: user.id,
-        total_questions_answered: TOTAL_QUESTIONS,
-        correct_answers: correctCount,
-        wrong_answers: wrongCount,
-        accuracy_percentage: accuracy,
-        max_streak: maxStreak,
-        last_round_score: score,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'user_id'
-      });
 
-      // Save to quiz_history
-      await supabase.from('quiz_history').insert({
+      const accuracy =
+        totalQuestions > 0
+          ? Math.round((correctCount / totalQuestions) * 100)
+          : 0;
+      const score = correctCount * 2;
+
+      await supabase
+        .from("user_stats")
+        .upsert(
+          {
+            user_id: user.id,
+            total_questions_answered: totalQuestions,
+            correct_answers: correctCount,
+            wrong_answers: wrongCount,
+            accuracy_percentage: accuracy,
+            max_streak: maxStreak,
+            last_round_score: score,
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "user_id",
+          }
+        );
+
+      await supabase.from("quiz_history").insert({
         user_id: user.id,
         score: score,
         correct_count: correctCount,
         wrong_count: wrongCount,
         accuracy: accuracy,
         max_streak: maxStreak,
-        completed_at: new Date().toISOString()
+        completed_at: new Date().toISOString(),
       });
     } catch (err) {
-      console.error('Error updating user stats:', err);
+      console.error("Error updating user stats:", err);
     }
   };
 
-  // === DECREASE USER ROUND ===
+  // Stats sadece 1 kez kaydet
+  const saveStatsOnce = async () => {
+    if (statsSavedRef.current) return;
+    statsSavedRef.current = true;
+    await updateUserStats();
+  };
+
+  // === DECREASE USER ROUND (for final score actions) ===
   const decreaseUserRound = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
-      
-      const { error } = await supabase.rpc('decrease_user_round', {
-        p_user_id: user.id
+
+      const { error } = await supabase.rpc("decrease_user_round", {
+        p_user_id: user.id,
       });
 
       if (error) {
-        console.error('Error decreasing round:', error);
+        console.error("Error decreasing round:", error);
       }
     } catch (err) {
-      console.error('Error decreasing round:', err);
+      console.error("Error decreasing round:", err);
     }
   };
 
   // === SOUND HELPERS ===
-  const playSound = (audio: HTMLAudioElement | null, options?: { loop?: boolean }) => {
+  const playSound = (
+    audio: HTMLAudioElement | null,
+    options?: { loop?: boolean }
+  ) => {
     if (!isSoundEnabled || !audio) return;
     try {
       audio.loop = !!options?.loop;
@@ -418,84 +357,104 @@ export default function QuizGamePage() {
   const startTick = () => playSound(tickSoundRef.current, { loop: true });
   const stopTick = () => stopSound(tickSoundRef.current);
 
-  // Start tick on mount
+  // 🔥 NEW: REALTIME ROUND STATE LISTENER
   useEffect(() => {
-    if (!showFinalScore && !showExplanation && timeLeft > 0 && isSoundEnabled) {
-      startTick();
-    }
-    return () => stopTick();
-  }, []);
+    if (!roundId) return;
 
-  // === MAIN TIMER ===
-  useEffect(() => {
-    if (showFinalScore || showExplanation || timeLeft <= 0) return;
+    const channel = supabase
+      .channel("round-state")
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "live_rounds",
+          filter: `id=eq.${roundId}`,
+        },
+        (payload) => {
+          const row = payload.new as any;
+          console.log(
+            "🔄 Round state updated:",
+            row.phase,
+            "Question:",
+            row.current_question_index
+          );
 
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => Math.max(0, prev - 1));
-    }, 1000);
+          const safeIndex =
+            typeof row.current_question_index === "number"
+              ? Math.max(0, row.current_question_index)
+              : 0;
 
-    return () => clearInterval(interval);
-  }, [timeLeft, showExplanation, showFinalScore]);
+          setPhase(row.phase);
+          setCurrentIndex(safeIndex);
+          setQuestionStart(row.question_started_at);
 
-  // Time's up handler
-  useEffect(() => {
-    if (showFinalScore || showExplanation || timeLeft !== 0) return;
-
-    stopTick();
-
-    if (!isAnswerLocked) {
-      setWrongCount((w) => w + 1);
-      setAnswers((prev) => {
-        const copy = [...prev];
-        copy[currentIndex] = "wrong";
-        return copy;
-      });
-      setIsCorrect(false);
-      setStreak(0);
-    }
-
-    setIsAnswerLocked(true);
-    playSound(whooshSoundRef.current);
-    setShowExplanation(true);
-  }, [timeLeft, showExplanation, showFinalScore, isAnswerLocked, currentIndex]);
-
-  // === EXPLANATION COUNTDOWN ===
-  useEffect(() => {
-    if (!showExplanation || showFinalScore) return;
-
-    let remaining = EXPLANATION_DURATION;
-    setExplanationTimer(remaining);
-
-    const interval = setInterval(() => {
-      remaining -= 1;
-      setExplanationTimer(remaining);
-    }, 1000);
-
-    const timeout = setTimeout(() => {
-      clearInterval(interval);
-
-      if (currentIndex < TOTAL_QUESTIONS - 1) {
-        const nextIndex = currentIndex + 1;
-        setCurrentIndex(nextIndex);
-        setTimeLeft(QUESTION_DURATION);
-        setSelectedAnswer(null);
-        setIsAnswerLocked(false);
-        setIsCorrect(false);
-        setShowExplanation(false);
-
-        if (isSoundEnabled) {
-          startTick();
+          if (row.phase === "QUESTION") {
+            setShowExplanation(false);
+            setIsAnswerLocked(false);
+            setSelectedAnswer(null);
+            setTimeLeft(QUESTION_DURATION);
+          } else if (row.phase === "INTERMISSION") {
+            setShowExplanation(true);
+          } else if (row.phase === "FINISHED") {
+            setShowFinalScore(true);
+            saveStatsOnce();
+          }
         }
-      } else {
-        setShowFinalScore(true);
-      }
-    }, EXPLANATION_DURATION * 1000);
+      )
+      .subscribe();
 
     return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
+      console.log("🔌 Unsubscribing from round-state channel");
+      supabase.removeChannel(channel);
     };
-  }, [showExplanation, currentIndex, showFinalScore, isSoundEnabled]);
+  }, [roundId]);
+
+  // Start/stop tick by UI state
+  useEffect(() => {
+    if (
+      phase === "QUESTION" &&
+      !isAnswerLocked &&
+      isSoundEnabled &&
+      !showFinalScore &&
+      !showExplanation &&
+      timeLeft > 0
+    ) {
+      startTick();
+    } else {
+      stopTick();
+    }
+  }, [
+    phase,
+    isAnswerLocked,
+    isSoundEnabled,
+    showFinalScore,
+    showExplanation,
+    timeLeft,
+  ]);
+
+  // 🔥 NEW: SERVER-SYNCED TIMER (replaces local countdown)
+  useEffect(() => {
+    if (!questionStart || phase !== "QUESTION") {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      const now = new Date().getTime();
+      const start = new Date(questionStart).getTime();
+      const diff = Math.floor((now - start) / 1000);
+      const remaining = Math.max(0, QUESTION_DURATION - diff);
+
+      setTimeLeft(remaining);
+
+      if (remaining === 0 && !isAnswerLocked) {
+        console.log("⏱️ Time expired, auto-submitting...");
+        handleTimeout();
+      }
+    }, 200);
+
+    return () => clearInterval(timer);
+  }, [questionStart, phase, isAnswerLocked]);
 
   // === FINAL SCORE COUNTDOWN ===
   useEffect(() => {
@@ -503,9 +462,6 @@ export default function QuizGamePage() {
 
     stopTick();
     playSound(gameoverSoundRef.current);
-
-    // Update user stats in Supabase
-    updateUserStats();
 
     let remaining = FINAL_SCORE_DURATION;
     setFinalCountdown(remaining);
@@ -516,7 +472,7 @@ export default function QuizGamePage() {
 
     const timeout = setTimeout(() => {
       clearInterval(interval);
-      router.push("/"); // Redirect to home after 10 seconds
+      router.push("/");
     }, FINAL_SCORE_DURATION * 1000);
 
     return () => {
@@ -531,10 +487,10 @@ export default function QuizGamePage() {
       stopTick();
       return;
     }
-    if (!showFinalScore && !showExplanation && timeLeft > 0) {
+    if (phase === "QUESTION" && timeLeft > 0) {
       startTick();
     }
-  }, [isSoundEnabled]);
+  }, [isSoundEnabled, phase, timeLeft]);
 
   // Stop tick safety
   useEffect(() => {
@@ -546,21 +502,26 @@ export default function QuizGamePage() {
   // === HANDLERS ===
   const handleAnswerClick = (optionId: OptionId) => {
     if (isAnswerLocked || showExplanation || showFinalScore) return;
+    if (!currentQ) return;
 
     playClick();
     setSelectedAnswer(optionId);
     setIsAnswerLocked(true);
 
-    const correct = optionId === currentQ.correctAnswer;
-    setIsCorrect(correct);
+    const correctFlag = optionId === currentQ.correctAnswer;
+    setIsCorrect(correctFlag);
 
     setAnswers((prev) => {
-      const next = [...prev];
-      next[currentIndex] = correct ? "correct" : "wrong";
+      const next = prev.length
+        ? [...prev]
+        : Array(totalQuestions).fill("none") as AnswerStatus[];
+      if (currentIndex >= 0 && currentIndex < next.length) {
+        next[currentIndex] = correctFlag ? "correct" : "wrong";
+      }
       return next;
     });
 
-    if (correct) {
+    if (correctFlag) {
       setCorrectCount((c) => c + 1);
       const newStreak = streak + 1;
       setStreak(newStreak);
@@ -572,8 +533,29 @@ export default function QuizGamePage() {
       playSound(wrongSoundRef.current);
     }
 
-    // Save answer to Supabase
-    saveAnswer(currentQ.id, optionId, correct);
+    saveAnswer(currentQ.id, optionId, correctFlag);
+  };
+
+  const handleTimeout = () => {
+    if (isAnswerLocked || showExplanation || showFinalScore) return;
+    if (!currentQ) return;
+
+    setIsAnswerLocked(true);
+    setWrongCount((w) => w + 1);
+    setStreak(0);
+
+    setAnswers((prev) => {
+      const next = prev.length
+        ? [...prev]
+        : Array(totalQuestions).fill("none") as AnswerStatus[];
+      if (currentIndex >= 0 && currentIndex < next.length) {
+        next[currentIndex] = "wrong";
+      }
+      return next;
+    });
+
+    saveAnswer(currentQ.id, null, false);
+    playSound(wrongSoundRef.current);
   };
 
   const handleExitClick = () => {
@@ -582,10 +564,11 @@ export default function QuizGamePage() {
     setShowExitConfirm(true);
   };
 
-  const handleExitConfirmYes = () => {
+  const handleExitConfirmYes = async () => {
     playClick();
     stopTick();
     setShowExitConfirm(false);
+    await saveStatsOnce();
     setShowFinalScore(true);
   };
 
@@ -606,38 +589,47 @@ export default function QuizGamePage() {
     return "#ef4444";
   };
 
-  const accuracy = TOTAL_QUESTIONS > 0 ? Math.round((correctCount / TOTAL_QUESTIONS) * 100) : 0;
-  const score = correctCount * 2; // 2 points per correct answer (50 questions = 100 points max)
+  const accuracy =
+    totalQuestions > 0
+      ? Math.round((correctCount / totalQuestions) * 100)
+      : 0;
+  const score = correctCount * 2;
 
   // 🔐 === SECURITY VERIFICATION SCREEN ===
   if (isVerifying) {
     return (
-      <div style={{
-        minHeight: "100vh",
-        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "20px",
-        color: "white",
-      }}>
-        <div style={{
-          width: "60px",
-          height: "60px",
-          border: "4px solid rgba(139, 92, 246, 0.3)",
-          borderTopColor: "#8b5cf6",
-          borderRadius: "50%",
-          animation: "spin 1s linear infinite"
-        }} />
-        <p style={{
-          color: "#a78bfa",
-          fontSize: "16px",
-          fontWeight: 600,
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
-          gap: "8px"
-        }}>
+          justifyContent: "center",
+          gap: "20px",
+          color: "white",
+        }}
+      >
+        <div
+          style={{
+            width: "60px",
+            height: "60px",
+            border: "4px solid rgba(139, 92, 246, 0.3)",
+            borderTopColor: "#8b5cf6",
+            borderRadius: "50%",
+            animation: "spin 1s linear infinite",
+          }}
+        />
+        <p
+          style={{
+            color: "#a78bfa",
+            fontSize: "16px",
+            fontWeight: 600,
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+        >
           🔐 Verifying access...
         </p>
       </div>
@@ -647,29 +639,37 @@ export default function QuizGamePage() {
   // === LOADING SCREEN ===
   if (isLoading) {
     return (
-      <div style={{
-        minHeight: "100vh",
-        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "white",
-      }}>
+      <div
+        style={{
+          minHeight: "100vh",
+          background:
+            "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "white",
+        }}
+      >
         <div style={{ textAlign: "center" }}>
-          <div className="animate-pulse" style={{
-            width: "80px",
-            height: "80px",
-            margin: "0 auto 20px",
-            borderRadius: "50%",
-            border: "4px solid rgba(139,92,246,0.3)",
-            borderTopColor: "#a78bfa",
-            animation: "spin 1s linear infinite",
-          }} />
-          <p style={{
-            fontSize: "18px",
-            fontWeight: 600,
-            color: "#cbd5e1",
-          }}>
+          <div
+            className="animate-pulse"
+            style={{
+              width: "80px",
+              height: "80px",
+              margin: "0 auto 20px",
+              borderRadius: "50%",
+              border: "4px solid rgba(139,92,246,0.3)",
+              borderTopColor: "#a78bfa",
+              animation: "spin 1s linear infinite",
+            }}
+          />
+          <p
+            style={{
+              fontSize: "18px",
+              fontWeight: 600,
+              color: "#cbd5e1",
+            }}
+          >
             Loading questions...
           </p>
         </div>
@@ -680,34 +680,43 @@ export default function QuizGamePage() {
   // === NO QUESTIONS FALLBACK ===
   if (!currentQ) {
     return (
-      <div style={{
-        minHeight: "100vh",
-        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "white",
-        padding: "20px",
-      }}>
+      <div
+        style={{
+          minHeight: "100vh",
+          background:
+            "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "white",
+          padding: "20px",
+        }}
+      >
         <div style={{ textAlign: "center", maxWidth: "400px" }}>
-          <XCircle style={{
-            width: "64px",
-            height: "64px",
-            color: "#ef4444",
-            margin: "0 auto 20px",
-          }} />
-          <h2 style={{
-            fontSize: "24px",
-            fontWeight: 900,
-            marginBottom: "12px",
-          }}>
+          <XCircle
+            style={{
+              width: "64px",
+              height: "64px",
+              color: "#ef4444",
+              margin: "0 auto 20px",
+            }}
+          />
+          <h2
+            style={{
+              fontSize: "24px",
+              fontWeight: 900,
+              marginBottom: "12px",
+            }}
+          >
             No Questions Available
           </h2>
-          <p style={{
-            fontSize: "16px",
-            color: "#94a3b8",
-            marginBottom: "24px",
-          }}>
+          <p
+            style={{
+              fontSize: "16px",
+              color: "#94a3b8",
+              marginBottom: "24px",
+            }}
+          >
             Unable to load quiz questions. Please try again later.
           </p>
           <button
@@ -721,7 +730,8 @@ export default function QuizGamePage() {
               fontSize: "16px",
               fontWeight: 700,
               cursor: "pointer",
-            }}>
+            }}
+          >
             Go Home
           </button>
         </div>
@@ -732,60 +742,108 @@ export default function QuizGamePage() {
   return (
     <>
       <style jsx global>{`
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+
         @keyframes float {
-          0%, 100% { transform: translateY(0px) rotate(0deg); }
-          50% { transform: translateY(-15px) rotate(2deg); }
+          0%,
+          100% {
+            transform: translateY(0px) rotate(0deg);
+          }
+          50% {
+            transform: translateY(-15px) rotate(2deg);
+          }
         }
-        
+
         @keyframes pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.7; transform: scale(0.98); }
+          0%,
+          100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.7;
+            transform: scale(0.98);
+          }
         }
-        
+
         @keyframes slideUp {
-          from { transform: translateY(30px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
+          from {
+            transform: translateY(30px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
         }
-        
+
         @keyframes shine {
-          0% { transform: translateX(-150%) skewX(-25deg); }
-          100% { transform: translateX(250%) skewX(-25deg); }
+          0% {
+            transform: translateX(-150%) skewX(-25deg);
+          }
+          100% {
+            transform: translateX(250%) skewX(-25deg);
+          }
         }
-        
+
         @keyframes neonPulse {
-          0%, 100% { 
+          0%,
+          100% {
             box-shadow: 0 0 15px rgba(139, 92, 246, 0.6),
-                        0 0 30px rgba(139, 92, 246, 0.4),
-                        inset 0 0 10px rgba(139, 92, 246, 0.2);
+              0 0 30px rgba(139, 92, 246, 0.4),
+              inset 0 0 10px rgba(139, 92, 246, 0.2);
           }
-          50% { 
+          50% {
             box-shadow: 0 0 25px rgba(217, 70, 239, 0.9),
-                        0 0 50px rgba(217, 70, 239, 0.6),
-                        inset 0 0 15px rgba(217, 70, 239, 0.3);
+              0 0 50px rgba(217, 70, 239, 0.6),
+              inset 0 0 15px rgba(217, 70, 239, 0.3);
           }
         }
-        
+
         @keyframes glow {
-          0%, 100% { filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.8)); }
-          50% { filter: drop-shadow(0 0 20px rgba(217, 70, 239, 1)); }
+          0%,
+          100% {
+            filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.8));
+          }
+          50% {
+            filter: drop-shadow(0 0 20px rgba(217, 70, 239, 1));
+          }
         }
-        
+
         @keyframes shimmer {
-          0% { background-position: -200% center; }
-          100% { background-position: 200% center; }
+          0% {
+            background-position: -200% center;
+          }
+          100% {
+            background-position: 200% center;
+          }
         }
 
         @keyframes spin {
-          to { transform: rotate(360deg); }
+          to {
+            transform: rotate(360deg);
+          }
         }
 
-        .animate-float { animation: float 6s ease-in-out infinite; }
-        .animate-pulse { animation: pulse 2s ease-in-out infinite; }
-        .animate-slide-up { animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
-        .neon-border { animation: neonPulse 3s ease-in-out infinite; }
-        .glow-icon { animation: glow 2s ease-in-out infinite; }
+        .animate-float {
+          animation: float 6s ease-in-out infinite;
+        }
+        .animate-pulse {
+          animation: pulse 2s ease-in-out infinite;
+        }
+        .animate-slide-up {
+          animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .neon-border {
+          animation: neonPulse 3s ease-in-out infinite;
+        }
+        .glow-icon {
+          animation: glow 2s ease-in-out infinite;
+        }
 
         *:focus-visible {
           outline: 3px solid #a78bfa;
@@ -849,14 +907,15 @@ export default function QuizGamePage() {
       <div
         style={{
           minHeight: "100vh",
-          background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 25%, #312e81 50%, #1e1b4b 75%, #0f172a 100%)",
+          background:
+            "linear-gradient(135deg, #0f172a 0%, #1e1b4b 25%, #312e81 50%, #1e1b4b 75%, #0f172a 100%)",
           backgroundSize: "400% 400%",
           animation: "shimmer 15s ease infinite",
           color: "white",
           position: "relative",
           overflow: "hidden",
-        }}>
-        
+        }}
+      >
         {/* Animated Background Orbs */}
         <div
           className="animate-float"
@@ -867,7 +926,8 @@ export default function QuizGamePage() {
             width: "min(600px, 80vw)",
             height: "min(600px, 80vw)",
             borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(124,58,237,0.5) 0%, rgba(124,58,237,0.1) 40%, transparent 70%)",
+            background:
+              "radial-gradient(circle, rgba(124,58,237,0.5) 0%, rgba(124,58,237,0.1) 40%, transparent 70%)",
             filter: "blur(80px)",
             opacity: 0.6,
             pointerEvents: "none",
@@ -883,7 +943,8 @@ export default function QuizGamePage() {
             width: "min(700px, 90vw)",
             height: "min(700px, 90vw)",
             borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(217,70,239,0.4) 0%, rgba(217,70,239,0.1) 40%, transparent 70%)",
+            background:
+              "radial-gradient(circle, rgba(217,70,239,0.4) 0%, rgba(217,70,239,0.1) 40%, transparent 70%)",
             filter: "blur(100px)",
             opacity: 0.5,
             pointerEvents: "none",
@@ -901,7 +962,8 @@ export default function QuizGamePage() {
             width: "min(500px, 70vw)",
             height: "min(500px, 70vw)",
             borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(56,189,248,0.3) 0%, rgba(56,189,248,0.05) 40%, transparent 70%)",
+            background:
+              "radial-gradient(circle, rgba(56,189,248,0.3) 0%, rgba(56,189,248,0.05) 40%, transparent 70%)",
             filter: "blur(90px)",
             opacity: 0.4,
             pointerEvents: "none",
@@ -920,8 +982,15 @@ export default function QuizGamePage() {
             backdropFilter: "blur(20px) saturate(180%)",
             background: "rgba(15,23,42,0.85)",
             boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
-          }}>
-          <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "0 clamp(16px, 4vw, 24px)" }}>
+          }}
+        >
+          <div
+            style={{
+              maxWidth: "1400px",
+              margin: "0 auto",
+              padding: "0 clamp(16px, 4vw, 24px)",
+            }}
+          >
             <div
               className="header-wrap"
               style={{
@@ -931,32 +1000,43 @@ export default function QuizGamePage() {
                 minHeight: "clamp(70px, 15vw, 80px)",
                 gap: "clamp(12px, 3vw, 16px)",
                 padding: "clamp(8px, 2vw, 12px) 0",
-              }}>
-              
+              }}
+            >
               {/* Logo & Brand */}
-              <div style={{ display: "flex", alignItems: "center", gap: "clamp(10px, 2.5vw, 12px)", flexShrink: 0 }}>
-                {/* Logo with Image */}
-                <div style={{
-                  position: "relative",
-                  width: "clamp(62px, 13vw, 78px)",
-                  height: "clamp(62px, 13vw, 78px)",
-                  borderRadius: "50%",
-                  padding: 2,
-                  background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-                  boxShadow: "0 0 20px rgba(124, 58, 237, 0.7)",
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "clamp(10px, 2.5vw, 12px)",
                   flexShrink: 0,
-                }}>
-                  <div style={{
+                }}
+              >
+                <div
+                  style={{
                     position: "relative",
-                    width: "100%",
-                    height: "100%",
+                    width: "clamp(62px, 13vw, 78px)",
+                    height: "clamp(62px, 13vw, 78px)",
                     borderRadius: "50%",
-                    backgroundColor: "#020817",
-                    overflow: "hidden",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}>
+                    padding: 2,
+                    background:
+                      "linear-gradient(135deg, #7c3aed, #d946ef)",
+                    boxShadow: "0 0 20px rgba(124, 58, 237, 0.7)",
+                    flexShrink: 0,
+                  }}
+                >
+                  <div
+                    style={{
+                      position: "relative",
+                      width: "100%",
+                      height: "100%",
+                      borderRadius: "50%",
+                      backgroundColor: "#020817",
+                      overflow: "hidden",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
                     <Image
                       src="/images/logo.png"
                       alt="VibraXX"
@@ -968,64 +1048,96 @@ export default function QuizGamePage() {
                   </div>
                 </div>
 
-                {/* Brand Text - Hidden on mobile */}
-                <div className="brand-text" style={{
-                  display: "none",
-                }}>
-                  <div style={{
-                    fontSize: "clamp(10px, 2.2vw, 13px)",
-                    letterSpacing: "0.2em",
-                    textTransform: "uppercase",
-                    fontWeight: 900,
-                    background: "linear-gradient(90deg, #a78bfa, #d946ef, #22d3ee)",
-                    backgroundSize: "200% auto",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    animation: "shimmer 3s linear infinite",
-                  }}>
+                <div
+                  className="brand-text"
+                  style={{
+                    display: "none",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "clamp(10px, 2.2vw, 13px)",
+                      letterSpacing: "0.2em",
+                      textTransform: "uppercase",
+                      fontWeight: 900,
+                      background:
+                        "linear-gradient(90deg, #a78bfa, #d946ef, #22d3ee)",
+                      backgroundSize: "200% auto",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      animation: "shimmer 3s linear infinite",
+                    }}
+                  >
                     LIVE QUIZ
                   </div>
-                  <div style={{ fontSize: "clamp(9px, 2vw, 11px)", color: "#94a3b8", fontWeight: 600 }}>
+                  <div
+                    style={{
+                      fontSize: "clamp(9px, 2vw, 11px)",
+                      color: "#94a3b8",
+                      fontWeight: 600,
+                    }}
+                  >
                     Global Championship
                   </div>
                 </div>
               </div>
 
               {/* Center: Question Progress */}
-              <div className="header-center" style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "clamp(4px, 1.5vw, 6px)",
-                justifySelf: "center",
-              }}>
-                <div style={{
-                  fontSize: "clamp(14px, 3.5vw, 20px)",
-                  fontWeight: 900,
-                  letterSpacing: "0.15em",
-                  textTransform: "uppercase",
-                  background: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)",
-                  backgroundSize: "200% auto",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  animation: "shimmer 2s linear infinite",
-                  textAlign: "center",
-                  whiteSpace: "nowrap",
-                }}>
-                  Q {currentIndex + 1}/{TOTAL_QUESTIONS}
+              <div
+                className="header-center"
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "clamp(4px, 1.5vw, 6px)",
+                  justifySelf: "center",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "clamp(14px, 3.5vw, 20px)",
+                    fontWeight: 900,
+                    letterSpacing: "0.15em",
+                    textTransform: "uppercase",
+                    background:
+                      "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)",
+                    backgroundSize: "200% auto",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    animation: "shimmer 2s linear infinite",
+                    textAlign: "center",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Q {currentIndex + 1}/{totalQuestions}
                 </div>
                 {streak > 1 && (
-                  <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
-                    padding: "3px 8px",
-                    borderRadius: "999px",
-                    background: "linear-gradient(90deg, rgba(239,68,68,0.2), rgba(249,115,22,0.2))",
-                    border: "1px solid rgba(239,68,68,0.5)",
-                  }}>
-                    <Flame style={{ width: "12px", height: "12px", color: "#fb923c" }} />
-                    <span style={{ fontSize: "10px", fontWeight: 800, color: "#fbbf24" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      padding: "3px 8px",
+                      borderRadius: "999px",
+                      background:
+                        "linear-gradient(90deg, rgba(239,68,68,0.2), rgba(249,115,22,0.2))",
+                      border: "1px solid rgba(239,68,68,0.5)",
+                    }}
+                  >
+                    <Flame
+                      style={{
+                        width: "12px",
+                        height: "12px",
+                        color: "#fb923c",
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: "10px",
+                        fontWeight: 800,
+                        color: "#fbbf24",
+                      }}
+                    >
                       {streak}
                     </span>
                   </div>
@@ -1033,39 +1145,80 @@ export default function QuizGamePage() {
               </div>
 
               {/* Right: Stats & Controls */}
-              <div className="header-right" style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "clamp(6px, 2vw, 10px)",
-                flexShrink: 0,
-              }}>
-                {/* Score Pills */}
-                <div className="score-pills" style={{ display: "flex", gap: "clamp(4px, 1.5vw, 6px)" }}>
-                  <div style={{
-                    padding: "clamp(4px, 1.5vw, 6px) clamp(8px, 2.5vw, 12px)",
-                    borderRadius: "999px",
-                    background: "linear-gradient(135deg, rgba(22,163,74,0.15), rgba(21,128,61,0.15))",
-                    border: "2px solid rgba(34,197,94,0.5)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
-                    boxShadow: "0 0 15px rgba(34,197,94,0.3)",
-                  }}>
-                    <CheckCircle style={{ width: "clamp(12px, 3vw, 16px)", height: "clamp(12px, 3vw, 16px)", color: "#22c55e" }} />
-                    <span style={{ fontSize: "clamp(11px, 2.5vw, 13px)", fontWeight: 900, color: "#22c55e" }}>{correctCount}</span>
+              <div
+                className="header-right"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "clamp(6px, 2vw, 10px)",
+                  flexShrink: 0,
+                }}
+              >
+                <div
+                  className="score-pills"
+                  style={{ display: "flex", gap: "clamp(4px, 1.5vw, 6px)" }}
+                >
+                  <div
+                    style={{
+                      padding:
+                        "clamp(4px, 1.5vw, 6px) clamp(8px, 2.5vw, 12px)",
+                      borderRadius: "999px",
+                      background:
+                        "linear-gradient(135deg, rgba(22,163,74,0.15), rgba(21,128,61,0.15))",
+                      border: "2px solid rgba(34,197,94,0.5)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      boxShadow: "0 0 15px rgba(34,197,94,0.3)",
+                    }}
+                  >
+                    <CheckCircle
+                      style={{
+                        width: "clamp(12px, 3vw, 16px)",
+                        height: "clamp(12px, 3vw, 16px)",
+                        color: "#22c55e",
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: "clamp(11px, 2.5vw, 13px)",
+                        fontWeight: 900,
+                        color: "#22c55e",
+                      }}
+                    >
+                      {correctCount}
+                    </span>
                   </div>
-                  <div style={{
-                    padding: "clamp(4px, 1.5vw, 6px) clamp(8px, 2.5vw, 12px)",
-                    borderRadius: "999px",
-                    background: "linear-gradient(135deg, rgba(220,38,38,0.15), rgba(185,28,28,0.15))",
-                    border: "2px solid rgba(239,68,68,0.5)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
-                    boxShadow: "0 0 15px rgba(239,68,68,0.3)",
-                  }}>
-                    <XCircle style={{ width: "clamp(12px, 3vw, 16px)", height: "clamp(12px, 3vw, 16px)", color: "#ef4444" }} />
-                    <span style={{ fontSize: "clamp(11px, 2.5vw, 13px)", fontWeight: 900, color: "#ef4444" }}>{wrongCount}</span>
+                  <div
+                    style={{
+                      padding:
+                        "clamp(4px, 1.5vw, 6px) clamp(8px, 2.5vw, 12px)",
+                      borderRadius: "999px",
+                      background:
+                        "linear-gradient(135deg, rgba(220,38,38,0.15), rgba(185,28,28,0.15))",
+                      border: "2px solid rgba(239,68,68,0.5)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      boxShadow: "0 0 15px rgba(239,68,68,0.3)",
+                    }}
+                  >
+                    <XCircle
+                      style={{
+                        width: "clamp(12px, 3vw, 16px)",
+                        height: "clamp(12px, 3vw, 16px)",
+                        color: "#ef4444",
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: "clamp(11px, 2.5vw, 13px)",
+                        fontWeight: 900,
+                        color: "#ef4444",
+                      }}
+                    >
+                      {wrongCount}
+                    </span>
                   </div>
                 </div>
 
@@ -1078,33 +1231,48 @@ export default function QuizGamePage() {
                     height: "clamp(36px, 10vw, 44px)",
                     borderRadius: "12px",
                     border: "2px solid rgba(167,139,250,0.6)",
-                    background: isSoundEnabled 
+                    background: isSoundEnabled
                       ? "linear-gradient(135deg, rgba(124,58,237,0.3), rgba(79,70,229,0.2))"
                       : "rgba(30,27,75,0.5)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     cursor: "pointer",
-                    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                    transition:
+                      "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                     flexShrink: 0,
-                  }}>
+                  }}
+                >
                   {isSoundEnabled ? (
-                    <Volume2 style={{ width: "clamp(16px, 4vw, 20px)", height: "clamp(16px, 4vw, 20px)", color: "#a78bfa" }} />
+                    <Volume2
+                      style={{
+                        width: "clamp(16px, 4vw, 20px)",
+                        height: "clamp(16px, 4vw, 20px)",
+                        color: "#a78bfa",
+                      }}
+                    />
                   ) : (
-                    <VolumeX style={{ width: "clamp(16px, 4vw, 20px)", height: "clamp(16px, 4vw, 20px)", color: "#6b7280" }} />
+                    <VolumeX
+                      style={{
+                        width: "clamp(16px, 4vw, 20px)",
+                        height: "clamp(16px, 4vw, 20px)",
+                        color: "#6b7280",
+                      }}
+                    />
                   )}
                 </button>
 
-                {/* Exit Button */}
                 {!showFinalScore && (
                   <button
                     onClick={handleExitClick}
                     className="neon-border"
                     style={{
-                      padding: "clamp(8px, 2.5vw, 10px) clamp(12px, 4vw, 20px)",
+                      padding:
+                        "clamp(8px, 2.5vw, 10px) clamp(12px, 4vw, 20px)",
                       borderRadius: "999px",
                       border: "2px solid rgba(239,68,68,0.6)",
-                      background: "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))",
+                      background:
+                        "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))",
                       color: "white",
                       fontSize: "clamp(10px, 2.5vw, 12px)",
                       fontWeight: 800,
@@ -1114,18 +1282,27 @@ export default function QuizGamePage() {
                       alignItems: "center",
                       gap: "6px",
                       cursor: "pointer",
-                      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                      transition:
+                        "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                       flexShrink: 0,
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.boxShadow = "0 0 30px rgba(239,68,68,0.6)";
+                      e.currentTarget.style.transform =
+                        "translateY(-2px)";
+                      e.currentTarget.style.boxShadow =
+                        "0 0 30px rgba(239,68,68,0.6)";
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = "translateY(0)";
                       e.currentTarget.style.boxShadow = "none";
-                    }}>
-                    <Zap style={{ width: "clamp(12px, 3vw, 16px)", height: "clamp(12px, 3vw, 16px)" }} />
+                    }}
+                  >
+                    <Zap
+                      style={{
+                        width: "clamp(12px, 3vw, 16px)",
+                        height: "clamp(12px, 3vw, 16px)",
+                      }}
+                    />
                     <span>Exit</span>
                   </button>
                 )}
@@ -1135,72 +1312,86 @@ export default function QuizGamePage() {
         </header>
 
         {/* MAIN CONTENT */}
-        <main style={{
-          position: "relative",
-          zIndex: 10,
-          maxWidth: "1200px",
-          margin: "0 auto",
-          padding: "clamp(20px, 5vw, 40px) clamp(16px, 4vw, 24px)",
-        }}>
-          
+        <main
+          style={{
+            position: "relative",
+            zIndex: 10,
+            maxWidth: "1200px",
+            margin: "0 auto",
+            padding: "clamp(20px, 5vw, 40px) clamp(16px, 4vw, 24px)",
+          }}
+        >
           {/* CIRCULAR TIMER */}
           {!showFinalScore && (
-            <div style={{
-              display: "flex",
-              justifyContent: "center",
-              marginBottom: "clamp(24px, 5vw, 32px)",
-            }}>
-              <div className="animate-pulse" style={{
-                position: "relative",
-                width: "clamp(100px, 20vw, 120px)",
-                height: "clamp(100px, 20vw, 120px)",
-              }}>
-                {/* Outer Ring */}
-                <div style={{
-                  position: "absolute",
-                  inset: 0,
-                  borderRadius: "50%",
-                  border: `4px solid ${getTimeColor()}`,
-                  boxShadow: `0 0 30px ${getTimeColor()}, inset 0 0 20px ${getTimeColor()}`,
-                  opacity: 0.8,
-                }} />
-                
-                {/* Inner Circle */}
-                <div style={{
-                  position: "absolute",
-                  inset: "10px",
-                  borderRadius: "50%",
-                  background: "radial-gradient(circle, rgba(15,23,42,1) 0%, rgba(6,8,20,1) 100%)",
-                  border: "2px solid rgba(139,92,246,0.3)",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "4px",
-                  boxShadow: "inset 0 0 20px rgba(0,0,0,0.5)",
-                }}>
-                  <Clock style={{
-                    width: "clamp(20px, 4vw, 28px)",
-                    height: "clamp(20px, 4vw, 28px)",
-                    color: getTimeColor(),
-                    filter: `drop-shadow(0 0 8px ${getTimeColor()})`,
-                  }} />
-                  <span style={{
-                    fontSize: "clamp(32px, 6vw, 42px)",
-                    fontWeight: 900,
-                    color: getTimeColor(),
-                    textShadow: `0 0 20px ${getTimeColor()}`,
-                    lineHeight: 1,
-                  }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                marginBottom: "clamp(24px, 5vw, 32px)",
+              }}
+            >
+              <div
+                className="animate-pulse"
+                style={{
+                  position: "relative",
+                  width: "clamp(100px, 20vw, 120px)",
+                  height: "clamp(100px, 20vw, 120px)",
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    borderRadius: "50%",
+                    border: `4px solid ${getTimeColor()}`,
+                    boxShadow: `0 0 30px ${getTimeColor()}, inset 0 0 20px ${getTimeColor()}`,
+                    opacity: 0.8,
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: "10px",
+                    borderRadius: "50%",
+                    background:
+                      "radial-gradient(circle, rgba(15,23,42,1) 0%, rgba(6,8,20,1) 100%)",
+                    border: "2px solid rgba(139,92,246,0.3)",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "4px",
+                    boxShadow: "inset 0 0 20px rgba(0,0,0,0.5)",
+                  }}
+                >
+                  <Clock
+                    style={{
+                      width: "clamp(20px, 4vw, 28px)",
+                      height: "clamp(20px, 4vw, 28px)",
+                      color: getTimeColor(),
+                      filter: `drop-shadow(0 0 8px ${getTimeColor()})`,
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontSize: "clamp(32px, 6vw, 42px)",
+                      fontWeight: 900,
+                      color: getTimeColor(),
+                      textShadow: `0 0 20px ${getTimeColor()}`,
+                      lineHeight: 1,
+                    }}
+                  >
                     {timeLeft}
                   </span>
-                  <span style={{
-                    fontSize: "clamp(9px, 1.8vw, 11px)",
-                    color: "#94a3b8",
-                    fontWeight: 600,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.1em",
-                  }}>
+                  <span
+                    style={{
+                      fontSize: "clamp(9px, 1.8vw, 11px)",
+                      color: "#94a3b8",
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.1em",
+                    }}
+                  >
                     seconds
                   </span>
                 </div>
@@ -1210,177 +1401,214 @@ export default function QuizGamePage() {
 
           {/* FINAL SCORE SCREEN */}
           {showFinalScore ? (
-            <article className="animate-slide-up" style={{
-              padding: "clamp(24px, 5vw, 32px)",
-              borderRadius: "clamp(20px, 4vw, 24px)",
-              border: "2px solid rgba(139,92,246,0.5)",
-              background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(139,92,246,0.4)",
-              textAlign: "center",
-              backdropFilter: "blur(20px)",
-              position: "relative",
-              overflow: "hidden",
-            }}>
-              
-              {/* Trophy Icon */}
-              <div style={{ 
-                display: "inline-block", 
-                marginBottom: "clamp(16px, 3vw, 20px)",
-              }}>
-                <Trophy style={{
-                  width: "clamp(48px, 10vw, 64px)",
-                  height: "clamp(48px, 10vw, 64px)",
-                  color: "#fbbf24",
-                  filter: "drop-shadow(0 0 20px #fbbf24)",
-                }} />
+            <article
+              className="animate-slide-up"
+              style={{
+                padding: "clamp(24px, 5vw, 32px)",
+                borderRadius: "clamp(20px, 4vw, 24px)",
+                border: "2px solid rgba(139,92,246,0.5)",
+                background:
+                  "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)",
+                boxShadow:
+                  "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(139,92,246,0.4)",
+                textAlign: "center",
+                backdropFilter: "blur(20px)",
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  display: "inline-block",
+                  marginBottom: "clamp(16px, 3vw, 20px)",
+                }}
+              >
+                <Trophy
+                  style={{
+                    width: "clamp(48px, 10vw, 64px)",
+                    height: "clamp(48px, 10vw, 64px)",
+                    color: "#fbbf24",
+                    filter: "drop-shadow(0 0 20px #fbbf24)",
+                  }}
+                />
               </div>
 
-              {/* Title */}
-              <h1 style={{
-                fontSize: "clamp(20px, 4.5vw, 28px)",
-                fontWeight: 900,
-                marginBottom: "clamp(20px, 4vw, 28px)",
-                backgroundImage: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)",
-                backgroundSize: "200% auto",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-                animation: "shimmer 3s linear infinite",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}>
+              <h1
+                style={{
+                  fontSize: "clamp(20px, 4.5vw, 28px)",
+                  fontWeight: 900,
+                  marginBottom: "clamp(20px, 4vw, 28px)",
+                  backgroundImage:
+                    "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)",
+                  backgroundSize: "200% auto",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                  animation: "shimmer 3s linear infinite",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
                 Round Complete!
               </h1>
 
-              {/* Stats Grid - Correct & Wrong */}
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(2, 1fr)",
-                gap: "clamp(12px, 3vw, 16px)",
-                marginBottom: "clamp(20px, 4vw, 24px)",
-              }}>
-                {/* Correct */}
-                <div style={{
-                  padding: "clamp(16px, 3.5vw, 20px)",
-                  borderRadius: "clamp(14px, 3vw, 16px)",
-                  background: "linear-gradient(135deg, rgba(22,163,74,0.2), rgba(21,128,61,0.15))",
-                  border: "2px solid rgba(34,197,94,0.5)",
-                  boxShadow: "0 0 20px rgba(34,197,94,0.3)",
-                }}>
-                  <CheckCircle style={{
-                    width: "clamp(28px, 6vw, 36px)",
-                    height: "clamp(28px, 6vw, 36px)",
-                    color: "#22c55e",
-                    marginBottom: "clamp(6px, 1.5vw, 8px)",
-                    filter: "drop-shadow(0 0 10px #22c55e)",
-                  }} />
-                  <div style={{
-                    fontSize: "clamp(32px, 7vw, 48px)",
-                    fontWeight: 900,
-                    color: "#22c55e",
-                    lineHeight: 1,
-                    marginBottom: "clamp(4px, 1vw, 6px)",
-                    textShadow: "0 0 15px rgba(34,197,94,0.6)",
-                  }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(2, 1fr)",
+                  gap: "clamp(12px, 3vw, 16px)",
+                  marginBottom: "clamp(20px, 4vw, 24px)",
+                }}
+              >
+                <div
+                  style={{
+                    padding: "clamp(16px, 3.5vw, 20px)",
+                    borderRadius: "clamp(14px, 3vw, 16px)",
+                    background:
+                      "linear-gradient(135deg, rgba(22,163,74,0.2), rgba(21,128,61,0.15))",
+                    border: "2px solid rgba(34,197,94,0.5)",
+                    boxShadow: "0 0 20px rgba(34,197,94,0.3)",
+                  }}
+                >
+                  <CheckCircle
+                    style={{
+                      width: "clamp(28px, 6vw, 36px)",
+                      height: "clamp(28px, 6vw, 36px)",
+                      color: "#22c55e",
+                      marginBottom: "clamp(6px, 1.5vw, 8px)",
+                      filter: "drop-shadow(0 0 10px #22c55e)",
+                    }}
+                  />
+                  <div
+                    style={{
+                      fontSize: "clamp(32px, 7vw, 48px)",
+                      fontWeight: 900,
+                      color: "#22c55e",
+                      lineHeight: 1,
+                      marginBottom: "clamp(4px, 1vw, 6px)",
+                      textShadow:
+                        "0 0 15px rgba(34,197,94,0.6)",
+                    }}
+                  >
                     {correctCount}
                   </div>
-                  <div style={{
-                    fontSize: "clamp(11px, 2.5vw, 13px)",
-                    color: "#86efac",
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                  }}>
+                  <div
+                    style={{
+                      fontSize: "clamp(11px, 2.5vw, 13px)",
+                      color: "#86efac",
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
                     Correct
                   </div>
                 </div>
 
-                {/* Wrong */}
-                <div style={{
-                  padding: "clamp(16px, 3.5vw, 20px)",
-                  borderRadius: "clamp(14px, 3vw, 16px)",
-                  background: "linear-gradient(135deg, rgba(220,38,38,0.2), rgba(185,28,28,0.15))",
-                  border: "2px solid rgba(239,68,68,0.5)",
-                  boxShadow: "0 0 20px rgba(239,68,68,0.3)",
-                }}>
-                  <XCircle style={{
-                    width: "clamp(28px, 6vw, 36px)",
-                    height: "clamp(28px, 6vw, 36px)",
-                    color: "#ef4444",
-                    marginBottom: "clamp(6px, 1.5vw, 8px)",
-                    filter: "drop-shadow(0 0 10px #ef4444)",
-                  }} />
-                  <div style={{
-                    fontSize: "clamp(32px, 7vw, 48px)",
-                    fontWeight: 900,
-                    color: "#ef4444",
-                    lineHeight: 1,
-                    marginBottom: "clamp(4px, 1vw, 6px)",
-                    textShadow: "0 0 15px rgba(239,68,68,0.6)",
-                  }}>
+                <div
+                  style={{
+                    padding: "clamp(16px, 3.5vw, 20px)",
+                    borderRadius: "clamp(14px, 3vw, 16px)",
+                    background:
+                      "linear-gradient(135deg, rgba(220,38,38,0.2), rgba(185,28,28,0.15))",
+                    border: "2px solid rgba(239,68,68,0.5)",
+                    boxShadow: "0 0 20px rgba(239,68,68,0.3)",
+                  }}
+                >
+                  <XCircle
+                    style={{
+                      width: "clamp(28px, 6vw, 36px)",
+                      height: "clamp(28px, 6vw, 36px)",
+                      color: "#ef4444",
+                      marginBottom: "clamp(6px, 1.5vw, 8px)",
+                      filter: "drop-shadow(0 0 10px #ef4444)",
+                    }}
+                  />
+                  <div
+                    style={{
+                      fontSize: "clamp(32px, 7vw, 48px)",
+                      fontWeight: 900,
+                      color: "#ef4444",
+                      lineHeight: 1,
+                      marginBottom: "clamp(4px, 1vw, 6px)",
+                      textShadow:
+                        "0 0 15px rgba(239,68,68,0.6)",
+                    }}
+                  >
                     {wrongCount}
                   </div>
-                  <div style={{
-                    fontSize: "clamp(11px, 2.5vw, 13px)",
-                    color: "#fca5a5",
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                  }}>
+                  <div
+                    style={{
+                      fontSize: "clamp(11px, 2.5vw, 13px)",
+                      color: "#fca5a5",
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
                     Wrong
                   </div>
                 </div>
               </div>
 
-              {/* Rounds Remaining Info */}
-              <div style={{
-                padding: "clamp(12px, 2.5vw, 14px) clamp(16px, 3.5vw, 20px)",
-                borderRadius: "clamp(12px, 2.5vw, 14px)",
-                background: "rgba(124,58,237,0.15)",
-                border: "1px solid rgba(139,92,246,0.4)",
-                marginBottom: "clamp(20px, 4vw, 24px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "8px",
-              }}>
-                <span style={{
-                  fontSize: "clamp(13px, 3vw, 15px)",
-                  color: "#cbd5e1",
-                  fontWeight: 600,
-                }}>
+              <div
+                style={{
+                  padding:
+                    "clamp(12px, 2.5vw, 14px) clamp(16px, 3.5vw, 20px)",
+                  borderRadius: "clamp(12px, 2.5vw, 14px)",
+                  background: "rgba(124,58,237,0.15)",
+                  border: "1px solid rgba(139,92,246,0.4)",
+                  marginBottom: "clamp(20px, 4vw, 24px)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "clamp(13px, 3vw, 15px)",
+                    color: "#cbd5e1",
+                    fontWeight: 600,
+                  }}
+                >
                   You have
                 </span>
-                <span style={{
-                  fontSize: "clamp(18px, 4vw, 22px)",
-                  fontWeight: 900,
-                  color: "#a78bfa",
-                  textShadow: "0 0 10px rgba(167,139,250,0.6)",
-                }}>
+                <span
+                  style={{
+                    fontSize: "clamp(18px, 4vw, 22px)",
+                    fontWeight: 900,
+                    color: "#a78bfa",
+                    textShadow:
+                      "0 0 10px rgba(167,139,250,0.6)",
+                  }}
+                >
                   {userRounds}
                 </span>
-                <span style={{
-                  fontSize: "clamp(13px, 3vw, 15px)",
-                  color: "#cbd5e1",
-                  fontWeight: 600,
-                }}>
+                <span
+                  style={{
+                    fontSize: "clamp(13px, 3vw, 15px)",
+                    color: "#cbd5e1",
+                    fontWeight: 600,
+                  }}
+                >
                   rounds left
                 </span>
               </div>
 
-              {/* Action Buttons */}
-              <div style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "clamp(10px, 2.5vw, 12px)",
-                marginBottom: "clamp(16px, 3.5vw, 20px)",
-              }}>
-                {/* NEW ROUND / BUY ROUNDS Button */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "clamp(10px, 2.5vw, 12px)",
+                  marginBottom: "clamp(16px, 3.5vw, 20px)",
+                }}
+              >
                 <button
                   onClick={async () => {
                     playClick();
                     if (userRounds > 0) {
-                      await decreaseUserRound(); // Decrease round in Supabase
+                      await decreaseUserRound();
                       router.push("/lobby");
                     } else {
                       router.push("/buy");
@@ -1388,14 +1616,17 @@ export default function QuizGamePage() {
                   }}
                   style={{
                     width: "100%",
-                    padding: "clamp(12px, 3vw, 14px) clamp(20px, 4vw, 24px)",
+                    padding:
+                      "clamp(12px, 3vw, 14px) clamp(20px, 4vw, 24px)",
                     borderRadius: "clamp(12px, 2.5vw, 14px)",
                     border: "none",
-                    background: userRounds > 0
-                      ? "linear-gradient(135deg, #7c3aed, #d946ef)"
-                      : "linear-gradient(135deg, #f59e0b, #fbbf24)",
+                    background:
+                      userRounds > 0
+                        ? "linear-gradient(135deg, #7c3aed, #d946ef)"
+                        : "linear-gradient(135deg, #f59e0b, #fbbf24)",
                     color: "white",
-                    fontSize: "clamp(14px, 3.2vw, 16px)",
+                    fontSize:
+                      "clamp(14px, 3.2vw, 16px)",
                     fontWeight: 800,
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
@@ -1404,23 +1635,28 @@ export default function QuizGamePage() {
                     alignItems: "center",
                     justifyContent: "center",
                     gap: "8px",
-                    boxShadow: userRounds > 0
-                      ? "0 8px 25px rgba(139,92,246,0.4)"
-                      : "0 8px 25px rgba(251,191,36,0.4)",
+                    boxShadow:
+                      userRounds > 0
+                        ? "0 8px 25px rgba(139,92,246,0.4)"
+                        : "0 8px 25px rgba(251,191,36,0.4)",
                     transition: "all 0.3s",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                    e.currentTarget.style.boxShadow = userRounds > 0
-                      ? "0 12px 35px rgba(139,92,246,0.6)"
-                      : "0 12px 35px rgba(251,191,36,0.6)";
+                    e.currentTarget.style.transform =
+                      "translateY(-2px)";
+                    e.currentTarget.style.boxShadow =
+                      userRounds > 0
+                        ? "0 12px 35px rgba(139,92,246,0.6)"
+                        : "0 12px 35px rgba(251,191,36,0.6)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = userRounds > 0
-                      ? "0 8px 25px rgba(139,92,246,0.4)"
-                      : "0 8px 25px rgba(251,191,36,0.4)";
-                  }}>
+                    e.currentTarget.style.boxShadow =
+                      userRounds > 0
+                        ? "0 8px 25px rgba(139,92,246,0.4)"
+                        : "0 8px 25px rgba(251,191,36,0.4)";
+                  }}
+                >
                   {userRounds > 0 ? (
                     <>
                       <Zap style={{ width: "18px", height: "18px" }} />
@@ -1434,7 +1670,6 @@ export default function QuizGamePage() {
                   )}
                 </button>
 
-                {/* EXIT Button */}
                 <button
                   onClick={() => {
                     playClick();
@@ -1442,12 +1677,14 @@ export default function QuizGamePage() {
                   }}
                   style={{
                     width: "100%",
-                    padding: "clamp(12px, 3vw, 14px) clamp(20px, 4vw, 24px)",
+                    padding:
+                      "clamp(12px, 3vw, 14px) clamp(20px, 4vw, 24px)",
                     borderRadius: "clamp(12px, 2.5vw, 14px)",
                     border: "2px solid rgba(148,163,253,0.4)",
                     background: "rgba(15,23,42,0.6)",
                     color: "white",
-                    fontSize: "clamp(14px, 3.2vw, 16px)",
+                    fontSize:
+                      "clamp(14px, 3.2vw, 16px)",
                     fontWeight: 800,
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
@@ -1459,38 +1696,51 @@ export default function QuizGamePage() {
                     transition: "all 0.3s",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                    e.currentTarget.style.borderColor = "rgba(139,92,246,0.6)";
-                    e.currentTarget.style.background = "rgba(139,92,246,0.15)";
+                    e.currentTarget.style.transform =
+                      "translateY(-2px)";
+                    e.currentTarget.style.borderColor =
+                      "rgba(139,92,246,0.6)";
+                    e.currentTarget.style.background =
+                      "rgba(139,92,246,0.15)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.borderColor = "rgba(148,163,253,0.4)";
-                    e.currentTarget.style.background = "rgba(15,23,42,0.6)";
-                  }}>
+                    e.currentTarget.style.borderColor =
+                      "rgba(148,163,253,0.4)";
+                    e.currentTarget.style.background =
+                      "rgba(15,23,42,0.6)";
+                  }}
+                >
                   <Star style={{ width: "18px", height: "18px" }} />
                   Exit Quiz
                 </button>
               </div>
 
-              {/* Redirect Countdown */}
-              <div style={{
-                padding: "clamp(10px, 2vw, 12px) clamp(14px, 3vw, 16px)",
-                borderRadius: "clamp(10px, 2vw, 12px)",
-                background: "rgba(139,92,246,0.1)",
-                border: "1px solid rgba(139,92,246,0.3)",
-              }}>
-                <p style={{
-                  fontSize: "clamp(11px, 2.5vw, 13px)",
-                  color: "#94a3b8",
-                  fontWeight: 600,
-                }}>
+              <div
+                style={{
+                  padding:
+                    "clamp(10px, 2vw, 12px) clamp(14px, 3vw, 16px)",
+                  borderRadius: "clamp(10px, 2vw, 12px)",
+                  background: "rgba(139,92,246,0.1)",
+                  border: "1px solid rgba(139,92,246,0.3)",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: "clamp(11px, 2.5vw, 13px)",
+                    color: "#94a3b8",
+                    fontWeight: 600,
+                  }}
+                >
                   Redirecting to home in{" "}
-                  <span style={{
-                    color: "#a78bfa",
-                    fontWeight: 900,
-                    fontSize: "clamp(13px, 3vw, 16px)",
-                  }}>
+                  <span
+                    style={{
+                      color: "#a78bfa",
+                      fontWeight: 900,
+                      fontSize:
+                        "clamp(13px, 3vw, 16px)",
+                    }}
+                  >
                     {finalCountdown}
                   </span>
                   s
@@ -1499,172 +1749,241 @@ export default function QuizGamePage() {
             </article>
           ) : (
             <>
-              {/* QUESTION OR EXPLANATION */}
               {!showExplanation ? (
-                <article className="animate-slide-up" style={{
-                  padding: "clamp(24px, 5vw, 32px) clamp(20px, 4vw, 28px)",
-                  borderRadius: "clamp(24px, 5vw, 32px)",
-                  border: "2px solid rgba(139,92,246,0.4)",
-                  background: "linear-gradient(135deg, rgba(30,27,75,0.95) 0%, rgba(15,23,42,0.95) 100%)",
-                  boxShadow: "0 20px 60px rgba(0,0,0,0.4), 0 0 40px rgba(139,92,246,0.2)",
-                  backdropFilter: "blur(20px)",
-                  marginBottom: "24px",
-                }}>
-                  
-                  {/* Question Header */}
-                  <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    marginBottom: "16px",
-                  }}>
-                    <Target style={{
-                      width: "24px",
-                      height: "24px",
-                      color: "#22d3ee",
-                      filter: "drop-shadow(0 0 8px #22d3ee)",
-                    }} />
-                    <span style={{
-                      fontSize: "clamp(11px, 2.3vw, 14px)",
-                      color: "#22d3ee",
-                      fontWeight: 800,
-                      letterSpacing: "0.15em",
-                      textTransform: "uppercase",
-                    }}>
+                <article
+                  className="animate-slide-up"
+                  style={{
+                    padding:
+                      "clamp(24px, 5vw, 32px) clamp(20px, 4vw, 28px)",
+                    borderRadius:
+                      "clamp(24px, 5vw, 32px)",
+                    border: "2px solid rgba(139,92,246,0.4)",
+                    background:
+                      "linear-gradient(135deg, rgba(30,27,75,0.95) 0%, rgba(15,23,42,0.95) 100%)",
+                    boxShadow:
+                      "0 20px 60px rgba(0,0,0,0.4), 0 0 40px rgba(139,92,246,0.2)",
+                    backdropFilter: "blur(20px)",
+                    marginBottom: "24px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      marginBottom: "16px",
+                    }}
+                  >
+                    <Target
+                      style={{
+                        width: "24px",
+                        height: "24px",
+                        color: "#22d3ee",
+                        filter:
+                          "drop-shadow(0 0 8px #22d3ee)",
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize:
+                          "clamp(11px, 2.3vw, 14px)",
+                        color: "#22d3ee",
+                        fontWeight: 800,
+                        letterSpacing: "0.15em",
+                        textTransform: "uppercase",
+                      }}
+                    >
                       Question {currentIndex + 1}
                     </span>
                   </div>
 
-                  {/* Question Text */}
-                  <h2 style={{
-                    fontSize: "clamp(18px, 4vw, 24px)",
-                    lineHeight: 1.5,
-                    fontWeight: 700,
-                    marginBottom: "24px",
-                    color: "#f8fafc",
-                  }}>
+                  <h2
+                    style={{
+                      fontSize: "clamp(18px, 4vw, 24px)",
+                      lineHeight: 1.5,
+                      fontWeight: 700,
+                      marginBottom: "24px",
+                      color: "#f8fafc",
+                    }}
+                  >
                     {currentQ.question}
                   </h2>
 
-                  {/* Options Grid */}
-                  <div className="question-grid" style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(2, 1fr)",
-                    gap: "14px",
-                  }}>
+                  <div
+                    className="question-grid"
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(2, 1fr)",
+                      gap: "14px",
+                    }}
+                  >
                     {currentQ.options.map((opt) => {
-                      const isSelected = selectedAnswer === opt.id;
-                      const isCorrectOpt = opt.id === currentQ.correctAnswer;
+                      const isSelected =
+                        selectedAnswer === opt.id;
+                      const isCorrectOpt =
+                        opt.id === currentQ.correctAnswer;
                       const locked = isAnswerLocked;
 
-                      let borderColor = "rgba(139,92,246,0.5)";
-                      let boxShadow = "0 4px 20px rgba(0,0,0,0.3)";
-                      let bg = "linear-gradient(135deg, rgba(30,27,75,0.8), rgba(15,23,42,0.9))";
+                      let borderColor =
+                        "rgba(139,92,246,0.5)";
+                      let boxShadow =
+                        "0 4px 20px rgba(0,0,0,0.3)";
+                      let bg =
+                        "linear-gradient(135deg, rgba(30,27,75,0.8), rgba(15,23,42,0.9))";
 
                       if (locked) {
                         if (isCorrectOpt) {
                           borderColor = "#22c55e";
-                          boxShadow = "0 0 25px rgba(34,197,94,0.6), 0 4px 20px rgba(0,0,0,0.3)";
-                          bg = "linear-gradient(135deg, rgba(22,163,74,0.3), rgba(21,128,61,0.2))";
-                        } else if (isSelected && !isCorrectOpt) {
+                          boxShadow =
+                            "0 0 25px rgba(34,197,94,0.6), 0 4px 20px rgba(0,0,0,0.3)";
+                          bg =
+                            "linear-gradient(135deg, rgba(22,163,74,0.3), rgba(21,128,61,0.2))";
+                        } else if (
+                          isSelected &&
+                          !isCorrectOpt
+                        ) {
                           borderColor = "#ef4444";
-                          boxShadow = "0 0 25px rgba(239,68,68,0.6), 0 4px 20px rgba(0,0,0,0.3)";
-                          bg = "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))";
+                          boxShadow =
+                            "0 0 25px rgba(239,68,68,0.6), 0 4px 20px rgba(0,0,0,0.3)";
+                          bg =
+                            "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))";
                         } else {
-                          borderColor = "rgba(75,85,99,0.4)";
-                          boxShadow = "0 4px 15px rgba(0,0,0,0.2)";
-                          bg = "linear-gradient(135deg, rgba(30,27,75,0.5), rgba(15,23,42,0.6))";
+                          borderColor =
+                            "rgba(75,85,99,0.4)";
+                          boxShadow =
+                            "0 4px 15px rgba(0,0,0,0.2)";
+                          bg =
+                            "linear-gradient(135deg, rgba(30,27,75,0.5), rgba(15,23,42,0.6))";
                         }
                       } else if (isSelected) {
                         borderColor = "#d946ef";
-                        boxShadow = "0 0 25px rgba(217,70,239,0.6), 0 4px 20px rgba(0,0,0,0.3)";
-                        bg = "linear-gradient(135deg, rgba(147,51,234,0.3), rgba(126,34,206,0.2))";
+                        boxShadow =
+                          "0 0 25px rgba(217,70,239,0.6), 0 4px 20px rgba(0,0,0,0.3)";
+                        bg =
+                          "linear-gradient(135deg, rgba(147,51,234,0.3), rgba(126,34,206,0.2))";
                       }
 
                       return (
                         <button
                           key={opt.id}
-                          onClick={() => handleAnswerClick(opt.id)}
+                          onClick={() =>
+                            handleAnswerClick(opt.id)
+                          }
                           disabled={locked}
                           style={{
                             position: "relative",
-                            padding: "clamp(16px, 3vw, 20px) clamp(14px, 3vw, 18px)",
-                            borderRadius: "clamp(16px, 3vw, 20px)",
+                            padding:
+                              "clamp(16px, 3vw, 20px) clamp(14px, 3vw, 18px)",
+                            borderRadius:
+                              "clamp(16px, 3vw, 20px)",
                             border: `3px solid ${borderColor}`,
                             background: bg,
                             color: "#f8fafc",
                             textAlign: "left",
-                            cursor: locked ? "default" : "pointer",
+                            cursor: locked
+                              ? "default"
+                              : "pointer",
                             boxShadow,
-                            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                            transition:
+                              "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                             overflow: "hidden",
-                            opacity: locked && !isSelected && !isCorrectOpt ? 0.4 : 1,
-                            transform: isSelected && !locked ? "scale(1.02)" : "scale(1)",
+                            opacity:
+                              locked &&
+                              !isSelected &&
+                              !isCorrectOpt
+                                ? 0.4
+                                : 1,
+                            transform:
+                              isSelected && !locked
+                                ? "scale(1.02)"
+                                : "scale(1)",
                           }}
                           onMouseEnter={(e) => {
                             if (!locked) {
-                              e.currentTarget.style.transform = "translateY(-4px) scale(1.02)";
-                              e.currentTarget.style.boxShadow = "0 0 30px rgba(139,92,246,0.5), 0 8px 25px rgba(0,0,0,0.4)";
+                              e.currentTarget.style.transform =
+                                "translateY(-4px) scale(1.02)";
+                              e.currentTarget.style.boxShadow =
+                                "0 0 30px rgba(139,92,246,0.5), 0 8px 25px rgba(0,0,0,0.4)";
                             }
                           }}
                           onMouseLeave={(e) => {
                             if (!locked) {
-                              e.currentTarget.style.transform = "translateY(0) scale(1)";
-                              e.currentTarget.style.boxShadow = boxShadow;
+                              e.currentTarget.style.transform =
+                                "translateY(0) scale(1)";
+                              e.currentTarget.style.boxShadow =
+                                boxShadow;
                             }
-                          }}>
-                          
-                          {/* Shine Effect */}
+                          }}
+                        >
                           {!locked && (
-                            <div style={{
-                              position: "absolute",
-                              top: 0,
-                              left: "-100%",
-                              width: "50%",
-                              height: "100%",
-                              background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)",
-                              animation: "shine 3s infinite",
-                              pointerEvents: "none",
-                            }} />
+                            <div
+                              style={{
+                                position: "absolute",
+                                top: 0,
+                                left: "-100%",
+                                width: "50%",
+                                height: "100%",
+                                background:
+                                  "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)",
+                                animation:
+                                  "shine 3s infinite",
+                                pointerEvents: "none",
+                              }}
+                            />
                           )}
 
-                          <div style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                            position: "relative",
-                            zIndex: 2,
-                          }}>
-                            {/* Option Letter */}
-                            <div style={{
-                              width: "clamp(36px, 7vw, 44px)",
-                              height: "clamp(36px, 7vw, 44px)",
-                              borderRadius: "12px",
-                              border: `2px solid ${borderColor}`,
+                          <div
+                            style={{
                               display: "flex",
                               alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: "clamp(16px, 3vw, 20px)",
-                              fontWeight: 900,
-                              background: "rgba(15,23,42,0.9)",
-                              boxShadow: "inset 0 2px 8px rgba(0,0,0,0.3)",
-                              color: isCorrectOpt && locked
-                                ? "#22c55e"
-                                : isSelected && locked && !isCorrectOpt
-                                ? "#ef4444"
-                                : "#a78bfa",
-                              flexShrink: 0,
-                            }}>
+                              gap: "12px",
+                              position: "relative",
+                              zIndex: 2,
+                            }}
+                          >
+                            <div
+                              style={{
+                                width:
+                                  "clamp(36px, 7vw, 44px)",
+                                height:
+                                  "clamp(36px, 7vw, 44px)",
+                                borderRadius: "12px",
+                                border: `2px solid ${borderColor}`,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent:
+                                  "center",
+                                fontSize:
+                                  "clamp(16px, 3vw, 20px)",
+                                fontWeight: 900,
+                                background:
+                                  "rgba(15,23,42,0.9)",
+                                boxShadow:
+                                  "inset 0 2px 8px rgba(0,0,0,0.3)",
+                                color:
+                                  isCorrectOpt &&
+                                  locked
+                                    ? "#22c55e"
+                                    : isSelected &&
+                                      locked &&
+                                      !isCorrectOpt
+                                    ? "#ef4444"
+                                    : "#a78bfa",
+                                flexShrink: 0,
+                              }}
+                            >
                               {opt.id}
                             </div>
-                            
-                            {/* Option Text */}
-                            <div style={{
-                              fontSize: "clamp(14px, 3vw, 16px)",
-                              fontWeight: 600,
-                              color: "#f8fafc",
-                              lineHeight: 1.4,
-                            }}>
+
+                            <div
+                              style={{
+                                fontSize:
+                                  "clamp(14px, 3vw, 16px)",
+                                fontWeight: 600,
+                                color: "#f8fafc",
+                                lineHeight: 1.4,
+                              }}
+                            >
                               {opt.text}
                             </div>
                           </div>
@@ -1674,288 +1993,371 @@ export default function QuizGamePage() {
                   </div>
                 </article>
               ) : (
-                /* EXPLANATION SCREEN */
-                <article className="animate-slide-up" style={{
-                  padding: "clamp(24px, 5vw, 32px) clamp(20px, 4vw, 28px)",
-                  borderRadius: "clamp(24px, 5vw, 32px)",
-                  border: "2px solid rgba(56,189,248,0.5)",
-                  background: "linear-gradient(135deg, rgba(8,47,73,0.95), rgba(6,8,20,0.95))",
-                  boxShadow: "0 20px 60px rgba(0,0,0,0.4), 0 0 40px rgba(56,189,248,0.3)",
-                  backdropFilter: "blur(20px)",
-                  marginBottom: "24px",
-                }}>
-                  
-                  {/* Result Header */}
-                  <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    marginBottom: "16px",
-                    flexWrap: "wrap",
-                  }}>
+                <article
+                  className="animate-slide-up"
+                  style={{
+                    padding:
+                      "clamp(24px, 5vw, 32px) clamp(20px, 4vw, 28px)",
+                    borderRadius:
+                      "clamp(24px, 5vw, 32px)",
+                    border: "2px solid rgba(56,189,248,0.5)",
+                    background:
+                      "linear-gradient(135deg, rgba(8,47,73,0.95), rgba(6,8,20,0.95))",
+                    boxShadow:
+                      "0 20px 60px rgba(0,0,0,0.4), 0 0 40px rgba(56,189,248,0.3)",
+                    backdropFilter: "blur(20px)",
+                    marginBottom: "24px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      marginBottom: "16px",
+                      flexWrap: "wrap",
+                    }}
+                  >
                     {isCorrect ? (
                       <>
-                        <CheckCircle style={{
-                          width: "32px",
-                          height: "32px",
-                          color: "#22c55e",
-                          filter: "drop-shadow(0 0 10px #22c55e)",
-                        }} />
-                        <span style={{
-                          fontSize: "clamp(20px, 4vw, 26px)",
-                          fontWeight: 900,
-                          color: "#22c55e",
-                          textShadow: "0 0 10px rgba(34,197,94,0.5)",
-                        }}>
+                        <CheckCircle
+                          style={{
+                            width: "32px",
+                            height: "32px",
+                            color: "#22c55e",
+                            filter:
+                              "drop-shadow(0 0 10px #22c55e)",
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontSize:
+                              "clamp(20px, 4vw, 26px)",
+                            fontWeight: 900,
+                            color: "#22c55e",
+                            textShadow:
+                              "0 0 10px rgba(34,197,94,0.5)",
+                          }}
+                        >
                           Correct Answer!
                         </span>
                       </>
                     ) : (
                       <>
-                        <XCircle style={{
-                          width: "32px",
-                          height: "32px",
-                          color: "#ef4444",
-                          filter: "drop-shadow(0 0 10px #ef4444)",
-                        }} />
-                        <span style={{
-                          fontSize: "clamp(20px, 4vw, 26px)",
-                          fontWeight: 900,
-                          color: "#ef4444",
-                          textShadow: "0 0 10px rgba(239,68,68,0.5)",
-                        }}>
+                        <XCircle
+                          style={{
+                            width: "32px",
+                            height: "32px",
+                            color: "#ef4444",
+                            filter:
+                              "drop-shadow(0 0 10px #ef4444)",
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontSize:
+                              "clamp(20px, 4vw, 26px)",
+                            fontWeight: 900,
+                            color: "#ef4444",
+                            textShadow:
+                              "0 0 10px rgba(239,68,68,0.5)",
+                          }}
+                        >
                           Incorrect
                         </span>
                       </>
                     )}
                   </div>
 
-                  {/* Correct Answer Info */}
-                  <div style={{
-                    padding: "14px 18px",
-                    borderRadius: "16px",
-                    background: "rgba(22,163,74,0.15)",
-                    border: "2px solid rgba(34,197,94,0.4)",
-                    marginBottom: "16px",
-                  }}>
-                    <span style={{
-                      fontSize: "clamp(13px, 2.8vw, 15px)",
-                      color: "#86efac",
-                      fontWeight: 700,
-                    }}>
+                  <div
+                    style={{
+                      padding: "14px 18px",
+                      borderRadius: "16px",
+                      background: "rgba(22,163,74,0.15)",
+                      border:
+                        "2px solid rgba(34,197,94,0.4)",
+                      marginBottom: "16px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize:
+                          "clamp(13px, 2.8vw, 15px)",
+                        color: "#86efac",
+                        fontWeight: 700,
+                      }}
+                    >
                       Correct Answer:{" "}
-                      <span style={{
-                        color: "#22c55e",
-                        fontWeight: 900,
-                        fontSize: "clamp(15px, 3.2vw, 18px)",
-                      }}>
+                      <span
+                        style={{
+                          color: "#22c55e",
+                          fontWeight: 900,
+                          fontSize:
+                            "clamp(15px, 3.2vw, 18px)",
+                        }}
+                      >
                         {currentQ.correctAnswer}
                       </span>
                     </span>
                   </div>
 
-                  {/* Explanation */}
-                  <p style={{
-                    fontSize: "clamp(14px, 3vw, 16px)",
-                    color: "#e0f2fe",
-                    lineHeight: 1.7,
-                    marginBottom: "20px",
-                    fontWeight: 500,
-                  }}>
+                  <p
+                    style={{
+                      fontSize: "clamp(14px, 3vw, 16px)",
+                      color: "#e0f2fe",
+                      lineHeight: 1.7,
+                      marginBottom: "20px",
+                      fontWeight: 500,
+                    }}
+                  >
                     {currentQ.explanation}
                   </p>
 
-                  {/* Next Question Timer */}
-                  <div style={{
-                    padding: "14px 20px",
-                    borderRadius: "16px",
-                    background: "rgba(15,23,42,0.9)",
-                    border: "1px solid rgba(56,189,248,0.3)",
-                    textAlign: "center",
-                  }}>
-                    <p style={{
-                      fontSize: "clamp(12px, 2.5vw, 14px)",
-                      color: "#94a3b8",
-                      fontWeight: 600,
-                    }}>
+                  <div
+                    style={{
+                      padding: "14px 20px",
+                      borderRadius: "16px",
+                      background: "rgba(15,23,42,0.9)",
+                      border:
+                        "1px solid rgba(56,189,248,0.3)",
+                      textAlign: "center",
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontSize:
+                          "clamp(12px, 2.5vw, 14px)",
+                        color: "#94a3b8",
+                        fontWeight: 600,
+                      }}
+                    >
                       Next question in{" "}
-                      <span style={{
-                        color: "#22d3ee",
-                        fontWeight: 900,
-                        fontSize: "clamp(14px, 3vw, 18px)",
-                        textShadow: "0 0 10px rgba(34,211,238,0.5)",
-                      }}>
-                        {explanationTimer}
-                      </span>
-                      {" "}seconds...
+                      <span
+                        style={{
+                          color: "#22d3ee",
+                          fontWeight: 900,
+                          fontSize:
+                            "clamp(14px, 3vw, 18px)",
+                          textShadow:
+                            "0 0 10px rgba(34,211,238,0.5)",
+                        }}
+                      >
+                        {phase === "INTERMISSION"
+                          ? "..."
+                          : "5"}
+                      </span>{" "}
+                      seconds...
                     </p>
                   </div>
                 </article>
               )}
 
-              {/* Progress Dots */}
-              <div style={{
-                display: "flex",
-                justifyContent: "center",
-                flexWrap: "wrap",
-                gap: "clamp(4px, 1vw, 6px)",
-                padding: "0 16px",
-              }}>
-                {Array.from({ length: TOTAL_QUESTIONS }).map((_, i) => {
-                  const st = answers[i];
-                  let bg = "rgba(75,85,99,0.4)";
-                  let shadow = "none";
-                  
-                  if (i === currentIndex) {
-                    bg = "#a78bfa";
-                    shadow = "0 0 10px rgba(167,139,250,0.8)";
-                  } else if (st === "correct") {
-                    bg = "#22c55e";
-                    shadow = "0 0 8px rgba(34,197,94,0.6)";
-                  } else if (st === "wrong") {
-                    bg = "#ef4444";
-                    shadow = "0 0 8px rgba(239,68,68,0.6)";
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  flexWrap: "wrap",
+                  gap: "clamp(4px, 1vw, 6px)",
+                  padding: "0 16px",
+                }}
+              >
+                {Array.from({ length: totalQuestions }).map(
+                  (_, i) => {
+                    const st = answers[i];
+                    let bg =
+                      "rgba(75,85,99,0.4)";
+                    let shadow = "none";
+
+                    if (i === currentIndex) {
+                      bg = "#a78bfa";
+                      shadow =
+                        "0 0 10px rgba(167,139,250,0.8)";
+                    } else if (st === "correct") {
+                      bg = "#22c55e";
+                      shadow =
+                        "0 0 8px rgba(34,197,94,0.6)";
+                    } else if (st === "wrong") {
+                      bg = "#ef4444";
+                      shadow =
+                        "0 0 8px rgba(239,68,68,0.6)";
+                    }
+
+                    return (
+                      <div
+                        key={i}
+                        style={{
+                          width:
+                            "clamp(6px, 1.5vw, 8px)",
+                          height:
+                            "clamp(6px, 1.5vw, 8px)",
+                          borderRadius: "50%",
+                          background: bg,
+                          boxShadow: shadow,
+                          transition: "all 0.3s ease",
+                          transform:
+                            i === currentIndex
+                              ? "scale(1.3)"
+                              : "scale(1)",
+                        }}
+                      />
+                    );
                   }
-                  
-                  return (
-                    <div
-                      key={i}
-                      style={{
-                        width: "clamp(6px, 1.5vw, 8px)",
-                        height: "clamp(6px, 1.5vw, 8px)",
-                        borderRadius: "50%",
-                        background: bg,
-                        boxShadow: shadow,
-                        transition: "all 0.3s ease",
-                        transform: i === currentIndex ? "scale(1.3)" : "scale(1)",
-                      }}
-                    />
-                  );
-                })}
+                )}
               </div>
             </>
           )}
 
-          {/* EXIT CONFIRMATION MODAL */}
           {showExitConfirm && (
-            <div style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(0,0,0,0.85)",
-              backdropFilter: "blur(8px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 50,
-              padding: "20px",
-            }}>
-              <div className="animate-slide-up" style={{
-                width: "min(400px, 90vw)",
-                padding: "32px 28px",
-                borderRadius: "24px",
-                background: "linear-gradient(135deg, rgba(30,27,75,0.98), rgba(15,23,42,0.98))",
-                border: "2px solid rgba(139,92,246,0.5)",
-                boxShadow: "0 20px 60px rgba(0,0,0,0.8), 0 0 40px rgba(139,92,246,0.4)",
-                textAlign: "center",
-                backdropFilter: "blur(20px)",
-              }}>
-                
-                {/* Warning Icon */}
-                <div style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: "64px",
-                  height: "64px",
-                  borderRadius: "50%",
-                  background: "linear-gradient(135deg, rgba(239,68,68,0.2), rgba(220,38,38,0.1))",
-                  border: "2px solid rgba(239,68,68,0.5)",
-                  marginBottom: "20px",
-                }}>
-                  <Zap style={{
-                    width: "32px",
-                    height: "32px",
-                    color: "#ef4444",
-                    filter: "drop-shadow(0 0 10px #ef4444)",
-                  }} />
+            <div
+              style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(0,0,0,0.85)",
+                backdropFilter: "blur(8px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 50,
+                padding: "20px",
+              }}
+            >
+              <div
+                className="animate-slide-up"
+                style={{
+                  width: "min(400px, 90vw)",
+                  padding: "32px 28px",
+                  borderRadius: "24px",
+                  background:
+                    "linear-gradient(135deg, rgba(30,27,75,0.98), rgba(15,23,42,0.98))",
+                  border: "2px solid rgba(139,92,246,0.5)",
+                  boxShadow:
+                    "0 20px 60px rgba(0,0,0,0.8), 0 0 40px rgba(139,92,246,0.4)",
+                  textAlign: "center",
+                  backdropFilter: "blur(20px)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "64px",
+                    height: "64px",
+                    borderRadius: "50%",
+                    background:
+                      "linear-gradient(135deg, rgba(239,68,68,0.2), rgba(220,38,38,0.1))",
+                    border:
+                      "2px solid rgba(239,68,68,0.5)",
+                    marginBottom: "20px",
+                  }}
+                >
+                  <Zap
+                    style={{
+                      width: "32px",
+                      height: "32px",
+                      color: "#ef4444",
+                      filter:
+                        "drop-shadow(0 0 10px #ef4444)",
+                    }}
+                  />
                 </div>
 
-                {/* Title */}
-                <h3 style={{
-                  fontSize: "clamp(18px, 4vw, 22px)",
-                  fontWeight: 900,
-                  color: "#f8fafc",
-                  marginBottom: "12px",
-                }}>
+                <h3
+                  style={{
+                    fontSize: "clamp(18px, 4vw, 22px)",
+                    fontWeight: 900,
+                    color: "#f8fafc",
+                    marginBottom: "12px",
+                  }}
+                >
                   Exit Quiz?
                 </h3>
 
-                {/* Description */}
-                <p style={{
-                  fontSize: "clamp(13px, 2.8vw, 15px)",
-                  color: "#94a3b8",
-                  marginBottom: "28px",
-                  lineHeight: 1.6,
-                }}>
-                  Your current progress will be saved and you'll see your final score.
+                <p
+                  style={{
+                    fontSize: "clamp(13px, 2.8vw, 15px)",
+                    color: "#94a3b8",
+                    marginBottom: "28px",
+                    lineHeight: 1.6,
+                  }}
+                >
+                  Your current progress will be saved and
+                  you'll see your final score.
                 </p>
 
-                {/* Buttons */}
-                <div style={{
-                  display: "flex",
-                  gap: "12px",
-                }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "12px",
+                  }}
+                >
                   <button
                     onClick={handleExitConfirmNo}
                     style={{
                       flex: 1,
                       padding: "14px 20px",
                       borderRadius: "999px",
-                      border: "2px solid rgba(139,92,246,0.6)",
-                      background: "linear-gradient(135deg, rgba(124,58,237,0.3), rgba(79,70,229,0.2))",
+                      border:
+                        "2px solid rgba(139,92,246,0.6)",
+                      background:
+                        "linear-gradient(135deg, rgba(124,58,237,0.3), rgba(79,70,229,0.2))",
                       color: "#f8fafc",
                       fontWeight: 800,
-                      fontSize: "clamp(13px, 2.8vw, 15px)",
+                      fontSize:
+                        "clamp(13px, 2.8vw, 15px)",
                       cursor: "pointer",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
                       transition: "all 0.3s ease",
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.boxShadow = "0 0 25px rgba(139,92,246,0.6)";
+                      e.currentTarget.style.transform =
+                        "translateY(-2px)";
+                      e.currentTarget.style.boxShadow =
+                        "0 0 25px rgba(139,92,246,0.6)";
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = "none";
-                    }}>
+                      e.currentTarget.style.transform =
+                        "translateY(0)";
+                      e.currentTarget.style.boxShadow =
+                        "none";
+                    }}
+                  >
                     Continue Quiz
                   </button>
-                  
+
                   <button
                     onClick={handleExitConfirmYes}
                     style={{
                       flex: 1,
                       padding: "14px 20px",
                       borderRadius: "999px",
-                      border: "2px solid rgba(239,68,68,0.6)",
-                      background: "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))",
+                      border:
+                        "2px solid rgba(239,68,68,0.6)",
+                      background:
+                        "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))",
                       color: "#f8fafc",
                       fontWeight: 800,
-                      fontSize: "clamp(13px, 2.8vw, 15px)",
+                      fontSize:
+                        "clamp(13px, 2.8vw, 15px)",
                       cursor: "pointer",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
                       transition: "all 0.3s ease",
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.boxShadow = "0 0 25px rgba(239,68,68,0.6)";
+                      e.currentTarget.style.transform =
+                        "translateY(-2px)";
+                      e.currentTarget.style.boxShadow =
+                        "0 0 25px rgba(239,68,68,0.6)";
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = "none";
-                    }}>
+                      e.currentTarget.style.transform =
+                        "translateY(0)";
+                      e.currentTarget.style.boxShadow =
+                        "none";
+                    }}
+                  >
                     Yes, Exit
                   </button>
                 </div>

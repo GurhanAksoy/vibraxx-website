@@ -43,6 +43,7 @@ export default function LobbyPage() {
 
   // Core State
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [globalTimeLeft, setGlobalTimeLeft] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showWarning, setShowWarning] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -144,6 +145,19 @@ export default function LobbyPage() {
 
     checkAuth();
   }, [router]);
+
+  // === LOAD GLOBAL ROUND STATE ===
+  const loadGlobalRoundState = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("overlay_round_state")
+      .select("*")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .single();
+    if (!error && data) {
+      setGlobalTimeLeft(data.time_left);
+    }
+  }, []);
 
   // === FETCH NEXT ROUND & COUNTDOWN ===
   const fetchNextRound = useCallback(async () => {
@@ -330,10 +344,10 @@ export default function LobbyPage() {
 
     const loadLobbyData = async () => {
       await Promise.all([
-        fetchNextRound(),
         fetchLobbyPlayers(),
         fetchTotalPlayers(),
         markUserInLobby(),
+        loadGlobalRoundState(),  // 🔥 EKLENDİ
       ]);
     };
 
@@ -346,37 +360,49 @@ export default function LobbyPage() {
       clearInterval(playersInterval);
       clearInterval(totalPlayersInterval);
     };
-  }, [user, isLoading, fetchNextRound, fetchLobbyPlayers, fetchTotalPlayers, markUserInLobby]);
+  }, [user, isLoading, fetchLobbyPlayers, fetchTotalPlayers, markUserInLobby, loadGlobalRoundState]);
 
-  // === COUNTDOWN TIMER ===
+  // === REALTIME LISTENER FOR OVERLAY STATE ===
   useEffect(() => {
-    if (timeLeft === null || timeLeft <= 0 || isRedirecting) return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev === null) return null;
-        if (prev <= 1) {
-          return 0;
+    const channel = supabase
+      .channel("lobby-overlay")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "overlay_round_state" },
+        (payload) => {
+          const newData = payload.new;
+          setGlobalTimeLeft(newData.time_left);
         }
-        return prev - 1;
-      });
-    }, 1000);
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
-    return () => clearInterval(timer);
-  }, [timeLeft, isRedirecting]);
+  // === GLOBAL COUNTDOWN TIMER ===
+  useEffect(() => {
+    if (globalTimeLeft === null || isRedirecting) return;
+    const countdownInterval = setInterval(() => {
+      setGlobalTimeLeft((prev) =>
+        prev !== null && prev > 0 ? prev - 1 : prev
+      );
+    }, 1000);
+    return () => clearInterval(countdownInterval);
+  }, [globalTimeLeft, isRedirecting]);
 
   // === AUTO START WHEN COUNTDOWN ENDS ===
   useEffect(() => {
-    if (timeLeft === 0 && !isRedirecting) {
+    if (globalTimeLeft === 0 && !isRedirecting) {
       handleStartGame();
     }
-  }, [timeLeft, isRedirecting]);
+  }, [globalTimeLeft, isRedirecting]);
 
   // === WARNING & SOUND EFFECTS ===
   useEffect(() => {
-    if (timeLeft === null) return;
+    if (globalTimeLeft === null) return;
 
-    if (timeLeft === 10) {
+    if (globalTimeLeft === 10) {
       setShowWarning(true);
       if (isPlaying && alarmRef.current) {
         alarmRef.current.currentTime = 0;
@@ -384,17 +410,17 @@ export default function LobbyPage() {
       }
     }
 
-    if (timeLeft <= 10 && timeLeft > 0) {
+    if (globalTimeLeft <= 10 && globalTimeLeft > 0) {
       if (isPlaying && countdownBeepRef.current) {
         countdownBeepRef.current.currentTime = 0;
         countdownBeepRef.current.play().catch(() => {});
       }
     }
 
-    if (timeLeft > 10) {
+    if (globalTimeLeft > 10) {
       setShowWarning(false);
     }
-  }, [timeLeft, isPlaying]);
+  }, [globalTimeLeft, isPlaying]);
 
   // === START GAME HANDLER ===
   const handleStartGame = async () => {
@@ -461,20 +487,20 @@ export default function LobbyPage() {
   };
 
   // === PROGRESS CALCULATION ===
-  const progress = timeLeft !== null ? ((900 - timeLeft) / 900) * 100 : 0;
+  const progress = globalTimeLeft !== null ? ((900 - globalTimeLeft) / 900) * 100 : 0;
 
   // === WARNING HELPERS ===
   const getWarningColor = () => {
-    if (timeLeft === null) return "#a78bfa";
-    if (timeLeft <= 10) return "#ef4444"; // RED for last 10 seconds
+    if (globalTimeLeft === null) return "#a78bfa";
+    if (globalTimeLeft <= 10) return "#ef4444"; // RED for last 10 seconds
     return "#a78bfa";
   };
 
   const getWarningMessage = () => {
-    if (timeLeft === null) return "LOADING...";
-    if (timeLeft <= 3) return "🚀 QUIZ STARTING NOW!";
-    if (timeLeft <= 5) return "⚡ GET READY!";
-    if (timeLeft <= 10) return "⏰ FINAL COUNTDOWN!";
+    if (globalTimeLeft === null) return "LOADING...";
+    if (globalTimeLeft <= 3) return "🚀 QUIZ STARTING NOW!";
+    if (globalTimeLeft <= 5) return "⚡ GET READY!";
+    if (globalTimeLeft <= 10) return "⏰ FINAL COUNTDOWN!";
     return "Quiz Starting Soon";
   };
 
@@ -703,7 +729,7 @@ export default function LobbyPage() {
         />
 
         {/* RED WARNING Overlay - Last 10 Seconds */}
-        {showWarning && timeLeft !== null && timeLeft <= 10 && (
+        {showWarning && globalTimeLeft !== null && globalTimeLeft <= 10 && (
           <div
             style={{
               position: "fixed",
@@ -1083,14 +1109,14 @@ export default function LobbyPage() {
               style={{
                 padding: "clamp(32px, 6vw, 56px)",
                 borderRadius: "28px",
-                border: timeLeft !== null && timeLeft <= 10 ? "3px solid #ef4444" : "3px solid rgba(139, 92, 246, 0.6)",
-                background: timeLeft !== null && timeLeft <= 10 
+                border: globalTimeLeft !== null && globalTimeLeft <= 10 ? "3px solid #ef4444" : "3px solid rgba(139, 92, 246, 0.6)",
+                background: globalTimeLeft !== null && globalTimeLeft <= 10 
                   ? "linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.1))"
                   : "rgba(15, 23, 42, 0.85)",
                 backdropFilter: "blur(25px)",
                 textAlign: "center",
-                animation: showWarning && timeLeft !== null && timeLeft <= 10 ? "redAlarm 0.8s ease-in-out infinite, shake 0.5s ease-in-out infinite" : "none",
-                boxShadow: timeLeft !== null && timeLeft <= 10
+                animation: showWarning && globalTimeLeft !== null && globalTimeLeft <= 10 ? "redAlarm 0.8s ease-in-out infinite, shake 0.5s ease-in-out infinite" : "none",
+                boxShadow: globalTimeLeft !== null && globalTimeLeft <= 10
                   ? "0 0 60px rgba(239, 68, 68, 0.6)"
                   : "0 0 40px rgba(139, 92, 246, 0.4)",
               }}>
@@ -1103,18 +1129,18 @@ export default function LobbyPage() {
                   gap: "10px",
                   padding: "10px 24px",
                   borderRadius: "999px",
-                  background: timeLeft !== null && timeLeft <= 10
+                  background: globalTimeLeft !== null && globalTimeLeft <= 10
                     ? "rgba(239, 68, 68, 0.25)"
                     : "rgba(34, 197, 94, 0.25)",
-                  border: timeLeft !== null && timeLeft <= 10
+                  border: globalTimeLeft !== null && globalTimeLeft <= 10
                     ? "2px solid rgba(239, 68, 68, 0.6)"
                     : "2px solid rgba(34, 197, 94, 0.5)",
                   marginBottom: "clamp(20px, 4vw, 32px)",
-                  boxShadow: timeLeft !== null && timeLeft <= 10
+                  boxShadow: globalTimeLeft !== null && globalTimeLeft <= 10
                     ? "0 0 25px rgba(239, 68, 68, 0.5)"
                     : "0 0 20px rgba(34, 197, 94, 0.4)",
                 }}>
-                {timeLeft !== null && timeLeft <= 10 ? (
+                {globalTimeLeft !== null && globalTimeLeft <= 10 ? (
                   <Zap style={{ width: 20, height: 20, color: "#ef4444" }} />
                 ) : (
                   <Shield style={{ width: 20, height: 20, color: "#4ade80" }} />
@@ -1123,16 +1149,16 @@ export default function LobbyPage() {
                   style={{
                     fontSize: "clamp(12px, 2.8vw, 14px)",
                     fontWeight: 800,
-                    color: timeLeft !== null && timeLeft <= 10 ? "#fca5a5" : "#4ade80",
+                    color: globalTimeLeft !== null && globalTimeLeft <= 10 ? "#fca5a5" : "#4ade80",
                     textTransform: "uppercase",
                     letterSpacing: "0.06em",
                   }}>
-                  {timeLeft !== null && timeLeft <= 10 ? "🚨 STARTING NOW!" : "✓ You're in the Lobby"}
+                  {globalTimeLeft !== null && globalTimeLeft <= 10 ? "🚨 STARTING NOW!" : "✓ You're in the Lobby"}
                 </span>
               </div>
 
               {/* Warning Message */}
-              {showWarning && timeLeft !== null && timeLeft <= 10 && (
+              {showWarning && globalTimeLeft !== null && globalTimeLeft <= 10 && (
                 <div
                   style={{
                     padding: "20px 28px",
@@ -1169,13 +1195,13 @@ export default function LobbyPage() {
                   justifyContent: "center",
                   gap: "14px",
                   flexWrap: "wrap",
-                  color: timeLeft !== null && timeLeft <= 10 ? "#fca5a5" : "white",
+                  color: globalTimeLeft !== null && globalTimeLeft <= 10 ? "#fca5a5" : "white",
                 }}>
                 <Clock 
                   style={{ 
                     width: "clamp(28px, 7vw, 36px)", 
                     height: "clamp(28px, 7vw, 36px)", 
-                    color: timeLeft !== null && timeLeft <= 10 ? "#ef4444" : "#a78bfa",
+                    color: globalTimeLeft !== null && globalTimeLeft <= 10 ? "#ef4444" : "#a78bfa",
                   }} 
                 />
                 Quiz Starting In
@@ -1186,7 +1212,7 @@ export default function LobbyPage() {
                 style={{
                   fontSize: "clamp(56px, 18vw, 120px)",
                   fontWeight: 900,
-                  backgroundImage: timeLeft !== null && timeLeft <= 10
+                  backgroundImage: globalTimeLeft !== null && globalTimeLeft <= 10
                     ? "linear-gradient(135deg, #ef4444, #dc2626)"
                     : "linear-gradient(135deg, #a78bfa, #f0abfc)",
                   WebkitBackgroundClip: "text",
@@ -1194,13 +1220,13 @@ export default function LobbyPage() {
                   backgroundClip: "text",
                   marginBottom: "clamp(24px, 5vw, 40px)",
                   fontFamily: "monospace",
-                  textShadow: timeLeft !== null && timeLeft <= 10
+                  textShadow: globalTimeLeft !== null && globalTimeLeft <= 10
                     ? "0 0 50px rgba(239, 68, 68, 0.8)"
                     : "0 0 50px rgba(167, 139, 250, 0.6)",
-                  animation: timeLeft !== null && timeLeft <= 10 ? "warningPulse 0.4s ease-in-out infinite" : "none",
+                  animation: globalTimeLeft !== null && globalTimeLeft <= 10 ? "warningPulse 0.4s ease-in-out infinite" : "none",
                   letterSpacing: "0.05em",
                 }}>
-                {formatTime(timeLeft)}
+                {formatTime(globalTimeLeft)}
               </div>
 
               {/* Progress Bar */}
@@ -1212,10 +1238,10 @@ export default function LobbyPage() {
                   background: "rgba(30, 41, 59, 0.9)",
                   overflow: "hidden",
                   marginBottom: "clamp(24px, 5vw, 40px)",
-                  border: timeLeft !== null && timeLeft <= 10
+                  border: globalTimeLeft !== null && globalTimeLeft <= 10
                     ? "2px solid rgba(239, 68, 68, 0.5)"
                     : "2px solid rgba(139, 92, 246, 0.4)",
-                  boxShadow: timeLeft !== null && timeLeft <= 10
+                  boxShadow: globalTimeLeft !== null && globalTimeLeft <= 10
                     ? "0 0 20px rgba(239, 68, 68, 0.5), inset 0 0 10px rgba(239, 68, 68, 0.3)"
                     : "0 0 15px rgba(139, 92, 246, 0.4)",
                 }}>
@@ -1223,12 +1249,12 @@ export default function LobbyPage() {
                   style={{
                     width: `${progress}%`,
                     height: "100%",
-                    background: timeLeft !== null && timeLeft <= 10
+                    background: globalTimeLeft !== null && globalTimeLeft <= 10
                       ? "linear-gradient(90deg, #ef4444, #dc2626)"
                       : "linear-gradient(90deg, #7c3aed, #d946ef)",
                     borderRadius: "999px",
                     transition: "width 1s linear",
-                    boxShadow: timeLeft !== null && timeLeft <= 10
+                    boxShadow: globalTimeLeft !== null && globalTimeLeft <= 10
                       ? "0 0 25px rgba(239, 68, 68, 1)"
                       : "0 0 25px rgba(139, 92, 246, 0.9)",
                   }}
@@ -1239,12 +1265,12 @@ export default function LobbyPage() {
               <p
                 style={{
                   fontSize: "clamp(14px, 3.2vw, 17px)",
-                  color: timeLeft !== null && timeLeft <= 10 ? "#fca5a5" : "#cbd5e1",
+                  color: globalTimeLeft !== null && globalTimeLeft <= 10 ? "#fca5a5" : "#cbd5e1",
                   marginBottom: "clamp(28px, 6vw, 40px)",
                   lineHeight: 1.7,
                   fontWeight: 600,
                 }}>
-                {timeLeft !== null && timeLeft <= 10 
+                {globalTimeLeft !== null && globalTimeLeft <= 10 
                   ? "🔥 Get ready! You'll be automatically entered when the countdown ends!"
                   : "You'll be automatically entered when the quiz begins. Get ready! 🚀"
                 }
