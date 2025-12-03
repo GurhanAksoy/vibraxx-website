@@ -260,7 +260,14 @@ export default function OverlayPage() {
           .limit(10);
 
         if (isMounted && leaderboardData) {
-          setLeaderboard(leaderboardData as OverlayLeaderboardRow[]);
+          setLeaderboard(leaderboardData.map((row: any) => ({
+            rank: row.rank ?? 0,
+            username: row.username ?? "",
+            country: row.country ?? "",
+            score: row.score ?? 0,
+            correct: row.correct ?? 0,
+            avgTime: row.avg_time ?? 0,
+          })));
         }
 
       } catch (err) {
@@ -414,7 +421,14 @@ export default function OverlayPage() {
               .limit(10);
             
             if (data) {
-              setLeaderboard(data as OverlayLeaderboardRow[]);
+              setLeaderboard(data.map((row: any) => ({
+              rank: row.rank ?? 0,
+              username: row.username ?? "",
+              country: row.country ?? "",
+              score: row.score ?? 0,
+              correct: row.correct ?? 0,
+              avgTime: row.avg_time ?? 0,
+            })));
             }
           }
         }
