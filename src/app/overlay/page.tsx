@@ -448,7 +448,7 @@ function getFlagFromCode(code: string) {
           if (row.round_id === currentRoundId) {
             // Optimized: patch state instead of full refetch
             setLeaderboard((prev) => {
-              const updated = prev.map((p) =>
+              let updated = prev.map((p) =>
                 p.rank === row.rank
                   ? {
                       rank: row.rank ?? 0,
@@ -461,16 +461,19 @@ function getFlagFromCode(code: string) {
                   : p
               );
               
-              // If new rank and not in list, add it
-              if (!updated.find((p) => p.rank === row.rank)) {
-                updated.push({
-                  rank: row.rank ?? 0,
-                  username: row.username ?? "",
-                  country: row.country ?? "",
-                  score: row.score ?? 0,
-                  correct: row.correct ?? 0,
-                  avgTime: row.avg_time ?? 0,
-                });
+              // If rank not in list, add it (immutable)
+              if (!updated.some((p) => p.rank === row.rank)) {
+                updated = [
+                  ...updated,
+                  {
+                    rank: row.rank ?? 0,
+                    username: row.username ?? "",
+                    country: row.country ?? "",
+                    score: row.score ?? 0,
+                    correct: row.correct ?? 0,
+                    avgTime: row.avg_time ?? 0,
+                  },
+                ];
               }
               
               // Sort and limit to top 10
@@ -499,7 +502,7 @@ function getFlagFromCode(code: string) {
     overlayStats?.avg_time != null ? overlayStats.avg_time : 3.2;
 
   const getCountryFlag = (code: string) => {
-    const country = MOCK_COUNTRIES.find((c) => c.code === code);
+    const country = countries.find((c) => c.code === code);
     return country?.flag || "🌍";
   };
 
@@ -1334,7 +1337,7 @@ function getFlagFromCode(code: string) {
               >
                 {leaderboard.map((player, idx) => (
                   <div
-                    key={player.rank}
+                    key={player.rank + player.username}
                     className={`animate-fade-in stagger-${Math.min(
                       idx + 1,
                       4
