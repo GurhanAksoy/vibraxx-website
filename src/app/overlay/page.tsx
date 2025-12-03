@@ -166,6 +166,7 @@ export default function OverlayPage() {
   const [phase, setPhase] = useState<Phase>("question");
   const [timeLeft, setTimeLeft] = useState<number>(6);
   const [questionStartAt, setQuestionStartAt] = useState<string | null>(null);
+  const [roundNumber, setRoundNumber] = useState<number | null>(null);
 
   // Ekranda görünen soru (mock yapısında tutuyoruz)
   const [question, setQuestion] = useState(MOCK_QUESTION);
@@ -180,8 +181,15 @@ export default function OverlayPage() {
 
   // Leaderboard
   const [leaderboard, setLeaderboard] = useState(MOCK_LEADERBOARD);
-
-  // --- SUPABASE'TEN İLK VERİYİ ÇEKME ---
+            
+// Helper: Convert country code to flag emoji
+function getFlagFromCode(code: string) {
+  return code
+    .toUpperCase()
+    .replace(/./g, char =>
+      String.fromCodePoint(char.charCodeAt(0) + 127397)
+    );
+}
 
   // --- FETCH ACTIVE ROUND & INITIAL DATA ---
   useEffect(() => {
@@ -199,17 +207,21 @@ export default function OverlayPage() {
           .single();
 
         const roundId = activeRound?.id ?? null;
+        const roundNumber = activeRound?.global_round_index ?? null;
         
         if (!isMounted || !roundId) return;
 
-        // Set phase from live_rounds
-        const currentPhase = activeRound.phase === "QUESTION" ? "question" : "countdown";
-        setPhase(currentPhase as Phase);
+        // Set phase from live_rounds (proper mapping)
+        if (activeRound.phase === "QUESTION") setPhase("question");
+        else if (activeRound.phase === "READY") setPhase("countdown");
         
         const currentIndex = activeRound.current_question_index || 0;
 
         // Store question start time for timer
         setQuestionStartAt(activeRound.question_started_at);
+
+        // Store round number for display
+        setRoundNumber(roundNumber);
 
         // 2️⃣ Fetch question from live_round_questions
         const { data: qData } = await supabase
@@ -246,8 +258,14 @@ export default function OverlayPage() {
         if (isMounted && statsData?.[0]) {
           setOverlayStats(statsData[0] as OverlayStatsRow);
           
-          if (statsData[0].countries) {
-            setCountries(statsData[0].countries);
+          // Convert countries with flag mapping
+          if (statsData[0].countries && Array.isArray(statsData[0].countries)) {
+            const mappedCountries = statsData[0].countries.map((c: any) => ({
+              code: c.code,
+              flag: getFlagFromCode(c.code),
+              count: c.count,
+            }));
+            setCountries(mappedCountries);
           }
         }
 
@@ -282,7 +300,7 @@ export default function OverlayPage() {
     };
   }, []);
 
-  // --- SERVER-SYNC TIMER (500ms polling) ---
+  // --- SERVER-SYNC TIMER (500ms polling with phase-aware duration) ---
   useEffect(() => {
     if (!questionStartAt) return;
     
@@ -290,12 +308,20 @@ export default function OverlayPage() {
       const start = new Date(questionStartAt).getTime();
       const now = Date.now();
       const elapsed = Math.floor((now - start) / 1000);
-      const remaining = Math.max(0, 6 - elapsed);
+      
+      // Phase-aware duration
+      const duration =
+        phase === "question" ? 6 :
+        phase === "reveal" ? 5 :
+        phase === "explanation" ? 5 :
+        6;
+      
+      const remaining = Math.max(0, duration - elapsed);
       setTimeLeft(remaining);
     }, 500);
     
     return () => clearInterval(interval);
-  }, [questionStartAt]);
+  }, [questionStartAt, phase]);
 
   // --- REALTIME SUBSCRIPTIONS ---
   useEffect(() => {
@@ -332,16 +358,15 @@ export default function OverlayPage() {
           // Update current round ID
           currentRoundId = row.id;
           
-          // Update phase
-          if (row.phase === "QUESTION") {
-            setPhase("question");
-          } else if (row.phase === "READY") {
-            setPhase("countdown");
-          } else if (row.phase === "INTERMISSION") {
-            setPhase("explanation");
-          } else if (row.phase === "FINISHED") {
-            setPhase("reveal");
-          }
+          // Update round number
+          setRoundNumber(row.global_round_index ?? null);
+          
+          // Proper phase mapping
+          if (row.phase === "QUESTION") setPhase("question");
+          else if (row.phase === "READY") setPhase("countdown");
+          else if (row.phase === "REVEAL") setPhase("reveal");
+          else if (row.phase === "EXPLANATION" || row.phase === "INTERMISSION") setPhase("explanation");
+          else if (row.phase === "FINISHED") setPhase("reveal");
 
           // Update question start time
           setQuestionStartAt(row.question_started_at);
@@ -390,15 +415,21 @@ export default function OverlayPage() {
           // Only update if same round
           if (row.round_id === currentRoundId) {
             setOverlayStats(row);
-            if (row.countries) {
-              setCountries(row.countries);
+            // Convert countries with flag mapping
+            if (row.countries && Array.isArray(row.countries)) {
+              const mappedCountries = row.countries.map((c: any) => ({
+                code: c.code,
+                flag: getFlagFromCode(c.code),
+                count: c.count,
+              }));
+              setCountries(mappedCountries);
             }
           }
         }
       )
       .subscribe();
 
-    // Subscribe to overlay_leaderboard
+    // Subscribe to overlay_leaderboard (optimized: patch state, not full refetch)
     const leaderboardChannel = supabase
       .channel("overlay-leaderboard")
       .on(
@@ -408,18 +439,52 @@ export default function OverlayPage() {
           schema: "public",
           table: "overlay_leaderboard",
         },
-        async (payload) => {
+        (payload) => {
           const row = payload.new as any;
           
-          // Only refetch if same round
+          // Only update if same round
           if (row.round_id === currentRoundId) {
-            const { data } = await supabase
-              .from("overlay_leaderboard")
-              .select("*")
-              .eq("round_id", row.round_id)
-              .order("rank", { ascending: true })
-              .limit(10);
-            
+            // Optimized: patch state instead of full refetch
+            setLeaderboard((prev) => {
+              const updated = prev.map((p) =>
+                p.rank === row.rank
+                  ? {
+                      rank: row.rank ?? 0,
+                      username: row.username ?? "",
+                      country: row.country ?? "",
+                      score: row.score ?? 0,
+                      correct: row.correct ?? 0,
+                      avgTime: row.avg_time ?? 0,
+                    }
+                  : p
+              );
+              
+              // If new rank and not in list, add it
+              if (!updated.find((p) => p.rank === row.rank)) {
+                updated.push({
+                  rank: row.rank ?? 0,
+                  username: row.username ?? "",
+                  country: row.country ?? "",
+                  score: row.score ?? 0,
+                  correct: row.correct ?? 0,
+                  avgTime: row.avg_time ?? 0,
+                });
+              }
+              
+              // Sort and limit to top 10
+              return updated.sort((a, b) => a.rank - b.rank).slice(0, 10);
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(roundsChannel);
+      supabase.removeChannel(statsChannel);
+      supabase.removeChannel(leaderboardChannel);
+    };
+  }, []);
             if (data) {
               setLeaderboard(data.map((row: any) => ({
               rank: row.rank ?? 0,
@@ -869,8 +934,7 @@ export default function OverlayPage() {
                   fontSize: "20px",
                 }}
               >
-                {/* Şimdilik sabit, cron bağlanınca buraya round index'i koyacağız */}
-                3/10
+                {roundNumber ? `${roundNumber}/10` : "LIVE"}
               </span>
             </div>
           </div>
