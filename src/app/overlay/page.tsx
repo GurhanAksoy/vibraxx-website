@@ -485,27 +485,6 @@ function getFlagFromCode(code: string) {
       supabase.removeChannel(leaderboardChannel);
     };
   }, []);
-            if (data) {
-              setLeaderboard(data.map((row: any) => ({
-              rank: row.rank ?? 0,
-              username: row.username ?? "",
-              country: row.country ?? "",
-              score: row.score ?? 0,
-              correct: row.correct ?? 0,
-              avgTime: row.avg_time ?? 0,
-            })));
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(roundsChannel);
-      supabase.removeChannel(statsChannel);
-      supabase.removeChannel(leaderboardChannel);
-    };
-  }, []);
   const totalPlayers =
     overlayStats?.total_players != null ? overlayStats.total_players : 688;
   const answering =
