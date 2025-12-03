@@ -1,52 +1,50 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+export const runtime = "nodejs";   // Edge DEĞİL
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+
+  // Kullanıcıyı doğrulamak için ANON KEY kullanılmalı
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { auth: { persistSession: false } }
   );
 
-  // 1) Kullanıcının kim olduğu (Token cookie üzerinden değil → service role ile RPC güvenli)
-  const {
-    data: { user },
-    error: userError
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user || userError) {
+  if (!user) {
     return NextResponse.json({
       canEnterLobby: false,
       reason: "NOT_AUTHENTICATED"
     });
   }
 
-  // 2) Round hakkı kontrolü
-  const { data: rounds, error: roundsError } = await supabase
+  // user_rounds tablosundan remaining çek (doğru kolon)
+  const { data: roundInfo, error } = await supabase
     .from("user_rounds")
-    .select("remaining_rounds")
+    .select("purchased, used, remaining")
     .eq("user_id", user.id)
     .single();
 
-  if (roundsError || !rounds) {
+  if (error || !roundInfo) {
     return NextResponse.json({
       canEnterLobby: false,
-      reason: "NO_ROUNDS_TABLE"
+      reason: "USER_ROUNDS_NOT_FOUND"
     });
   }
 
-  if (rounds.remaining_rounds <= 0) {
+  if (roundInfo.remaining <= 0) {
     return NextResponse.json({
       canEnterLobby: false,
       reason: "NO_ROUNDS_AVAILABLE"
     });
   }
 
-  // 3) Giriş serbest
   return NextResponse.json({
     canEnterLobby: true,
-    remaining_rounds: rounds.remaining_rounds
+    remaining_rounds: roundInfo.remaining
   });
 }

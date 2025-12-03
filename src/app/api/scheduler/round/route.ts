@@ -1,23 +1,31 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// 🔥 BU ÜÇ SATIR build hatasını %100 çözer
+/**
+ * 🔥 DERLENME SORUNLARINI %100 ÇÖZEN AYARLAR
+ * - dynamic = force-dynamic → Edge önbellekleme engellenir
+ * - revalidate = 0 → her çağrıda çalışır
+ * - runtime = "nodejs" → SERVICE_ROLE_KEY çalışır
+ */
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-export const runtime = "nodejs"; // edge DEĞİL !!!
+export const runtime = "nodejs";
 
-// 🔥 server-only Supabase client
+// 🔥 Server-side Supabase client (SERVICE ROLE → sadece backend)
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,         // URL
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,        // SERVICE KEY (sadece server)
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
   { auth: { persistSession: false } }
 );
 
-// 15 dakikalık block hesaplama (UTC)
+/** ───────────────────────────────────────────────
+ *  15 Dakikalık blok hesaplama (UTC)
+ *  Round numarası ve planlanan başlangıç saati
+ * ─────────────────────────────────────────────── */
 function getCurrentRoundBlock() {
   const now = new Date();
   const minute = now.getUTCMinutes();
-  const block = minute - (minute % 15); // 0, 15, 30, 45
+  const block = minute - (minute % 15); // 00 / 15 / 30 / 45
 
   const roundNumber = now.getUTCHours() * 4 + block / 15;
 
@@ -33,11 +41,16 @@ function getCurrentRoundBlock() {
   return { roundNumber, scheduledStart };
 }
 
+/** ───────────────────────────────────────────────
+ *  GET → round scheduler çalıştır
+ * ─────────────────────────────────────────────── */
 export async function GET() {
   const now = new Date();
   const { roundNumber, scheduledStart } = getCurrentRoundBlock();
 
-  // 1) Var olan round var mı?
+  /** ─────────────────────────────────────────
+   * 1) ACTIVE 15-min round var mı?
+   * ───────────────────────────────────────── */
   const { data: existingRounds, error: fetchError } = await supabase
     .from("live_rounds")
     .select("*")
@@ -50,9 +63,10 @@ export async function GET() {
 
   let round = existingRounds?.[0];
 
-  // 2) Eğer round yoksa oluştur
+  /** ─────────────────────────────────────────
+   * 2) Round yoksa → 50 soru seç ve round oluştur
+   * ───────────────────────────────────────── */
   if (!round) {
-    // aktif 50 soru seç
     const { data: questions } = await supabase
       .from("questions")
       .select("id")
@@ -60,7 +74,7 @@ export async function GET() {
       .limit(5000);
 
     const shuffled = questions
-      ?.map(q => q.id)
+      ?.map((q) => q.id)
       .sort(() => Math.random() - 0.5)
       .slice(0, 50);
 
@@ -69,8 +83,8 @@ export async function GET() {
       .insert({
         round_number: roundNumber,
         scheduled_start: scheduledStart.toISOString(),
-        status: "scheduled",
         phase: "READY",
+        status: "scheduled",
         current_question_index: 0,
         questions: shuffled
       })
@@ -83,17 +97,19 @@ export async function GET() {
 
     round = created;
 
-    // mapping tabloya 50 soruyu yaz
+    // mapping tabloya yaz (round_id + question_id + position)
     const bulkInsert = shuffled.map((id: number, index: number) => ({
       round_id: round.id,
       question_id: id,
-      position: index + 1
+      position: index + 1,
     }));
 
     await supabase.from("live_round_questions").insert(bulkInsert);
   }
 
-  // 3) Faz hesaplama
+  /** ─────────────────────────────────────────
+   * 3) Round faz hesaplama (READY → QUESTION → FINISHED)
+   * ───────────────────────────────────────── */
   const SECONDS_READY = 15;
   const QUESTION_TIME = 12;
   const TOTAL_QUESTIONS = 50;
@@ -124,7 +140,9 @@ export async function GET() {
     }
   }
 
-  // 4) live_rounds güncelle
+  /** ─────────────────────────────────────────
+   * 4) live_rounds güncelle
+   * ───────────────────────────────────────── */
   await supabase
     .from("live_rounds")
     .update({
@@ -134,7 +152,10 @@ export async function GET() {
     })
     .eq("id", round.id);
 
-  // 5) overlay_round_state güncelle
+  /** ─────────────────────────────────────────
+   * 5) overlay_round_state güncelle (KRİTİK SATIR)
+   *    ❗ round_id ile değil → id = 2 olan SATIR güncellenir
+   * ───────────────────────────────────────── */
   await supabase
     .from("overlay_round_state")
     .update({
@@ -144,11 +165,15 @@ export async function GET() {
       time_left,
       updated_at: now.toISOString()
     })
-    .eq("round_id", round.id);
+    .eq("id", 2);  // ✔ SENDEKİ TEK SATIR = 2
 
+  /** ─────────────────────────────────────────
+   * 6) Response
+   * ───────────────────────────────────────── */
   return NextResponse.json({
     ok: true,
     round_id: round.id,
+    round_number: roundNumber,
     phase,
     question_index,
     time_left
