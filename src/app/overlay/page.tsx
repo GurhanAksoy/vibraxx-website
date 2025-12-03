@@ -327,7 +327,7 @@ export default function OverlayPage() {
           table: "live_rounds",
         },
         async (payload) => {
-          const row = payload.new;
+          const row = payload.new as any;
           
           // Update current round ID
           currentRoundId = row.id;
@@ -409,7 +409,7 @@ export default function OverlayPage() {
           table: "overlay_leaderboard",
         },
         async (payload) => {
-          const row = payload.new;
+          const row = payload.new as any;
           
           // Only refetch if same round
           if (row.round_id === currentRoundId) {
