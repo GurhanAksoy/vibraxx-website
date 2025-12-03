@@ -129,19 +129,19 @@ export default function LobbyPage() {
 
       // Kullanıcının round hakkı kontrolü
       const { data: roundsData, error: roundsError } = await supabase
-        .from("user_rounds")
-        .select("available_rounds")
-        .eq("user_id", authUser.id)
-        .single();
+  .from("user_rounds")
+  .select("remaining")
+  .eq("user_id", authUser.id)
+  .single();
 
-      if (roundsError || !roundsData || roundsData.available_rounds <= 0) {
-        console.log("❌ Lobby Security: No available rounds");
-        router.push("/buy");
-        return;
-      }
+if (roundsError || !roundsData || roundsData.remaining <= 0) {
+  console.log("❌ Lobby Security: No remaining rounds");
+  router.push("/buy");
+  return;
+}
 
-      setUserRounds(roundsData.available_rounds);
-      console.log("✅ Lobby Security: Available rounds -", roundsData.available_rounds);
+setUserRounds(roundsData.remaining);
+console.log("✅ Lobby Security: User remaining rounds -", roundsData.remaining);
       console.log("✅ Lobby Security: All checks passed!");
       setIsLoading(false);
     };
