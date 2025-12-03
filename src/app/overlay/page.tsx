@@ -262,6 +262,7 @@ function getFlagFromCode(code: string) {
           if (statsData[0].countries && Array.isArray(statsData[0].countries)) {
             const mappedCountries = statsData[0].countries.map((c: any) => ({
               code: c.code,
+                name: c.name ?? c.code,
               flag: getFlagFromCode(c.code),
               count: c.count,
             }));
@@ -419,6 +420,7 @@ function getFlagFromCode(code: string) {
             if (row.countries && Array.isArray(row.countries)) {
               const mappedCountries = row.countries.map((c: any) => ({
                 code: c.code,
+                name: c.name ?? c.code,
                 flag: getFlagFromCode(c.code),
                 count: c.count,
               }));
