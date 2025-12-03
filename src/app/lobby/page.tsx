@@ -1352,7 +1352,7 @@ console.log("✅ Lobby Security: User remaining rounds -", roundsData.remaining)
               >
                 {globalTimeLeft !== null && globalTimeLeft <= 10
                   ? "🔥 Get ready! You'll be automatically entered when the countdown ends!"
-                  : "You'll be automatically entered when the quiz begins. Get ready! 🚀"}
+                  : "You'll be automatically entered when the quiz begins. Get ready! "}
               </p>
 
               {/* Quiz Info Grid (tasarım aynen) */}
@@ -1501,7 +1501,7 @@ console.log("✅ Lobby Security: User remaining rounds -", roundsData.remaining)
                   }}
                 >
                   💡 <strong style={{ color: "white" }}>Pro Tip:</strong>{" "}
-                  Answer quickly and accurately to maximize your score!
+                  In a tie, the fastest correct responder wins the monthly prize!
                 </div>
               </div>
             </div>
