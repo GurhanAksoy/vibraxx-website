@@ -366,28 +366,28 @@ export default function HomePage() {
 
   // Fetch user's available rounds
   const fetchUserRounds = useCallback(async () => {
-    if (!user) {
-      setUserRounds(0);
-      return;
-    }
+  if (!user) {
+    setUserRounds(0);
+    return;
+  }
 
-    try {
-      const { data, error } = await supabase
-  .from("user_rounds")
-  .select("remaining")
-  .eq("user_id", user.id)
-  .single();
+  try {
+    const { data, error } = await supabase
+      .from("user_stats")
+      .select("rounds")
+      .eq("user_id", user.id)
+      .single();
 
-if (!error && data) {
-  setUserRounds(data.remaining || 0);
-} else {
-  setUserRounds(0);
-}
-    } catch (err) {
-      console.error("User rounds fetch error:", err);
+    if (!error && data?.rounds) {
+      setUserRounds(data.rounds.remaining || 0);
+    } else {
       setUserRounds(0);
     }
-  }, [user]);
+  } catch (err) {
+    console.error("User rounds fetch error:", err);
+    setUserRounds(0);
+  }
+}, [user]);
 
   // Initial Load with smooth fade in
   useEffect(() => {
