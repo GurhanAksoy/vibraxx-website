@@ -373,16 +373,16 @@ export default function HomePage() {
 
     try {
       const { data, error } = await supabase
-        .from("user_rounds")
-        .select("available_rounds")
-        .eq("user_id", user.id)
-        .single();
+  .from("user_rounds")
+  .select("remaining")
+  .eq("user_id", user.id)
+  .single();
 
-      if (!error && data) {
-        setUserRounds(data.available_rounds || 0);
-      } else {
-        setUserRounds(0);
-      }
+if (!error && data) {
+  setUserRounds(data.remaining || 0);
+} else {
+  setUserRounds(0);
+}
     } catch (err) {
       console.error("User rounds fetch error:", err);
       setUserRounds(0);

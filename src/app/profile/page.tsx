@@ -171,15 +171,16 @@ export default function ProfilePage() {
 
         // Fetch user rounds
         const { data: roundsData } = await supabase
-          .from("user_rounds")
-          .select("available_rounds, total_purchased_rounds")
-          .eq("user_id", authUser.id)
-          .single();
+  .from("user_rounds")
+  .select("purchased, used, remaining")
+  .eq("user_id", authUser.id)
+  .single();
 
-        if (roundsData) {
-          setUserRounds(roundsData.available_rounds || 0);
-          setTotalPurchasedRounds(roundsData.total_purchased_rounds || 0);
-        }
+if (roundsData) {
+  setUserRounds(roundsData.remaining || 0);
+  setTotalPurchasedRounds(roundsData.purchased || 0);
+}
+
 
         // Fetch round_scores (all for aggregation)
         const { data: scoresData, error: scoresError } = await supabase
