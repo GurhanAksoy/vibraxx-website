@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-export const runtime = "nodejs"; // ⚠ Edge değil
+export const runtime = "nodejs"; // ⚠ Edge OLMAZ
 
 function getCurrentRoundBlock() {
   const now = new Date();
@@ -67,19 +67,23 @@ export async function GET() {
     const list = shuffled.map((id: number, index: number) => ({
       round_id: round.id,
       question_id: id,
-      position: index + 1
+      position: index + 1,
     }));
 
     await supabaseAdmin.from("live_round_questions").insert(list);
   }
 
-  // 3) Faz hesaplama
+  // 3) Faz hesaplama (NEGATİF DEĞER DÜZELTME)
   const SECONDS_READY = 15;
   const QUESTION_TIME = 12;
   const TOTAL_QUESTIONS = 50;
 
-  const secondsSinceStart =
-    (now.getTime() - new Date(round.scheduled_start).getTime()) / 1000;
+  let secondsSinceStart = Math.floor(
+    (now.getTime() - new Date(round.scheduled_start).getTime()) / 1000
+  );
+
+  // 🔥 NEGATİF OLURSA → 0 yapıyoruz. Build hatası buradan çıkıyordu!
+  if (secondsSinceStart < 0) secondsSinceStart = 0;
 
   let phase = "READY";
   let question_index = 0;
@@ -111,7 +115,7 @@ export async function GET() {
     })
     .eq("id", round.id);
 
-  // 5) overlay → id = 2 güncelle
+  // 5) overlay state (TEK SATIR id=2)
   await supabaseAdmin
     .from("overlay_round_state")
     .update({
