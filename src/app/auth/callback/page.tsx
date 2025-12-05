@@ -1,14 +1,14 @@
 ﻿"use client";
 
 export const dynamic = "force-dynamic";
-export const runtime = "edge";
+export const runtime = "nodejs";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { createOrUpdateProfile } from "@/lib/createProfile";
 
-export default function AuthCallbackPage() {
+function AuthCallbackInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -22,7 +22,6 @@ export default function AuthCallbackPage() {
         const errorDesc = searchParams.get("error_description");
 
         if (error) {
-          console.error("OAuth error:", error, errorDesc);
           setMessage("Sign-in failed");
           setSubMessage(errorDesc || "An error occurred while signing you in.");
           setTimeout(() => router.replace("/"), 2500);
@@ -32,7 +31,6 @@ export default function AuthCallbackPage() {
         const { data, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) {
-          console.error("Session error:", sessionError);
           setMessage("Session error");
           setSubMessage("Please try signing in again.");
           setTimeout(() => router.replace("/"), 2500);
@@ -47,18 +45,13 @@ export default function AuthCallbackPage() {
           return;
         }
 
-        try {
-          await createOrUpdateProfile(session.user);
-        } catch (profileError) {}
+        await createOrUpdateProfile(session.user);
 
         setMessage("Welcome!");
         setSubMessage("Redirecting you to VibraXX...");
 
-        setTimeout(() => {
-          router.replace("/");
-        }, 1000);
+        setTimeout(() => router.replace("/"), 1000);
       } catch (err) {
-        console.error("Auth callback fatal error:", err);
         setMessage("Unexpected error");
         setSubMessage("Redirecting you to home...");
         setTimeout(() => router.replace("/"), 2000);
@@ -79,5 +72,13 @@ export default function AuthCallbackPage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={<div style={{ color: "white" }}>Loading...</div>}>
+      <AuthCallbackInner />
+    </Suspense>
   );
 }
