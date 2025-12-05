@@ -4,18 +4,23 @@ import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { createOrUpdateProfile } from "@/lib/createProfile";
+import { updateActiveSession } from "@/lib/activeSession"; // <-- EKLENDİ
 
 export default function LoginPage() {
   const router = useRouter();
 
-  // Google login dönüşünde user varsa profili oluştur
+  // Google login dönüşünde user varsa profili + active session'ı oluştur
   useEffect(() => {
     const loadUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session?.user) {
         await createOrUpdateProfile(session.user);
-        router.replace("/"); // login başarı → ana sayfaya
+
+        // Kullanıcı login oldu → aktif session oluştur
+        await updateActiveSession(session.user.id, "HOME");  // <-- EKLENDİ
+
+        router.replace("/"); // login başarı → ana sayfa
       }
     };
 
