@@ -3,7 +3,9 @@ import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-export const runtime = "nodejs"; // ⚠ Edge OLMAZ
+export const runtime = "nodejs"; // Edge OLMAZ
+
+// -------------- ROUND BLOK HESAPLAMA --------------------
 
 function getCurrentRoundBlock() {
   const now = new Date();
@@ -22,6 +24,8 @@ function getCurrentRoundBlock() {
 
   return { roundNumber, scheduledStart };
 }
+
+// ---------------------------------------------------------
 
 export async function GET() {
   const now = new Date();
@@ -52,7 +56,7 @@ export async function GET() {
     const { data: created } = await supabaseAdmin
       .from("live_rounds")
       .insert({
-        round_number,
+        round_number: roundNumber, // ✔ Hata düzeltilmiş
         scheduled_start: scheduledStart.toISOString(),
         phase: "READY",
         status: "scheduled",
@@ -73,16 +77,17 @@ export async function GET() {
     await supabaseAdmin.from("live_round_questions").insert(list);
   }
 
-  // 3) Faz hesaplama (NEGATİF DEĞER DÜZELTME)
-  const SECONDS_READY = 15;
-  const QUESTION_TIME = 12;
+  // ------------------ FAZ / ZAMAN HESABI --------------------
+
+  const SECONDS_READY = 15;   // READY bekleme süresi
+  const QUESTION_TIME = 12;   // Her soru için süre
   const TOTAL_QUESTIONS = 50;
 
   let secondsSinceStart = Math.floor(
     (now.getTime() - new Date(round.scheduled_start).getTime()) / 1000
   );
 
-  // 🔥 NEGATİF OLURSA → 0 yapıyoruz. Build hatası buradan çıkıyordu!
+  // ❗ NEGATİF DEĞER YOK (cron geç kalırsa hata engelleniyor)
   if (secondsSinceStart < 0) secondsSinceStart = 0;
 
   let phase = "READY";
@@ -105,17 +110,19 @@ export async function GET() {
     }
   }
 
-  // 4) live_rounds güncelle
+  // ----------------- ROUND UPDATE --------------------
+
   await supabaseAdmin
     .from("live_rounds")
     .update({
       phase,
       current_question_index: question_index,
-      question_started_at: now.toISOString()
+      question_started_at: now.toISOString(),
     })
     .eq("id", round.id);
 
-  // 5) overlay state (TEK SATIR id=2)
+  // ----------------- OVERLAY GÜNCELLEME --------------------
+
   await supabaseAdmin
     .from("overlay_round_state")
     .update({
@@ -123,15 +130,17 @@ export async function GET() {
       phase: phase === "READY" ? "countdown" : "question",
       question_index,
       time_left,
-      updated_at: now.toISOString()
+      updated_at: now.toISOString(),
     })
     .eq("id", 2);
+
+  // ----------------- RESPONSE --------------------
 
   return NextResponse.json({
     ok: true,
     round_id: round.id,
     phase,
     question_index,
-    time_left
+    time_left,
   });
 }
