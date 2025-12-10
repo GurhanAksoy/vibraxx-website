@@ -416,12 +416,12 @@ export default function HomePage() {
   // Real-time Active Players with Dynamic Variation
   const fetchActivePlayers = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from("active_sessions")
-        .select("count", { count: "exact", head: true });
-      
-      if (!error && data !== null) {
-        const realCount = (data as any) || 0;
+      const { count, error } = await supabase
+  .from("active_sessions")
+  .select("*", { count: "exact", head: true });
+
+if (!error && count !== null) {
+  const realCount = count || 0;
         // Base: 600 + real count + random variation (-50 to +150)
         const variation = Math.floor(Math.random() * 200) - 50;
         const finalCount = Math.max(600, 600 + realCount + variation);
@@ -560,20 +560,47 @@ export default function HomePage() {
     loadData();
   }, [fetchActivePlayers, fetchChampions, loadGlobalRoundState]);
 
-  // Real-time Updates
-  useEffect(() => {
-    const playersInterval = setInterval(fetchActivePlayers, 8000);
-    const countdownInterval = setInterval(() => {
+  // ✅ FIX 2: Real-time Updates with countdown jump prevention
+useEffect(() => {
+  const playersInterval = setInterval(fetchActivePlayers, 8000);
+  
+  let pauseCountdown = false;
+  const countdownInterval = setInterval(() => {
+    if (!pauseCountdown) {
       setGlobalTimeLeft((prev) =>
         prev !== null && prev > 0 ? prev - 1 : prev
       );
-    }, 1000);
+    }
+  }, 1000);
 
-    return () => {
-      clearInterval(playersInterval);
-      clearInterval(countdownInterval);
-    };
-  }, [fetchActivePlayers]);
+  // Realtime listener that pauses local countdown briefly
+  const channel = supabase
+    .channel("home-overlay-countdown")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "overlay_round_state" },
+      (payload) => {
+        const newData = (payload.new || {}) as { time_left?: number | null };
+        if (typeof newData.time_left === "number") {
+          // Pause local countdown for 2 seconds when DB update arrives
+          pauseCountdown = true;
+          setGlobalTimeLeft(newData.time_left);
+          setTimeout(() => {
+            pauseCountdown = false;
+          }, 2000);
+        } else {
+          setGlobalTimeLeft(null);
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    clearInterval(playersInterval);
+    clearInterval(countdownInterval);
+    supabase.removeChannel(channel);
+  };
+}, [fetchActivePlayers]);
 
   // Auth Listener
   useEffect(() => {
@@ -608,29 +635,7 @@ export default function HomePage() {
     return () => sub.subscription.unsubscribe();
   }, [router]);
 
-  // Realtime listener for global overlay state
-  useEffect(() => {
-    const channel = supabase
-      .channel("home-overlay")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "overlay_round_state" },
-        (payload) => {
-          const newData = (payload.new || {}) as { time_left?: number | null };
-          if (typeof newData.time_left === "number") {
-            setGlobalTimeLeft(newData.time_left);
-          } else {
-            setGlobalTimeLeft(null);
-          }
-        }
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  // Music Toggle
+   // Music Toggle
   const toggleMusic = useCallback(() => {
     if (isPlaying) {
       stopMenuMusic();
@@ -1157,9 +1162,9 @@ export default function HomePage() {
 
         /* ✅ PREMIUM: Champion Card */
         .vx-champ-card {
-          position: relative;
-          padding: 24px;
-          borderRadius: 16px;
+  position: relative;
+  padding: 24px;
+  border-radius: 16px;
           border: 1px solid rgba(255, 255, 255, 0.08);
           background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
           backdrop-filter: blur(20px);
