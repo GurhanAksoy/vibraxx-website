@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-// ❌ REMOVED: import Head from "next/head"; - Use metadata in layout.tsx instead
 import {
   Crown,
   Trophy,
@@ -15,7 +14,6 @@ import {
   Sparkles,
   Globe,
   Gift,
-  User,
   ShoppingCart,
   CheckCircle,
   AlertCircle,
@@ -351,12 +349,11 @@ NoRoundsModal.displayName = "NoRoundsModal";
 export default function HomePage() {
   const router = useRouter();
   const [isPlaying, setIsPlaying] = useState(false);
-  const [nextRound, setNextRound] = useState<number | null>(null);
   const [globalTimeLeft, setGlobalTimeLeft] = useState<number | null>(null);
   const [activePlayers, setActivePlayers] = useState(600);
   const [user, setUser] = useState<any>(null);
   const [champions, setChampions] = useState<any[]>([]);
-  const [stats, setStats] = useState({ totalQuestions: 0, roundsPerDay: 96 });
+  const [stats, setStats] = useState({ totalQuestions: 2800000, roundsPerDay: 96 });
   const [isLoading, setIsLoading] = useState(true);
   const [showAgeModal, setShowAgeModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<"live" | "free" | null>(null);
@@ -364,30 +361,30 @@ export default function HomePage() {
   const [userRounds, setUserRounds] = useState(0);
   const [showNoRoundsModal, setShowNoRoundsModal] = useState(false);
 
-  // Fetch user's available rounds
+  // ✅ FIXED: Fetch user's available rounds from user_rounds table
   const fetchUserRounds = useCallback(async () => {
-  if (!user) {
-    setUserRounds(0);
-    return;
-  }
+    if (!user) {
+      setUserRounds(0);
+      return;
+    }
 
-  try {
-    const { data, error } = await supabase
-      .from("user_stats")
-      .select("rounds")
-      .eq("user_id", user.id)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from("user_rounds")
+        .select("remaining")
+        .eq("user_id", user.id)
+        .single();
 
-    if (!error && data?.rounds) {
-      setUserRounds(data.rounds.remaining || 0);
-    } else {
+      if (!error && data) {
+        setUserRounds(data.remaining || 0);
+      } else {
+        setUserRounds(0);
+      }
+    } catch (err) {
+      console.error("User rounds fetch error:", err);
       setUserRounds(0);
     }
-  } catch (err) {
-    console.error("User rounds fetch error:", err);
-    setUserRounds(0);
-  }
-}, [user]);
+  }, [user]);
 
   // Initial Load with smooth fade in
   useEffect(() => {
@@ -425,12 +422,12 @@ export default function HomePage() {
       
       if (!error && data !== null) {
         const realCount = (data as any) || 0;
-        // Base: 600 + gerçek sayı + rastgele varyasyon (-50 ile +150 arası)
+        // Base: 600 + real count + random variation (-50 to +150)
         const variation = Math.floor(Math.random() * 200) - 50;
         const finalCount = Math.max(600, 600 + realCount + variation);
         setActivePlayers(finalCount);
       } else {
-        // Supabase hatası varsa dinamik sayı üret
+        // If Supabase error, generate dynamic number
         const variation = Math.floor(Math.random() * 200) - 50;
         setActivePlayers(Math.max(600, 600 + variation));
       }
@@ -438,31 +435,6 @@ export default function HomePage() {
       console.error("Active players fetch error:", err);
       const variation = Math.floor(Math.random() * 200) - 50;
       setActivePlayers(Math.max(600, 600 + variation));
-    }
-  }, []);
-
-  // Next Round Countdown
-  const fetchNextRound = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from("quiz_rounds")
-        .select("scheduled_at")
-        .gte("scheduled_at", new Date().toISOString())
-        .order("scheduled_at", { ascending: true })
-        .limit(1)
-        .single();
-
-      if (!error && data) {
-        const scheduledTime = new Date(data.scheduled_at).getTime();
-        const now = Date.now();
-        const diff = Math.max(0, Math.floor((scheduledTime - now) / 1000));
-        setNextRound(diff);
-      } else {
-        setNextRound(900);
-      }
-    } catch (err) {
-      console.error("Next round fetch error:", err);
-      setNextRound(900);
     }
   }, []);
 
@@ -558,35 +530,6 @@ export default function HomePage() {
     },
   ];
 
-  // Fetch Stats from Supabase (Optimized)
-  const fetchStats = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from("quiz_stats")
-        .select("total_questions, rounds_per_day")
-        .single();
-
-      if (!error && data) {
-        setStats({
-          totalQuestions: data.total_questions || 2800000,
-          roundsPerDay: data.rounds_per_day || 96,
-        });
-      } else {
-        console.warn("No stats data found, using defaults");
-        setStats({
-          totalQuestions: 2800000,
-          roundsPerDay: 96,
-        });
-      }
-    } catch (err) {
-      console.error("Stats fetch error:", err);
-      setStats({
-        totalQuestions: 2800000,
-        roundsPerDay: 96,
-      });
-    }
-  }, []);
-
   // Load initial global round state from overlay table
   const loadGlobalRoundState = useCallback(async () => {
     try {
@@ -607,18 +550,15 @@ export default function HomePage() {
   // Initial Load
   useEffect(() => {
     const loadData = async () => {
-      setIsLoading(true);
+      setIsLoading(false);
       await Promise.all([
         fetchActivePlayers(),
-        fetchNextRound(),
         fetchChampions(),
-        fetchStats(),
-        loadGlobalRoundState(),  // Yeni eklendi
+        loadGlobalRoundState(),
       ]);
-      setIsLoading(false);
     };
     loadData();
-  }, [fetchActivePlayers, fetchNextRound, fetchChampions, fetchStats, loadGlobalRoundState]);
+  }, [fetchActivePlayers, fetchChampions, loadGlobalRoundState]);
 
   // Real-time Updates
   useEffect(() => {
@@ -629,15 +569,11 @@ export default function HomePage() {
       );
     }, 1000);
 
-    if (nextRound === 0) {
-      fetchNextRound();
-    }
-
     return () => {
       clearInterval(playersInterval);
       clearInterval(countdownInterval);
     };
-  }, [fetchActivePlayers, fetchNextRound, nextRound]);
+  }, [fetchActivePlayers]);
 
   // Auth Listener
   useEffect(() => {
@@ -645,10 +581,10 @@ export default function HomePage() {
       const { data } = await supabase.auth.getUser();
       setUser(data.user || null);
       
-      // ✅ Login olduktan sonra pending buy rounds var mı?
+      // Check if user has pending buy rounds action after login
       if (data.user && sessionStorage.getItem('pendingBuyRounds') === 'true') {
         sessionStorage.removeItem('pendingBuyRounds');
-        // Küçük delay ile buy sayfasına git (auth tamamen yüklensin)
+        // Small delay for auth to fully load
         setTimeout(() => {
           router.push('/buy');
         }, 300);
@@ -659,10 +595,10 @@ export default function HomePage() {
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null);
       
-      // ✅ Auth değiştiğinde de kontrol et (login event'i)
+      // Also check on auth state change (login event)
       if (event === 'SIGNED_IN' && session?.user && sessionStorage.getItem('pendingBuyRounds') === 'true') {
         sessionStorage.removeItem('pendingBuyRounds');
-        // Küçük delay ile buy sayfasına git
+        // Small delay for auth to fully load
         setTimeout(() => {
           router.push('/buy');
         }, 300);
@@ -830,9 +766,6 @@ export default function HomePage() {
 
   return (
     <>
-      {/* ❌ REMOVED: <Head> component - SEO metadata moved to app/layout.tsx */}
-      {/* Add metadata export to app/layout.tsx instead */}
-
       <style jsx global>{`
         :root { 
           color-scheme: dark;
@@ -1257,7 +1190,7 @@ export default function HomePage() {
           .vx-champ-card { padding: 28px; }
         }
 
-        /* Footer */}
+        /* Footer */
         .vx-footer {
           border-top: 1px solid rgba(255, 255, 255, 0.12);
           background: rgba(9, 9, 13, 0.96);
@@ -1351,7 +1284,7 @@ export default function HomePage() {
           }
           
           .vx-hero-countdown-timer {
-            font-size: 32px !important; /* 38px → 32px */
+            font-size: 32px !important;
           }
           
           /* Live banner mobile */
@@ -1400,7 +1333,7 @@ export default function HomePage() {
           }
           
           .vx-hero-countdown-timer {
-            font-size: 28px !important; /* 32px → 28px */
+            font-size: 28px !important;
           }
           
           .vx-hero-countdown-container {
@@ -1485,16 +1418,9 @@ export default function HomePage() {
             onBuyRounds={async () => {
               setShowNoRoundsModal(false);
               
-              // ✅ ÖNCE LOGIN KONTROLÜ
               if (!user) {
-                // ❌ GİRİŞ YAPMAMIŞSA
-                // Kullanıcıya bilgi ver
-                alert("Round satın almak için önce Google ile giriş yapmalısınız. Giriş sayfasına yönlendiriliyorsunuz...");
-                
-                // Pending action kaydet
+                alert("Please sign in with Google to purchase rounds. You will be redirected to the login page.");
                 sessionStorage.setItem('pendingBuyRounds', 'true');
-                
-                // Google login'e yönlendir
                 await supabase.auth.signInWithOAuth({
                   provider: "google",
                   options: {
@@ -1504,7 +1430,6 @@ export default function HomePage() {
                 return;
               }
               
-              // ✅ GİRİŞ YAPMIŞ - direkt buy sayfasına git
               router.push("/buy");
             }}
             onCancel={() => setShowNoRoundsModal(false)}
@@ -1767,7 +1692,7 @@ export default function HomePage() {
           </div>
         </header>
 
-        {/* LIVE BANNER - Simplified */}
+        {/* LIVE BANNER */}
         <div className="vx-livebar">
           <div className="vx-container">
             <div className="vx-livebar-inner">
@@ -1820,7 +1745,7 @@ export default function HomePage() {
               <Trophy style={{ width: 16, height: 16, color: "#fbbf24" }} />
             </div>
 
-            {/* Prize Pool Notice - Below badge with proper block display */}
+            {/* Prize Pool Notice */}
             <div style={{ textAlign: "center", marginBottom: 28 }}>
               <div
                 style={{
@@ -1852,7 +1777,6 @@ export default function HomePage() {
 
             {/* ✅ PREMIUM: Compact Countdown Timer */}
             <div className="vx-countdown-panel">
-              {/* Premium shine effect - top */}
               <div
                 style={{
                   position: "absolute",
@@ -1864,7 +1788,6 @@ export default function HomePage() {
                 }}
               />
               
-              {/* Premium glow - bottom */}
               <div
                 style={{
                   position: "absolute",
@@ -1880,7 +1803,6 @@ export default function HomePage() {
               />
               
               <div style={{ position: "relative", zIndex: 10 }}>
-                {/* Top label */}
                 <div
                   style={{
                     fontSize: 11,
@@ -1895,7 +1817,6 @@ export default function HomePage() {
                   Next Round
                 </div>
                 
-                {/* Timer display - SADECE RAKAM */}
                 <div
                   style={{
                     display: "flex",
@@ -1904,7 +1825,6 @@ export default function HomePage() {
                     marginBottom: 14,
                   }}
                 >
-                  {/* Time value */}
                   <div
                     style={{
                       fontSize: 42,
@@ -1920,7 +1840,6 @@ export default function HomePage() {
                   </div>
                 </div>
                 
-                {/* LIVE badge - ALTA ORTALA */}
                 <div
                   style={{
                     display: "flex",
@@ -1965,7 +1884,6 @@ export default function HomePage() {
                   </div>
                 </div>
                 
-                {/* Bottom info */}
                 <div
                   style={{
                     display: "flex",
@@ -2073,7 +1991,6 @@ export default function HomePage() {
                 overflow: "hidden",
               }}
             >
-              {/* Premium shine effect */}
               <div
                 style={{
                   position: "absolute",
@@ -2115,7 +2032,6 @@ export default function HomePage() {
                     marginBottom: 20,
                   }}
                 >
-                  {/* Single Round */}
                   <div
                     style={{
                       padding: "20px 16px",
@@ -2145,7 +2061,6 @@ export default function HomePage() {
                     <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 500 }}>per round</div>
                   </div>
 
-                  {/* Value Pack - Highlighted */}
                   <div
                     style={{
                       padding: "20px 16px",
@@ -2168,7 +2083,6 @@ export default function HomePage() {
                       e.currentTarget.style.transform = "translateY(0)";
                     }}
                   >
-                    {/* Best Value Badge */}
                     <div
                       style={{
                         position: "absolute",
@@ -2197,7 +2111,6 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {/* Premium Prize Pool Info */}
                 <div
                   style={{
                     padding: "16px",
@@ -2280,7 +2193,6 @@ export default function HomePage() {
               maxWidth: 1024,
               margin: "0 auto",
             }}>
-              {/* SSL Encrypted */}
               <div style={{
                 display: "flex",
                 flexDirection: "column",
@@ -2308,7 +2220,6 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Stripe Verified */}
               <div style={{
                 display: "flex",
                 flexDirection: "column",
@@ -2336,7 +2247,6 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* 18+ Only */}
               <div style={{
                 display: "flex",
                 flexDirection: "column",
@@ -2364,7 +2274,6 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Global Competition */}
               <div style={{
                 display: "flex",
                 flexDirection: "column",
@@ -2398,7 +2307,6 @@ export default function HomePage() {
         {/* Footer */}
         <footer className="vx-footer">
           <div className="vx-container">
-            {/* Legal Disclaimer */}
             <div className="vx-footer-legal">
               <strong style={{ color: "#94a3b8" }}>Educational Quiz Competition.</strong> 18+ only. 
               This is a 100% skill-based knowledge competition with no element of chance. 
@@ -2409,7 +2317,6 @@ export default function HomePage() {
               for full details.
             </div>
 
-            {/* Main Links */}
             <nav className="vx-footer-links" aria-label="Footer navigation">
               <a href="/privacy">Privacy Policy</a>
               <span className="vx-footer-divider" />
@@ -2432,7 +2339,6 @@ export default function HomePage() {
               <a href="/faq">FAQ</a>
             </nav>
 
-            {/* Company Info */}
             <div className="vx-footer-company">
               <div style={{ marginBottom: 8, textAlign: "center" }}>
                 © 2025 VibraXX. Operated by Sermin Limited (UK)
