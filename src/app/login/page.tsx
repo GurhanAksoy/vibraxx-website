@@ -4,7 +4,6 @@ import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { createOrUpdateProfile } from "@/lib/createProfile";
-import { updateActiveSession } from "@/lib/activeSession"; // <-- EKLENDİ
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,9 +15,6 @@ export default function LoginPage() {
 
       if (session?.user) {
         await createOrUpdateProfile(session.user);
-
-        // Kullanıcı login oldu → aktif session oluştur
-        await updateActiveSession(session.user.id, "HOME");  // <-- EKLENDİ
 
         router.replace("/"); // login başarı → ana sayfa
       }
