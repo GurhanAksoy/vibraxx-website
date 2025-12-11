@@ -9,6 +9,38 @@ export default function HowItWorksPage() {
 
   return (
     <>
+      {/* ⚡ CRITICAL CSS - Prevents layout shift during hydration */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        :root {
+          color-scheme: dark;
+          background-color: #020817;
+        }
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+        body {
+          background-color: #020817 !important;
+          color: white !important;
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+          line-height: 1.7 !important;
+          overflow-x: hidden !important;
+        }
+        .legal-page {
+          min-height: 100vh;
+          background: #020817;
+          position: relative;
+          overflow-x: hidden;
+          contain: layout style paint;
+        }
+        .content-wrapper {
+          max-width: 1000px;
+          margin: 0 auto;
+          padding: 40px 20px 80px;
+        }
+      `}} />
+
       <style jsx global>{`
         :root {
           color-scheme: dark;
@@ -279,6 +311,7 @@ export default function HowItWorksPage() {
           display: flex;
           align-items: center;
           gap: 12px;
+          flex-wrap: wrap;
         }
 
         .subsection-title {
@@ -368,7 +401,7 @@ export default function HowItWorksPage() {
           margin: 24px 0;
         }
 
-        @media (min-width: 768px) {
+        @media (min-width: 640px) {
           .step-grid {
             grid-template-columns: repeat(2, 1fr);
           }
@@ -386,6 +419,12 @@ export default function HowItWorksPage() {
           background: rgba(251, 191, 36, 0.1);
           border-color: rgba(251, 191, 36, 0.4);
           transform: translateY(-4px);
+        }
+
+        @media (max-width: 640px) {
+          .step-card {
+            padding: 20px;
+          }
         }
 
         .step-number {
@@ -409,11 +448,23 @@ export default function HowItWorksPage() {
           margin-bottom: 8px;
         }
 
+        @media (max-width: 640px) {
+          .step-title {
+            font-size: 16px;
+          }
+        }
+
         .step-description {
           font-size: 14px;
           color: #94a3b8;
           line-height: 1.7;
           margin: 0;
+        }
+
+        @media (max-width: 640px) {
+          .step-description {
+            font-size: 13px;
+          }
         }
 
         .stat-grid {
@@ -443,6 +494,12 @@ export default function HowItWorksPage() {
           text-align: center;
         }
 
+        @media (max-width: 640px) {
+          .stat-card {
+            padding: 16px;
+          }
+        }
+
         .stat-value {
           font-size: 32px;
           font-weight: 800;
@@ -450,9 +507,21 @@ export default function HowItWorksPage() {
           margin-bottom: 8px;
         }
 
+        @media (max-width: 640px) {
+          .stat-value {
+            font-size: 28px;
+          }
+        }
+
         .stat-label {
           font-size: 14px;
           color: #94a3b8;
+        }
+
+        @media (max-width: 640px) {
+          .stat-label {
+            font-size: 13px;
+          }
         }
 
         .vx-footer {
@@ -515,6 +584,7 @@ export default function HowItWorksPage() {
                     alt="VibraXX"
                     width={46}
                     height={46}
+                    priority
                     style={{ objectFit: "contain" }}
                   />
                 </div>
@@ -595,7 +665,7 @@ export default function HowItWorksPage() {
                 <div className="step-number">3</div>
                 <div className="step-title">Purchase Rounds</div>
                 <p className="step-description">
-                  Buy quiz rounds: £1 per round or save 17% with the 35-round pack for £29.
+                  Buy quiz rounds: £2.00 per round or save 30% with the 35-round bundle for £49.00.
                 </p>
               </div>
 
@@ -693,17 +763,21 @@ export default function HowItWorksPage() {
 
             <h3 className="subsection-title">Important Threshold</h3>
             <div className="info-box">
-              <strong>3000+ Participants Required</strong>
+              <strong>3000+ Unique Paid Participants Required</strong>
               <p>
-                The £1000 prize pool activates only when 3000 or more unique participants compete during the month. This ensures platform sustainability while delivering the full prize to winners. If the threshold is not met, all entry fees are automatically refunded within 14 days.
+                The £1000 prize pool activates only when 3000 or more unique participants who have purchased at least one paid round compete during the calendar month. This threshold covers platform operational costs including payment processing fees, infrastructure, security, and support services.
+                <br /><br />
+                <strong style={{ color: "#a78bfa" }}>If the threshold is not met:</strong> No prize is awarded and funds do not carry over to the next month. Entry fees are not refunded as the platform service (quiz participation, scoring, leaderboards) has been provided.
               </p>
             </div>
 
             <h3 className="subsection-title">Tie-Breaking</h3>
             <p>If multiple players have the same top score:</p>
             <ol>
-              <li>The player with fewer incorrect answers wins</li>
-              <li>If still tied, the prize is split equally among tied participants</li>
+              <li><strong>Fewest Incorrect Answers:</strong> The player with fewer wrong answers wins</li>
+              <li><strong>Highest Accuracy Rate:</strong> If still tied, highest overall accuracy percentage wins</li>
+              <li><strong>Highest Average Score Per Round:</strong> If still tied, highest average score wins</li>
+              <li><strong>Prize Split:</strong> If all criteria are equal, the prize is divided equally</li>
             </ol>
           </div>
 
@@ -730,7 +804,7 @@ export default function HowItWorksPage() {
                   color: "#fbbf24",
                   marginBottom: 8
                 }}>
-                  £1
+                  £2.00
                 </div>
                 <p className="step-description">
                   Perfect for trying out the competition. One round, one chance to compete.
@@ -753,10 +827,10 @@ export default function HowItWorksPage() {
                   color: "#fbbf24",
                   marginBottom: 8
                 }}>
-                  £29
+                  £49.00
                 </div>
                 <p className="step-description">
-                  35 rounds (£0.83 each) - Save 17%. Best value for serious competitors.
+                  35 rounds (£1.40 each) - Save 30%. Best value for serious competitors.
                 </p>
               </div>
             </div>

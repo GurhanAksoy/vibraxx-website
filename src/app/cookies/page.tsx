@@ -9,6 +9,38 @@ export default function CookiePolicyPage() {
 
   return (
     <>
+      {/* ⚡ CRITICAL CSS - Prevents layout shift during hydration */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        :root {
+          color-scheme: dark;
+          background-color: #020817;
+        }
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+        body {
+          background-color: #020817 !important;
+          color: white !important;
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+          line-height: 1.7 !important;
+          overflow-x: hidden !important;
+        }
+        .legal-page {
+          min-height: 100vh;
+          background: #020817;
+          position: relative;
+          overflow-x: hidden;
+          contain: layout style paint;
+        }
+        .content-wrapper {
+          max-width: 1000px;
+          margin: 0 auto;
+          padding: 40px 20px 80px;
+        }
+      `}} />
+
       <style jsx global>{`
         :root {
           color-scheme: dark;
@@ -374,37 +406,60 @@ export default function CookiePolicyPage() {
           line-height: 1.7;
         }
 
-        .cookie-table {
+        /* ✅ MOBILE-FIRST RESPONSIVE TABLE */
+        .cookie-table-wrapper {
           width: 100%;
-          border-collapse: collapse;
-          margin: 24px 0;
-          font-size: 14px;
           overflow-x: auto;
-          display: block;
+          margin: 24px 0;
+          -webkit-overflow-scrolling: touch;
+          border-radius: 12px;
+          border: 1px solid rgba(251, 191, 36, 0.2);
         }
 
-        @media (min-width: 768px) {
+        .cookie-table {
+          width: 100%;
+          min-width: 600px;
+          border-collapse: collapse;
+          font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
           .cookie-table {
-            display: table;
+            font-size: 13px;
           }
         }
 
         .cookie-table thead {
-          background: rgba(251, 191, 36, 0.1);
+          background: rgba(251, 191, 36, 0.15);
         }
 
         .cookie-table th {
-          padding: 16px;
+          padding: 16px 12px;
           text-align: left;
           font-weight: 700;
           color: #fbbf24;
           border-bottom: 2px solid rgba(251, 191, 36, 0.3);
+          white-space: nowrap;
+        }
+
+        @media (max-width: 768px) {
+          .cookie-table th {
+            padding: 12px 10px;
+            font-size: 12px;
+          }
         }
 
         .cookie-table td {
-          padding: 14px 16px;
+          padding: 14px 12px;
           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
           color: #cbd5e1;
+          vertical-align: top;
+        }
+
+        @media (max-width: 768px) {
+          .cookie-table td {
+            padding: 12px 10px;
+          }
         }
 
         .cookie-table tbody tr:hover {
@@ -413,10 +468,18 @@ export default function CookiePolicyPage() {
 
         .cookie-type-badge {
           display: inline-block;
-          padding: 4px 12px;
+          padding: 6px 12px;
           border-radius: 6px;
-          font-size: 12px;
+          font-size: 11px;
           font-weight: 600;
+          white-space: nowrap;
+        }
+
+        @media (max-width: 768px) {
+          .cookie-type-badge {
+            padding: 4px 8px;
+            font-size: 10px;
+          }
         }
 
         .badge-necessary {
@@ -450,7 +513,7 @@ export default function CookiePolicyPage() {
           margin: 24px 0;
         }
 
-        @media (min-width: 768px) {
+        @media (min-width: 640px) {
           .browser-guide {
             grid-template-columns: repeat(2, 1fr);
           }
@@ -467,6 +530,7 @@ export default function CookiePolicyPage() {
         .browser-card:hover {
           background: rgba(251, 191, 36, 0.1);
           border-color: rgba(251, 191, 36, 0.3);
+          transform: translateY(-2px);
         }
 
         .browser-card h4 {
@@ -481,6 +545,20 @@ export default function CookiePolicyPage() {
           color: #94a3b8;
           margin: 0;
           line-height: 1.6;
+        }
+
+        @media (max-width: 640px) {
+          .browser-card {
+            padding: 16px;
+          }
+          
+          .browser-card h4 {
+            font-size: 15px;
+          }
+          
+          .browser-card p {
+            font-size: 13px;
+          }
         }
 
         .vx-footer {
@@ -543,6 +621,7 @@ export default function CookiePolicyPage() {
                     alt="VibraXX"
                     width={46}
                     height={46}
+                    priority
                     style={{ objectFit: "contain" }}
                   />
                 </div>
@@ -580,7 +659,7 @@ export default function CookiePolicyPage() {
             </p>
             <div className="last-updated-badge">
               <CheckCircle style={{ width: 16, height: 16 }} />
-              Last Updated: November 18, 2025
+              Last Updated: December 11, 2025
             </div>
           </div>
 
@@ -611,8 +690,8 @@ export default function CookiePolicyPage() {
               <span>2. Types of Cookies We Use</span>
             </h2>
 
-            <div className="cookie-table">
-              <table style={{ width: "100%" }}>
+            <div className="cookie-table-wrapper">
+              <table className="cookie-table">
                 <thead>
                   <tr>
                     <th>Cookie Type</th>
