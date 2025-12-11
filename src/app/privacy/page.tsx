@@ -9,6 +9,38 @@ export default function PrivacyPage() {
 
   return (
     <>
+      {/* ⚡ CRITICAL CSS - Prevents layout shift during hydration */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        :root {
+          color-scheme: dark;
+          background-color: #020817;
+        }
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+        body {
+          background-color: #020817 !important;
+          color: white !important;
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+          line-height: 1.7 !important;
+          overflow-x: hidden !important;
+        }
+        .legal-page {
+          min-height: 100vh;
+          background: #020817;
+          position: relative;
+          overflow-x: hidden;
+          contain: layout style paint;
+        }
+        .content-wrapper {
+          max-width: 1000px;
+          margin: 0 auto;
+          padding: 40px 20px 80px;
+        }
+      `}} />
+
       <style jsx global>{`
         :root {
           color-scheme: dark;
@@ -531,6 +563,7 @@ export default function PrivacyPage() {
                     alt="VibraXX"
                     width={46}
                     height={46}
+                    priority
                     style={{ objectFit: "contain" }}
                   />
                 </div>
