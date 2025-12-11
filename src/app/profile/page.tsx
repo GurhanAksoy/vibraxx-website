@@ -169,17 +169,23 @@ export default function ProfilePage() {
         });
         setEditName(profileData?.full_name || authUser.user_metadata?.full_name || "User");
 
-        // Fetch user rounds
-        const { data: statsData, error: statsError } = await supabase
-  .from("user_stats")
-  .select("rounds")
-  .eq("user_id", authUser.id)
-  .single();
+        // ✅ FIXED: Fetch user rounds from user_rounds table
+        const { data: roundsData, error: roundsError } = await supabase
+          .from("user_rounds")
+          .select("remaining, purchased")
+          .eq("user_id", authUser.id)
+          .single();
 
-if (!statsError && statsData?.rounds) {
-  setUserRounds(statsData.rounds.remaining || 0);
-  setTotalPurchasedRounds(statsData.rounds.purchased || 0);
-}
+        if (!roundsError && roundsData) {
+          const remaining = roundsData.remaining ?? 0;
+          const purchased = roundsData.purchased ?? 0;
+
+          setUserRounds(remaining);
+          setTotalPurchasedRounds(purchased);
+        } else {
+          setUserRounds(0);
+          setTotalPurchasedRounds(0);
+        }
 
         // Fetch round_scores (all for aggregation)
         const { data: scoresData, error: scoresError } = await supabase
@@ -250,15 +256,22 @@ if (!statsError && statsData?.rounds) {
           const monthScore = monthRounds.reduce((sum, r) => sum + (r.total_score || 0), 0);
 
           // Last round (most recent)
-          const lastRound = scoresData[0] ? {
-            id: scoresData[0].id,
-            score: scoresData[0].total_score,
-            correct_count: scoresData[0].correct,
-            wrong_count: scoresData[0].wrong,
-            accuracy: scoresData[0].accuracy,
-            max_streak: 0,
-            completed_at: scoresData[0].created_at,
-          } : null;
+          const last = scoresData[0];
+
+          const lastRound = last
+            ? {
+                id: last.id,
+                score: last.total_score,
+                correct_count: last.correct,
+                wrong_count: last.wrong,
+                accuracy:
+                  last.correct + last.wrong > 0
+                    ? Math.round((last.correct / (last.correct + last.wrong)) * 100)
+                    : 0,
+                max_streak: 0,
+                completed_at: last.created_at,
+              }
+            : null;
 
           setDetailedStats({
             today: {
@@ -1228,7 +1241,7 @@ if (!statsError && statsData?.rounds) {
                     <div>
                       <span style={{ fontSize: "clamp(10px, 2vw, 11px)", color: "#94a3b8" }}>Used: </span>
                       <span style={{ fontSize: "clamp(14px, 3vw, 16px)", fontWeight: 900, color: "#fb923c" }}>
-                        {totalPurchasedRounds - userRounds}
+                        {Math.max(0, totalPurchasedRounds - userRounds)}
                       </span>
                     </div>
                   </div>
