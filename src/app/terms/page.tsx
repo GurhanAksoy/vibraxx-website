@@ -964,7 +964,7 @@ export default function TermsPage() {
             <div className="highlight-box">
               <strong>Contact Details</strong>
               <p style={{ marginTop: 12 }}>
-                <strong style={{ color: "#c4b5fd" }}>Company:</strong> Sermin Limited (trading as VibraXX)
+                <strong style={{ color: "#c4b5fd" }}>Company:</strong> Sermin Limited (T/A VibraXX)
                 <br />
                 <strong style={{ color: "#c4b5fd" }}>Company Number:</strong> 16778648
                 <br />
