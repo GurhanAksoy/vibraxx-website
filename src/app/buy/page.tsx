@@ -29,12 +29,12 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// Pricing packages
+// ✅ FIXED: Updated pricing packages
 const packages = [
   {
     id: "single",
     name: "Single Round",
-    price: 1,
+    price: 2,
     originalPrice: null,
     rounds: 1,
     popular: false,
@@ -52,16 +52,16 @@ const packages = [
   {
     id: "bundle",
     name: "Champion Bundle",
-    price: 29,
-    originalPrice: 35,
-    rounds: 35,
+    price: 49,
+    originalPrice: 60,
+    rounds: 30,
     popular: true,
-    savings: 17,
+    savings: 18,
     icon: Crown,
     features: [
-      "35 Quiz Rounds",
-      "1,750 Questions", 
-      "17% Savings (Save £6)",
+      "30 Quiz Rounds",
+      "1,500 Questions", 
+      "18% Savings (Save £11)",
       "Priority Support",
       "Extended Statistics",
       "Champion Badge",
@@ -113,14 +113,17 @@ export default function BuyPage() {
 
       setUser(authUser);
 
-      const { data: roundsData } = await supabase
+      // ✅ FIXED: Using correct column name 'remaining'
+      const { data: roundsData, error: roundsError } = await supabase
         .from("user_rounds")
-        .select("available_rounds")
+        .select("remaining")
         .eq("user_id", authUser.id)
         .single();
 
-      if (roundsData) {
-        setUserRounds(roundsData.available_rounds || 0);
+      if (roundsError || !roundsData) {
+        setUserRounds(0);
+      } else {
+        setUserRounds(roundsData.remaining || 0);
       }
 
       setIsLoading(false);
