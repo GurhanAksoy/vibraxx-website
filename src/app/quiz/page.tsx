@@ -1,5 +1,4 @@
- "use client";
-
+"use client";
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -80,6 +79,9 @@ export default function QuizGamePage() {
 
   // Stats only once guard
   const statsSavedRef = useRef(false);
+  
+  // ✅ FIXED: Timeout double-trigger protection
+  const timeoutTriggeredRef = useRef(false);
 
   // === AUDIO REFS ===
   const correctSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -143,6 +145,8 @@ export default function QuizGamePage() {
         }
 
         console.log("✅ Active round found:", round.id);
+        
+        // ✅ FIXED: Robust round state initialization
         setRoundId(round.id);
         setPhase(round.phase || "READY");
 
@@ -151,7 +155,9 @@ export default function QuizGamePage() {
             ? Math.max(0, round.current_question_index)
             : 0;
         setCurrentIndex(safeIndex);
-        setQuestionStart(round.question_started_at);
+        
+        // ✅ FIXED: Safe questionStart handling
+        setQuestionStart(round.question_started_at || null);
 
         // Get questions for this round
         const { data: questionData, error: questionsError } = await supabase
@@ -203,24 +209,27 @@ export default function QuizGamePage() {
         const {
           data: { user },
         } = await supabase.auth.getUser();
+        
         if (!user) {
           setUserRounds(0);
           return;
         }
 
+        // ✅ FIXED: Correct column name 'remaining'
         const { data, error } = await supabase
           .from("user_rounds")
-          .select("available_rounds")
+          .select("remaining")
           .eq("user_id", user.id)
           .single();
 
-        if (error) {
+        // ✅ FIXED: Improved error handling
+        if (error || !data) {
           console.error("Error fetching user rounds:", error);
           setUserRounds(0);
           return;
         }
 
-        setUserRounds(data?.available_rounds || 0);
+        setUserRounds(data.remaining || 0);
       } catch (err) {
         console.error("Error fetching user rounds:", err);
         setUserRounds(0);
@@ -301,30 +310,37 @@ export default function QuizGamePage() {
     }
   };
 
-  // Stats sadece 1 kez kaydet
+  // ✅ FIXED: Stats save with better guard
   const saveStatsOnce = async () => {
-    if (statsSavedRef.current) return;
+    if (statsSavedRef.current) {
+      console.log("📊 Stats already saved, skipping...");
+      return;
+    }
+    
+    console.log("📊 Saving stats...");
     statsSavedRef.current = true;
     await updateUserStats();
   };
 
-  // === DECREASE USER ROUND (for final score actions) ===
-  const decreaseUserRound = async () => {
+  // ✅ FIXED: Correct RPC function name (deduct_user_round, not decrease_user_round)
+  const deductUserRound = async () => {
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { error } = await supabase.rpc("decrease_user_round", {
+      const { error } = await supabase.rpc("deduct_user_round", {
         p_user_id: user.id,
       });
 
       if (error) {
-        console.error("Error decreasing round:", error);
+        console.error("Error deducting round:", error);
+      } else {
+        console.log("✅ Round deducted successfully");
       }
     } catch (err) {
-      console.error("Error decreasing round:", err);
+      console.error("Error deducting round:", err);
     }
   };
 
@@ -358,6 +374,8 @@ export default function QuizGamePage() {
   useEffect(() => {
     if (!roundId) return;
 
+    console.log("🔌 Subscribing to round-state channel for round:", roundId);
+
     const channel = supabase
       .channel("round-state")
       .on(
@@ -377,23 +395,28 @@ export default function QuizGamePage() {
             row.current_question_index
           );
 
+          // ✅ FIXED: Safe index handling
           const safeIndex =
             typeof row.current_question_index === "number"
               ? Math.max(0, row.current_question_index)
               : 0;
 
-          setPhase(row.phase);
+          setPhase(row.phase || "READY");
           setCurrentIndex(safeIndex);
-          setQuestionStart(row.question_started_at);
+          setQuestionStart(row.question_started_at || null);
 
           if (row.phase === "QUESTION") {
+            console.log("▶️ Phase: QUESTION - Resetting UI state");
             setShowExplanation(false);
             setIsAnswerLocked(false);
             setSelectedAnswer(null);
             setTimeLeft(QUESTION_DURATION);
+            timeoutTriggeredRef.current = false; // ✅ Reset timeout guard
           } else if (row.phase === "INTERMISSION") {
+            console.log("⏸️ Phase: INTERMISSION - Showing explanation");
             setShowExplanation(true);
           } else if (row.phase === "FINISHED") {
+            console.log("🏁 Phase: FINISHED - Showing final score");
             setShowFinalScore(true);
             saveStatsOnce();
           }
@@ -444,8 +467,10 @@ export default function QuizGamePage() {
 
       setTimeLeft(remaining);
 
-      if (remaining === 0 && !isAnswerLocked) {
+      // ✅ FIXED: Double-trigger protection
+      if (remaining === 0 && !isAnswerLocked && !timeoutTriggeredRef.current) {
         console.log("⏱️ Time expired, auto-submitting...");
+        timeoutTriggeredRef.current = true;
         handleTimeout();
       }
     }, 200);
@@ -453,10 +478,11 @@ export default function QuizGamePage() {
     return () => clearInterval(timer);
   }, [questionStart, phase, isAnswerLocked]);
 
-  // === FINAL SCORE COUNTDOWN ===
+  // ✅ FIXED: Stabilized final score countdown
   useEffect(() => {
     if (!showFinalScore) return;
 
+    console.log("🏁 Final score screen activated");
     stopTick();
     playSound(gameoverSoundRef.current);
 
@@ -464,11 +490,16 @@ export default function QuizGamePage() {
     setFinalCountdown(remaining);
 
     const interval = setInterval(() => {
-      setFinalCountdown((prev) => Math.max(0, prev - 1));
+      remaining -= 1;
+      setFinalCountdown(Math.max(0, remaining));
+      
+      if (remaining <= 0) {
+        clearInterval(interval);
+      }
     }, 1000);
 
     const timeout = setTimeout(() => {
-      clearInterval(interval);
+      console.log("🏠 Auto-redirecting to home...");
       router.push("/");
     }, FINAL_SCORE_DURATION * 1000);
 
@@ -501,9 +532,11 @@ export default function QuizGamePage() {
     if (isAnswerLocked || showExplanation || showFinalScore) return;
     if (!currentQ) return;
 
+    console.log("✅ Answer selected:", optionId);
     playClick();
     setSelectedAnswer(optionId);
     setIsAnswerLocked(true);
+    timeoutTriggeredRef.current = true; // ✅ Prevent timeout after manual answer
 
     const correctFlag = optionId === currentQ.correctAnswer;
     setIsCorrect(correctFlag);
@@ -537,6 +570,7 @@ export default function QuizGamePage() {
     if (isAnswerLocked || showExplanation || showFinalScore) return;
     if (!currentQ) return;
 
+    console.log("⏱️ Timeout - no answer submitted");
     setIsAnswerLocked(true);
     setWrongCount((w) => w + 1);
     setStreak(0);
@@ -562,6 +596,7 @@ export default function QuizGamePage() {
   };
 
   const handleExitConfirmYes = async () => {
+    console.log("🚪 User confirmed exit");
     playClick();
     stopTick();
     setShowExitConfirm(false);
@@ -570,6 +605,7 @@ export default function QuizGamePage() {
   };
 
   const handleExitConfirmNo = () => {
+    console.log("↩️ User cancelled exit");
     playClick();
     setShowExitConfirm(false);
   };
@@ -1605,7 +1641,7 @@ export default function QuizGamePage() {
                   onClick={async () => {
                     playClick();
                     if (userRounds > 0) {
-                      await decreaseUserRound();
+                      await deductUserRound();
                       router.push("/lobby");
                     } else {
                       router.push("/buy");
@@ -2128,22 +2164,9 @@ export default function QuizGamePage() {
                         fontWeight: 600,
                       }}
                     >
-                      Next question in{" "}
-                      <span
-                        style={{
-                          color: "#22d3ee",
-                          fontWeight: 900,
-                          fontSize:
-                            "clamp(14px, 3vw, 18px)",
-                          textShadow:
-                            "0 0 10px rgba(34,211,238,0.5)",
-                        }}
-                      >
-                        {phase === "INTERMISSION"
-                          ? "..."
-                          : "5"}
-                      </span>{" "}
-                      seconds...
+                      {phase === "INTERMISSION"
+                        ? "⏳ Waiting for next question..."
+                        : "Next question starting..."}
                     </p>
                   </div>
                 </article>
