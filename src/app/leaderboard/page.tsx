@@ -114,7 +114,7 @@ useEffect(() => {
 
         // Aggregate data in JS
         const userStats = new Map();
-        scores?.forEach((row) => {
+        scores?.forEach((row: any) => {
           const userId = row.user_id;
           const existing = userStats.get(userId);
           if (existing) {
