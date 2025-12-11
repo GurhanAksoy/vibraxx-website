@@ -558,7 +558,7 @@ export default function TermsPage() {
             </p>
             <div className="last-updated-badge">
               <CheckCircle style={{ width: 16, height: 16 }} />
-              Effective: 19 November 2025
+              Last Updated: December 11, 2025
             </div>
           </div>
 
@@ -607,6 +607,9 @@ export default function TermsPage() {
             </h2>
             <p>
               By accessing or using VibraXX, you agree to be bound by these Terms & Conditions, our Privacy Policy, and all applicable laws. If you do not agree, you must not use our Services.
+            </p>
+            <p style={{ marginTop: 16 }}>
+              For information about how we handle your personal data, including data retention periods and international transfers, please see our <a href="/privacy" style={{ color: "#a78bfa", fontWeight: 600 }}>Privacy Policy</a>.
             </p>
           </div>
 
@@ -670,9 +673,13 @@ export default function TermsPage() {
             </div>
 
             <div className="warning-box" style={{ marginTop: 24 }}>
-              <strong>VPN & Proxy Use Strictly Prohibited</strong>
+              <strong>VPN & Proxy Detection Policy</strong>
               <p>
-                Using VPN, proxy servers, or any method to bypass geographic restrictions is forbidden. If detected, your account will be terminated immediately and any prizes forfeited—even if legitimately won.
+                Using VPN, proxy servers, or any method to bypass geographic restrictions is strictly prohibited. We detect VPN usage through IP address analysis and ASN (Autonomous System Number) checks against known VPN provider ranges.
+                <br /><br />
+                <strong style={{ color: "#fbbf24" }}>Consequences:</strong> If VPN usage is detected, your account will be immediately terminated and all prizes forfeited—even if legitimately won.
+                <br /><br />
+                <strong style={{ color: "#fbbf24" }}>False Positives:</strong> If you believe your account was incorrectly flagged (e.g., corporate VPN, shared network), you may appeal by contacting team@vibraxx.com with proof of residency (utility bill, government ID). Appeals are reviewed within 5 business days.
               </p>
             </div>
           </div>
@@ -724,8 +731,8 @@ export default function TermsPage() {
             </h2>
             <h3 className="subsection-title">6.1 Round Prices</h3>
             <ul>
-              <li><strong>Single Round:</strong> £1.00</li>
-              <li><strong>35 Rounds:</strong> £29.00 (£0.83 per round - 17% savings)</li>
+              <li><strong>Single Round:</strong> £2.00</li>
+              <li><strong>35 Round Bundle:</strong> £49.00 (£1.40 per round - 30% savings)</li>
             </ul>
 
             <h3 className="subsection-title">6.2 Payment Processing</h3>
@@ -735,7 +742,7 @@ export default function TermsPage() {
 
             <h3 className="subsection-title">6.3 Currency</h3>
             <p>
-              All prices are in British Pounds (GBP). If you pay in a different currency, your bank or payment provider handles the conversion. We are not responsible for exchange rate differences or conversion fees.
+              All prices are in British Pounds (GBP). If you pay in a different currency, your bank or payment provider handles the conversion. We are not responsible for exchange rate differences or conversion fees charged during purchase transactions.
             </p>
           </div>
 
@@ -750,26 +757,33 @@ export default function TermsPage() {
 
             <h3 className="subsection-title">7.2 Minimum Participation Threshold</h3>
             <div className="warning-box">
-              <strong>3000+ Participants Required</strong>
+              <strong>3000+ Unique Paid Participants Required</strong>
               <p>
-                The prize pool activates only if 3000 or more participants compete during the calendar month. This threshold covers platform operational costs including payment processing fees, infrastructure, security, and support services. If the threshold is not met, no prize is awarded and funds do not carry over to the next month.
+                The prize pool activates only if <strong>3000 or more unique participants who have purchased at least one paid round</strong> compete during the calendar month. This threshold covers platform operational costs including payment processing fees, infrastructure, security, and support services. If the threshold is not met, no prize is awarded and funds do not carry over to the next month.
+                <br /><br />
+                <strong style={{ color: "#fbbf24" }}>Clarification:</strong> "Unique paid participants" means individual users who have purchased and used at least one paid competition round during the month. Free practice rounds do not count toward this threshold.
               </p>
             </div>
 
             <h3 className="subsection-title">7.3 Tie-Breaking Rules</h3>
-            <p>If multiple participants have the same highest score:</p>
+            <p>If multiple participants have the same highest cumulative score, the following tie-breaking rules apply in order:</p>
             <ol>
-              <li>The participant with the fewest incorrect answers wins</li>
-              <li>If still tied, the prize is divided equally among tied participants</li>
+              <li><strong>Fewest Incorrect Answers:</strong> The participant with the fewest total wrong answers wins</li>
+              <li><strong>Highest Accuracy Rate:</strong> If still tied, the participant with the highest overall accuracy percentage wins</li>
+              <li><strong>Highest Average Score Per Round:</strong> If still tied, the participant with the highest average score across all rounds played wins</li>
+              <li><strong>Prize Split:</strong> If all above criteria are equal, the prize is divided equally among all tied participants</li>
             </ol>
 
-            <h3 className="subsection-title">7.4 Prize Payment</h3>
+            <h3 className="subsection-title">7.4 Prize Payment Timeline</h3>
             <ul>
-              <li>Winners are notified by email within 3 business days of month-end</li>
-              <li>Payment is made via Stripe to your verified bank account</li>
-              <li>Payment processed within 7 business days of verification</li>
-              <li>All payments in GBP - currency conversion fees apply if applicable</li>
+              <li><strong>Winner Notification:</strong> Winners are notified by email within <strong>3 business days</strong> of month-end</li>
+              <li><strong>Identity Verification:</strong> Up to <strong>10 business days</strong> for document review and approval</li>
+              <li><strong>Payment Processing:</strong> <strong>7 business days</strong> after verification approval</li>
+              <li><strong>Maximum Total Timeline:</strong> <strong>21 calendar days</strong> from month-end to payment completion</li>
             </ul>
+            <p>
+              All payments are made in GBP via Stripe to your verified bank account. If you require payment in a different currency, currency conversion fees and exchange rate differences are your responsibility.
+            </p>
           </div>
 
           <div className="content-card">
@@ -825,13 +839,22 @@ export default function TermsPage() {
 
           <div className="content-card">
             <h2 className="section-title">
-              <span>11.</span> Technical Issues
+              <span>11.</span> Technical Issues & Question Errors
             </h2>
+            <h3 className="subsection-title">11.1 Question Error Policy</h3>
             <p>
-              If a question contains an error or technical issue, that specific question will be cancelled and excluded from scoring. The remainder of the quiz continues normally.
+              If a quiz question contains a factual error, ambiguous wording, or technical display issue that affects answer validity, the following process applies:
             </p>
+            <ul>
+              <li><strong>Error Validation:</strong> Errors must be reported within 24 hours of the round completion via team@vibraxx.com. Our admin team will review the question and validate the error.</li>
+              <li><strong>Question Cancellation:</strong> If an error is confirmed, that specific question will be cancelled and excluded from all participants' scores for that round.</li>
+              <li><strong>Score Recalculation:</strong> The round score will be recalculated based on the remaining 49 questions (maximum score becomes 98 points).</li>
+              <li><strong>No Refunds:</strong> Cancelled questions do not entitle participants to refunds. The competition continues normally with adjusted scoring.</li>
+            </ul>
+
+            <h3 className="subsection-title">11.2 Technical Issues Beyond Our Control</h3>
             <p>
-              We are not liable for issues caused by your internet connection, device problems, or browser incompatibility.
+              We are not liable for issues caused by your internet connection, device problems, browser incompatibility, or third-party service outages (Google OAuth, Stripe, Supabase).
             </p>
           </div>
 
@@ -883,17 +906,30 @@ export default function TermsPage() {
 
           <div className="content-card">
             <h2 className="section-title">
-              <span>15.</span> Account Termination
+              <span>15.</span> Account Termination & Inactive Accounts
             </h2>
+            <h3 className="subsection-title">15.1 Termination by VibraXX</h3>
             <p>We may suspend or terminate your account if:</p>
             <ul>
               <li>You breach these Terms</li>
               <li>We suspect fraud or illegal activity</li>
               <li>Required by law</li>
-              <li>Your account is inactive for 3+ years</li>
+              <li>Your account meets the inactive account criteria (see below)</li>
             </ul>
-            <p style={{ marginTop: 16 }}>
-              You may close your account anytime by contacting team@vibraxx.com. Account closure does not affect obligations already incurred or prizes already won.
+
+            <h3 className="subsection-title">15.2 Inactive Account Policy</h3>
+            <p>
+              An account is considered inactive if there has been <strong>no login activity for 36 consecutive months</strong> (3 years).
+            </p>
+            <ul>
+              <li><strong>Warning Notice:</strong> We will send an email notification to your registered address 30 days before account closure.</li>
+              <li><strong>Remaining Rounds:</strong> Any unused purchased rounds will expire and will <strong>not be refunded</strong> upon account closure due to inactivity.</li>
+              <li><strong>Reactivation:</strong> To prevent closure, simply log in within the 30-day warning period.</li>
+            </ul>
+
+            <h3 className="subsection-title">15.3 Voluntary Account Closure</h3>
+            <p>
+              You may close your account anytime by contacting team@vibraxx.com. Account closure does not affect obligations already incurred or prizes already won. Unused rounds are subject to our standard refund policy (see Section 9).
             </p>
           </div>
 
