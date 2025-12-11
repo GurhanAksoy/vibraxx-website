@@ -127,21 +127,27 @@ export default function LobbyPage() {
       setUser(authUser);
       console.log("✅ Lobby Security: User authenticated -", authUser.id);
 
-      // Kullanıcının round hakkı kontrolü
+      // ✅ FIXED: Improved user rounds security check
       const { data: roundsData, error: roundsError } = await supabase
-  .from("user_rounds")
-  .select("remaining")
-  .eq("user_id", authUser.id)
-  .single();
+        .from("user_rounds")
+        .select("remaining")
+        .eq("user_id", authUser.id)
+        .single();
 
-if (roundsError || !roundsData || roundsData.remaining <= 0) {
-  console.log("❌ Lobby Security: No remaining rounds");
-  router.push("/buy");
-  return;
-}
+      if (roundsError || !roundsData) {
+        console.log("❌ Lobby Security: User rounds record not found");
+        router.push("/buy");
+        return;
+      }
 
-setUserRounds(roundsData.remaining);
-console.log("✅ Lobby Security: User remaining rounds -", roundsData.remaining);
+      if (roundsData.remaining <= 0) {
+        console.log("❌ Lobby Security: No remaining rounds");
+        router.push("/buy");
+        return;
+      }
+
+      setUserRounds(roundsData.remaining);
+      console.log("✅ Lobby Security: User remaining rounds -", roundsData.remaining);
       console.log("✅ Lobby Security: All checks passed!");
       setIsLoading(false);
     };
@@ -341,22 +347,20 @@ console.log("✅ Lobby Security: User remaining rounds -", roundsData.remaining)
   useEffect(() => {
     const channel = supabase
       .channel("lobby-overlay")
-     .on(
-  "postgres_changes",
-  { event: "*", schema: "public", table: "overlay_round_state" },
-  (payload) => {
-    const newData = payload.new as { time_left?: number | null };
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "overlay_round_state" },
+        (payload) => {
+          const newData = payload.new as { time_left?: number | null };
 
-    if (typeof newData?.time_left === "number") {
-      setGlobalTimeLeft(newData.time_left);
-    } else {
-      setGlobalTimeLeft(null);
-    }
-  }
-)
-
-.subscribe();
-
+          if (typeof newData?.time_left === "number") {
+            setGlobalTimeLeft(newData.time_left);
+          } else {
+            setGlobalTimeLeft(null);
+          }
+        }
+      )
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
@@ -922,10 +926,6 @@ console.log("✅ Lobby Security: User remaining rounds -", roundsData.remaining)
             padding: "clamp(24px, 5vw, 40px) clamp(16px, 4vw, 32px)",
           }}
         >
-          {/* 🎯 PREMIUM SPONSOR BANNER */}
-          {/* (TASARIMA DOKUNMADIM) */}
-          {/* ... Aşağıdaki tüm JSX senin orijinal tasarımın, sadece yukarıdaki logic optimize edildi ... */}
-
           {/* Sponsor Banner */}
           <div
             style={{
@@ -1355,9 +1355,7 @@ console.log("✅ Lobby Security: User remaining rounds -", roundsData.remaining)
                   : "You'll be automatically entered when the quiz begins. Get ready! "}
               </p>
 
-              {/* Quiz Info Grid (tasarım aynen) */}
-              {/* ... (buradaki grid ve altındaki pro tip bloğu senin orijinal kodun; kısaltmıyorum) */}
-
+              {/* Quiz Info Grid */}
               <div
                 style={{
                   display: "grid",
@@ -1506,9 +1504,7 @@ console.log("✅ Lobby Security: User remaining rounds -", roundsData.remaining)
               </div>
             </div>
 
-            {/* Players Section (tasarım aynen korundu) */}
-            {/* ... Tüm aşağısı orijinal JSX'in, sadece state/logic üst tarafta düzeltildi ... */}
-
+            {/* Players Section */}
             <div
               style={{
                 padding: "clamp(28px, 6vw, 40px)",
