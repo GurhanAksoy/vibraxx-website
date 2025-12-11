@@ -93,7 +93,7 @@ useEffect(() => {
             break;
         }
 
-        // Fetch round_scores with profiles JOIN
+        // ✅ FIXED: Fetch round_scores with profiles JOIN (correct syntax)
         const { data: scores, error } = await supabase
           .from("round_scores")
           .select(`
@@ -103,7 +103,7 @@ useEffect(() => {
             accuracy,
             total_score,
             created_at,
-            profiles:profiles (
+            profiles!inner (
               full_name,
               avatar_url
             )
@@ -125,8 +125,9 @@ useEffect(() => {
           } else {
             userStats.set(userId, {
               user_id: userId,
-              name: row.profiles?.[0]?.full_name || "Anonymous",
-avatar: row.profiles?.[0]?.avatar_url || null,
+              // ✅ FIXED: Access profiles as single object, not array
+              name: row.profiles?.full_name || "Anonymous",
+              avatar: row.profiles?.avatar_url || null,
               totalScore: row.total_score,
               correct: row.correct,
               wrong: row.wrong,
@@ -155,7 +156,13 @@ avatar: row.profiles?.[0]?.avatar_url || null,
         // Sort by score descending
         leaderboard.sort((a, b) => b.score - a.score);
 
-        setTopPlayers(leaderboard);
+        // ✅ FIXED: Add rank field to all players
+        const ranked = leaderboard.map((p, index) => ({
+          ...p,
+          rank: index + 1
+        }));
+
+        setTopPlayers(ranked);
       } catch (error) {
         console.error("Error fetching leaderboard:", error);
         setTopPlayers([]);
@@ -716,7 +723,7 @@ const restPlayers = topPlayers.slice(3, 100);
                       boxShadow: '0 0 30px rgba(192, 192, 192, 0.5)'
                     }}>
                       <img 
-                        src={top3[1].avatar} 
+                        src={top3[1].avatar || "/images/default-avatar.png"} 
                         alt={`${top3[1].name}'s avatar`}
                         style={{ width: '100%', height: '100%', borderRadius: '50%' }} 
                       />
@@ -812,7 +819,7 @@ const restPlayers = topPlayers.slice(3, 100);
                       boxShadow: '0 0 50px rgba(234, 179, 8, 0.8)'
                     }}>
                       <img 
-                        src={top3[0].avatar} 
+                        src={top3[0].avatar || "/images/default-avatar.png"} 
                         alt={`${top3[0].name}'s avatar - Champion`}
                         style={{ width: '100%', height: '100%', borderRadius: '50%' }} 
                       />
@@ -895,7 +902,7 @@ const restPlayers = topPlayers.slice(3, 100);
                       boxShadow: '0 0 30px rgba(180, 83, 9, 0.5)'
                     }}>
                       <img 
-                        src={top3[2].avatar} 
+                        src={top3[2].avatar || "/images/default-avatar.png"} 
                         alt={`${top3[2].name}'s avatar`}
                         style={{ width: '100%', height: '100%', borderRadius: '50%' }} 
                       />
@@ -1038,7 +1045,7 @@ const restPlayers = topPlayers.slice(3, 100);
 
                       <div style={{ position: 'relative', flexShrink: 0 }}>
                         <img 
-                          src={player.avatar} 
+                          src={player.avatar || "/images/default-avatar.png"} 
                           alt={`${player.name}'s avatar`}
                           style={{
                             width: 'clamp(40px, 8vw, 56px)',
