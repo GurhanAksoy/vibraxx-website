@@ -7,7 +7,6 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { createOrUpdateProfile } from "@/lib/createProfile";
-import { updateActiveSession } from "@/lib/activeSession";
 
 // ✅ STANDARDIZED REDIRECT DELAYS
 const REDIRECT_DELAYS = {
@@ -91,7 +90,16 @@ function AuthCallbackInner() {
         // STEP 4: REGISTER ACTIVE SESSION (CRITICAL)
         // ============================================
         console.log("🔐 Callback: Registering active session...");
-        await updateActiveSession(session.user.id, "HOME");
+        await fetch("/api/session/update", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            userId: session.user.id,
+            location: "HOME"
+          })
+        });
         console.log("✅ Callback: Active session registered");
 
         // ============================================
