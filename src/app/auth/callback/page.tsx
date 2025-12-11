@@ -7,66 +7,168 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { createOrUpdateProfile } from "@/lib/createProfile";
+import { updateActiveSession } from "@/lib/activeSession";
+
+// ✅ STANDARDIZED REDIRECT DELAYS
+const REDIRECT_DELAYS = {
+  SUCCESS: 1000,      // Happy path - fast redirect
+  ERROR: 2500,        // Error cases - give user time to read
+  NO_SESSION: 1500,   // Mild error - medium delay
+};
 
 function AuthCallbackInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-
   const [message, setMessage] = useState("Signing you in...");
   const [subMessage, setSubMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const run = async () => {
+    const handleOAuthCallback = async () => {
       try {
+        // ============================================
+        // STEP 1: CHECK FOR OAUTH ERROR PARAMETERS
+        // ============================================
         const error = searchParams.get("error");
         const errorDesc = searchParams.get("error_description");
 
         if (error) {
-          setMessage("Sign-in failed");
-          setSubMessage(errorDesc || "An error occurred while signing you in.");
-          setTimeout(() => router.replace("/"), 2500);
+          console.error("❌ Callback: OAuth error:", error, errorDesc);
+
+          // ✅ SPECIFIC ERROR HANDLING
+          let userMessage = "Sign-in failed";
+          let userSubMessage = errorDesc || "An error occurred while signing you in.";
+
+          if (error === "access_denied") {
+            userMessage = "Sign-in cancelled";
+            userSubMessage = "You chose not to continue. Redirecting...";
+          } else if (error === "server_error") {
+            userMessage = "Service temporarily unavailable";
+            userSubMessage = "Google is experiencing issues. Please try again later.";
+          } else if (error === "temporarily_unavailable") {
+            userMessage = "Service busy";
+            userSubMessage = "Too many requests. Please try again in a moment.";
+          }
+
+          setMessage(userMessage);
+          setSubMessage(userSubMessage);
+          setTimeout(() => router.replace("/"), REDIRECT_DELAYS.ERROR);
           return;
         }
 
+        // ============================================
+        // STEP 2: VALIDATE SESSION
+        // ============================================
         const { data, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) {
+          console.error("❌ Callback: Session error:", sessionError);
           setMessage("Session error");
           setSubMessage("Please try signing in again.");
-          setTimeout(() => router.replace("/"), 2500);
+          setTimeout(() => router.replace("/"), REDIRECT_DELAYS.ERROR);
           return;
         }
 
         const session = data.session;
+
         if (!session?.user) {
+          console.warn("⚠️ Callback: No active session found");
           setMessage("No active session");
           setSubMessage("Redirecting you to home...");
-          setTimeout(() => router.replace("/"), 1500);
+          setTimeout(() => router.replace("/"), REDIRECT_DELAYS.NO_SESSION);
           return;
         }
 
-        await createOrUpdateProfile(session.user);
+        console.log("✅ Callback: Session validated for user:", session.user.id);
 
+        // ============================================
+        // STEP 3: CREATE/UPDATE PROFILE (CENTRAL HANDLER)
+        // ============================================
+        console.log("📝 Callback: Creating/updating user profile...");
+        await createOrUpdateProfile(session.user);
+        console.log("✅ Callback: Profile created/updated");
+
+        // ============================================
+        // STEP 4: REGISTER ACTIVE SESSION (CRITICAL)
+        // ============================================
+        console.log("🔐 Callback: Registering active session...");
+        await updateActiveSession(session.user.id, "HOME");
+        console.log("✅ Callback: Active session registered");
+
+        // ============================================
+        // STEP 5: SUCCESS - REDIRECT TO HOME
+        // ============================================
         setMessage("Welcome!");
         setSubMessage("Redirecting you to VibraXX...");
+        setTimeout(() => {
+          console.log("🚀 Callback: Redirecting to homepage");
+          router.replace("/");
+        }, REDIRECT_DELAYS.SUCCESS);
 
-        setTimeout(() => router.replace("/"), 1000);
-      } catch (err) {
+      } catch (err: any) {
+        // ============================================
+        // STEP 6: CATCH-ALL ERROR HANDLER
+        // ============================================
+        console.error("❌ Callback: Unexpected error:", err);
+        console.error("Error details:", {
+          message: err?.message,
+          stack: err?.stack,
+          name: err?.name,
+        });
+
+        // Optional: Sentry integration
+        // if (typeof Sentry !== 'undefined') {
+        //   Sentry.captureException(err, {
+        //     tags: { context: 'oauth_callback' },
+        //     extra: { searchParams: Object.fromEntries(searchParams) },
+        //   });
+        // }
+
         setMessage("Unexpected error");
-        setSubMessage("Redirecting you to home...");
-        setTimeout(() => router.replace("/"), 2000);
+        setSubMessage("Something went wrong. Redirecting you to home...");
+        setTimeout(() => router.replace("/"), REDIRECT_DELAYS.ERROR);
       }
     };
 
-    run();
+    handleOAuthCallback();
   }, [router, searchParams]);
 
   return (
-    <main className="min-h-screen bg-black text-white grid place-items-center">
-      <div className="flex flex-col items-center gap-2">
-        <p className="text-lg font-semibold">{message}</p>
+    <main className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white grid place-items-center">
+      {/* Background Decorative Elements (matching login page) */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 left-10 w-72 h-72 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse" />
+        <div className="absolute bottom-20 right-10 w-72 h-72 bg-pink-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse" 
+             style={{ animationDelay: "700ms" }} />
+      </div>
+
+      {/* Content */}
+      <div className="relative z-10 flex flex-col items-center gap-4">
+        {/* Loading Spinner */}
+        <svg
+          className="animate-spin h-12 w-12 text-cyan-400"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          />
+        </svg>
+
+        {/* Messages */}
+        <p className="text-xl font-semibold text-center">{message}</p>
         {subMessage && (
-          <p className="text-sm text-gray-400 text-center max-w-md">
+          <p className="text-sm text-gray-400 text-center max-w-md px-4">
             {subMessage}
           </p>
         )}
@@ -77,7 +179,44 @@ function AuthCallbackInner() {
 
 export default function AuthCallbackPage() {
   return (
-    <Suspense fallback={<div style={{ color: "white" }}>Loading...</div>}>
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white grid place-items-center">
+          {/* Background Elements */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute top-20 left-10 w-72 h-72 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse" />
+            <div className="absolute bottom-20 right-10 w-72 h-72 bg-pink-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse" 
+                 style={{ animationDelay: "700ms" }} />
+          </div>
+
+          {/* Loading Content */}
+          <div className="relative z-10 flex flex-col items-center gap-4">
+            <svg
+              className="animate-spin h-12 w-12 text-cyan-400"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+            <p className="text-xl font-semibold">Loading...</p>
+            <p className="text-sm text-gray-400">Preparing your session</p>
+          </div>
+        </main>
+      }
+    >
       <AuthCallbackInner />
     </Suspense>
   );
