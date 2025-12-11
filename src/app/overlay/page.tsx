@@ -1,18 +1,34 @@
 ﻿"use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Trophy, Users, Globe, Clock, Zap, CheckCircle } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 
 type Phase = "question" | "countdown" | "reveal" | "explanation";
+
+type OptionId = "A" | "B" | "C" | "D";
+
+type QuestionOption = {
+  id: OptionId;
+  text: string;
+};
+
+type QuestionState = {
+  index: number;
+  total: number;
+  question: string;
+  options: QuestionOption[];
+  correctAnswer: OptionId;
+  explanation: string;
+};
 
 // --- Supabase client (browser) ---
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// --- Fallback MOCK data (design için aynı kaldı) ---
-const MOCK_QUESTION = {
+// --- Fallback MOCK data (sadece design preview için, runtime’da zorunlu değil) ---
+const MOCK_QUESTION: QuestionState = {
   index: 23,
   total: 50,
   question: "Which element has the atomic number 79?",
@@ -118,28 +134,7 @@ const MOCK_COUNTRIES = [
   { code: "IN", name: "India", count: 56, flag: "🇮🇳" },
 ];
 
-// Supabase row tipleri (basit)
-type OverlayRoundStateRow = {
-  id: number;
-  round_id: string | null;
-  phase: Phase | null;
-  question_index: number | null;
-  time_left: number | null;
-};
-
-type OverlayCurrentQuestionRow = {
-  id: number;
-  round_id: string | null;
-  question_id: string | null;
-  question_text: string | null;
-  option_a: string | null;
-  option_b: string | null;
-  option_c: string | null;
-  option_d: string | null;
-  correct_answer: "A" | "B" | "C" | "D" | null;
-  explanation: string | null;
-};
-
+// Supabase row tipleri
 type OverlayStatsRow = {
   id: number;
   round_id: string | null;
@@ -147,7 +142,13 @@ type OverlayStatsRow = {
   answering: number | null;
   correct_percent: number | null;
   avg_time: number | null;
-  countries: any | null; // [{code, count}, ...] bekliyoruz
+  countries:
+    | {
+        code: string;
+        name?: string | null;
+        count: number;
+      }[]
+    | null;
 };
 
 type OverlayLeaderboardRow = {
@@ -161,6 +162,25 @@ type OverlayLeaderboardRow = {
   avg_time: number | null;
 };
 
+// Helper: Convert country code to flag emoji (güvenli)
+function getFlagFromCode(code: string): string {
+  try {
+    if (!code) return "🌍";
+    const trimmed = code.trim().toUpperCase();
+    if (trimmed.length !== 2 || !/^[A-Z]{2}$/.test(trimmed)) {
+      return "🌍";
+    }
+    return trimmed
+      .split("")
+      .map((char) =>
+        String.fromCodePoint(char.charCodeAt(0) + 127397)
+      )
+      .join("");
+  } catch {
+    return "🌍";
+  }
+}
+
 export default function OverlayPage() {
   // Faz & süre
   const [phase, setPhase] = useState<Phase>("question");
@@ -168,8 +188,11 @@ export default function OverlayPage() {
   const [questionStartAt, setQuestionStartAt] = useState<string | null>(null);
   const [roundNumber, setRoundNumber] = useState<number | null>(null);
 
-  // Ekranda görünen soru (mock yapısında tutuyoruz)
-  const [question, setQuestion] = useState(MOCK_QUESTION);
+  // Aktif round ID için ref (closure bug fix)
+  const roundIdRef = useRef<string | null>(null);
+
+  // Ekranda görünen soru
+  const [question, setQuestion] = useState<QuestionState | null>(null);
 
   // İstatistikler
   const [overlayStats, setOverlayStats] = useState<OverlayStatsRow | null>(
@@ -177,19 +200,37 @@ export default function OverlayPage() {
   );
 
   // Ülkeler paneli
-  const [countries, setCountries] = useState(MOCK_COUNTRIES);
+  const [countries, setCountries] = useState<
+    { code: string; name: string; flag: string; count: number }[]
+  >(MOCK_COUNTRIES);
 
   // Leaderboard
-  const [leaderboard, setLeaderboard] = useState(MOCK_LEADERBOARD);
-            
-// Helper: Convert country code to flag emoji
-function getFlagFromCode(code: string) {
-  return code
-    .toUpperCase()
-    .replace(/./g, char =>
-      String.fromCodePoint(char.charCodeAt(0) + 127397)
-    );
-}
+  const [leaderboard, setLeaderboard] = useState<
+    {
+      rank: number;
+      username: string;
+      country: string;
+      score: number;
+      correct: number;
+      avgTime: number;
+    }[]
+  >(MOCK_LEADERBOARD);
+
+  // Effective question (real yoksa bekleme placeholder’ı)
+  const effectiveQuestion: QuestionState =
+    question ?? {
+      index: 0,
+      total: 50,
+      question: "Waiting for the next live question...",
+      options: [
+        { id: "A", text: "..." },
+        { id: "B", text: "..." },
+        { id: "C", text: "..." },
+        { id: "D", text: "..." },
+      ],
+      correctAnswer: "A",
+      explanation: "",
+    };
 
   // --- FETCH ACTIVE ROUND & INITIAL DATA ---
   useEffect(() => {
@@ -197,72 +238,152 @@ function getFlagFromCode(code: string) {
 
     const loadInitial = async () => {
       try {
-        // 1️⃣ Get active round from live_rounds
-        const { data: activeRound } = await supabase
+        // 1️⃣ Aktif round’u live_rounds’tan çek
+        const {
+          data: activeRound,
+          error: activeRoundError,
+        } = await supabase
           .from("live_rounds")
           .select("*")
-          .or("phase.eq.QUESTION,phase.eq.READY")
+          .or(
+            "phase.eq.QUESTION,phase.eq.READY,phase.eq.REVEAL,phase.eq.EXPLANATION,phase.eq.INTERMISSION"
+          )
           .order("scheduled_start", { ascending: false })
           .limit(1)
           .single();
 
-        const roundId = activeRound?.id ?? null;
-        const roundNumber = activeRound?.global_round_index ?? null;
-        
-        if (!isMounted || !roundId) return;
+        if (!isMounted) return;
 
-        // Set phase from live_rounds (proper mapping)
-        if (activeRound.phase === "QUESTION") setPhase("question");
-        else if (activeRound.phase === "READY") setPhase("countdown");
-        
-        const currentIndex = activeRound.current_question_index || 0;
+        if (activeRoundError || !activeRound) {
+          console.warn(
+            "Overlay: No active round found or error:",
+            activeRoundError
+          );
+          // Aktif round yoksa sadece mock ile bekleme görüntüsü kalsın
+          setQuestion(null);
+          roundIdRef.current = null;
+          setOverlayStats(null);
+          return;
+        }
 
-        // Store question start time for timer
-        setQuestionStartAt(activeRound.question_started_at);
+        const roundId: string | null = activeRound.id ?? null;
+        const globalRoundIndex: number | null =
+          activeRound.global_round_index ?? null;
 
-        // Store round number for display
-        setRoundNumber(roundNumber);
+        if (!roundId) {
+          console.warn("Overlay: Active round has no id");
+          setQuestion(null);
+          roundIdRef.current = null;
+          setOverlayStats(null);
+          return;
+        }
 
-        // 2️⃣ Fetch question from live_round_questions
-        const { data: qData } = await supabase
+        roundIdRef.current = roundId;
+
+        // Faz mapping
+        switch (activeRound.phase) {
+          case "QUESTION":
+            setPhase("question");
+            break;
+          case "READY":
+            setPhase("countdown");
+            break;
+          case "REVEAL":
+            setPhase("reveal");
+            break;
+          case "EXPLANATION":
+          case "INTERMISSION":
+            setPhase("explanation");
+            break;
+          case "FINISHED":
+            setPhase("reveal");
+            break;
+          default:
+            setPhase("question");
+            break;
+        }
+
+        const currentIndex: number =
+          activeRound.current_question_index ?? 0;
+
+        setQuestionStartAt(activeRound.question_started_at ?? null);
+        setRoundNumber(globalRoundIndex);
+
+        // 2️⃣ Soruyu live_round_questions’tan çek
+        const {
+          data: qData,
+          error: qError,
+        } = await supabase
           .from("live_round_questions")
           .select("position, questions(*)")
           .eq("round_id", roundId)
           .eq("position", currentIndex)
           .single();
 
-        if (isMounted && (qData as any)?.questions) {
+        if (!isMounted) return;
+
+        if (qError) {
+          console.error("Overlay: Error loading question:", qError);
+        }
+
+        const qRow: any = qData;
+        if (qRow?.questions) {
           setQuestion({
             index: currentIndex,
             total: 50,
-            question: (qData as any).questions.question_text || "",
+            question: qRow.questions.question_text || "",
             options: [
-              { id: "A", text: (qData as any).questions.option_a || "" },
-              { id: "B", text: (qData as any).questions.option_b || "" },
-              { id: "C", text: (qData as any).questions.option_c || "" },
-              { id: "D", text: (qData as any).questions.option_d || "" },
+              {
+                id: "A",
+                text: qRow.questions.option_a || "",
+              },
+              {
+                id: "B",
+                text: qRow.questions.option_b || "",
+              },
+              {
+                id: "C",
+                text: qRow.questions.option_c || "",
+              },
+              {
+                id: "D",
+                text: qRow.questions.option_d || "",
+              },
             ],
-            correctAnswer: (qData as any).questions.correct_answer || "A",
-            explanation: (qData as any).questions.explanation || "",
+            correctAnswer: (qRow.questions.correct_answer ||
+              "A") as OptionId,
+            explanation: qRow.questions.explanation || "",
           });
+        } else {
+          console.warn("Overlay: No question data for current index");
+          setQuestion(null);
         }
 
-        // 3️⃣ Fetch overlay stats
-        const { data: statsData } = await supabase
+        // 3️⃣ Stats çek
+        const {
+          data: statsData,
+          error: statsError,
+        } = await supabase
           .from("overlay_stats")
           .select("*")
           .eq("round_id", roundId)
           .order("updated_at", { ascending: false })
           .limit(1);
 
-        if (isMounted && statsData?.[0]) {
-          setOverlayStats(statsData[0] as OverlayStatsRow);
-          
-          // Convert countries with flag mapping
-          if (statsData[0].countries && Array.isArray(statsData[0].countries)) {
-            const mappedCountries = statsData[0].countries.map((c: any) => ({
+        if (!isMounted) return;
+
+        if (statsError) {
+          console.error("Overlay: Error loading stats:", statsError);
+        }
+
+        if (statsData && statsData[0]) {
+          const row = statsData[0] as OverlayStatsRow;
+          setOverlayStats(row);
+
+          if (row.countries && Array.isArray(row.countries)) {
+            const mappedCountries = row.countries.map((c) => ({
               code: c.code,
-                name: c.name ?? c.code,
+              name: c.name ?? c.code,
               flag: getFlagFromCode(c.code),
               count: c.count,
             }));
@@ -270,27 +391,45 @@ function getFlagFromCode(code: string) {
           }
         }
 
-        // 4️⃣ Fetch leaderboard
-        const { data: leaderboardData } = await supabase
+        // 4️⃣ Leaderboard çek
+        const {
+          data: leaderboardData,
+          error: leaderboardError,
+        } = await supabase
           .from("overlay_leaderboard")
           .select("*")
           .eq("round_id", roundId)
           .order("rank", { ascending: true })
           .limit(10);
 
-        if (isMounted && leaderboardData) {
-          setLeaderboard(leaderboardData.map((row: any) => ({
-            rank: row.rank ?? 0,
-            username: row.username ?? "",
-            country: row.country ?? "",
-            score: row.score ?? 0,
-            correct: row.correct ?? 0,
-            avgTime: row.avg_time ?? 0,
-          })));
+        if (!isMounted) return;
+
+        if (leaderboardError) {
+          console.error(
+            "Overlay: Error loading leaderboard:",
+            leaderboardError
+          );
         }
 
+        if (leaderboardData) {
+          const mapped = (leaderboardData as OverlayLeaderboardRow[]).map(
+            (row) => ({
+              rank: row.rank ?? 0,
+              username: row.username ?? "",
+              country: row.country ?? "",
+              score: row.score ?? 0,
+              correct: row.correct ?? 0,
+              avgTime: row.avg_time ?? 0,
+            })
+          );
+          setLeaderboard(mapped);
+        }
       } catch (err) {
-        console.error("Error loading overlay data:", err);
+        console.error("Overlay: Unexpected error in loadInitial:", err);
+        // Hata durumunda mock görünümde kal
+        if (isMounted) {
+          setQuestion(null);
+        }
       }
     };
 
@@ -301,49 +440,74 @@ function getFlagFromCode(code: string) {
     };
   }, []);
 
-  // --- SERVER-SYNC TIMER (500ms polling with phase-aware duration) ---
+  // --- SERVER-SYNC TIMER (500ms) ---
   useEffect(() => {
     if (!questionStartAt) return;
-    
+
     const interval = setInterval(() => {
-      const start = new Date(questionStartAt).getTime();
-      const now = Date.now();
-      const elapsed = Math.floor((now - start) / 1000);
-      
-      // Phase-aware duration
-      const duration =
-        phase === "question" ? 6 :
-        phase === "reveal" ? 5 :
-        phase === "explanation" ? 5 :
-        6;
-      
-      const remaining = Math.max(0, duration - elapsed);
-      setTimeLeft(remaining);
+      try {
+        const startMs = new Date(questionStartAt).getTime();
+        if (Number.isNaN(startMs)) return;
+
+        const now = Date.now();
+        const elapsed = Math.floor((now - startMs) / 1000);
+
+        // Faz bazlı süre
+        const duration =
+          phase === "question"
+            ? 6
+            : phase === "reveal"
+            ? 5
+            : phase === "explanation"
+            ? 5
+            : 6;
+
+        const remaining = Math.max(0, duration - elapsed);
+        setTimeLeft(remaining);
+      } catch (e) {
+        console.error("Overlay: Timer calc error:", e);
+      }
     }, 500);
-    
+
     return () => clearInterval(interval);
   }, [questionStartAt, phase]);
 
   // --- REALTIME SUBSCRIPTIONS ---
   useEffect(() => {
-    let currentRoundId: string | null = null;
-
-    // Get current round ID first
+    // Başlangıçta current round id öğren (stats filtresi için)
     const initRealtime = async () => {
-      const { data: activeRound } = await supabase
-        .from("live_rounds")
-        .select("id")
-        .or("phase.eq.QUESTION,phase.eq.READY")
-        .order("scheduled_start", { ascending: false })
-        .limit(1)
-        .single();
+      try {
+        const {
+          data: activeRound,
+          error: activeRoundError,
+        } = await supabase
+          .from("live_rounds")
+          .select("id")
+          .or(
+            "phase.eq.QUESTION,phase.eq.READY,phase.eq.REVEAL,phase.eq.EXPLANATION,phase.eq.INTERMISSION"
+          )
+          .order("scheduled_start", { ascending: false })
+          .limit(1)
+          .single();
 
-      currentRoundId = activeRound?.id ?? null;
+        if (activeRoundError) {
+          console.warn(
+            "Overlay: Realtime init active round error:",
+            activeRoundError
+          );
+        }
+
+        if (activeRound?.id) {
+          roundIdRef.current = activeRound.id;
+        }
+      } catch (err) {
+        console.error("Overlay: Realtime init error:", err);
+      }
     };
 
     initRealtime();
 
-    // Subscribe to live_rounds for phase/question updates
+    // live_rounds subscription
     const roundsChannel = supabase
       .channel("overlay-rounds")
       .on(
@@ -353,54 +517,94 @@ function getFlagFromCode(code: string) {
           schema: "public",
           table: "live_rounds",
         },
-        async (payload) => {
-          const row = payload.new as any;
-          
-          // Update current round ID
-          currentRoundId = row.id;
-          
-          // Update round number
-          setRoundNumber(row.global_round_index ?? null);
-          
-          // Proper phase mapping
-          if (row.phase === "QUESTION") setPhase("question");
-          else if (row.phase === "READY") setPhase("countdown");
-          else if (row.phase === "REVEAL") setPhase("reveal");
-          else if (row.phase === "EXPLANATION" || row.phase === "INTERMISSION") setPhase("explanation");
-          else if (row.phase === "FINISHED") setPhase("reveal");
+        async (payload: any) => {
+          try {
+            const row = payload.new as any;
+            if (!row) return;
 
-          // Update question start time
-          setQuestionStartAt(row.question_started_at);
+            roundIdRef.current = row.id || roundIdRef.current;
 
-          // Fetch new question
-          const newIndex = row.current_question_index || 0;
-          const { data: qData } = await supabase
-            .from("live_round_questions")
-            .select("position, questions(*)")
-            .eq("round_id", row.id)
-            .eq("position", newIndex)
-            .single();
+            setRoundNumber(row.global_round_index ?? null);
 
-          if ((qData as any)?.questions) {
-            setQuestion({
-              index: newIndex,
-              total: 50,
-              question: (qData as any).questions.question_text || "",
-              options: [
-                { id: "A", text: (qData as any).questions.option_a || "" },
-                { id: "B", text: (qData as any).questions.option_b || "" },
-                { id: "C", text: (qData as any).questions.option_c || "" },
-                { id: "D", text: (qData as any).questions.option_d || "" },
-              ],
-              correctAnswer: (qData as any).questions.correct_answer || "A",
-              explanation: (qData as any).questions.explanation || "",
-            });
+            // Faz mapping
+            switch (row.phase) {
+              case "QUESTION":
+                setPhase("question");
+                break;
+              case "READY":
+                setPhase("countdown");
+                break;
+              case "REVEAL":
+                setPhase("reveal");
+                break;
+              case "EXPLANATION":
+              case "INTERMISSION":
+                setPhase("explanation");
+                break;
+              case "FINISHED":
+                setPhase("reveal");
+                break;
+              default:
+                break;
+            }
+
+            setQuestionStartAt(row.question_started_at ?? null);
+
+            const newIndex: number =
+              row.current_question_index ?? 0;
+
+            const { data: qData, error: qError } = await supabase
+              .from("live_round_questions")
+              .select("position, questions(*)")
+              .eq("round_id", row.id)
+              .eq("position", newIndex)
+              .single();
+
+            if (qError) {
+              console.error(
+                "Overlay: Error loading question (realtime):",
+                qError
+              );
+              return;
+            }
+
+            const qRow: any = qData;
+            if (qRow?.questions) {
+              setQuestion({
+                index: newIndex,
+                total: 50,
+                question: qRow.questions.question_text || "",
+                options: [
+                  {
+                    id: "A",
+                    text: qRow.questions.option_a || "",
+                  },
+                  {
+                    id: "B",
+                    text: qRow.questions.option_b || "",
+                  },
+                  {
+                    id: "C",
+                    text: qRow.questions.option_c || "",
+                  },
+                  {
+                    id: "D",
+                    text: qRow.questions.option_d || "",
+                  },
+                ],
+                correctAnswer: (qRow.questions.correct_answer ||
+                  "A") as OptionId,
+                explanation: qRow.questions.explanation || "",
+              });
+            }
+          } catch (err) {
+            console.error("Overlay: live_rounds realtime error:", err);
           }
         }
       )
       .subscribe();
 
-    // Subscribe to overlay_stats
+    // overlay_stats subscription
     const statsChannel = supabase
       .channel("overlay-stats")
       .on(
@@ -410,15 +614,25 @@ function getFlagFromCode(code: string) {
           schema: "public",
           table: "overlay_stats",
         },
-        (payload) => {
-          const row = payload.new as OverlayStatsRow;
-          
-          // Only update if same round
-          if (row.round_id === currentRoundId) {
+        (payload: any) => {
+          try {
+            const row = payload.new as OverlayStatsRow;
+            if (!row) return;
+
+            // RoundId eşleşmesi, yoksa ilk geleni set et
+            if (!roundIdRef.current) {
+              roundIdRef.current = row.round_id ?? null;
+            } else if (
+              row.round_id &&
+              row.round_id !== roundIdRef.current
+            ) {
+              return;
+            }
+
             setOverlayStats(row);
-            // Convert countries with flag mapping
+
             if (row.countries && Array.isArray(row.countries)) {
-              const mappedCountries = row.countries.map((c: any) => ({
+              const mappedCountries = row.countries.map((c) => ({
                 code: c.code,
                 name: c.name ?? c.code,
                 flag: getFlagFromCode(c.code),
@@ -426,12 +640,14 @@ function getFlagFromCode(code: string) {
               }));
               setCountries(mappedCountries);
             }
+          } catch (err) {
+            console.error("Overlay: overlay_stats realtime error:", err);
           }
         }
       )
       .subscribe();
 
-    // Subscribe to overlay_leaderboard (optimized: patch state, not full refetch)
+    // overlay_leaderboard subscription
     const leaderboardChannel = supabase
       .channel("overlay-leaderboard")
       .on(
@@ -441,44 +657,44 @@ function getFlagFromCode(code: string) {
           schema: "public",
           table: "overlay_leaderboard",
         },
-        (payload) => {
-          const row = payload.new as any;
-          
-          // Only update if same round
-          if (row.round_id === currentRoundId) {
-            // Optimized: patch state instead of full refetch
+        (payload: any) => {
+          try {
+            const row = payload.new as OverlayLeaderboardRow;
+            if (!row) return;
+
+            if (!roundIdRef.current) {
+              roundIdRef.current = row.round_id ?? null;
+            } else if (
+              row.round_id &&
+              row.round_id !== roundIdRef.current
+            ) {
+              return;
+            }
+
             setLeaderboard((prev) => {
-              let updated = prev.map((p) =>
-                p.rank === row.rank
-                  ? {
-                      rank: row.rank ?? 0,
-                      username: row.username ?? "",
-                      country: row.country ?? "",
-                      score: row.score ?? 0,
-                      correct: row.correct ?? 0,
-                      avgTime: row.avg_time ?? 0,
-                    }
-                  : p
-              );
-              
-              // If rank not in list, add it (immutable)
-              if (!updated.some((p) => p.rank === row.rank)) {
-                updated = [
-                  ...updated,
-                  {
-                    rank: row.rank ?? 0,
-                    username: row.username ?? "",
-                    country: row.country ?? "",
-                    score: row.score ?? 0,
-                    correct: row.correct ?? 0,
-                    avgTime: row.avg_time ?? 0,
-                  },
-                ];
-              }
-              
-              // Sort and limit to top 10
-              return updated.sort((a, b) => a.rank - b.rank).slice(0, 10);
+              const updated = prev
+                // aynı rank’i sil
+                .filter((p) => p.rank !== (row.rank ?? 0))
+                // yenisini ekle
+                .concat({
+                  rank: row.rank ?? 0,
+                  username: row.username ?? "",
+                  country: row.country ?? "",
+                  score: row.score ?? 0,
+                  correct: row.correct ?? 0,
+                  avgTime: row.avg_time ?? 0,
+                })
+                // sırala ve top 10
+                .sort((a, b) => a.rank - b.rank)
+                .slice(0, 10);
+
+              return updated;
             });
+          } catch (err) {
+            console.error(
+              "Overlay: overlay_leaderboard realtime error:",
+              err
+            );
           }
         }
       )
@@ -490,8 +706,11 @@ function getFlagFromCode(code: string) {
       supabase.removeChannel(leaderboardChannel);
     };
   }, []);
+
   const totalPlayers =
-    overlayStats?.total_players != null ? overlayStats.total_players : 688;
+    overlayStats?.total_players != null
+      ? overlayStats.total_players
+      : 688;
   const answering =
     overlayStats?.answering != null ? overlayStats.answering : 531;
   const correctPercent =
@@ -503,7 +722,7 @@ function getFlagFromCode(code: string) {
 
   const getCountryFlag = (code: string) => {
     const country = countries.find((c) => c.code === code);
-    return country?.flag || "🌍";
+    return country?.flag || getFlagFromCode(code);
   };
 
   const getMedalEmoji = (rank: number) => {
@@ -960,7 +1179,8 @@ function getFlagFromCode(code: string) {
                   textTransform: "uppercase",
                 }}
               >
-                ⚡ Question {question.index}/{question.total} ⚡
+                ⚡ Question {effectiveQuestion.index}/
+                {effectiveQuestion.total} ⚡
               </div>
             </div>
 
@@ -987,7 +1207,7 @@ function getFlagFromCode(code: string) {
                   marginBottom: "45px",
                 }}
               >
-                {question.question}
+                {effectiveQuestion.question}
               </div>
 
               {/* Options Grid */}
@@ -998,9 +1218,10 @@ function getFlagFromCode(code: string) {
                   gap: "22px",
                 }}
               >
-                {question.options.map((option, idx) => {
+                {effectiveQuestion.options.map((option, idx) => {
                   const isCorrect =
                     phase === "reveal" &&
+                    question &&
                     option.id === question.correctAnswer;
                   const shouldHighlight = isCorrect;
 
@@ -1233,7 +1454,7 @@ function getFlagFromCode(code: string) {
             </div>
 
             {/* Explanation Card */}
-            {phase === "explanation" && (
+            {phase === "explanation" && question && (
               <div
                 style={{
                   background:
