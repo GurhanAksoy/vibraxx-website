@@ -96,16 +96,19 @@ function SuccessContent() {
         return;
       }
 
+      // ✅ FIX 1: Use 'remaining' column (DB unified)
       const { data, error } = await supabase
         .from("user_rounds")
-        .select("available_rounds")
+        .select("remaining")
         .eq("user_id", user.id)
         .single();
 
       if (!error && data) {
-        setUserRounds(data.available_rounds || 0);
+        // ✅ FIX 2: DB-backed real rounds
+        setUserRounds(data.remaining || 0);
       }
 
+      // ✅ FIX 3: purchasedRounds is UX-only (sessionStorage)
       if (sessionId) {
         const storedPackage = sessionStorage.getItem(`purchase_${sessionId}`);
         if (storedPackage) {
@@ -590,6 +593,16 @@ function SuccessContent() {
           line-height: 1.6;
         }
 
+        .vx-champ-prize-note {
+          font-size: 12px;
+          color: #94a3b8;
+          margin-top: 12px;
+          padding: 12px;
+          background: rgba(139, 92, 246, 0.1);
+          border: 1px solid rgba(139, 92, 246, 0.2);
+          border-radius: 8px;
+        }
+
         .vx-champ-actions {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
@@ -792,6 +805,9 @@ function SuccessContent() {
                 <div className="vx-champ-prize-amount">£1,000</div>
                 <p className="vx-champ-prize-text">
                   The prize activates when we reach 3000+ monthly participants.
+                </p>
+                <p className="vx-champ-prize-note">
+                  💡 <strong>Note:</strong> Prize pool requires 3000+ unique paid participants per month. Entry fees are non-refundable if threshold is not met as the quiz service is provided.
                 </p>
               </div>
             </div>

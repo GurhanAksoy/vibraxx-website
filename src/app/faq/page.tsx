@@ -27,7 +27,7 @@ export default function FAQPage() {
         },
         {
           q: "Is VibraXX free to play?",
-          a: "Every registered user gets one free daily practice quiz (50 questions). This practice quiz doesn't count toward prizes or leaderboards—it's purely for learning. To compete for the monthly £1000 prize, you need to purchase quiz rounds: £2.00 per round or £49.00 for 35 rounds (30% savings)."
+          a: "Every registered user gets one free daily practice quiz (50 questions). This practice quiz doesn't count toward prizes or leaderboards—it's purely for learning. To compete for the monthly £1000 prize, you need to purchase quiz rounds: £2.00 per round or £49.00 for 30 rounds (18% savings)."
         },
         {
           q: "Do I need to download an app?",
@@ -94,7 +94,7 @@ export default function FAQPage() {
       questions: [
         {
           q: "How much does it cost to play?",
-          a: "Individual rounds cost £2.00 each. We also offer a value pack: 35 rounds for £49.00 (£1.40 per round), saving you 30%."
+          a: "Individual rounds cost £2.00 each. We also offer a value pack: 35 rounds for £49.00, saving you 18%."
         },
         {
           q: "What payment methods do you accept?",

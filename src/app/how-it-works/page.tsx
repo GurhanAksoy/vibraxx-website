@@ -665,7 +665,7 @@ export default function HowItWorksPage() {
                 <div className="step-number">3</div>
                 <div className="step-title">Purchase Rounds</div>
                 <p className="step-description">
-                  Buy quiz rounds: £2.00 per round or save 30% with the 35-round bundle for £49.00.
+                  Buy quiz rounds: £2.00 per round or save 18% with the 30-round bundle for £49.00.
                 </p>
               </div>
 
@@ -830,7 +830,7 @@ export default function HowItWorksPage() {
                   £49.00
                 </div>
                 <p className="step-description">
-                  35 rounds (£1.40 each) - Save 30%. Best value for serious competitors.
+                  30 rounds - Save 18%. Best value for serious competitors.
                 </p>
               </div>
             </div>

@@ -765,7 +765,7 @@ export default function TermsPage() {
             <h3 className="subsection-title">6.1 Round Prices</h3>
             <ul>
               <li><strong>Single Round:</strong> £2.00</li>
-              <li><strong>35 Round Bundle:</strong> £49.00 (£1.40 per round - 30% savings)</li>
+              <li><strong>30 Round Bundle:</strong> £49.00 (18% savings)</li>
             </ul>
 
             <h3 className="subsection-title">6.2 Payment Processing</h3>

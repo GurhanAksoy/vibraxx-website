@@ -2112,7 +2112,8 @@ useEffect(() => {
                     <div style={{ fontSize: 32, fontWeight: 800, color: "#fbbf24", marginBottom: 4, lineHeight: 1 }}>
                       £49
                     </div>
-                    <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500 }}>30 rounds (£1.63 each)</div>
+                    <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500 }}>30 rounds 
+		   </div>
                   </div>
                 </div>
 
