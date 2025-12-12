@@ -1010,7 +1010,11 @@ export default function BuyPage() {
             <div className="vx-buy-footer-disclaimer">
               <strong style={{ color: "#94a3b8" }}>Educational Quiz Competition.</strong> 18+ only. 
               This is a 100% skill-based knowledge competition with no element of chance. 
-              Entry fees apply. Prize pool activates with 3000+ monthly participants. See{" "}
+              Entry fees apply. Prize pool activates with 3000+ monthly participants.
+              <br /><br />
+              <strong style={{ color: "#94a3b8" }}>Digital Content Notice:</strong> Digital quiz access is provided immediately after purchase. All sales are final. Refunds are only issued where required by law.
+              <br /><br />
+              See{" "}
               <a href="/terms" style={{ color: "#a78bfa", textDecoration: "underline" }}>Terms & Conditions</a> for full details.
             </div>
 
