@@ -1,41 +1,46 @@
 "use client";
 
-import { ArrowLeft, Mail, MapPin, Building, Send, Clock, MessageCircle, HelpCircle, AlertCircle } from "lucide-react";
+import { ArrowLeft, Mail, MapPin, Building, Clock, HelpCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { useState } from "react";
 
 export default function ContactPage() {
   const router = useRouter();
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    subject: "",
-    message: ""
-  });
-  const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
-
-  const handleSubmit = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setStatus("sending");
-    
-    // Simulated form submission
-    setTimeout(() => {
-      setStatus("success");
-      setFormData({ name: "", email: "", subject: "", message: "" });
-      setTimeout(() => setStatus("idle"), 5000);
-    }, 1500);
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }));
-  };
 
   return (
     <>
+      {/* ⚡ CRITICAL CSS - Prevents layout shift during hydration */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        :root {
+          color-scheme: dark;
+          background-color: #020817;
+        }
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+        body {
+          background-color: #020817 !important;
+          color: white !important;
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+          line-height: 1.7 !important;
+          overflow-x: hidden !important;
+        }
+        .legal-page {
+          min-height: 100vh;
+          background: #020817;
+          position: relative;
+          overflow-x: hidden;
+          contain: layout style paint;
+        }
+        .content-wrapper {
+          max-width: 1000px;
+          margin: 0 auto;
+          padding: 40px 20px 80px;
+        }
+      `}} />
+
       <style jsx global>{`
         :root {
           color-scheme: dark;
@@ -200,7 +205,7 @@ export default function ContactPage() {
         .content-wrapper {
           position: relative;
           z-index: 1;
-          max-width: 1200px;
+          max-width: 1000px;
           margin: 0 auto;
           padding: 40px 20px 80px;
         }
@@ -257,9 +262,12 @@ export default function ContactPage() {
 
         .hero-subtitle {
           font-size: 16px;
-          color: #94a3b8;
+          color: #cbd5e1;
           margin-bottom: 24px;
           line-height: 1.6;
+          max-width: 600px;
+          margin-left: auto;
+          margin-right: auto;
         }
 
         @media (max-width: 768px) {
@@ -275,114 +283,17 @@ export default function ContactPage() {
           }
         }
 
-        .contact-grid {
+        .contact-info-grid {
           display: grid;
           grid-template-columns: 1fr;
-          gap: 24px;
+          gap: 20px;
           margin-bottom: 40px;
         }
 
-        @media (min-width: 1024px) {
-          .contact-grid {
-            grid-template-columns: 1fr 1fr;
+        @media (min-width: 640px) {
+          .contact-info-grid {
+            grid-template-columns: repeat(2, 1fr);
           }
-        }
-
-        .contact-form-section {
-          background: rgba(9, 9, 13, 0.9);
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          border-radius: 20px;
-          padding: 36px;
-          backdrop-filter: blur(18px);
-        }
-
-        .contact-info-section {
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-        }
-
-        @media (max-width: 768px) {
-          .contact-form-section {
-            padding: 24px 20px;
-          }
-        }
-
-        .section-title {
-          font-size: clamp(22px, 4vw, 28px);
-          font-weight: 800;
-          color: #34d399;
-          margin-bottom: 24px;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .form-group {
-          margin-bottom: 20px;
-        }
-
-        .form-label {
-          display: block;
-          font-size: 14px;
-          font-weight: 600;
-          color: #cbd5e1;
-          margin-bottom: 8px;
-        }
-
-        .form-input,
-        .form-select,
-        .form-textarea {
-          width: 100%;
-          padding: 12px 16px;
-          border-radius: 12px;
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          background: rgba(15, 23, 42, 0.5);
-          color: white;
-          font-size: 15px;
-          transition: all 0.2s;
-          font-family: inherit;
-        }
-
-        .form-input:focus,
-        .form-select:focus,
-        .form-textarea:focus {
-          outline: none;
-          border-color: #10b981;
-          background: rgba(15, 23, 42, 0.8);
-          box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
-        }
-
-        .form-textarea {
-          min-height: 150px;
-          resize: vertical;
-        }
-
-        .submit-button {
-          width: 100%;
-          padding: 14px 24px;
-          border-radius: 12px;
-          border: none;
-          background: linear-gradient(135deg, #10b981, #34d399);
-          color: white;
-          font-size: 16px;
-          font-weight: 700;
-          cursor: pointer;
-          transition: all 0.3s;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-        }
-
-        .submit-button:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4);
-        }
-
-        .submit-button:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
         }
 
         .info-card {
@@ -392,6 +303,12 @@ export default function ContactPage() {
           padding: 24px;
           backdrop-filter: blur(18px);
           transition: all 0.3s;
+        }
+
+        @media (max-width: 640px) {
+          .info-card {
+            padding: 20px;
+          }
         }
 
         .info-card:hover {
@@ -423,44 +340,65 @@ export default function ContactPage() {
           color: #34d399;
         }
 
+        @media (max-width: 640px) {
+          .info-title {
+            font-size: 16px;
+          }
+        }
+
         .info-content {
           font-size: 14px;
           color: #94a3b8;
           line-height: 1.7;
         }
 
+        @media (max-width: 640px) {
+          .info-content {
+            font-size: 13px;
+          }
+        }
+
+        .info-content p {
+          margin-bottom: 8px;
+        }
+
+        .info-content p:last-child {
+          margin-bottom: 0;
+        }
+
         .info-content a {
           color: #10b981;
           text-decoration: none;
           transition: color 0.2s;
+          font-weight: 600;
         }
 
         .info-content a:hover {
           color: #34d399;
         }
 
-        .success-message {
-          padding: 16px 20px;
-          border-radius: 12px;
+        .highlight-box {
+          padding: 24px;
+          border-radius: 16px;
           background: rgba(16, 185, 129, 0.1);
-          border: 1px solid rgba(16, 185, 129, 0.3);
-          color: #34d399;
-          margin-bottom: 20px;
-          display: flex;
-          align-items: center;
-          gap: 12px;
+          border-left: 4px solid #10b981;
+          margin-bottom: 40px;
+          backdrop-filter: blur(10px);
         }
 
-        .error-message {
-          padding: 16px 20px;
-          border-radius: 12px;
-          background: rgba(239, 68, 68, 0.1);
-          border: 1px solid rgba(239, 68, 68, 0.3);
-          color: #fca5a5;
-          margin-bottom: 20px;
-          display: flex;
-          align-items: center;
-          gap: 12px;
+        .highlight-box strong {
+          color: #34d399;
+          display: block;
+          margin-bottom: 10px;
+          font-size: 17px;
+          font-weight: 700;
+        }
+
+        .highlight-box p {
+          margin: 0;
+          color: #cbd5e1;
+          font-size: 15px;
+          line-height: 1.7;
         }
 
         .quick-links {
@@ -512,6 +450,13 @@ export default function ContactPage() {
           transition: all 0.3s;
           font-size: 14px;
           font-weight: 600;
+        }
+
+        @media (max-width: 640px) {
+          .quick-link-item {
+            padding: 14px 16px;
+            font-size: 13px;
+          }
         }
 
         .quick-link-item:hover {
@@ -568,6 +513,10 @@ export default function ContactPage() {
           .quick-links {
             padding: 24px 20px;
           }
+
+          .quick-links h3 {
+            font-size: 20px;
+          }
         }
       `}</style>
 
@@ -585,6 +534,7 @@ export default function ContactPage() {
                     alt="VibraXX"
                     width={46}
                     height={46}
+                    priority
                     style={{ objectFit: "contain" }}
                   />
                 </div>
@@ -614,181 +564,93 @@ export default function ContactPage() {
         <div className="content-wrapper">
           <div className="hero-section">
             <div className="hero-icon">
-              <MessageCircle style={{ width: 40, height: 40, color: "white" }} />
+              <Mail style={{ width: 40, height: 40, color: "white" }} />
             </div>
-            <h1 className="hero-title animate-shimmer">Get In Touch</h1>
+            <h1 className="hero-title animate-shimmer">Contact Us</h1>
             <p className="hero-subtitle">
-              Have questions, feedback, or need support? We're here to help. Reach out to us and we'll respond within 24-48 hours.
+              For all inquiries, please contact us directly via email. We typically respond within 24-48 hours during business days.
             </p>
           </div>
 
-          <div className="contact-grid">
-            <div className="contact-form-section">
-              <h2 className="section-title">
-                <Send style={{ width: 24, height: 24 }} />
-                <span>Send Us a Message</span>
-              </h2>
+          <div className="highlight-box">
+            <strong>Email Contact Only</strong>
+            <p>
+              We handle all customer inquiries via email to ensure proper documentation and tracking. Please reach out to the appropriate email address below based on your inquiry type.
+            </p>
+          </div>
 
-              {status === "success" && (
-                <div className="success-message">
-                  <Mail style={{ width: 20, height: 20 }} />
-                  <span>Thank you! Your message has been sent successfully. We'll get back to you soon.</span>
+          <div className="contact-info-grid">
+            <div className="info-card">
+              <div className="info-card-header">
+                <div className="info-icon">
+                  <Mail style={{ width: 20, height: 20, color: "white" }} />
                 </div>
-              )}
-
-              {status === "error" && (
-                <div className="error-message">
-                  <AlertCircle style={{ width: 20, height: 20 }} />
-                  <span>Oops! Something went wrong. Please try again or email us directly.</span>
-                </div>
-              )}
-
-              <div>
-                <div className="form-group">
-                  <label className="form-label">Full Name *</label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    className="form-input"
-                    placeholder="John Doe"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Email Address *</label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    className="form-input"
-                    placeholder="john@example.com"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Subject *</label>
-                  <select
-                    name="subject"
-                    value={formData.subject}
-                    onChange={handleChange}
-                    className="form-select"
-                  >
-                    <option value="">Select a subject</option>
-                    <option value="general">General Inquiry</option>
-                    <option value="technical">Technical Support</option>
-                    <option value="account">Account Issues</option>
-                    <option value="payment">Payment & Billing</option>
-                    <option value="prize">Prize Claims</option>
-                    <option value="complaint">Complaint</option>
-                    <option value="feedback">Feedback & Suggestions</option>
-                    <option value="partnership">Business Partnership</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Message *</label>
-                  <textarea
-                    name="message"
-                    value={formData.message}
-                    onChange={handleChange}
-                    className="form-textarea"
-                    placeholder="Please describe your inquiry in detail..."
-                  />
-                </div>
-
-                <button 
-                  onClick={handleSubmit}
-                  className="submit-button"
-                  disabled={status === "sending"}
-                >
-                  {status === "sending" ? (
-                    <>Sending...</>
-                  ) : (
-                    <>
-                      <Send style={{ width: 18, height: 18 }} />
-                      Send Message
-                    </>
-                  )}
-                </button>
+                <span className="info-title">Email Support</span>
+              </div>
+              <div className="info-content">
+                <p>
+                  <strong>VibraXX Platform:</strong><br />
+                  <a href="mailto:team@vibraxx.com">team@vibraxx.com</a>
+                </p>
+                <p style={{ marginTop: 12 }}>
+                  For technical support, account issues, prize claims, complaints, feedback, and all platform-related inquiries.
+                </p>
               </div>
             </div>
 
-            <div className="contact-info-section">
-              <div className="info-card">
-                <div className="info-card-header">
-                  <div className="info-icon">
-                    <Mail style={{ width: 20, height: 20, color: "white" }} />
-                  </div>
-                  <span className="info-title">Email Support</span>
+            <div className="info-card">
+              <div className="info-card-header">
+                <div className="info-icon">
+                  <Mail style={{ width: 20, height: 20, color: "white" }} />
                 </div>
-                <div className="info-content">
-                  <p style={{ marginBottom: 8 }}>
-                    <strong>VibraXX Platform:</strong><br />
-                    <a href="mailto:team@vibraxx.com">team@vibraxx.com</a>
-                  </p>
-                  <p>
-                    <strong>Sermin Limited (Corporate):</strong><br />
-                    <a href="mailto:contact@sermin.uk">contact@sermin.uk</a>
-                  </p>
-                </div>
+                <span className="info-title">Corporate Contact</span>
               </div>
-
-              <div className="info-card">
-                <div className="info-card-header">
-                  <div className="info-icon">
-                    <Clock style={{ width: 20, height: 20, color: "white" }} />
-                  </div>
-                  <span className="info-title">Response Time</span>
-                </div>
-                <div className="info-content">
-                  <p>
-                    We typically respond to all inquiries within <strong>24-48 hours</strong> during business days (Monday-Friday).
-                  </p>
-                  <p style={{ marginTop: 8 }}>
-                    For urgent technical issues during active quiz rounds, please include "URGENT" in your subject line.
-                  </p>
-                </div>
+              <div className="info-content">
+                <p>
+                  <strong>Sermin Limited:</strong><br />
+                  <a href="mailto:contact@sermin.uk">contact@sermin.uk</a>
+                </p>
+                <p style={{ marginTop: 12 }}>
+                  For business partnerships, legal matters, press inquiries, and corporate communications.
+                </p>
               </div>
+            </div>
 
-              <div className="info-card">
-                <div className="info-card-header">
-                  <div className="info-icon">
-                    <Building style={{ width: 20, height: 20, color: "white" }} />
-                  </div>
-                  <span className="info-title">Registered Office</span>
+            <div className="info-card">
+              <div className="info-card-header">
+                <div className="info-icon">
+                  <Clock style={{ width: 20, height: 20, color: "white" }} />
                 </div>
-                <div className="info-content">
-                  <p>
-                    <strong>Sermin Limited</strong><br />
-                    Company No. 16778648
-                  </p>
-                  <p style={{ marginTop: 8 }}>
-                    71-75 Shelton Street<br />
-                    Covent Garden<br />
-                    London, WC2H 9JQ<br />
-                    United Kingdom
-                  </p>
-                </div>
+                <span className="info-title">Response Time</span>
               </div>
+              <div className="info-content">
+                <p>
+                  We typically respond to all inquiries within <strong>24-48 hours</strong> during business days (Monday-Friday).
+                </p>
+                <p style={{ marginTop: 12 }}>
+                  For urgent technical issues during active quiz rounds, please include <strong>"URGENT"</strong> in your email subject line.
+                </p>
+              </div>
+            </div>
 
-              <div className="info-card">
-                <div className="info-card-header">
-                  <div className="info-icon">
-                    <MapPin style={{ width: 20, height: 20, color: "white" }} />
-                  </div>
-                  <span className="info-title">Operating Hours</span>
+            <div className="info-card">
+              <div className="info-card-header">
+                <div className="info-icon">
+                  <Building style={{ width: 20, height: 20, color: "white" }} />
                 </div>
-                <div className="info-content">
-                  <p>
-                    <strong>Platform:</strong> 24/7 (Quiz rounds every 15 minutes)<br />
-                    <strong>Support:</strong> Monday-Friday, 9:00 AM - 6:00 PM GMT<br />
-                    <strong>Emergency:</strong> 24/7 for critical platform issues
-                  </p>
-                </div>
+                <span className="info-title">Registered Office</span>
+              </div>
+              <div className="info-content">
+                <p>
+                  <strong>Sermin Limited</strong><br />
+                  Company No. 16778648
+                </p>
+                <p style={{ marginTop: 12 }}>
+                  71-75 Shelton Street<br />
+                  Covent Garden<br />
+                  London, WC2H 9JQ<br />
+                  United Kingdom
+                </p>
               </div>
             </div>
           </div>

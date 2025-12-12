@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, RefreshCw, CheckCircle, XCircle, Clock, AlertCircle } from "lucide-react";
+import { ArrowLeft, RefreshCw, XCircle, AlertCircle, CheckCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
@@ -9,6 +9,38 @@ export default function RefundPolicyPage() {
 
   return (
     <>
+      {/* ⚡ CRITICAL CSS - Prevents layout shift during hydration */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        :root {
+          color-scheme: dark;
+          background-color: #020817;
+        }
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+        body {
+          background-color: #020817 !important;
+          color: white !important;
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+          line-height: 1.7 !important;
+          overflow-x: hidden !important;
+        }
+        .legal-page {
+          min-height: 100vh;
+          background: #020817;
+          position: relative;
+          overflow-x: hidden;
+          contain: layout style paint;
+        }
+        .content-wrapper {
+          max-width: 1000px;
+          margin: 0 auto;
+          padding: 40px 20px 80px;
+        }
+      `}} />
+
       <style jsx global>{`
         :root {
           color-scheme: dark;
@@ -279,6 +311,7 @@ export default function RefundPolicyPage() {
           display: flex;
           align-items: center;
           gap: 12px;
+          flex-wrap: wrap;
         }
 
         .subsection-title {
@@ -409,62 +442,73 @@ export default function RefundPolicyPage() {
           line-height: 1.7;
         }
 
-        .refund-grid {
+        /* ✅ MOBILE-FIRST RESPONSIVE EXCEPTION GRID */
+        .exception-grid {
           display: grid;
           grid-template-columns: 1fr;
           gap: 16px;
           margin: 24px 0;
         }
 
-        @media (min-width: 768px) {
-          .refund-grid {
+        @media (min-width: 640px) {
+          .exception-grid {
             grid-template-columns: repeat(2, 1fr);
           }
         }
 
-        .refund-card {
+        @media (min-width: 1024px) {
+          .exception-grid {
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
+
+        .exception-card {
           padding: 20px;
           border-radius: 12px;
-          border: 1px solid rgba(59, 130, 246, 0.2);
+          background: rgba(34, 197, 94, 0.05);
+          border: 1px solid rgba(34, 197, 94, 0.3);
           transition: all 0.2s;
         }
 
-        .refund-card.eligible {
-          background: rgba(34, 197, 94, 0.05);
-          border-color: rgba(34, 197, 94, 0.3);
+        @media (max-width: 640px) {
+          .exception-card {
+            padding: 16px;
+          }
         }
 
-        .refund-card.not-eligible {
-          background: rgba(239, 68, 68, 0.05);
-          border-color: rgba(239, 68, 68, 0.3);
-        }
-
-        .refund-card:hover {
+        .exception-card:hover {
           transform: translateY(-2px);
+          background: rgba(34, 197, 94, 0.1);
+          border-color: rgba(34, 197, 94, 0.4);
         }
 
-        .refund-card h4 {
+        .exception-card h4 {
           font-size: 16px;
           font-weight: 700;
+          color: #4ade80;
           margin-bottom: 8px;
           display: flex;
           align-items: center;
           gap: 8px;
         }
 
-        .refund-card.eligible h4 {
-          color: #4ade80;
+        @media (max-width: 640px) {
+          .exception-card h4 {
+            font-size: 15px;
+          }
         }
 
-        .refund-card.not-eligible h4 {
-          color: #f87171;
-        }
-
-        .refund-card p {
+        .exception-card p {
           font-size: 14px;
           color: #94a3b8;
           margin: 0;
           line-height: 1.6;
+        }
+
+        @media (max-width: 640px) {
+          .exception-card p {
+            font-size: 13px;
+          }
         }
 
         .vx-footer {
@@ -527,6 +571,7 @@ export default function RefundPolicyPage() {
                     alt="VibraXX"
                     width={46}
                     height={46}
+                    priority
                     style={{ objectFit: "contain" }}
                   />
                 </div>
@@ -560,93 +605,118 @@ export default function RefundPolicyPage() {
             </div>
             <h1 className="hero-title animate-shimmer">Refund Policy</h1>
             <p className="hero-subtitle">
-              Clear and fair refund terms compliant with UK Consumer Rights Act 2015
+              Digital service purchases are final - refunds available only in exceptional circumstances
             </p>
           </div>
 
           <div className="content-card">
             <h2 className="section-title">
-              <CheckCircle style={{ width: 24, height: 24 }} />
-              <span>1. Your Right to Refund</span>
+              <XCircle style={{ width: 24, height: 24 }} />
+              <span>1. No General Right to Refund</span>
             </h2>
-            <p>
-              Under the UK Consumer Rights Act 2015, you have the right to request a refund for digital content in certain circumstances. This policy outlines when refunds are available for purchased quiz rounds on VibraXX.
-            </p>
-          </div>
-
-          <div className="content-card">
-            <h2 className="section-title">
-              <Clock style={{ width: 24, height: 24 }} />
-              <span>2. 14-Day Refund Window</span>
-            </h2>
-            <div className="highlight-box">
-              <strong>Unused Rounds - Full Refund Available</strong>
+            <div className="error-box">
+              <strong>All Purchases Are Final</strong>
               <p>
-                You may request a full refund for unused quiz rounds within 14 days of purchase. Once a round is used to enter a live competition, it cannot be refunded.
+                Quiz round purchases are for digital content that is supplied immediately upon payment. Under the UK Consumer Rights Act 2015, the 14-day cooling-off period does not apply to digital content once delivery has begun with your express consent.
+                <br /><br />
+                By purchasing quiz rounds, you expressly agree that the digital service begins immediately, and you waive your right to the 14-day cancellation period.
               </p>
             </div>
 
-            <h3 className="subsection-title">What Qualifies as "Unused"</h3>
+            <h3 className="subsection-title">Why No General Refunds?</h3>
             <ul>
-              <li>Rounds purchased but not yet used to enter any live quiz</li>
-              <li>Rounds still visible in your account balance</li>
-              <li>Rounds not consumed or activated</li>
+              <li><strong>Instant Delivery:</strong> Quiz rounds are credited to your account immediately upon purchase</li>
+              <li><strong>Digital Service:</strong> Digital quiz rounds are considered delivered once credited to the account</li>
+              <li><strong>Platform Costs:</strong> Payment processing fees, server infrastructure, and operational costs are incurred immediately</li>
+              <li><strong>Service Provided:</strong> Access to the live quiz platform, leaderboards, and competition features begins immediately</li>
             </ul>
           </div>
 
           <div className="content-card">
             <h2 className="section-title">
-              <span>3. Refund Eligibility</span>
+              <CheckCircle style={{ width: 24, height: 24 }} />
+              <span>2. Exceptional Circumstances Only</span>
             </h2>
+            <p>
+              Refunds are available ONLY in the following exceptional circumstances where the fault lies with VibraXX:
+            </p>
 
-            <div className="refund-grid">
-              <div className="refund-card eligible">
+            <div className="exception-grid">
+              <div className="exception-card">
                 <h4>
                   <CheckCircle style={{ width: 18, height: 18 }} />
-                  Eligible for Refund
+                  Platform Error
                 </h4>
-                <p>Purchased rounds not used within 14 days</p>
+                <p>Verified technical fault on our side preventing round usage</p>
               </div>
 
-              <div className="refund-card not-eligible">
-                <h4>
-                  <XCircle style={{ width: 18, height: 18 }} />
-                  Not Eligible
-                </h4>
-                <p>Rounds already used in competitions</p>
-              </div>
-
-              <div className="refund-card eligible">
+              <div className="exception-card">
                 <h4>
                   <CheckCircle style={{ width: 18, height: 18 }} />
-                  Eligible for Refund
+                  Wrongful Charge
                 </h4>
-                <p>Technical fault preventing round usage</p>
+                <p>Payment charged without your authorization or in error</p>
               </div>
 
-              <div className="refund-card not-eligible">
-                <h4>
-                  <XCircle style={{ width: 18, height: 18 }} />
-                  Not Eligible
-                </h4>
-                <p>Rounds purchased more than 14 days ago</p>
-              </div>
-
-              <div className="refund-card eligible">
+              <div className="exception-card">
                 <h4>
                   <CheckCircle style={{ width: 18, height: 18 }} />
-                  Eligible for Refund
+                  Duplicate Payment
                 </h4>
-                <p>Account banned due to our error</p>
+                <p>Same purchase charged multiple times due to system error</p>
               </div>
 
-              <div className="refund-card not-eligible">
+              <div className="exception-card">
                 <h4>
-                  <XCircle style={{ width: 18, height: 18 }} />
-                  Not Eligible
+                  <CheckCircle style={{ width: 18, height: 18 }} />
+                  Wrongful Ban
                 </h4>
-                <p>Account terminated for Terms violation</p>
+                <p>Account restricted due to our error (not Terms violation)</p>
               </div>
+
+              <div className="exception-card">
+                <h4>
+                  <CheckCircle style={{ width: 18, height: 18 }} />
+                  Service Failure
+                </h4>
+                <p>Widespread platform outage preventing competition access</p>
+              </div>
+
+              <div className="exception-card">
+                <h4>
+                  <CheckCircle style={{ width: 18, height: 18 }} />
+                  Billing Error
+                </h4>
+                <p>Incorrect amount charged compared to displayed price</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="content-card">
+            <h2 className="section-title">
+              <span>3. When Refunds Are NOT Available</span>
+            </h2>
+            <div className="warning-box">
+              <strong>No Refunds For</strong>
+              <p>
+                • Change of mind after purchase
+                <br />
+                • Rounds you chose not to use
+                <br />
+                • Poor quiz performance or low scores
+                <br />
+                • Account banned for cheating or Terms violations
+                <br />
+                • Internet connection problems on your end
+                <br />
+                • Monthly threshold (3000+ participants) not being met
+                <br />
+                • Disagreement with quiz questions or answers
+                <br />
+                • Device compatibility issues on your end
+                <br />
+                • Misunderstanding of how the service works
+              </p>
             </div>
           </div>
 
@@ -654,143 +724,139 @@ export default function RefundPolicyPage() {
             <h2 className="section-title">
               <span>4. How to Request a Refund</span>
             </h2>
-            <p>To request a refund, follow these steps:</p>
+            <p>If you believe you qualify for a refund under Section 2 (Exceptional Circumstances), follow these steps:</p>
             <ol>
-              <li>Email us at <a href="mailto:team@vibraxx.com" style={{ color: "#60a5fa", fontWeight: 600 }}>team@vibraxx.com</a> within 14 days of purchase</li>
-              <li>Include "Refund Request" in the subject line</li>
-              <li>Provide your account email and purchase details</li>
-              <li>Specify the number of unused rounds you wish to refund</li>
-              <li>Explain the reason for your refund request</li>
+              <li>Email <a href="mailto:team@vibraxx.com" style={{ color: "#60a5fa", fontWeight: 600, textDecoration: "none" }}>team@vibraxx.com</a> with subject "Refund Request - [Exception Type]"</li>
+              <li>Provide your account email address</li>
+              <li>Include purchase date and transaction ID (if available)</li>
+              <li>Clearly explain which exceptional circumstance applies</li>
+              <li>Provide evidence: screenshots, error messages, timestamps, etc.</li>
             </ol>
 
             <div className="info-box" style={{ marginTop: 24 }}>
-              <strong>Required Information</strong>
+              <strong>Burden of Proof</strong>
               <p>
-                Please include: Account email, purchase date, transaction ID (if available), number of unused rounds, and reason for refund.
+                You must demonstrate that one of the exceptional circumstances in Section 2 applies. General dissatisfaction or change of mind does not qualify for a refund.
               </p>
             </div>
           </div>
 
           <div className="content-card">
             <h2 className="section-title">
-              <span>5. Refund Processing Time</span>
+              <span>5. Refund Processing</span>
             </h2>
             <ul>
-              <li><strong>Review:</strong> We will review your request within 3 business days</li>
-              <li><strong>Approval:</strong> Approved refunds are processed within 5 business days</li>
-              <li><strong>Payment:</strong> Refunds are issued to your original payment method via Stripe</li>
+              <li><strong>Review:</strong> We will investigate your claim within 3 business days</li>
+              <li><strong>Evidence Required:</strong> You may be asked to provide additional proof</li>
+              <li><strong>Decision:</strong> You will receive our decision within 5 business days</li>
+              <li><strong>Approval:</strong> If approved, refund processed within 5 business days</li>
+              <li><strong>Payment Method:</strong> Refund issued to original payment method via Stripe</li>
               <li><strong>Arrival:</strong> Allow 5-10 business days for funds to appear in your account</li>
             </ul>
 
             <div className="warning-box">
               <strong>Payment Processing Fees</strong>
               <p>
-                Stripe payment processing fees (approximately 1.5% + 20p per transaction) are non-refundable. You will receive a refund for the round purchase price minus the original processing fee.
+                Stripe payment processing fees (approximately 1.5% + 20p per transaction) are non-refundable in all cases. Approved refunds will be for the purchase amount minus the original processing fee.
               </p>
             </div>
           </div>
 
           <div className="content-card">
             <h2 className="section-title">
-              <span>6. Prize Pool Threshold Not Met</span>
-            </h2>
-            <p>
-              If the monthly participation threshold of 3000+ active participants is not reached, ALL rounds purchased during that month are automatically refunded—regardless of whether they were used.
-            </p>
-
-            <div className="highlight-box">
-              <strong>Automatic Refund Process</strong>
-              <p>
-                If the 3000-participant threshold is not met by month-end, refunds are automatically processed within 14 business days. No action is required from you. You will receive an email notification when the refund is initiated.
-              </p>
-            </div>
-          </div>
-
-          <div className="content-card">
-            <h2 className="section-title">
-              <span>7. Technical Issues</span>
-            </h2>
-            <p>
-              If you experience technical problems that prevent you from using purchased rounds:
-            </p>
-            <ul>
-              <li>Contact us immediately at team@vibraxx.com</li>
-              <li>Describe the technical issue in detail</li>
-              <li>Include screenshots or error messages if available</li>
-              <li>We will investigate and issue a refund or replacement rounds if the fault is on our side</li>
-            </ul>
-          </div>
-
-          <div className="content-card">
-            <h2 className="section-title">
-              <span>8. Currency and Exchange Rates</span>
+              <span>6. Currency and Exchange Rates</span>
             </h2>
             <p>
               All refunds are processed in British Pounds (GBP). If you paid in a different currency:
             </p>
             <ul>
-              <li>The refund amount will be the GBP equivalent at the time of purchase</li>
+              <li>The refund will be the GBP amount originally charged</li>
               <li>Your bank or payment provider will convert it to your local currency</li>
-              <li>We are not responsible for exchange rate fluctuations</li>
-              <li>Currency conversion fees charged by your bank are non-refundable</li>
+              <li>We are not responsible for exchange rate fluctuations between purchase and refund</li>
+              <li>Currency conversion fees charged by your bank are your responsibility</li>
             </ul>
           </div>
 
           <div className="content-card">
             <h2 className="section-title">
-              <span>9. Exceptions and Special Circumstances</span>
+              <span>7. Alternative Resolutions</span>
             </h2>
+            <p>
+              In cases of technical issues or errors on our side, we may offer alternatives to monetary refunds:
+            </p>
+            <ul>
+              <li><strong>Replacement Rounds:</strong> Additional quiz rounds credited to your account at no cost</li>
+              <li><strong>Account Credit:</strong> Credit applied for future purchases</li>
+              <li><strong>Technical Support:</strong> Assistance resolving issues preventing round usage</li>
+              <li><strong>Compensation:</strong> In exceptional cases, additional rounds or credit beyond the original purchase</li>
+            </ul>
 
-            <h3 className="subsection-title">When Refunds Are Not Available</h3>
-            <div className="error-box">
-              <strong>No Refunds For</strong>
+            <div className="info-box">
+              <strong>Our Discretion</strong>
               <p>
-                • Rounds used in competitions (even if you scored poorly)
-                <br />
-                • Rounds purchased more than 14 days ago
-                <br />
-                • Rounds on accounts banned for cheating or Terms violations
-                <br />
-                • Loss due to internet connection issues on your end
-                <br />
-                • Change of mind after using rounds
+                The form of remedy (refund, replacement, credit, or support) is at our sole discretion based on the specific circumstances of each case.
+              </p>
+            </div>
+          </div>
+
+          <div className="content-card">
+            <h2 className="section-title">
+              <span>8. Disputes and Appeals</span>
+            </h2>
+            <p>
+              If your refund request is denied and you believe this decision is incorrect:
+            </p>
+            <ul>
+              <li>Reply to the refund decision email requesting escalation</li>
+              <li>Provide any additional evidence or information</li>
+              <li>A senior team member will review within 5 business days</li>
+              <li>The senior review decision is final</li>
+              <li>If still unsatisfied, see our Complaints Procedure for further options</li>
+            </ul>
+          </div>
+
+          <div className="content-card">
+            <h2 className="section-title">
+              <span>9. Consumer Rights Information</span>
+            </h2>
+            <p>
+              This refund policy complies with the UK Consumer Rights Act 2015. Under this Act:
+            </p>
+            <ul>
+              <li>The 14-day cancellation right does NOT apply to digital content once delivery begins with your consent</li>
+              <li>By clicking "Purchase," you expressly consent to immediate delivery</li>
+              <li>You have rights to refunds for digital content that is faulty or not as described</li>
+              <li>Nothing in this policy affects your statutory rights under UK consumer law</li>
+            </ul>
+
+            <div className="info-box">
+              <strong>UK Consumer Advice</strong>
+              <p>
+                For independent advice on your consumer rights, contact Citizens Advice: 0808 223 1133 or visit citizensadvice.org.uk
               </p>
             </div>
 
-            <h3 className="subsection-title">Exceptional Circumstances</h3>
-            <p>
-              In cases of serious illness, bereavement, or other exceptional circumstances, please contact us. We will consider refund requests outside the standard policy on a case-by-case basis.
-            </p>
+            <div className="highlight-box" style={{ marginTop: 16 }}>
+              <strong>Your Statutory Rights</strong>
+              <p>
+                Nothing in this policy limits or excludes your statutory rights where applicable. This policy sets out our commercial practices but does not override rights granted to you by law.
+              </p>
+            </div>
           </div>
 
           <div className="content-card">
             <h2 className="section-title">
-              <span>10. Disputes</span>
-            </h2>
-            <p>
-              If your refund request is denied and you believe this is incorrect:
-            </p>
-            <ul>
-              <li>You may appeal the decision by replying to our refund decision email</li>
-              <li>Provide any additional evidence or information</li>
-              <li>A senior team member will review your appeal within 5 business days</li>
-              <li>If still unsatisfied, see our Complaints Procedure</li>
-            </ul>
-          </div>
-
-          <div className="content-card">
-            <h2 className="section-title">
-              <span>11. Contact Information</span>
+              <span>10. Contact Information</span>
             </h2>
             <div className="info-box">
               <strong>Refund Requests</strong>
               <p style={{ marginTop: 12 }}>
                 <strong style={{ color: "#93c5fd" }}>Email:</strong>{" "}
-                <a href="mailto:team@vibraxx.com" style={{ color: "#60a5fa", fontWeight: 600 }}>
+                <a href="mailto:team@vibraxx.com" style={{ color: "#60a5fa", fontWeight: 600, textDecoration: "none" }}>
                   team@vibraxx.com
                 </a>
                 <br />
-                <strong style={{ color: "#93c5fd" }}>Subject:</strong> "Refund Request"
+                <strong style={{ color: "#93c5fd" }}>Subject:</strong> "Refund Request - [Exception Type]"
                 <br />
                 <strong style={{ color: "#93c5fd" }}>Response Time:</strong> Within 3 business days
                 <br />
@@ -814,9 +880,9 @@ export default function RefundPolicyPage() {
           }}>
             <AlertCircle style={{ width: 28, height: 28, color: "#60a5fa", margin: "0 auto 12px" }} />
             <p style={{ fontSize: 15, color: "#cbd5e1", margin: 0, lineHeight: 1.7 }}>
-              <strong style={{ color: "#60a5fa" }}>Fair Refund Policy</strong>
+              <strong style={{ color: "#60a5fa" }}>Important Notice</strong>
               <br />
-              We are committed to providing fair refunds in accordance with UK consumer law. If you have any questions about our refund policy, please contact us.
+              All quiz round purchases are final. Refunds are available only in exceptional circumstances where VibraXX is at fault. Please review this policy carefully before making a purchase.
             </p>
           </div>
         </div>

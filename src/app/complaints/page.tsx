@@ -9,6 +9,38 @@ export default function ComplaintsPage() {
 
   return (
     <>
+      {/* ⚡ CRITICAL CSS - Prevents layout shift during hydration */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        :root {
+          color-scheme: dark;
+          background-color: #020817;
+        }
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+        body {
+          background-color: #020817 !important;
+          color: white !important;
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+          line-height: 1.7 !important;
+          overflow-x: hidden !important;
+        }
+        .legal-page {
+          min-height: 100vh;
+          background: #020817;
+          position: relative;
+          overflow-x: hidden;
+          contain: layout style paint;
+        }
+        .content-wrapper {
+          max-width: 1000px;
+          margin: 0 auto;
+          padding: 40px 20px 80px;
+        }
+      `}} />
+
       <style jsx global>{`
         :root {
           color-scheme: dark;
@@ -279,6 +311,7 @@ export default function ComplaintsPage() {
           display: flex;
           align-items: center;
           gap: 12px;
+          flex-wrap: wrap;
         }
 
         .subsection-title {
@@ -361,15 +394,16 @@ export default function ComplaintsPage() {
           line-height: 1.7;
         }
 
+        /* ✅ MOBILE-OPTIMIZED TIMELINE */
         .timeline {
           position: relative;
           padding-left: 40px;
           margin: 24px 0;
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 640px) {
           .timeline {
-            padding-left: 30px;
+            padding-left: 24px;
           }
         }
 
@@ -383,9 +417,21 @@ export default function ComplaintsPage() {
           background: linear-gradient(to bottom, #ec4899, #db2777);
         }
 
+        @media (max-width: 640px) {
+          .timeline::before {
+            left: 6px;
+          }
+        }
+
         .timeline-item {
           position: relative;
           margin-bottom: 32px;
+        }
+
+        @media (max-width: 640px) {
+          .timeline-item {
+            margin-bottom: 28px;
+          }
         }
 
         .timeline-item::before {
@@ -398,13 +444,15 @@ export default function ComplaintsPage() {
           border-radius: 50%;
           background: #ec4899;
           border: 3px solid #020817;
+          box-shadow: 0 0 0 2px rgba(236, 72, 153, 0.3);
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 640px) {
           .timeline-item::before {
-            left: -26px;
-            width: 14px;
-            height: 14px;
+            left: -19px;
+            width: 13px;
+            height: 13px;
+            border-width: 2px;
           }
         }
 
@@ -415,10 +463,22 @@ export default function ComplaintsPage() {
           margin-bottom: 8px;
         }
 
+        @media (max-width: 640px) {
+          .timeline-step {
+            font-size: 15px;
+          }
+        }
+
         .timeline-content {
           color: #cbd5e1;
           font-size: 15px;
           line-height: 1.7;
+        }
+
+        @media (max-width: 640px) {
+          .timeline-content {
+            font-size: 14px;
+          }
         }
 
         .contact-card {
@@ -429,6 +489,12 @@ export default function ComplaintsPage() {
           margin: 16px 0;
         }
 
+        @media (max-width: 640px) {
+          .contact-card {
+            padding: 20px;
+          }
+        }
+
         .contact-card h4 {
           font-size: 16px;
           font-weight: 700;
@@ -437,6 +503,12 @@ export default function ComplaintsPage() {
           display: flex;
           align-items: center;
           gap: 8px;
+        }
+
+        @media (max-width: 640px) {
+          .contact-card h4 {
+            font-size: 15px;
+          }
         }
 
         .vx-footer {
@@ -499,6 +571,7 @@ export default function ComplaintsPage() {
                     alt="VibraXX"
                     width={46}
                     height={46}
+                    priority
                     style={{ objectFit: "contain" }}
                   />
                 </div>
@@ -579,7 +652,7 @@ export default function ComplaintsPage() {
               </h4>
               <p style={{ color: "#cbd5e1", fontSize: 14, lineHeight: 1.7, margin: 0 }}>
                 <strong style={{ color: "#f9a8d4" }}>Address:</strong>{" "}
-                <a href="mailto:team@vibraxx.com" style={{ color: "#f472b6", fontWeight: 600 }}>
+                <a href="mailto:team@vibraxx.com" style={{ color: "#f472b6", fontWeight: 600, textDecoration: "none" }}>
                   team@vibraxx.com
                 </a>
                 <br />
@@ -597,7 +670,7 @@ export default function ComplaintsPage() {
               <li><strong>Detailed description</strong> of what happened</li>
               <li><strong>Screenshots or evidence</strong> (if applicable)</li>
               <li><strong>Quiz round details</strong> (if complaint relates to a specific competition)</li>
-              <li><strong>Your desired outcome</strong> (refund, replay, explanation, etc.)</li>
+              <li><strong>Your desired outcome</strong> (e.g. explanation or technical review). Requested outcomes do not guarantee entitlement.</li>
             </ul>
           </div>
 
@@ -660,7 +733,7 @@ export default function ComplaintsPage() {
             <p>Depending on the nature of your complaint, we may offer:</p>
             <ul>
               <li><strong>Apology</strong> and explanation</li>
-              <li><strong>Refund</strong> of entry fees or rounds</li>
+              <li><strong>Refund</strong> of entry fees or rounds (only in cases of verified platform error or wrongful charge, in accordance with our Refund Policy)</li>
               <li><strong>Replacement rounds</strong> at no cost</li>
               <li><strong>Account reinstatement</strong> (if wrongly suspended)</li>
               <li><strong>Quiz replay opportunity</strong> (in case of technical fault)</li>
@@ -754,7 +827,7 @@ export default function ComplaintsPage() {
               <strong>Complaints Department</strong>
               <p style={{ marginTop: 12 }}>
                 <strong style={{ color: "#f9a8d4" }}>Email:</strong>{" "}
-                <a href="mailto:team@vibraxx.com" style={{ color: "#f472b6", fontWeight: 600 }}>
+                <a href="mailto:team@vibraxx.com" style={{ color: "#f472b6", fontWeight: 600, textDecoration: "none" }}>
                   team@vibraxx.com
                 </a>
                 <br />

@@ -772,6 +772,9 @@ export default function TermsPage() {
             <p>
               All payments are processed securely through Stripe. By purchasing, you agree to Stripe's terms. We do not store payment card details.
             </p>
+            <p style={{ marginTop: 16 }}>
+              <strong>Payment processing fees (approximately 1.5% + 20p per transaction) are non-refundable.</strong> These fees are charged by Stripe and deducted immediately upon transaction completion.
+            </p>
 
             <h3 className="subsection-title">6.3 Currency</h3>
             <p>
@@ -842,8 +845,24 @@ export default function TermsPage() {
             <h2 className="section-title">
               <span>9.</span> Refund Policy
             </h2>
+            <div className="warning-box">
+              <strong>All Purchases Are Final</strong>
+              <p>
+                Quiz round purchases are for digital content that is delivered immediately upon payment. By purchasing, you expressly agree that the digital service begins immediately, and you waive your right to the 14-day cancellation period under the UK Consumer Rights Act 2015.
+              </p>
+            </div>
             <p>
-              Unused rounds may be refunded within 14 days of purchase. Once a round is used to enter a competition, it cannot be refunded. See our full Refund Policy for details.
+              Refunds are available <strong>only in exceptional circumstances</strong> where VibraXX is at fault, including:
+            </p>
+            <ul>
+              <li>Verified platform technical error preventing round usage</li>
+              <li>Wrongful or duplicate payment charges</li>
+              <li>Account wrongfully restricted due to our error</li>
+              <li>Widespread platform outage preventing competition access</li>
+              <li>Billing error (incorrect amount charged)</li>
+            </ul>
+            <p style={{ marginTop: 16 }}>
+              For full details on refund eligibility, the request process, and processing times, see our <a href="/refunds" style={{ color: "#a78bfa", fontWeight: 600 }}>Refund Policy</a>.
             </p>
           </div>
 
@@ -976,6 +995,12 @@ export default function TermsPage() {
             <p style={{ marginTop: 16 }}>
               EU residents may also bring proceedings in their country of residence. Nothing in these Terms affects your statutory consumer rights.
             </p>
+            <div className="highlight-box" style={{ marginTop: 24 }}>
+              <strong>Your Statutory Rights</strong>
+              <p>
+                Nothing in these Terms limits or excludes your statutory rights where applicable. These Terms set out our commercial practices but do not override rights granted to you by law.
+              </p>
+            </div>
           </div>
 
           <div className="content-card">

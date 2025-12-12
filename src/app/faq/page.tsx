@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, HelpCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, HelpCircle, ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useState } from "react";
@@ -27,7 +27,7 @@ export default function FAQPage() {
         },
         {
           q: "Is VibraXX free to play?",
-          a: "Every registered user gets one free daily practice quiz (50 questions). This practice quiz doesn't count toward prizes or leaderboards—it's purely for learning. To compete for the monthly £1000 prize, you need to purchase quiz rounds: £1 per round or £29 for 35 rounds (17% savings)."
+          a: "Every registered user gets one free daily practice quiz (50 questions). This practice quiz doesn't count toward prizes or leaderboards—it's purely for learning. To compete for the monthly £1000 prize, you need to purchase quiz rounds: £2.00 per round or £49.00 for 35 rounds (30% savings)."
         },
         {
           q: "Do I need to download an app?",
@@ -73,11 +73,11 @@ export default function FAQPage() {
         },
         {
           q: "What is the 3000 participant threshold?",
-          a: "The £1000 monthly prize activates only if 3000 or more unique participants compete during that month. This ensures the platform can sustain the prize pool. If the threshold isn't met, all entry fees are refunded within 14 days."
+          a: "The prize pool activates only if 3000+ unique paid participants compete during the month. This threshold covers platform operational costs. If not met, no prize is awarded and entry fees are not refunded as platform service has been provided (quiz participation, scoring, leaderboards)."
         },
         {
           q: "What happens if there's a tie for first place?",
-          a: "If multiple players have the same top score: (1) The player with fewer incorrect answers wins. (2) If still tied, the prize is split equally among all tied participants."
+          a: "If multiple players have the same top score: (1) The player with fewer incorrect answers wins. (2) If still tied, highest accuracy rate wins. (3) If still tied, the prize is split equally among all tied participants."
         },
         {
           q: "Does the free daily quiz count toward my score?",
@@ -94,7 +94,7 @@ export default function FAQPage() {
       questions: [
         {
           q: "How much does it cost to play?",
-          a: "Individual rounds cost £1 each. We also offer a value pack: 35 rounds for £29 (£0.83 per round), saving you 17%."
+          a: "Individual rounds cost £2.00 each. We also offer a value pack: 35 rounds for £49.00 (£1.40 per round), saving you 30%."
         },
         {
           q: "What payment methods do you accept?",
@@ -102,7 +102,7 @@ export default function FAQPage() {
         },
         {
           q: "Can I get a refund?",
-          a: "Purchased rounds are generally non-refundable once used. However, unused rounds may be refunded within 14 days of purchase. If the monthly prize threshold (3000 participants) isn't met, all entry fees are automatically refunded. See our Refund Policy for full details."
+          a: "All quiz round purchases are final. Digital content is delivered immediately upon payment. Refunds are available only in exceptional circumstances where VibraXX is at fault (platform technical errors, wrongful charges, etc.). If the monthly prize threshold is not met, no refunds are issued. See our Refund Policy for full details."
         },
         {
           q: "Do round credits expire?",
@@ -135,7 +135,7 @@ export default function FAQPage() {
         },
         {
           q: "Which countries can participate?",
-          a: "VibraXX is available in most countries. However, due to local gambling and competition laws, some regions may be restricted. Check our Terms & Conditions for the current list."
+          a: "VibraXX is available in 40+ countries worldwide. However, due to local gambling and competition laws, some regions may be restricted. Check our Terms & Conditions for the complete list of permitted countries."
         }
       ]
     },
@@ -144,7 +144,7 @@ export default function FAQPage() {
       questions: [
         {
           q: "What if I experience technical issues during a quiz?",
-          a: "If you encounter technical problems (internet disconnection, browser crash, etc.), unfortunately the round cannot be restarted or refunded. We recommend using a stable internet connection and a modern browser for the best experience."
+          a: "If you encounter technical problems (internet disconnection, browser crash, etc.) on your end, unfortunately the round cannot be restarted or refunded. If the issue is caused by our platform, contact us immediately. We recommend using a stable internet connection and a modern browser for the best experience."
         },
         {
           q: "Which browsers are supported?",
@@ -169,11 +169,11 @@ export default function FAQPage() {
       questions: [
         {
           q: "How are winners paid?",
-          a: "Monthly winners are contacted via their registered email within 7 days after month-end. Prizes are paid via bank transfer (UK) or PayPal (international). Winners must provide valid payment details and verify their identity."
+          a: "Monthly winners are contacted via their registered email within 3 business days after month-end. After identity verification (up to 10 business days), prizes are paid within 7 business days via bank transfer to your verified account."
         },
         {
           q: "How long does it take to receive my prize?",
-          a: "Once you've provided your payment details and completed identity verification, prizes are typically paid within 14 business days."
+          a: "Once you've provided your payment details and completed identity verification, prizes are typically paid within 21 calendar days from month-end (maximum total timeline)."
         },
         {
           q: "Are prizes taxable?",
@@ -181,7 +181,7 @@ export default function FAQPage() {
         },
         {
           q: "What if I can't claim my prize?",
-          a: "Winners have 60 days to claim their prize. If unclaimed after 60 days, the prize is forfeited and may be donated to charity or added to the next month's prize pool."
+          a: "Winners must complete identity verification within the timeframe specified in the winner notification email. Failure to verify or provide required documentation may result in prize forfeiture."
         }
       ]
     },
@@ -198,7 +198,7 @@ export default function FAQPage() {
         },
         {
           q: "Can I watch quiz competitions live?",
-          a: "Yes! We broadcast live quiz rounds 24/7 on our YouTube channel. You can watch questions, explanations, and leaderboard updates in real-time, even if you're not competing."
+          a: "24/7 YouTube streaming with live overlay launching soon. You'll be able to watch real-time quiz action, see questions and explanations, and follow leaderboards even when you're not playing."
         },
         {
           q: "How can I contact support?",
@@ -210,6 +210,38 @@ export default function FAQPage() {
 
   return (
     <>
+      {/* ⚡ CRITICAL CSS - Prevents layout shift during hydration */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        :root {
+          color-scheme: dark;
+          background-color: #020817;
+        }
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+        body {
+          background-color: #020817 !important;
+          color: white !important;
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+          line-height: 1.7 !important;
+          overflow-x: hidden !important;
+        }
+        .legal-page {
+          min-height: 100vh;
+          background: #020817;
+          position: relative;
+          overflow-x: hidden;
+          contain: layout style paint;
+        }
+        .content-wrapper {
+          max-width: 1000px;
+          margin: 0 auto;
+          padding: 40px 20px 80px;
+        }
+      `}} />
+
       <style jsx global>{`
         :root {
           color-scheme: dark;
@@ -531,6 +563,10 @@ export default function FAQPage() {
             font-size: 15px;
           }
 
+          .faq-answer {
+            font-size: 14px;
+          }
+
           .faq-answer.open {
             padding: 0 20px 16px;
           }
@@ -617,6 +653,10 @@ export default function FAQPage() {
           .contact-box {
             padding: 24px 20px;
           }
+
+          .contact-box h3 {
+            font-size: 20px;
+          }
         }
       `}</style>
 
@@ -634,6 +674,7 @@ export default function FAQPage() {
                     alt="VibraXX"
                     width={46}
                     height={46}
+                    priority
                     style={{ objectFit: "contain" }}
                   />
                 </div>

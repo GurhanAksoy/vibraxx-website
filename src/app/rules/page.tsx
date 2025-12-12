@@ -9,6 +9,38 @@ export default function QuizRulesPage() {
 
   return (
     <>
+      {/* ⚡ CRITICAL CSS - Prevents layout shift during hydration */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        :root {
+          color-scheme: dark;
+          background-color: #020817;
+        }
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+        body {
+          background-color: #020817 !important;
+          color: white !important;
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+          line-height: 1.7 !important;
+          overflow-x: hidden !important;
+        }
+        .legal-page {
+          min-height: 100vh;
+          background: #020817;
+          position: relative;
+          overflow-x: hidden;
+          contain: layout style paint;
+        }
+        .content-wrapper {
+          max-width: 1000px;
+          margin: 0 auto;
+          padding: 40px 20px 80px;
+        }
+      `}} />
+
       <style jsx global>{`
         :root {
           color-scheme: dark;
@@ -279,6 +311,7 @@ export default function QuizRulesPage() {
           display: flex;
           align-items: center;
           gap: 12px;
+          flex-wrap: wrap;
         }
 
         .subsection-title {
@@ -392,7 +425,7 @@ export default function QuizRulesPage() {
           margin: 24px 0;
         }
 
-        @media (min-width: 768px) {
+        @media (min-width: 640px) {
           .rule-grid {
             grid-template-columns: repeat(2, 1fr);
           }
@@ -409,6 +442,13 @@ export default function QuizRulesPage() {
         .rule-card:hover {
           background: rgba(168, 85, 247, 0.1);
           border-color: rgba(168, 85, 247, 0.3);
+          transform: translateY(-2px);
+        }
+
+        @media (max-width: 640px) {
+          .rule-card {
+            padding: 16px;
+          }
         }
 
         .rule-card h4 {
@@ -421,11 +461,23 @@ export default function QuizRulesPage() {
           gap: 8px;
         }
 
+        @media (max-width: 640px) {
+          .rule-card h4 {
+            font-size: 15px;
+          }
+        }
+
         .rule-card p {
           font-size: 14px;
           color: #94a3b8;
           margin: 0;
           line-height: 1.6;
+        }
+
+        @media (max-width: 640px) {
+          .rule-card p {
+            font-size: 13px;
+          }
         }
 
         .vx-footer {
@@ -488,6 +540,7 @@ export default function QuizRulesPage() {
                     alt="VibraXX"
                     width={46}
                     height={46}
+                    priority
                     style={{ objectFit: "contain" }}
                   />
                 </div>
@@ -816,6 +869,7 @@ export default function QuizRulesPage() {
             <ol>
               <li>The participant with the highest cumulative score wins</li>
               <li>If tied, the participant with fewer incorrect answers wins</li>
+              <li>If still tied, highest accuracy percentage wins</li>
               <li>If still tied, the prize is divided equally</li>
             </ol>
 
@@ -831,9 +885,11 @@ export default function QuizRulesPage() {
 
             <h3 className="subsection-title">Threshold Requirement</h3>
             <div className="info-box">
-              <strong>3000+ Participants Needed</strong>
+              <strong>3000+ Unique Paid Participants Required</strong>
               <p>
-                Remember: The £1000 prize is only awarded if 3000 or more unique participants compete during the month. If this threshold is not reached, all entry fees are refunded.
+                The £1000 prize pool activates only when 3000 or more unique participants who have purchased at least one paid round compete during the calendar month. This threshold covers platform operational costs including payment processing fees, infrastructure, security, and support services.
+                <br /><br />
+                <strong style={{ color: "#60a5fa" }}>If the threshold is not met:</strong> No prize is awarded and funds do not carry over to the next month. Entry fees are not refunded as the platform service (quiz participation, scoring, leaderboards) has been provided.
               </p>
             </div>
           </div>

@@ -9,6 +9,38 @@ export default function AboutPage() {
 
   return (
     <>
+      {/* ⚡ CRITICAL CSS - Prevents layout shift during hydration */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        :root {
+          color-scheme: dark;
+          background-color: #020817;
+        }
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+        body {
+          background-color: #020817 !important;
+          color: white !important;
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+          line-height: 1.7 !important;
+          overflow-x: hidden !important;
+        }
+        .legal-page {
+          min-height: 100vh;
+          background: #020817;
+          position: relative;
+          overflow-x: hidden;
+          contain: layout style paint;
+        }
+        .content-wrapper {
+          max-width: 1000px;
+          margin: 0 auto;
+          padding: 40px 20px 80px;
+        }
+      `}} />
+
       <style jsx global>{`
         :root {
           color-scheme: dark;
@@ -286,6 +318,7 @@ export default function AboutPage() {
           display: flex;
           align-items: center;
           gap: 12px;
+          flex-wrap: wrap;
         }
 
         .subsection-title {
@@ -319,6 +352,7 @@ export default function AboutPage() {
           font-weight: 700;
         }
 
+        /* ✅ MOBILE-FIRST RESPONSIVE VALUE GRID */
         .value-grid {
           display: grid;
           grid-template-columns: 1fr;
@@ -326,7 +360,7 @@ export default function AboutPage() {
           margin: 24px 0;
         }
 
-        @media (min-width: 768px) {
+        @media (min-width: 640px) {
           .value-grid {
             grid-template-columns: repeat(2, 1fr);
           }
@@ -338,6 +372,12 @@ export default function AboutPage() {
           background: rgba(139, 92, 246, 0.05);
           border: 1px solid rgba(139, 92, 246, 0.2);
           transition: all 0.3s;
+        }
+
+        @media (max-width: 640px) {
+          .value-card {
+            padding: 20px;
+          }
         }
 
         .value-card:hover {
@@ -364,11 +404,23 @@ export default function AboutPage() {
           margin-bottom: 8px;
         }
 
+        @media (max-width: 640px) {
+          .value-title {
+            font-size: 16px;
+          }
+        }
+
         .value-description {
           font-size: 14px;
           color: #94a3b8;
           line-height: 1.7;
           margin: 0;
+        }
+
+        @media (max-width: 640px) {
+          .value-description {
+            font-size: 13px;
+          }
         }
 
         .highlight-box {
@@ -491,6 +543,10 @@ export default function AboutPage() {
           .company-info {
             padding: 24px 20px;
           }
+
+          .company-info h3 {
+            font-size: 20px;
+          }
         }
       `}</style>
 
@@ -508,6 +564,7 @@ export default function AboutPage() {
                     alt="VibraXX"
                     width={46}
                     height={46}
+                    priority
                     style={{ objectFit: "contain" }}
                   />
                 </div>
@@ -554,7 +611,7 @@ export default function AboutPage() {
               VibraXX was created with a simple yet powerful vision: to build the world's most exciting and accessible knowledge competition platform. We believe that everyone, regardless of location or background, should have the opportunity to test their knowledge, challenge themselves, and win real prizes based purely on skill.
             </p>
             <p>
-              Unlike traditional quiz shows limited to TV studios or local venues, VibraXX breaks down geographical barriers. Whether you're in London, Tokyo, New York, or Mumbai, you can compete alongside thousands of players worldwide in synchronized live quiz battles every 15 minutes, 24 hours a day, 7 days a week.
+              Unlike traditional quiz shows limited to TV studios or local venues, VibraXX breaks down geographical barriers. Whether you're in London, Tokyo, New York, or Mumbai, you can compete alongside players worldwide in synchronized live quiz battles every 15 minutes, 24 hours a day, 7 days a week.
             </p>
             <div className="highlight-box">
               <strong>The Next Generation of Quiz Competitions</strong>
@@ -632,9 +689,9 @@ export default function AboutPage() {
                 <div className="value-icon">
                   <Users style={{ width: 24, height: 24, color: "white" }} />
                 </div>
-                <div className="value-title">Live Broadcasting</div>
+                <div className="value-title">Live Broadcasting (Coming Soon)</div>
                 <p className="value-description">
-                  Watch live quiz action 24/7 on YouTube. See questions, explanations, and leaderboards in real-time even if you're not playing.
+                  24/7 YouTube streaming launching soon—watch live quiz action, see questions and explanations in real-time, even when you're not playing.
                 </p>
               </div>
 
@@ -677,12 +734,12 @@ export default function AboutPage() {
               VibraXX is more than a quiz platform—it's a global community of knowledge enthusiasts. Our players come from all walks of life: students, professionals, retirees, trivia lovers, and competitive minds from over 40 countries.
             </p>
             <p>
-              Every month, thousands of rounds are played, millions of questions answered, and countless personal bests achieved. Whether you're here to win prizes, test your knowledge, or simply enjoy the thrill of competition, you're part of something special.
+              Join a growing global community where skill is rewarded and knowledge is celebrated. Whether you're here to win prizes, test your knowledge, or simply enjoy the thrill of competition, you're part of something special.
             </p>
             <div className="highlight-box">
               <strong>Join the Movement</strong>
               <p>
-                Be part of the world's fastest-growing live quiz community. Compete, learn, connect, and win. Your knowledge is your power.
+                Be part of the world's most innovative live quiz platform. Compete, learn, connect, and win. Your knowledge is your power.
               </p>
             </div>
           </div>
@@ -700,8 +757,8 @@ export default function AboutPage() {
               <li><strong>Robust Infrastructure:</strong> Handling thousands of concurrent players without lag or delays</li>
               <li><strong>Secure Payment Systems:</strong> Integration with Stripe for safe, reliable transactions</li>
               <li><strong>Mobile Optimization:</strong> Full functionality across all devices—desktop, tablet, and smartphone</li>
-              <li><strong>AI-Powered Questions:</strong> Dynamic question generation to maintain freshness and variety</li>
-              <li><strong>Live Broadcasting:</strong> 24/7 YouTube streaming with real-time overlay and statistics</li>
+              <li><strong>AI-Powered Questions:</strong> Questions curated and generated using advanced AI technology to maintain freshness, variety, and quality</li>
+              <li><strong>Live Broadcasting Capability:</strong> 24/7 YouTube streaming infrastructure ready to launch</li>
             </ul>
             <p>
               We continuously improve and expand VibraXX based on player feedback, technological advances, and emerging opportunities. Our roadmap includes new game modes, expanded prize structures, regional championships, and enhanced social features.
@@ -763,7 +820,7 @@ export default function AboutPage() {
             <p style={{ fontSize: 15, color: "#cbd5e1", margin: 0, lineHeight: 1.7 }}>
               <strong style={{ color: "#a78bfa" }}>Ready to Test Your Knowledge?</strong>
               <br />
-              Join thousands of players worldwide in the ultimate quiz competition. Sign in with Google and start competing for £1000 monthly prizes today!
+              Join players worldwide in the ultimate quiz competition. Sign in with Google and start competing for £1000 monthly prizes today!
             </p>
           </div>
         </div>
