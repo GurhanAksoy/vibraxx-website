@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabaseClient";
 import {
   Trophy,
   Clock,
@@ -16,12 +16,6 @@ import {
   Flame,
   Star,
 } from "lucide-react";
-
-// Initialize Supabase Client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 // === CONFIGURATION ===
 const TOTAL_QUESTIONS = 50;
@@ -124,74 +118,79 @@ export default function QuizGamePage() {
     verifyAccess();
   }, [router]);
 
-  // === FETCH LIVE QUESTIONS FROM LIVE_ROUNDS ===
+  // === FETCH LIVE QUESTIONS FROM ROUNDS ===
   useEffect(() => {
     if (!securityPassed) return;
 
     const fetchLiveQuestions = async () => {
       try {
-        // Get latest live round
-        const { data: round, error: roundError } = await supabase
-          .from("live_rounds")
-          .select("*")
-          .order("scheduled_start", { ascending: false })
-          .limit(1)
-          .single();
+        // 1️⃣ Get current live round using RPC
+        const { data: roundData, error: roundError } = await supabase.rpc(
+          "get_current_live_round"
+        );
 
-        if (roundError || !round) {
+        if (roundError || !roundData) {
           console.error("❌ No active round found:", roundError);
           setIsLoading(false);
           return;
         }
 
-        console.log("✅ Active round found:", round.id);
-        
-        // ✅ FIXED: Robust round state initialization
-        setRoundId(round.id);
-        setPhase(round.phase || "READY");
+        console.log("✅ Active round found:", roundData.round_id);
+        setRoundId(roundData.round_id);
 
-        const safeIndex =
-          typeof round.current_question_index === "number"
-            ? Math.max(0, round.current_question_index)
-            : 0;
-        setCurrentIndex(safeIndex);
-        
-        // ✅ FIXED: Safe questionStart handling
-        setQuestionStart(round.question_started_at || null);
+        // 2️⃣ Get round details with questions
+        const { data: round, error: roundFetchError } = await supabase
+          .from("rounds")
+          .select("questions_selected, scheduled_start, status")
+          .eq("id", roundData.round_id)
+          .single();
 
-        // Get questions for this round
-        const { data: questionData, error: questionsError } = await supabase
-          .from("live_round_questions")
-          .select("position, questions(*)")
-          .eq("round_id", round.id)
-          .order("position");
-
-        if (questionsError || !questionData) {
-          console.error("❌ Error fetching questions:", questionsError);
+        if (roundFetchError || !round || !round.questions_selected) {
+          console.error("❌ Error fetching round questions:", roundFetchError);
           setIsLoading(false);
           return;
         }
 
-        console.log(`✅ Loaded ${questionData.length} questions`);
+        const questionIds = round.questions_selected as number[];
+        console.log(`✅ Round has ${questionIds.length} questions`);
 
+        // 3️⃣ Fetch question details using RPC
+        const { data: questionData, error: questionsError } = await supabase.rpc(
+          "get_question_details",
+          { p_question_ids: questionIds }
+        );
+
+        if (questionsError || !questionData) {
+          console.error("❌ Error fetching question details:", questionsError);
+          setIsLoading(false);
+          return;
+        }
+
+        console.log(`✅ Loaded ${questionData.length} question details`);
+
+        // 4️⃣ Format questions (same as before)
         const formattedQuestions: Question[] = questionData.map((item: any) => ({
-          id: item.questions.id,
-          question: item.questions.question_text,
+          id: item.id,
+          question: item.question_text,
           options: [
-            { id: "A", text: item.questions.option_a },
-            { id: "B", text: item.questions.option_b },
-            { id: "C", text: item.questions.option_c },
-            { id: "D", text: item.questions.option_d },
+            { id: "A", text: item.option_a },
+            { id: "B", text: item.option_b },
+            { id: "C", text: item.option_c },
+            { id: "D", text: item.option_d },
           ],
-          correctAnswer: item.questions.correct_answer as OptionId,
-          explanation: item.questions.explanation,
+          correctAnswer: item.correct_answer as OptionId,
+          explanation: item.explanation,
         }));
 
         setQuestions(formattedQuestions);
         setTotalQuestions(formattedQuestions.length);
 
-        // answers dizisini soru sayısına göre resetle
+        // Initialize answers array
         setAnswers(Array(formattedQuestions.length).fill("none"));
+        
+        // Set phase to QUESTION (since we don't have realtime sync)
+        setPhase("QUESTION");
+        setCurrentIndex(0);
       } catch (err) {
         console.error("❌ Error in fetchLiveQuestions:", err);
       } finally {
@@ -206,30 +205,15 @@ export default function QuizGamePage() {
   useEffect(() => {
     const fetchUserRounds = async () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        
-        if (!user) {
-          setUserRounds(0);
-          return;
-        }
+        const { data, error } = await supabase.rpc("get_my_round_credits");
 
-        // ✅ FIXED: Correct column name 'remaining'
-        const { data, error } = await supabase
-          .from("user_rounds")
-          .select("remaining")
-          .eq("user_id", user.id)
-          .single();
-
-        // ✅ FIXED: Improved error handling
-        if (error || !data) {
+        if (error) {
           console.error("Error fetching user rounds:", error);
           setUserRounds(0);
           return;
         }
 
-        setUserRounds(data.remaining || 0);
+        setUserRounds(data || 0);
       } catch (err) {
         console.error("Error fetching user rounds:", err);
         setUserRounds(0);
@@ -239,108 +223,40 @@ export default function QuizGamePage() {
     fetchUserRounds();
   }, []);
 
-  // === SAVE ANSWER TO SUPABASE ===
-  const saveAnswer = async (
-    questionId: number,
-    answer: OptionId | null,
-    isCorrectFlag: boolean
-  ) => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      await supabase.from("user_answers").insert({
-        user_id: user.id,
-        question_id: questionId,
-        selected_answer: answer,
-        is_correct: isCorrectFlag,
-        time_taken: QUESTION_DURATION - timeLeft,
-        answered_at: new Date().toISOString(),
-      });
-    } catch (err) {
-      console.error("Error saving answer:", err);
-    }
-  };
-
-  // === UPDATE USER STATS ===
-  const updateUserStats = async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const accuracy =
-        totalQuestions > 0
-          ? Math.round((correctCount / totalQuestions) * 100)
-          : 0;
-      const score = correctCount * 2;
-
-      await supabase
-        .from("user_stats")
-        .upsert(
-          {
-            user_id: user.id,
-            total_questions_answered: totalQuestions,
-            correct_answers: correctCount,
-            wrong_answers: wrongCount,
-            accuracy_percentage: accuracy,
-            max_streak: maxStreak,
-            last_round_score: score,
-            updated_at: new Date().toISOString(),
-          },
-          {
-            onConflict: "user_id",
-          }
-        );
-
-      await supabase.from("quiz_history").insert({
-        user_id: user.id,
-        score: score,
-        correct_count: correctCount,
-        wrong_count: wrongCount,
-        accuracy: accuracy,
-        max_streak: maxStreak,
-        completed_at: new Date().toISOString(),
-      });
-    } catch (err) {
-      console.error("Error updating user stats:", err);
-    }
-  };
-
-  // ✅ FIXED: Stats save with better guard
-  const saveStatsOnce = async () => {
-    if (statsSavedRef.current) {
-      console.log("📊 Stats already saved, skipping...");
+  // === SUBMIT ROUND RESULT (replaces saveAnswer, updateUserStats, saveStatsOnce) ===
+  const submitRoundResult = async () => {
+    if (!roundId || statsSavedRef.current) {
+      console.log("📊 Round result already submitted or no roundId");
       return;
     }
-    
-    console.log("📊 Saving stats...");
-    statsSavedRef.current = true;
-    await updateUserStats();
-  };
 
-  // ✅ FIXED: Correct RPC function name (deduct_user_round, not decrease_user_round)
-  const deductUserRound = async () => {
     try {
+      console.log("📊 Submitting round result...");
+      statsSavedRef.current = true;
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
 
-      const { error } = await supabase.rpc("deduct_user_round", {
+      if (!user) {
+        console.error("❌ User not authenticated for result submission");
+        return;
+      }
+
+      const { data, error } = await supabase.rpc("submit_round_result", {
+        p_round_id: roundId,
         p_user_id: user.id,
+        p_correct_answers: correctCount,
+        p_wrong_answers: wrongCount,
       });
 
       if (error) {
-        console.error("Error deducting round:", error);
+        console.error("❌ Error submitting result:", error);
       } else {
-        console.log("✅ Round deducted successfully");
+        console.log("✅ Result submitted successfully:", data);
       }
     } catch (err) {
-      console.error("Error deducting round:", err);
+      console.error("❌ Error in result submission:", err);
     }
   };
 
@@ -370,65 +286,20 @@ export default function QuizGamePage() {
   const startTick = () => playSound(tickSoundRef.current, { loop: true });
   const stopTick = () => stopSound(tickSoundRef.current);
 
-  // 🔥 NEW: REALTIME ROUND STATE LISTENER
+  // === SIMPLE QUESTION TIMER (replaces realtime sync) ===
   useEffect(() => {
-    if (!roundId) return;
+    if (isLoading || showExplanation || showFinalScore || !currentQ || phase !== "QUESTION") return;
 
-    console.log("🔌 Subscribing to round-state channel for round:", roundId);
-
-    const channel = supabase
-      .channel("round-state")
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "live_rounds",
-          filter: `id=eq.${roundId}`,
-        },
-        (payload) => {
-          const row = payload.new as any;
-          console.log(
-            "🔄 Round state updated:",
-            row.phase,
-            "Question:",
-            row.current_question_index
-          );
-
-          // ✅ FIXED: Safe index handling
-          const safeIndex =
-            typeof row.current_question_index === "number"
-              ? Math.max(0, row.current_question_index)
-              : 0;
-
-          setPhase(row.phase || "READY");
-          setCurrentIndex(safeIndex);
-          setQuestionStart(row.question_started_at || null);
-
-          if (row.phase === "QUESTION") {
-            console.log("▶️ Phase: QUESTION - Resetting UI state");
-            setShowExplanation(false);
-            setIsAnswerLocked(false);
-            setSelectedAnswer(null);
-            setTimeLeft(QUESTION_DURATION);
-            timeoutTriggeredRef.current = false; // ✅ Reset timeout guard
-          } else if (row.phase === "INTERMISSION") {
-            console.log("⏸️ Phase: INTERMISSION - Showing explanation");
-            setShowExplanation(true);
-          } else if (row.phase === "FINISHED") {
-            console.log("🏁 Phase: FINISHED - Showing final score");
-            setShowFinalScore(true);
-            saveStatsOnce();
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      console.log("🔌 Unsubscribing from round-state channel");
-      supabase.removeChannel(channel);
-    };
-  }, [roundId]);
+    if (timeLeft > 0 && !isAnswerLocked) {
+      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+      return () => clearTimeout(timer);
+    } else if (timeLeft === 0 && !isAnswerLocked && !timeoutTriggeredRef.current) {
+      // Time's up - auto submit wrong answer
+      console.log("⏱️ Time expired, auto-submitting...");
+      timeoutTriggeredRef.current = true;
+      handleTimeout();
+    }
+  }, [timeLeft, isLoading, showExplanation, showFinalScore, isAnswerLocked, currentQ, phase]);
 
   // Start/stop tick by UI state
   useEffect(() => {
@@ -453,30 +324,30 @@ export default function QuizGamePage() {
     timeLeft,
   ]);
 
-  // 🔥 NEW: SERVER-SYNCED TIMER (replaces local countdown)
+  // === EXPLANATION TIMER (5 seconds) ===
   useEffect(() => {
-    if (!questionStart || phase !== "QUESTION") {
-      return;
+    if (showExplanation && !showFinalScore) {
+      const timer = setTimeout(() => {
+        // Move to next question or finish quiz
+        if (currentIndex < totalQuestions - 1) {
+          playSound(whooshSoundRef.current);
+          setCurrentIndex(currentIndex + 1);
+          setTimeLeft(QUESTION_DURATION);
+          setSelectedAnswer(null);
+          setIsAnswerLocked(false);
+          setShowExplanation(false);
+          timeoutTriggeredRef.current = false;
+        } else {
+          // Quiz finished - submit results
+          submitRoundResult();
+          setShowFinalScore(true);
+        }
+      }, 5000); // 5 seconds explanation
+
+      return () => clearTimeout(timer);
     }
+  }, [showExplanation, showFinalScore, currentIndex, totalQuestions]);
 
-    const timer = setInterval(() => {
-      const now = new Date().getTime();
-      const start = new Date(questionStart).getTime();
-      const diff = Math.floor((now - start) / 1000);
-      const remaining = Math.max(0, QUESTION_DURATION - diff);
-
-      setTimeLeft(remaining);
-
-      // ✅ FIXED: Double-trigger protection
-      if (remaining === 0 && !isAnswerLocked && !timeoutTriggeredRef.current) {
-        console.log("⏱️ Time expired, auto-submitting...");
-        timeoutTriggeredRef.current = true;
-        handleTimeout();
-      }
-    }, 200);
-
-    return () => clearInterval(timer);
-  }, [questionStart, phase, isAnswerLocked]);
 
   // ✅ FIXED: Stabilized final score countdown
   useEffect(() => {
@@ -563,7 +434,8 @@ export default function QuizGamePage() {
       playSound(wrongSoundRef.current);
     }
 
-    saveAnswer(currentQ.id, optionId, correctFlag);
+    // Show explanation immediately
+    setShowExplanation(true);
   };
 
   const handleTimeout = () => {
@@ -585,8 +457,9 @@ export default function QuizGamePage() {
       return next;
     });
 
-    saveAnswer(currentQ.id, null, false);
     playSound(wrongSoundRef.current);
+    // Show explanation immediately
+    setShowExplanation(true);
   };
 
   const handleExitClick = () => {
@@ -600,7 +473,7 @@ export default function QuizGamePage() {
     playClick();
     stopTick();
     setShowExitConfirm(false);
-    await saveStatsOnce();
+    await submitRoundResult();
     setShowFinalScore(true);
   };
 

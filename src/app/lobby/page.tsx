@@ -2,40 +2,34 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
-  Crown,
   Users,
-  Zap,
-  Trophy,
   Clock,
   Sparkles,
   Flame,
-  Target,
   Volume2,
   VolumeX,
   ArrowLeft,
-  AlertCircle,
   Shield,
-  Gift,
-  TrendingUp,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabaseClient";
 import Image from "next/image";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
-// 🔧 DEVELOPMENT MODE - Set to true for local testing without auth
-const DEV_MODE = false; // ✅ PRODUCTION MODE - Security enabled!
+interface CurrentRound {
+  round_id: string;
+  round_number: number;
+  scheduled_start: string;
+  status: string;
+  time_until_start: number;
+}
 
 interface LobbyPlayer {
-  id: string;
-  name: string;
+  user_id: string;
+  full_name: string;
   avatar_url: string;
-  score: number;
+  total_score: number;
   streak: number;
+  joined_at: string;
 }
 
 export default function LobbyPage() {
@@ -49,6 +43,8 @@ export default function LobbyPage() {
   const [userRounds, setUserRounds] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [currentRound, setCurrentRound] = useState<CurrentRound | null>(null);
+  const [hasJoined, setHasJoined] = useState(false);
 
   // Lobby Data
   const [players, setPlayers] = useState<LobbyPlayer[]>([]);
@@ -96,22 +92,10 @@ export default function LobbyPage() {
     }
   }, [isPlaying]);
 
-  // 🔐 === SECURITY: AUTH CHECK & ROUND VERIFICATION ===
+  // 🔐 === AUTH CHECK & ROUND VERIFICATION ===
   useEffect(() => {
     const checkAuth = async () => {
       setIsLoading(true);
-
-      // 🔧 Skip auth check in development mode
-      if (DEV_MODE) {
-        console.log("🔧 DEV MODE: Skipping auth check");
-        setUser({
-          id: "dev-user-123",
-          user_metadata: { full_name: "Dev User", avatar_url: "/images/logo.png" },
-        });
-        setUserRounds(5);
-        setIsLoading(false);
-        return;
-      }
 
       const {
         data: { user: authUser },
@@ -127,254 +111,206 @@ export default function LobbyPage() {
       setUser(authUser);
       console.log("✅ Lobby Security: User authenticated -", authUser.id);
 
-      // ✅ FIXED: Improved user rounds security check
-      const { data: roundsData, error: roundsError } = await supabase
-        .from("user_rounds")
-        .select("remaining")
-        .eq("user_id", authUser.id)
-        .single();
+      // ✅ Round credits kontrol
+      const { data: creditsData, error: creditsError } = await supabase.rpc(
+        "get_my_round_credits"
+      );
 
-      if (roundsError || !roundsData) {
-        console.log("❌ Lobby Security: User rounds record not found");
+      if (creditsError) {
+        console.error("❌ Round credits check error:", creditsError);
         router.push("/buy");
         return;
       }
 
-      if (roundsData.remaining <= 0) {
+      if (!creditsData || creditsData <= 0) {
         console.log("❌ Lobby Security: No remaining rounds");
         router.push("/buy");
         return;
       }
 
-      setUserRounds(roundsData.remaining);
-      console.log("✅ Lobby Security: User remaining rounds -", roundsData.remaining);
-      console.log("✅ Lobby Security: All checks passed!");
+      setUserRounds(creditsData);
+      console.log("✅ Lobby Security: User remaining rounds -", creditsData);
       setIsLoading(false);
     };
 
     checkAuth();
   }, [router]);
 
-  // === LOAD GLOBAL ROUND STATE (server global timer) ===
-  const loadGlobalRoundState = useCallback(async () => {
+  // === LOAD CURRENT ROUND ===
+  const loadCurrentRound = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from("overlay_round_state")
-        .select("time_left")
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .single();
+      const { data, error } = await supabase.rpc("get_current_live_round");
 
-      if (!error && data) {
-        const tl =
-          typeof (data as { time_left?: number | null }).time_left === "number"
-            ? (data as { time_left: number }).time_left
-            : null;
-        setGlobalTimeLeft(tl);
-      }
-    } catch (err) {
-      console.error("loadGlobalRoundState error:", err);
-    }
-  }, []);
-
-  // === FETCH LOBBY PLAYERS ===
-  const fetchLobbyPlayers = useCallback(async () => {
-    try {
-      if (DEV_MODE) {
-        console.log("🔧 DEV MODE: Using mock players");
-        const mockPlayers: LobbyPlayer[] = [
-          {
-            id: "1",
-            name: "Sarah Chen",
-            avatar_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah",
-            score: 2840,
-            streak: 12,
-          },
-          {
-            id: "2",
-            name: "Alex Kumar",
-            avatar_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex",
-            score: 1950,
-            streak: 8,
-          },
-          {
-            id: "3",
-            name: "Emma Rodriguez",
-            avatar_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=Emma",
-            score: 3120,
-            streak: 15,
-          },
-          {
-            id: "4",
-            name: "Michael Zhang",
-            avatar_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=Michael",
-            score: 1750,
-            streak: 5,
-          },
-          {
-            id: "5",
-            name: "Sofia Martinez",
-            avatar_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sofia",
-            score: 2600,
-            streak: 10,
-          },
-          {
-            id: "6",
-            name: "David Kim",
-            avatar_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=David",
-            score: 3500,
-            streak: 18,
-          },
-        ];
-        setPlayers(mockPlayers);
-        setTotalPlayers(mockPlayers.length);
+      if (error) {
+        console.error("Load current round error:", error);
         return;
       }
 
-      const { data, error } = await supabase
-        .from("active_sessions")
-        .select(
-          `
-          user_id,
-          users:user_id (
-            full_name,
-            avatar_url
-          ),
-          user_stats:user_id (
-            total_score,
-            max_streak
-          )
-        `
-        )
-        .eq("in_lobby", true)
-        .limit(10);
+      if (data && data.length > 0) {
+        const round = data[0];
+        setCurrentRound(round);
+        setGlobalTimeLeft(round.time_until_start);
+        console.log("✅ Current round loaded:", round.round_id);
+      }
+    } catch (err) {
+      console.error("loadCurrentRound error:", err);
+    }
+  }, []);
 
-      if (!error && data) {
-        const formattedPlayers: LobbyPlayer[] = (data as any[]).map((session: any) => ({
-          id: session.user_id,
-          name: session.users?.full_name || "Anonymous Player",
-          avatar_url: session.users?.avatar_url || "/images/logo.png",
-          score: session.user_stats?.total_score || 0,
-          streak: session.user_stats?.max_streak || 0,
-        }));
+  // === JOIN ROUND ===
+  const joinRound = useCallback(async () => {
+    if (!user || !currentRound || hasJoined) return;
 
-        setPlayers(formattedPlayers);
-        setTotalPlayers(data.length);
+    try {
+      console.log("🎯 Joining round:", currentRound.round_id);
+      
+      const { data, error } = await supabase.rpc("join_round", {
+        p_round_id: currentRound.round_id,
+        p_user_id: user.id,
+        p_round_type: "live",
+      });
+
+      if (error) {
+        console.error("❌ Join round error:", error);
+        
+        // Error handling
+        if (error.message?.includes("no_credits")) {
+          router.push("/buy");
+        }
+        return;
+      }
+
+      const result = data as { success: boolean; error?: string };
+      
+      if (result.success) {
+        console.log("✅ Successfully joined round");
+        setHasJoined(true);
+        
+        // Round credits güncelle
+        setUserRounds((prev) => prev - 1);
+      } else {
+        console.error("❌ Join failed:", result.error);
+        
+        if (result.error === "no_credits") {
+          router.push("/buy");
+        }
+      }
+    } catch (err) {
+      console.error("Join round error:", err);
+    }
+  }, [user, currentRound, hasJoined, router]);
+
+  // === FETCH LOBBY PLAYERS ===
+  const fetchLobbyPlayers = useCallback(async () => {
+    if (!currentRound) return;
+
+    try {
+      const { data, error } = await supabase.rpc("get_lobby_participants", {
+        p_round_id: currentRound.round_id,
+      });
+
+      if (error) {
+        console.error("Fetch lobby players error:", error);
+        return;
+      }
+
+      if (data) {
+        setPlayers(data);
       }
     } catch (err) {
       console.error("Fetch lobby players error:", err);
     }
-  }, []);
+  }, [currentRound]);
 
-  // === FETCH TOTAL ACTIVE PLAYERS ===
-  const fetchTotalPlayers = useCallback(async () => {
+  // === FETCH TOTAL PARTICIPANTS ===
+  const fetchTotalParticipants = useCallback(async () => {
+    if (!currentRound) return;
+
     try {
-      if (DEV_MODE) {
-        const mockTotal = 12000 + Math.floor(Math.random() * 500);
-        setTotalPlayers(mockTotal);
+      const { data, error } = await supabase.rpc("get_round_participant_count", {
+        p_round_id: currentRound.round_id,
+      });
+
+      if (error) {
+        console.error("Fetch participant count error:", error);
         return;
       }
 
-      const { count, error } = await supabase
-        .from("active_sessions")
-        .select("*", { count: "exact", head: true });
-
-      if (!error && typeof count === "number") {
-        setTotalPlayers((prev) => Math.max(count, prev));
+      if (typeof data === "number") {
+        setTotalPlayers(data);
       }
     } catch (err) {
-      console.error("Fetch total players error:", err);
+      console.error("Fetch total participants error:", err);
     }
-  }, []);
-
-  // === MARK USER AS IN LOBBY ===
-  const markUserInLobby = useCallback(async () => {
-    if (!user) return;
-
-    if (DEV_MODE) {
-      console.log("🔧 DEV MODE: Skipping mark user in lobby");
-      return;
-    }
-
-    try {
-      await supabase.from("active_sessions").upsert(
-        {
-          user_id: user.id,
-          in_lobby: true,
-          last_activity: new Date().toISOString(),
-        },
-        {
-          onConflict: "user_id",
-        }
-      );
-    } catch (err) {
-      console.error("Mark user in lobby error:", err);
-    }
-  }, [user]);
+  }, [currentRound]);
 
   // === INITIAL DATA LOAD ===
   useEffect(() => {
     if (!user || isLoading) return;
 
     const loadLobbyData = async () => {
-      await Promise.all([
-        fetchLobbyPlayers(),
-        fetchTotalPlayers(),
-        markUserInLobby(),
-        loadGlobalRoundState(),
-      ]);
+      await loadCurrentRound();
     };
 
     loadLobbyData();
 
+    // Polling: Round'u her 3 saniyede kontrol et
+    const roundInterval = setInterval(loadCurrentRound, 3000);
+
+    return () => {
+      clearInterval(roundInterval);
+    };
+  }, [user, isLoading, loadCurrentRound]);
+
+  // === JOIN ROUND WHEN READY ===
+  useEffect(() => {
+    if (currentRound && !hasJoined && user) {
+      joinRound();
+    }
+  }, [currentRound, hasJoined, user, joinRound]);
+
+  // === FETCH PLAYERS WHEN JOINED ===
+  useEffect(() => {
+    if (!hasJoined || !currentRound) return;
+
+    const loadParticipants = async () => {
+      await Promise.all([fetchLobbyPlayers(), fetchTotalParticipants()]);
+    };
+
+    loadParticipants();
+
+    // Polling: Katılımcıları her 5 saniyede güncelle
     const playersInterval = setInterval(fetchLobbyPlayers, 5000);
-    const totalPlayersInterval = setInterval(fetchTotalPlayers, 8000);
+    const countInterval = setInterval(fetchTotalParticipants, 5000);
 
     return () => {
       clearInterval(playersInterval);
-      clearInterval(totalPlayersInterval);
+      clearInterval(countInterval);
     };
-  }, [
-    user,
-    isLoading,
-    fetchLobbyPlayers,
-    fetchTotalPlayers,
-    markUserInLobby,
-    loadGlobalRoundState,
-  ]);
+  }, [hasJoined, currentRound, fetchLobbyPlayers, fetchTotalParticipants]);
 
-  // === REALTIME LISTENER FOR OVERLAY STATE (server global countdown) ===
+  // === LOCAL COUNTDOWN ===
   useEffect(() => {
-    const channel = supabase
-      .channel("lobby-overlay")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "overlay_round_state" },
-        (payload) => {
-          const newData = payload.new as { time_left?: number | null };
+    if (globalTimeLeft === null || globalTimeLeft <= 0) return;
 
-          if (typeof newData?.time_left === "number") {
-            setGlobalTimeLeft(newData.time_left);
-          } else {
-            setGlobalTimeLeft(null);
-          }
-        }
-      )
-      .subscribe();
+    const timer = setInterval(() => {
+      setGlobalTimeLeft((prev) => {
+        if (prev === null || prev <= 0) return 0;
+        return prev - 1;
+      });
+    }, 1000);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
+    return () => clearInterval(timer);
+  }, [globalTimeLeft]);
 
-  // === AUTO START WHEN COUNTDOWN ENDS (server time_left == 0) ===
+  // === AUTO START WHEN COUNTDOWN ENDS ===
   useEffect(() => {
-    if (globalTimeLeft === 0 && !isRedirecting) {
+    if (globalTimeLeft === 0 && !isRedirecting && hasJoined) {
       handleStartGame();
     }
-  }, [globalTimeLeft, isRedirecting]);
+  }, [globalTimeLeft, isRedirecting, hasJoined]);
 
-  // === WARNING & SOUND EFFECTS (last 10 seconds) ===
+  // === WARNING & SOUND EFFECTS ===
   useEffect(() => {
     if (globalTimeLeft === null) return;
 
@@ -401,60 +337,15 @@ export default function LobbyPage() {
   // === START GAME HANDLER ===
   const handleStartGame = async () => {
     if (isRedirecting) return;
-    if (!user) return;
-
     setIsRedirecting(true);
 
-    try {
-      if (DEV_MODE) {
-        console.log("🔧 DEV MODE: Skipping round deduction, redirecting to quiz...");
-        router.push("/quiz");
-        return;
-      }
-
-      // ❗ Round hakkı tam quiz'e giriş anında düşüyor
-      const { error: deductError } = await supabase.rpc("deduct_user_round", {
-        p_user_id: user.id,
-      });
-
-      if (deductError) {
-        console.error("Failed to deduct round:", deductError);
-      }
-
-      // Kullanıcı artık lobby'de değil
-      await supabase
-        .from("active_sessions")
-        .update({ in_lobby: false })
-        .eq("user_id", user.id);
-
-      router.push("/quiz");
-    } catch (err) {
-      console.error("Start game error:", err);
-      router.push("/quiz");
-    }
+    console.log("🚀 Redirecting to quiz...");
+    router.push("/quiz");
   };
 
   // === HANDLE BACK BUTTON ===
   const handleBack = async () => {
-    if (!user) return;
-
-    try {
-      if (DEV_MODE) {
-        console.log("🔧 DEV MODE: Skipping lobby cleanup, redirecting to home...");
-        router.push("/");
-        return;
-      }
-
-      await supabase
-        .from("active_sessions")
-        .update({ in_lobby: false })
-        .eq("user_id", user.id);
-
-      router.push("/");
-    } catch (err) {
-      console.error("Back navigation error:", err);
-      router.push("/");
-    }
+    router.push("/");
   };
 
   // === FORMAT TIME ===
@@ -720,7 +611,7 @@ export default function LobbyPage() {
           }}
         />
 
-        {/* RED WARNING Overlay - Last 10 Seconds */}
+        {/* RED WARNING Overlay */}
         {showWarning && globalTimeLeft !== null && globalTimeLeft <= 10 && (
           <div
             style={{
@@ -970,12 +861,6 @@ export default function LobbyPage() {
                 alignItems: "center",
                 justifyContent: "center",
               }}
-              onError={(e) => {
-                const target = e.currentTarget as HTMLDivElement;
-                target.style.display = "none";
-                const placeholder = target.nextElementSibling as HTMLDivElement;
-                if (placeholder) placeholder.style.display = "block";
-              }}
             >
               <Image
                 src="/images/sponsor.png"
@@ -1187,13 +1072,16 @@ export default function LobbyPage() {
                       : "0 0 20px rgba(34, 197, 94, 0.4)",
                 }}
               >
-                {globalTimeLeft !== null && globalTimeLeft <= 10 ? (
-                  <Zap style={{ width: 20, height: 20, color: "#ef4444" }} />
-                ) : (
-                  <Shield
-                    style={{ width: 20, height: 20, color: "#4ade80" }}
-                  />
-                )}
+                <Shield
+                  style={{
+                    width: 20,
+                    height: 20,
+                    color:
+                      globalTimeLeft !== null && globalTimeLeft <= 10
+                        ? "#ef4444"
+                        : "#4ade80",
+                  }}
+                />
                 <span
                   style={{
                     fontSize: "clamp(12px, 2.8vw, 14px)",
@@ -1352,7 +1240,7 @@ export default function LobbyPage() {
               >
                 {globalTimeLeft !== null && globalTimeLeft <= 10
                   ? "🔥 Get ready! You'll be automatically entered when the countdown ends!"
-                  : "You'll be automatically entered when the quiz begins. Get ready! "}
+                  : "You'll be automatically entered when the quiz begins. Get ready!"}
               </p>
 
               {/* Quiz Info Grid */}
@@ -1498,8 +1386,8 @@ export default function LobbyPage() {
                     fontWeight: 600,
                   }}
                 >
-                  💡 <strong style={{ color: "white" }}>Pro Tip:</strong>{" "}
-                  In a tie, the fastest correct responder wins the monthly prize!
+                  💡 <strong style={{ color: "white" }}>Pro Tip:</strong> In a
+                  tie, the fastest correct responder wins the monthly prize!
                 </div>
               </div>
             </div>
@@ -1572,7 +1460,7 @@ export default function LobbyPage() {
                 {players.length > 0 ? (
                   players.map((player, idx) => (
                     <div
-                      key={player.id}
+                      key={player.user_id}
                       className="animate-slide-in"
                       style={{
                         display: "flex",
@@ -1614,8 +1502,8 @@ export default function LobbyPage() {
                         }}
                       >
                         <Image
-                          src={player.avatar_url}
-                          alt={player.name}
+                          src={player.avatar_url || "/images/logo.png"}
+                          alt={player.full_name}
                           fill
                           sizes="54px"
                           style={{ objectFit: "cover" }}
@@ -1641,7 +1529,7 @@ export default function LobbyPage() {
                               whiteSpace: "nowrap",
                             }}
                           >
-                            {player.name}
+                            {player.full_name || "Anonymous"}
                           </span>
                           {player.streak >= 10 && (
                             <div
@@ -1652,10 +1540,8 @@ export default function LobbyPage() {
                                 padding: "3px 10px",
                                 borderRadius: "8px",
                                 background: "rgba(239, 68, 68, 0.25)",
-                                border:
-                                  "1px solid rgba(239, 68, 68, 0.4)",
-                                boxShadow:
-                                  "0 0 10px rgba(239, 68, 68, 0.3)",
+                                border: "1px solid rgba(239, 68, 68, 0.4)",
+                                boxShadow: "0 0 10px rgba(239, 68, 68, 0.3)",
                               }}
                             >
                               <Flame
@@ -1684,7 +1570,7 @@ export default function LobbyPage() {
                             fontWeight: 600,
                           }}
                         >
-                          🏆 {player.score.toLocaleString()} points
+                          🏆 {player.total_score.toLocaleString()} points
                         </div>
                       </div>
                     </div>
@@ -1725,12 +1611,10 @@ export default function LobbyPage() {
                   }}
                 >
                   🌍{" "}
-                  <strong
-                    style={{ color: "#c4b5fd", fontWeight: 800 }}
-                  >
+                  <strong style={{ color: "#c4b5fd", fontWeight: 800 }}>
                     {totalPlayers.toLocaleString()}
                   </strong>{" "}
-                  players worldwide online
+                  players in this round
                 </div>
               </div>
             </div>
@@ -1767,7 +1651,7 @@ export default function LobbyPage() {
 
         ::-webkit-scrollbar-track {
           background: rgba(15, 23, 42, 0.7);
-          border-radius: 10px;
+          borderRadius: 10px;
         }
 
         ::-webkit-scrollbar-thumb {
@@ -1776,7 +1660,7 @@ export default function LobbyPage() {
             rgba(139, 92, 246, 0.7),
             rgba(217, 70, 239, 0.5)
           );
-          border-radius: 10px;
+          borderRadius: 10px;
           border: 2px solid rgba(15, 23, 42, 0.7);
         }
 

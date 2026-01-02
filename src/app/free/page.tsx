@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabaseClient";
 import {
   Trophy,
   Clock,
@@ -14,12 +14,6 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-
-// Initialize Supabase
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 const TOTAL_QUESTIONS = 50; // 🎮 FREE PRACTICE MODE
 const QUESTION_DURATION = 6; // saniye
@@ -37,86 +31,17 @@ interface Question {
   explanation: string;
 }
 
-const baseQuestions: Omit<Question, "id">[] = [
-  {
-    question: "Which planet is known as the Red Planet?",
-    options: [
-      { id: "A", text: "Mars" },
-      { id: "B", text: "Venus" },
-      { id: "C", text: "Jupiter" },
-      { id: "D", text: "Mercury" },
-    ],
-    correctAnswer: "A",
-    explanation:
-      "Mars is often called the Red Planet due to its iron oxide-rich surface, which gives it a reddish appearance.",
-  },
-  {
-    question: "What is the chemical symbol for Gold?",
-    options: [
-      { id: "A", text: "Ag" },
-      { id: "B", text: "Au" },
-      { id: "C", text: "Gd" },
-      { id: "D", text: "Go" },
-    ],
-    correctAnswer: "B",
-    explanation:
-      "The symbol Au comes from the Latin word 'Aurum', meaning 'shining dawn'.",
-  },
-  {
-    question: "Which ocean is the largest by surface area?",
-    options: [
-      { id: "A", text: "Atlantic Ocean" },
-      { id: "B", text: "Indian Ocean" },
-      { id: "C", text: "Pacific Ocean" },
-      { id: "D", text: "Arctic Ocean" },
-    ],
-    correctAnswer: "C",
-    explanation:
-      "The Pacific Ocean covers more than 30% of the Earth's surface, making it the largest ocean.",
-  },
-  {
-    question: "Who developed the theory of general relativity?",
-    options: [
-      { id: "A", text: "Isaac Newton" },
-      { id: "B", text: "Albert Einstein" },
-      { id: "C", text: "Niels Bohr" },
-      { id: "D", text: "Galileo Galilei" },
-    ],
-    correctAnswer: "B",
-    explanation:
-      "Albert Einstein published the theory of general relativity in 1915, changing our understanding of gravity.",
-  },
-  {
-    question: "Which is the smallest prime number?",
-    options: [
-      { id: "A", text: "0" },
-      { id: "B", text: "1" },
-      { id: "C", text: "2" },
-      { id: "D", text: "3" },
-    ],
-    correctAnswer: "C",
-    explanation: "2 is the smallest and the only even prime number.",
-  },
-];
-
-// 50 soruluk set
-const questions: Question[] = Array.from({ length: TOTAL_QUESTIONS }, (_, i) => {
-  const base = baseQuestions[i % baseQuestions.length];
-  return {
-    id: i + 1,
-    question: `Q${i + 1}: ${base.question}`,
-    options: base.options,
-    correctAnswer: base.correctAnswer,
-    explanation: base.explanation,
-  };
-});
-
-export default function QuizGamePage() {
+export default function FreeQuizPage() {
   const router = useRouter();
 
   // 🔐 SECURITY STATES
   const [isVerifying, setIsVerifying] = useState(true);
   const [securityPassed, setSecurityPassed] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // 🎮 QUESTIONS STATE (will be loaded from database)
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [roundId, setRoundId] = useState<string | null>(null);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(QUESTION_DURATION);
@@ -152,76 +77,92 @@ export default function QuizGamePage() {
 
   const currentQ = questions[currentIndex];
 
-  // 🔐 === SECURITY CHECK - AUTHENTICATION & DAILY FREE ROUND ===
-  //⚠️ DEV MODE: Security disabled for testing
+  // 🔐 === SECURITY CHECK & FETCH FREE QUIZ ===
   useEffect(() => {
-    const verifyAccess = async () => {
+    const verifyAndFetchFreeQuiz = async () => {
       try {
         console.log("🔐 Free Quiz Security: Starting verification...");
-        console.log("⚠️ DEV MODE: Skipping security checks for testing");
 
-        // // CHECK 1: User authentication
-        // const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-        // 
-        // if (authError || !authUser) {
-        //   console.log("❌ Free Quiz Security: Not authenticated");
-        //   router.push("/");
-        //   return;
-        // }
+        // CHECK 1: User authentication
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError || !user) {
+          console.log("❌ Free Quiz Security: Not authenticated");
+          router.push("/");
+          return;
+        }
 
-        // console.log("✅ Free Quiz Security: User authenticated -", authUser.id);
+        console.log("✅ Free Quiz Security: User authenticated -", user.id);
 
-        // // CHECK 2: Daily free round availability
-        // const { data: roundsData, error: roundsError } = await supabase
-        //   .from("user_rounds")
-        //   .select("free_quiz_available")
-        //   .eq("user_id", authUser.id)
-        //   .single();
+        // CHECK 2: Get today's free round
+        const { data: freeRoundData, error: freeRoundError } = await supabase.rpc(
+          "get_today_free_round"
+        );
 
-        // if (roundsError || !roundsData) {
-        //   console.log("❌ Free Quiz Security: No rounds data");
-        //   router.push("/");
-        //   return;
-        // }
+        if (freeRoundError) {
+          console.error("❌ Free Quiz Error:", freeRoundError);
+          alert("Error loading free quiz. Please try again.");
+          router.push("/");
+          return;
+        }
 
-        // if (!roundsData.free_quiz_available || roundsData.free_quiz_available <= 0) {
-        //   console.log("❌ Free Quiz Security: No free quiz available today");
-        //   router.push("/?error=no_free_quiz");
-        //   return;
-        // }
+        // CHECK 3: Has user already played today?
+        if (freeRoundData.has_played) {
+          console.log("❌ Free Quiz Security: Already played today");
+          alert("You've already played your free quiz today! Come back tomorrow.");
+          router.push("/");
+          return;
+        }
 
-        // console.log("✅ Free Quiz Security: Free quiz available");
-        console.log("✅ Free Quiz Security: All checks passed! (DEV MODE)");
+        console.log("✅ Free Quiz Security: Free quiz available!");
+        setRoundId(freeRoundData.round_id);
 
+        // FETCH QUESTIONS from the free round
+        const questionIds = freeRoundData.questions as number[];
+        console.log(`✅ Free round has ${questionIds.length} questions`);
+
+        const { data: questionsData, error: questionsError } = await supabase.rpc(
+          "get_question_details",
+          { p_question_ids: questionIds }
+        );
+
+        if (questionsError || !questionsData) {
+          console.error("❌ Error fetching questions:", questionsError);
+          alert("Error loading quiz questions.");
+          router.push("/");
+          return;
+        }
+
+        console.log(`✅ Loaded ${questionsData.length} questions for free quiz`);
+
+        // Format questions
+        const formattedQuestions: Question[] = questionsData.map((q: any) => ({
+          id: q.id,
+          question: q.question_text,
+          options: [
+            { id: "A", text: q.option_a },
+            { id: "B", text: q.option_b },
+            { id: "C", text: q.option_c },
+            { id: "D", text: q.option_d },
+          ],
+          correctAnswer: q.correct_answer as OptionId,
+          explanation: q.explanation,
+        }));
+
+        setQuestions(formattedQuestions);
         setSecurityPassed(true);
         setIsVerifying(false);
+        setIsLoading(false);
 
-        // // 🔥 ATOMIC ROUND DEDUCTION - Tüket hakkı!
-        // const today = new Date().toISOString().split('T')[0];
-        // const { error: deductError } = await supabase
-        //   .from("user_rounds")
-        //   .update({ 
-        //     free_quiz_available: 0,
-        //     last_free_quiz_date: today
-        //   })
-        //   .eq("user_id", authUser.id)
-        //   .gt("free_quiz_available", 0);
-
-        // if (deductError) {
-        //   console.error("❌ Free Quiz Security: Deduction failed", deductError);
-        // } else {
-        //   console.log("✅ Free Quiz Security: Free quiz consumed (1 → 0)");
-        // }
+        console.log("✅ Free Quiz: Ready to play!");
 
       } catch (error) {
         console.error("❌ Free Quiz Security: Verification error", error);
-        // router.push("/");
-        setSecurityPassed(true);
-        setIsVerifying(false);
+        router.push("/");
       }
     };
 
-    verifyAccess();
+    verifyAndFetchFreeQuiz();
   }, [router]);
 
   // Ses helper
@@ -415,7 +356,8 @@ export default function QuizGamePage() {
       playSound(wrongSoundRef.current);
     }
 
-    // Explanation yine sadece süre 0 olduğunda açılıyor.
+    // Show explanation immediately
+    setShowExplanation(true);
   };
 
   const handleExitClick = () => {
@@ -453,6 +395,46 @@ export default function QuizGamePage() {
     TOTAL_QUESTIONS > 0
       ? Math.round((correctCount / TOTAL_QUESTIONS) * 100)
       : 0;
+
+  // === LOADING / VERIFYING SCREEN ===
+  if (isVerifying || isLoading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div className="animate-pulse" style={{ textAlign: "center" }}>
+          <div
+            className="animate-spin"
+            style={{
+              width: "64px",
+              height: "64px",
+              margin: "0 auto 24px",
+              border: "4px solid rgba(139,92,246,0.3)",
+              borderTopColor: "#8b5cf6",
+              borderRadius: "50%",
+            }}
+          />
+          <p
+            style={{
+              fontSize: "18px",
+              fontWeight: 700,
+              color: "#f8fafc",
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+            }}
+          >
+            {isVerifying ? "Verifying Access..." : "Loading Free Quiz..."}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -493,6 +475,11 @@ export default function QuizGamePage() {
             transform: translateX(100%);
           }
         }
+        @keyframes spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
         .animate-float {
           animation: float 4s ease-in-out infinite;
         }
@@ -501,6 +488,10 @@ export default function QuizGamePage() {
         }
         .animate-slide-up {
           animation: slideUp 0.4s ease-out;
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
         }
         @media (max-width: 768px) {
           .header-wrap {
@@ -532,44 +523,7 @@ export default function QuizGamePage() {
       <audio ref={whooshSoundRef} src="/sounds/whoosh.mp3" />
       <audio ref={tickSoundRef} src="/sounds/tick.mp3" />
 
-      {/* 🔐 SECURITY VERIFICATION SCREEN */}
-      {isVerifying ? (
-        <div style={{
-          minHeight: '100vh',
-          background: 'linear-gradient(135deg, #0a1628 0%, #064e3b 50%, #0f172a 100%)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '20px',
-          color: 'white',
-        }}>
-          <div style={{
-            width: '60px',
-            height: '60px',
-            border: '4px solid rgba(16, 185, 129, 0.3)',
-            borderTopColor: '#10b981',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite'
-          }} />
-          <p style={{
-            color: '#34d399',
-            fontSize: '16px',
-            fontWeight: 600,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            🔐 Verifying daily access...
-          </p>
-          <style>{`
-            @keyframes spin {
-              to { transform: rotate(360deg); }
-            }
-          `}</style>
-        </div>
-      ) : (
-        <div
+      <div
         style={{
           minHeight: "100vh",
           background:
@@ -1820,7 +1774,6 @@ export default function QuizGamePage() {
           )}
         </main>
       </div>
-      )}
     </>
   );
 }

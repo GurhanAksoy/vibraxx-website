@@ -1,0 +1,132 @@
+[
+  {
+    "category": "General Knowledge",
+    "difficulty": "medium",
+    "question": "Which planet in our solar system rotates in the opposite direction?",
+    "options": {
+      "A": "Mars",
+      "B": "Jupiter",
+      "C": "Venus",
+      "D": "Saturn"
+    },
+    "correct_answer": "C",
+    "explanation": "Venus is unique among planets for rotating clockwise, opposite to most other planets in the solar system. This retrograde rotation remains a fascinating astronomical mystery."
+  },
+  {
+    "category": "General Knowledge",
+    "difficulty": "medium",
+    "question": "How many time zones exist across the entire world?",
+    "options": {
+      "A": "12",
+      "B": "18",
+      "C": "24",
+      "D": "36"
+    },
+    "correct_answer": "C",
+    "explanation": "The Earth is divided into 24 standard time zones, each representing approximately 15 degrees of longitude. These zones help standardize timekeeping globally."
+  },
+  {
+    "category": "General Knowledge",
+    "difficulty": "medium",
+    "question": "What percentage of the human body is composed of water?",
+    "options": {
+      "A": "45%",
+      "B": "55%",
+      "C": "65%",
+      "D": "75%"
+    },
+    "correct_answer": "C",
+    "explanation": "The adult human body contains approximately 60-65% water, with variation depending on age, gender, and body composition. Water is crucial for biological functions."
+  },
+  {
+    "category": "General Knowledge",
+    "difficulty": "medium",
+    "question": "Which element has the highest melting point on the periodic table?",
+    "options": {
+      "A": "Tungsten",
+      "B": "Carbon",
+      "C": "Platinum",
+      "D": "Titanium"
+    },
+    "correct_answer": "A",
+    "explanation": "Tungsten has the highest melting point of any pure metal at 3,422°C, making it extremely resistant to heat and ideal for high-temperature applications."
+  },
+  {
+    "category": "Science",
+    "difficulty": "medium",
+    "question": "Which gas makes up approximately 78% of Earth's atmosphere?",
+    "options": {
+      "A": "Oxygen",
+      "B": "Carbon Dioxide",
+      "C": "Nitrogen",
+      "D": "Argon"
+    },
+    "correct_answer": "C",
+    "explanation": "Nitrogen is the most abundant gas in Earth's atmosphere, comprising roughly 78% of its composition. This colorless, odorless gas plays a crucial role in regulating atmospheric processes."
+  },
+  {
+    "category": "Geography",
+    "difficulty": "medium",
+    "question": "Which tectonic plate contains most of North America's landmass?",
+    "options": {
+      "A": "Pacific Plate",
+      "B": "North American Plate",
+      "C": "Caribbean Plate",
+      "D": "Eurasian Plate"
+    },
+    "correct_answer": "B",
+    "explanation": "The North American Plate covers most of North America, extending from the mid-Atlantic Ridge to the western edge of the continent. It is one of the major tectonic plates that shape Earth's surface."
+  },
+  {
+    "category": "History",
+    "difficulty": "medium",
+    "question": "Which ancient civilization first developed a comprehensive legal code?",
+    "options": {
+      "A": "Greeks",
+      "B": "Romans",
+      "C": "Babylonians",
+      "D": "Egyptians"
+    },
+    "correct_answer": "C",
+    "explanation": "The Babylonian Code of Hammurabi, created around 1754 BCE, was one of the earliest and most complete written legal systems in human history. It covered a wide range of social, economic, and criminal regulations."
+  },
+  {
+    "category": "Technology",
+    "difficulty": "medium",
+    "question": "Which technology enables wireless data transfer over short distances?",
+    "options": {
+      "A": "WiFi",
+      "B": "Bluetooth",
+      "C": "Satellite",
+      "D": "Cellular"
+    },
+    "correct_answer": "B",
+    "explanation": "Bluetooth is a short-range wireless communication technology designed for exchanging data between devices within a limited range. It's commonly used in headphones, speakers, and device pairing."
+  },
+  {
+    "category": "Sports & Games",
+    "difficulty": "medium",
+    "question": "In Olympic swimming, how many strokes are recognized as official?",
+    "options": {
+      "A": "3 strokes",
+      "B": "4 strokes",
+      "C": "5 strokes",
+      "D": "6 strokes"
+    },
+    "correct_answer": "B",
+    "explanation": "Four official swimming strokes exist in Olympic competition: freestyle, backstroke, breaststroke, and butterfly. These strokes form the core of competitive swimming events worldwide."
+  },
+  {
+    "category": "Sports & Games",
+    "difficulty": "medium",
+    "question": "Which chess piece can move in any direction on the board?",
+    "options": {
+      "A": "Rook",
+      "B": "Knight",
+      "C": "Queen",
+      "D": "Bishop"
+    },
+    "correct_answer": "C",
+    "explanation": "The queen is the most powerful chess piece, able to move any number of squares in any straight direction. This makes her the most versatile piece on the chessboard."
+  }
+]
