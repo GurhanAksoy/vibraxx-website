@@ -1512,14 +1512,14 @@ export default function QuizGamePage() {
               >
                 <button
                   onClick={async () => {
-                    playClick();
-                    if (userRounds > 0) {
-                      await deductUserRound();
-                      router.push("/lobby");
-                    } else {
-                      router.push("/buy");
-                    }
-                  }}
+  playClick();
+  if (userRounds > 0) {
+    router.push("/lobby");
+  } else {
+    router.push("/buy");
+  }
+}}
+
                   style={{
                     width: "100%",
                     padding:
