@@ -72,8 +72,8 @@ useEffect(() => {
         
         // ✅ Use get_leaderboard RPC function
         const { data, error } = await supabase.rpc('get_leaderboard', {
-          p_type: leaderboardType,
-          p_limit: 100
+          period: leaderboardType,
+          limit: 100
         });
 
         if (error) {
@@ -1022,7 +1022,11 @@ const restPlayers = topPlayers.slice(3, 100);
                             {player.name}
                           </h4>
                           <span 
-                            style={{ fontSize: 'clamp(14px, 2.8vw, 20px)' }}
+                            style={{ 
+                              fontSize: 'clamp(20px, 4vw, 28px)',  // BÜYÜTÜLDÜ!
+                              lineHeight: 1,
+                              display: 'inline-block'
+                            }}
                             aria-label="Country flag"
                             role="img">
                             {player.country}
