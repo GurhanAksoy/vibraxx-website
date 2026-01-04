@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabaseClient";
+import CountryPicker from "@/components/CountryPicker";
 import {
   User,
   Mail,
@@ -31,12 +32,6 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-// Initialize Supabase
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 interface UserStats {
   total_questions_answered: number;
   correct_answers: number;
@@ -62,6 +57,7 @@ interface UserProfile {
   email: string;
   full_name: string;
   avatar_url: string;
+  country?: string;
   created_at: string;
 }
 
@@ -100,6 +96,7 @@ export default function ProfilePage() {
   const [securityPassed, setSecurityPassed] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
+  const [editCountry, setEditCountry] = useState("🌍"); // Country edit state
   const [isSaving, setIsSaving] = useState(false);
   
   // Contact form
@@ -140,7 +137,7 @@ export default function ProfilePage() {
   }, [router]);
 
 
-  // === FETCH USER DATA (Optimized - round_scores only) ===
+  // === FETCH USER DATA (Optimized with RPC and correct tables) ===
   useEffect(() => {
     if (!securityPassed) return;
 
@@ -152,10 +149,10 @@ export default function ProfilePage() {
         const { data: { user: authUser } } = await supabase.auth.getUser();
         if (!authUser) return;
 
-        // Fetch profile from profiles table (id column, not user_id)
+        // Fetch profile from profiles table
         const { data: profileData } = await supabase
           .from("profiles")
-          .select("full_name, avatar_url")
+          .select("full_name, avatar_url, round_credits, country")
           .eq("id", authUser.id)
           .single();
 
@@ -165,135 +162,65 @@ export default function ProfilePage() {
           email: authUser.email || "",
           full_name: profileData?.full_name || authUser.user_metadata?.full_name || "User",
           avatar_url: profileData?.avatar_url || authUser.user_metadata?.avatar_url || "",
+          country: profileData?.country || authUser.user_metadata?.country || "🌍",
           created_at: authUser.created_at,
         });
         setEditName(profileData?.full_name || authUser.user_metadata?.full_name || "User");
+        setEditCountry(profileData?.country || authUser.user_metadata?.country || "🌍");
 
-        // ✅ FIXED: Fetch user rounds from user_rounds table
-        const { data: roundsData, error: roundsError } = await supabase
-          .from("user_rounds")
-          .select("remaining, purchased")
+        // ✅ Get user round credits using RPC
+        const { data: creditsData } = await supabase.rpc('get_my_round_credits');
+        setUserRounds(creditsData || 0);
+        setTotalPurchasedRounds(0); // Can be calculated from payment history if needed
+
+        // ✅ Fetch all-time stats from leaderboard_alltime
+        const { data: alltimeStats } = await supabase
+          .from("leaderboard_alltime")
+          .select("*")
           .eq("user_id", authUser.id)
           .single();
 
-        if (!roundsError && roundsData) {
-          const remaining = roundsData.remaining ?? 0;
-          const purchased = roundsData.purchased ?? 0;
-
-          setUserRounds(remaining);
-          setTotalPurchasedRounds(purchased);
-        } else {
-          setUserRounds(0);
-          setTotalPurchasedRounds(0);
-        }
-
-        // Fetch round_scores (all for aggregation)
-        const { data: scoresData, error: scoresError } = await supabase
-          .from("round_scores")
+        // ✅ Fetch recent round history from user_round_results
+        const { data: recentRounds } = await supabase
+          .from("user_round_results")
           .select("*")
           .eq("user_id", authUser.id)
-          .order("created_at", { ascending: false });
+          .order("completed_at", { ascending: false })
+          .limit(10);
 
-        if (!scoresError && scoresData && scoresData.length > 0) {
-          // Calculate aggregate stats
-          const totalCorrect = scoresData.reduce((sum, r) => sum + (r.correct || 0), 0);
-          const totalWrong = scoresData.reduce((sum, r) => sum + (r.wrong || 0), 0);
-          const totalScore = scoresData.reduce((sum, r) => sum + (r.total_score || 0), 0);
-          const totalQuestions = totalCorrect + totalWrong;
-          const accuracyPercentage = totalQuestions > 0 
-            ? Math.round((totalCorrect / totalQuestions) * 100) 
-            : 0;
+        // ✅ Fetch today's stats from leaderboard_daily
+        const today = new Date().toISOString().split('T')[0];
+        const { data: todayStats } = await supabase
+          .from("leaderboard_daily")
+          .select("*")
+          .eq("user_id", authUser.id)
+          .eq("date_key", today)
+          .single();
 
-          // max_streak doesn't exist in round_scores
-          const maxStreak = 0;
+        // ✅ Fetch this month's stats from leaderboard_monthly
+        const monthKey = new Date().toISOString().substring(0, 7); // YYYY-MM
+        const { data: monthStats } = await supabase
+          .from("leaderboard_monthly")
+          .select("*")
+          .eq("user_id", authUser.id)
+          .eq("month_key", monthKey)
+          .single();
 
-          // Set overall stats
+        // Set overall stats (from all-time leaderboard)
+        if (alltimeStats) {
+          const totalQuestions = (alltimeStats.correct_answers || 0) + (alltimeStats.wrong_answers || 0);
+          
           setStats({
             total_questions_answered: totalQuestions,
-            correct_answers: totalCorrect,
-            wrong_answers: totalWrong,
-            accuracy_percentage: accuracyPercentage,
-            max_streak: maxStreak,
-            last_round_score: scoresData[0]?.total_score || 0,
-            total_score: totalScore,
-          });
-
-          // Show last 10 in history
-         setHistory(scoresData.slice(0, 10).map(score => ({
-  id: score.id,
-  score: score.total_score,
-  correct_count: score.correct,
-  wrong_count: score.wrong,
-  accuracy: score.correct + score.wrong > 0 
-    ? Math.round((score.correct / (score.correct + score.wrong)) * 100)
-    : 0,
-  max_streak: 0,
-  completed_at: score.created_at,
-})));
-
-
-          // Calculate detailed stats (today, month, last round)
-          const now = new Date();
-          const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
-          // Today's rounds
-          const todayRounds = scoresData.filter(
-            (r) => new Date(r.created_at) >= todayStart
-          );
-          const todayCorrect = todayRounds.reduce((sum, r) => sum + (r.correct || 0), 0);
-          const todayWrong = todayRounds.reduce((sum, r) => sum + (r.wrong || 0), 0);
-          const todayTotal = todayCorrect + todayWrong;
-          const todayScore = todayRounds.reduce((sum, r) => sum + (r.total_score || 0), 0);
-
-          // This month's rounds
-          const monthRounds = scoresData.filter(
-            (r) => new Date(r.created_at) >= monthStart
-          );
-          const monthCorrect = monthRounds.reduce((sum, r) => sum + (r.correct || 0), 0);
-          const monthWrong = monthRounds.reduce((sum, r) => sum + (r.wrong || 0), 0);
-          const monthTotal = monthCorrect + monthWrong;
-          const monthScore = monthRounds.reduce((sum, r) => sum + (r.total_score || 0), 0);
-
-          // Last round (most recent)
-          const last = scoresData[0];
-
-          const lastRound = last
-            ? {
-                id: last.id,
-                score: last.total_score,
-                correct_count: last.correct,
-                wrong_count: last.wrong,
-                accuracy:
-                  last.correct + last.wrong > 0
-                    ? Math.round((last.correct / (last.correct + last.wrong)) * 100)
-                    : 0,
-                max_streak: 0,
-                completed_at: last.created_at,
-              }
-            : null;
-
-          setDetailedStats({
-            today: {
-              rounds_played: todayRounds.length,
-              total_questions: todayTotal,
-              correct: todayCorrect,
-              wrong: todayWrong,
-              accuracy: todayTotal > 0 ? (todayCorrect / todayTotal) * 100 : 0,
-              total_score: todayScore,
-            },
-            thisMonth: {
-              rounds_played: monthRounds.length,
-              total_questions: monthTotal,
-              correct: monthCorrect,
-              wrong: monthWrong,
-              accuracy: monthTotal > 0 ? (monthCorrect / monthTotal) * 100 : 0,
-              total_score: monthScore,
-            },
-            lastRound,
+            correct_answers: alltimeStats.correct_answers || 0,
+            wrong_answers: alltimeStats.wrong_answers || 0,
+            accuracy_percentage: alltimeStats.accuracy || 0,
+            max_streak: 0, // Can be added later if tracked
+            last_round_score: recentRounds && recentRounds.length > 0 ? recentRounds[0].total_points : 0,
+            total_score: alltimeStats.points || 0,
           });
         } else {
-          // No scores yet - set defaults
+          // No stats yet - set defaults
           setStats({
             total_questions_answered: 0,
             correct_answers: 0,
@@ -303,27 +230,55 @@ export default function ProfilePage() {
             last_round_score: 0,
             total_score: 0,
           });
-          setHistory([]);
-          setDetailedStats({
-            today: {
-              rounds_played: 0,
-              total_questions: 0,
-              correct: 0,
-              wrong: 0,
-              accuracy: 0,
-              total_score: 0,
-            },
-            thisMonth: {
-              rounds_played: 0,
-              total_questions: 0,
-              correct: 0,
-              wrong: 0,
-              accuracy: 0,
-              total_score: 0,
-            },
-            lastRound: null,
-          });
         }
+
+        // Set history from recent rounds
+        if (recentRounds && recentRounds.length > 0) {
+          setHistory(recentRounds.map(round => ({
+            id: round.id,
+            score: round.total_points,
+            correct_count: round.correct_answers,
+            wrong_count: round.wrong_answers,
+            accuracy: round.correct_answers + round.wrong_answers > 0 
+              ? Math.round((round.correct_answers / (round.correct_answers + round.wrong_answers)) * 100)
+              : 0,
+            max_streak: 0,
+            completed_at: round.completed_at,
+          })));
+        } else {
+          setHistory([]);
+        }
+
+        // Set detailed stats (today & month)
+        setDetailedStats({
+          today: {
+            rounds_played: todayStats?.rounds_played || 0,
+            total_questions: todayStats ? (todayStats.correct_answers + todayStats.wrong_answers) : 0,
+            correct: todayStats?.correct_answers || 0,
+            wrong: todayStats?.wrong_answers || 0,
+            accuracy: todayStats?.accuracy || 0,
+            total_score: todayStats?.points || 0,
+          },
+          thisMonth: {
+            rounds_played: monthStats?.rounds_played || 0,
+            total_questions: monthStats ? (monthStats.correct_answers + monthStats.wrong_answers) : 0,
+            correct: monthStats?.correct_answers || 0,
+            wrong: monthStats?.wrong_answers || 0,
+            accuracy: monthStats?.accuracy || 0,
+            total_score: monthStats?.points || 0,
+          },
+          lastRound: recentRounds && recentRounds.length > 0 ? {
+            id: recentRounds[0].id,
+            score: recentRounds[0].total_points,
+            correct_count: recentRounds[0].correct_answers,
+            wrong_count: recentRounds[0].wrong_answers,
+            accuracy: recentRounds[0].correct_answers + recentRounds[0].wrong_answers > 0
+              ? Math.round((recentRounds[0].correct_answers / (recentRounds[0].correct_answers + recentRounds[0].wrong_answers)) * 100)
+              : 0,
+            max_streak: 0,
+            completed_at: recentRounds[0].completed_at,
+          } : null,
+        });
 
       } catch (err) {
         console.error("Error fetching user data:", err);
@@ -341,13 +296,26 @@ export default function ProfilePage() {
     setIsSaving(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        data: { full_name: editName.trim() }
+      // Update user metadata (auth)
+      const { error: authError } = await supabase.auth.updateUser({
+        data: { 
+          full_name: editName.trim(),
+          country: editCountry
+        }
       });
 
-      if (!error) {
-        setUser({ ...user, full_name: editName.trim() });
+      // Update profiles table using RPC
+      const { error: profileError } = await supabase.rpc('update_user_profile', {
+        p_user_id: user.id,
+        p_full_name: editName.trim(),
+        p_country: editCountry
+      });
+
+      if (!authError && !profileError) {
+        setUser({ ...user, full_name: editName.trim(), country: editCountry });
         setIsEditing(false);
+      } else {
+        console.error("Update errors:", { authError, profileError });
       }
     } catch (err) {
       console.error("Error updating profile:", err);
@@ -650,55 +618,69 @@ export default function ProfilePage() {
                 {/* Name & Email */}
                 <div style={{ flex: 1, minWidth: "200px" }}>
                   {isEditing ? (
-                    <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
-                      <input
-                        type="text"
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        style={{
-                          flex: 1,
-                          padding: "8px 12px",
-                          borderRadius: "8px",
-                          border: "2px solid rgba(139,92,246,0.5)",
-                          background: "rgba(15,23,42,0.9)",
-                          color: "white",
-                          fontSize: "16px",
-                          fontWeight: 700,
-                        }}
-                        placeholder="Enter your name"
-                      />
-                      <button
-                        onClick={handleSaveProfile}
-                        disabled={isSaving}
-                        style={{
-                          padding: "8px 12px",
-                          borderRadius: "8px",
-                          border: "none",
-                          background: "linear-gradient(135deg, #22c55e, #16a34a)",
-                          color: "white",
-                          cursor: isSaving ? "not-allowed" : "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "4px",
-                        }}>
-                        <Save style={{ width: "16px", height: "16px" }} />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setIsEditing(false);
-                          setEditName(user.full_name);
-                        }}
-                        style={{
-                          padding: "8px 12px",
-                          borderRadius: "8px",
-                          border: "none",
-                          background: "rgba(239,68,68,0.2)",
-                          color: "#fca5a5",
-                          cursor: "pointer",
-                        }}>
-                        <X style={{ width: "16px", height: "16px" }} />
-                      </button>
-                    </div>
+                    <>
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "12px" }}>
+                        <input
+                          type="text"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          style={{
+                            flex: 1,
+                            padding: "8px 12px",
+                            borderRadius: "8px",
+                            border: "2px solid rgba(139,92,246,0.5)",
+                            background: "rgba(15,23,42,0.9)",
+                            color: "white",
+                            fontSize: "16px",
+                            fontWeight: 700,
+                          }}
+                          placeholder="Enter your name"
+                        />
+                        <button
+                          onClick={handleSaveProfile}
+                          disabled={isSaving}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: "8px",
+                            border: "none",
+                            background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                            color: "white",
+                            cursor: isSaving ? "not-allowed" : "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px",
+                          }}>
+                          <Save style={{ width: "16px", height: "16px" }} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIsEditing(false);
+                            setEditName(user.full_name);
+                            setEditCountry(user.country || '🌍');
+                          }}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: "8px",
+                            border: "none",
+                            background: "rgba(239,68,68,0.2)",
+                            color: "#fca5a5",
+                            cursor: "pointer",
+                          }}>
+                          <X style={{ width: "16px", height: "16px" }} />
+                        </button>
+                      </div>
+                      
+                      {/* Country Picker */}
+                      <div style={{ marginBottom: "8px" }}>
+                        <CountryPicker
+                          value={editCountry}
+                          onChange={setEditCountry}
+                          autoDetect={false}
+                          showSearch={true}
+                          size="sm"
+                        />
+                      </div>
+                    </>
                   ) : (
                     <div style={{
                       display: "flex",
@@ -706,6 +688,10 @@ export default function ProfilePage() {
                       gap: "12px",
                       marginBottom: "8px",
                     }}>
+                      {/* Country Flag */}
+                      <span style={{ fontSize: "clamp(32px, 6vw, 40px)" }}>
+                        {user.country || '🌍'}
+                      </span>
                       <h1 style={{
                         fontSize: "clamp(20px, 4vw, 28px)",
                         fontWeight: 900,

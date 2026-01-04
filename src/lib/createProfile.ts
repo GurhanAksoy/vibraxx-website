@@ -1,11 +1,5 @@
-// 📁 src/lib/createProfile.ts
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  { auth: { persistSession: false } }
-);
+// src/lib/createProfile.ts
+import { supabase } from "@/lib/supabaseClient";
 
 export async function createOrUpdateProfile(user: any) {
   if (!user) return;
@@ -35,14 +29,17 @@ export async function createOrUpdateProfile(user: any) {
     user_metadata?.picture ||
     null;
 
+  // Get country from user metadata (set by callback page auto-detection)
+  const country = user_metadata?.country || '🌍';
+
   if (!existing) {
     // Yeni profil oluştur
     const { error: insertError } = await supabase.from("profiles").insert({
       id: id,
       full_name: fullName,
       avatar_url: avatarUrl,
-      website: null,
-      country: null,
+      country: country, // ✅ Country eklendi!
+      round_credits: 0, // ✅ Default credits
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
@@ -52,13 +49,20 @@ export async function createOrUpdateProfile(user: any) {
     }
   } else {
     // Mevcut profili güncelle
+    const updateData: any = {
+      full_name: fullName,
+      avatar_url: avatarUrl,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Only update country if it's different and not default
+    if (country && country !== '🌍') {
+      updateData.country = country;
+    }
+
     const { error: updateError } = await supabase
       .from("profiles")
-      .update({
-        full_name: fullName,
-        avatar_url: avatarUrl,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq("id", id);
 
     if (updateError) {

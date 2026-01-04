@@ -7,6 +7,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { createOrUpdateProfile } from "@/lib/createProfile";
+import { detectCountry } from "@/lib/countryService";
 
 // ✅ STANDARDIZED REDIRECT DELAYS
 const REDIRECT_DELAYS = {
@@ -78,6 +79,28 @@ function AuthCallbackInner() {
         }
 
         console.log("✅ Callback: Session validated for user:", session.user.id);
+
+        // ============================================
+        // STEP 2.5: AUTO-DETECT COUNTRY (NEW!)
+        // ============================================
+        console.log("🌍 Callback: Auto-detecting user country...");
+        let userCountry = '🌍'; // Default
+        
+        try {
+          const countryData = await detectCountry();
+          userCountry = countryData.flag;
+          console.log("✅ Callback: Country detected:", countryData.countryName, userCountry);
+        } catch (error) {
+          console.warn("⚠️ Callback: Country detection failed, using default", error);
+        }
+
+        // Add country to user metadata if not already present
+        if (!session.user.user_metadata?.country) {
+          console.log("📝 Callback: Adding country to user metadata...");
+          await supabase.auth.updateUser({
+            data: { country: userCountry }
+          });
+        }
 
         // ============================================
         // STEP 3: CREATE/UPDATE PROFILE (CENTRAL HANDLER)
