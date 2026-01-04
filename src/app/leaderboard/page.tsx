@@ -1,9 +1,8 @@
 "use client";
 
-import { createClient } from "@supabase/supabase-js";
 import { useState, useEffect, useRef } from "react";
 import { Crown, Trophy, Medal, Flame, Zap, TrendingUp, Star, Award, ChevronRight, Volume2, VolumeX } from "lucide-react";
-// import { supabase } from "@/lib/supabaseClient"; // Uncomment and configure when ready
+import { supabase } from "@/lib/supabaseClient";
 
 export default function LeaderboardPage() {
   const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly' | 'allTime'>('daily');
@@ -22,10 +21,6 @@ useEffect(() => {
   const [topPlayers, setTopPlayers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDesktop, setIsDesktop] = useState(false);
-  const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
   
   // Audio controls - Simple mute/unmute
   const [isMuted, setIsMuted] = useState(true);
@@ -66,103 +61,44 @@ useEffect(() => {
   }, []);
 
 
-  // Fetch leaderboard with Supabase support
+  // Fetch leaderboard using RPC function
   useEffect(() => {
     const fetchLeaderboard = async () => {
       setLoading(true);
       
       try {
-        // Calculate date range based on activeTab
-        const now = new Date();
-        let startDate: Date;
+        // Map activeTab to RPC parameter format
+        const leaderboardType = activeTab === 'allTime' ? 'alltime' : activeTab;
         
-        switch (activeTab) {
-          case 'daily':
-            startDate = new Date(now.setHours(0, 0, 0, 0));
-            break;
-          case 'weekly':
-            const dayOfWeek = now.getDay();
-            startDate = new Date(now.setDate(now.getDate() - dayOfWeek));
-            startDate.setHours(0, 0, 0, 0);
-            break;
-          case 'monthly':
-            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-            break;
-          case 'allTime':
-            startDate = new Date('2024-01-01');
-            break;
-        }
-
-        // ✅ FIXED: Fetch round_scores with profiles JOIN (correct syntax)
-        const { data: scores, error } = await supabase
-          .from("round_scores")
-          .select(`
-            user_id,
-            correct,
-            wrong,
-            accuracy,
-            total_score,
-            created_at,
-            profiles!inner (
-              full_name,
-              avatar_url
-            )
-          `)
-          .gte("created_at", startDate.toISOString());
-
-        if (error) throw error;
-
-        // Aggregate data in JS
-        const userStats = new Map();
-        scores?.forEach((row: any) => {
-          const userId = row.user_id;
-          const existing = userStats.get(userId);
-          if (existing) {
-            existing.totalScore += row.total_score;
-            existing.correct += row.correct;
-            existing.wrong += row.wrong;
-            existing.rounds += 1;
-          } else {
-            userStats.set(userId, {
-              user_id: userId,
-              // ✅ FIXED: Access profiles as single object, not array
-              name: row.profiles?.full_name || "Anonymous",
-              avatar: row.profiles?.avatar_url || null,
-              totalScore: row.total_score,
-              correct: row.correct,
-              wrong: row.wrong,
-              rounds: 1,
-            });
-          }
+        // ✅ Use get_leaderboard RPC function
+        const { data, error } = await supabase.rpc('get_leaderboard', {
+          p_type: leaderboardType,
+          p_limit: 100
         });
 
-        // Convert to array with UI-compatible format
-        const leaderboard = Array.from(userStats.values()).map((u) => ({
-          id: u.user_id,
-          name: u.name,
-          avatar: u.avatar,
-          score: u.totalScore,  // UI expects "score"
-          correct: u.correct,
-          wrong: u.wrong,
-          rounds: u.rounds,
-          accuracy: (u.correct + u.wrong) > 0 
-            ? Math.round((u.correct / (u.correct + u.wrong)) * 100)
-            : 0,
-          streak: 0,
-          country: "🏳️",
-          isOnline: false
+        if (error) {
+          console.error("Error fetching leaderboard:", error);
+          setTopPlayers([]);
+          return;
+        }
+
+        // Map RPC response to UI format
+        const leaderboard = (data || []).map((player: any) => ({
+          id: player.user_id,
+          rank: player.rank,
+          name: player.full_name || "Anonymous",
+          avatar: player.avatar_url || null,
+          country: player.country || "🏳️",
+          score: player.points || 0,
+          correct: player.correct_answers || 0,
+          wrong: player.wrong_answers || 0,
+          rounds: player.rounds_played || 0,
+          accuracy: player.accuracy || 0,
+          streak: 0,  // Can be added later if needed
+          isOnline: false  // Can be added later if needed
         }));
 
-        // Sort by score descending
-        leaderboard.sort((a, b) => b.score - a.score);
-
-        // ✅ FIXED: Add rank field to all players
-        const ranked = leaderboard.map((p, index) => ({
-          ...p,
-          rank: index + 1
-        }));
-
-        setTopPlayers(ranked);
+        setTopPlayers(leaderboard);
       } catch (error) {
         console.error("Error fetching leaderboard:", error);
         setTopPlayers([]);
