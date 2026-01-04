@@ -356,8 +356,8 @@ export default function FreeQuizPage() {
       playSound(wrongSoundRef.current);
     }
 
-    // Show explanation immediately
-    setShowExplanation(true);
+    // ✅ Explanation will open automatically when timer reaches 0
+    // Timer continues running until timeLeft === 0
   };
 
   const handleExitClick = () => {

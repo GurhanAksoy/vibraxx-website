@@ -155,13 +155,23 @@ export default function QuizGamePage() {
         console.log(`✅ Round has ${questionIds.length} questions`);
 
         // 3️⃣ Fetch question details using RPC
+        console.log("🔍 Fetching question details for IDs:", questionIds);
+        console.log("🔍 Question IDs count:", questionIds.length);
+        console.log("🔍 First 5 IDs:", questionIds.slice(0, 5));
+        
         const { data: questionData, error: questionsError } = await supabase.rpc(
           "get_question_details",
           { p_question_ids: questionIds }
         );
 
+        console.log("📊 RPC Response - Data:", questionData);
+        console.log("📊 RPC Response - Error:", questionsError);
+        console.log("📊 Data is array?", Array.isArray(questionData));
+        console.log("📊 Data length:", questionData?.length);
+
         if (questionsError || !questionData) {
           console.error("❌ Error fetching question details:", questionsError);
+          console.error("❌ QuestionData:", questionData);
           setIsLoading(false);
           return;
         }
@@ -1511,15 +1521,10 @@ export default function QuizGamePage() {
                 }}
               >
                 <button
-                  onClick={async () => {
-  playClick();
-  if (userRounds > 0) {
-    router.push("/lobby");
-  } else {
-    router.push("/buy");
-  }
-}}
-
+                  onClick={() => {
+                    playClick();
+                    router.push(userRounds > 0 ? "/lobby" : "/buy");
+                  }}
                   style={{
                     width: "100%",
                     padding:
