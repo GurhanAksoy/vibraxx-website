@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
+import ShareButtons from "@/components/ShareButtons";
 import {
   Trophy,
   Clock,
@@ -65,6 +66,7 @@ export default function QuizGamePage() {
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [userRounds, setUserRounds] = useState(0);
+  const [user, setUser] = useState<any>(null); // User state for share buttons
 
   // 🔥 NEW: Live sync state variables
   const [phase, setPhase] = useState<string>("READY");
@@ -107,6 +109,7 @@ export default function QuizGamePage() {
         console.log("✅ Quiz Security: User authenticated -", user.id);
         console.log("✅ Quiz Security: All checks passed!");
 
+        setUser(user); // Set user for share buttons
         setSecurityPassed(true);
         setIsVerifying(false);
       } catch (error) {
@@ -1465,6 +1468,23 @@ export default function QuizGamePage() {
                     Wrong
                   </div>
                 </div>
+              </div>
+
+              {/* ✨ SHARE YOUR SCORE */}
+              <div style={{ marginTop: 'clamp(20px, 4vw, 24px)', marginBottom: 'clamp(20px, 4vw, 24px)', width: '100%' }}>
+                <ShareButtons
+                  scoreData={{
+                    score: correctCount * 2,
+                    correct: correctCount,
+                    wrong: wrongCount,
+                    accuracy: Math.round((correctCount / TOTAL_QUESTIONS) * 100),
+                    userName: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Anonymous',
+                    userCountry: user?.user_metadata?.country || '🌍',
+                    userId: user?.id,
+                    roundId: roundId || undefined,
+                  }}
+                  variant="full"
+                />
               </div>
 
               <div
