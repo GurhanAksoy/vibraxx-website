@@ -72,8 +72,8 @@ useEffect(() => {
         
         // ✅ Use get_leaderboard RPC function
         const { data, error } = await supabase.rpc('get_leaderboard', {
-          period: leaderboardType,
-          limit: 100
+          p_type: leaderboardType,
+          p_limit: 100
         });
 
         if (error) {
@@ -99,6 +99,11 @@ useEffect(() => {
         }));
 
         setTopPlayers(leaderboard);
+        
+        // 🔍 DEBUG
+        console.log('🎯 Leaderboard Data:', leaderboard);
+        console.log('👑 Top 3:', leaderboard.slice(0, 3));
+        console.log('📊 Total Players:', leaderboard.length);
       } catch (error) {
         console.error("Error fetching leaderboard:", error);
         setTopPlayers([]);
@@ -1023,7 +1028,7 @@ const restPlayers = topPlayers.slice(3, 100);
                           </h4>
                           <span 
                             style={{ 
-                              fontSize: 'clamp(20px, 4vw, 28px)',  // BÜYÜTÜLDÜ!
+                              fontSize: 'clamp(20px, 4vw, 28px)',
                               lineHeight: 1,
                               display: 'inline-block'
                             }}
