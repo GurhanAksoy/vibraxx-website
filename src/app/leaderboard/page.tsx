@@ -691,9 +691,21 @@ const restPlayers = topPlayers.slice(3, 100);
                       </div>
                     </div>
 
-                    <h3 style={{ fontSize: 'clamp(14px, 2.8vw, 20px)', fontWeight: 700, marginBottom: '6px' }}>
-                      {top3[1].name}
-                    </h3>
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      gap: '8px',
+                      marginBottom: '6px'
+                    }}>
+                      <span style={{ fontSize: 'clamp(22px, 4.5vw, 32px)' }}>
+                        {top3[1].country}
+                      </span>
+                      <h3 style={{ fontSize: 'clamp(14px, 2.8vw, 20px)', fontWeight: 700, margin: 0 }}>
+                        {top3[1].name}
+                      </h3>
+                    </div>
+                    
                     <div 
                       style={{ fontSize: 'clamp(20px, 4vw, 32px)', fontWeight: 900, color: '#d1d5db', marginBottom: '10px' }}
                       aria-label={`Score: ${top3[1].score.toLocaleString()} points`}>
@@ -785,9 +797,21 @@ const restPlayers = topPlayers.slice(3, 100);
                       </div>
                     </div>
 
-                    <h3 style={{ fontSize: 'clamp(16px, 3.2vw, 24px)', fontWeight: 900, marginBottom: '8px' }}>
-                      {top3[0].name}
-                    </h3>
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      gap: '12px',
+                      marginBottom: '8px'
+                    }}>
+                      <span style={{ fontSize: 'clamp(28px, 5.5vw, 40px)' }}>
+                        {top3[0].country}
+                      </span>
+                      <h3 style={{ fontSize: 'clamp(16px, 3.2vw, 24px)', fontWeight: 900, margin: 0 }}>
+                        {top3[0].name}
+                      </h3>
+                    </div>
+                    
                     <div 
                       style={{ fontSize: 'clamp(26px, 5vw, 42px)', fontWeight: 900, color: '#facc15', marginBottom: '12px' }}
                       aria-label={`Score: ${top3[0].score.toLocaleString()} points`}>
@@ -870,9 +894,21 @@ const restPlayers = topPlayers.slice(3, 100);
                       </div>
                     </div>
 
-                    <h3 style={{ fontSize: 'clamp(14px, 2.8vw, 20px)', fontWeight: 700, marginBottom: '6px' }}>
-                      {top3[2].name}
-                    </h3>
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      gap: '8px',
+                      marginBottom: '6px'
+                    }}>
+                      <span style={{ fontSize: 'clamp(22px, 4.5vw, 32px)' }}>
+                        {top3[2].country}
+                      </span>
+                      <h3 style={{ fontSize: 'clamp(14px, 2.8vw, 20px)', fontWeight: 700, margin: 0 }}>
+                        {top3[2].name}
+                      </h3>
+                    </div>
+                    
                     <div 
                       style={{ fontSize: 'clamp(20px, 4vw, 32px)', fontWeight: 900, color: '#d97706', marginBottom: '10px' }}
                       aria-label={`Score: ${top3[2].score.toLocaleString()} points`}>
