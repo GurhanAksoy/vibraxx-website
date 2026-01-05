@@ -368,28 +368,24 @@ export default function HomePage() {
 
   // ✅ FIXED: Fetch user's available rounds from user_rounds table
   const fetchUserRounds = useCallback(async () => {
-    if (!user) {
-      setUserRounds(0);
-      return;
-    }
+  if (!user) {
+    setUserRounds(0);
+    return;
+  }
 
-    try {
-      const { data, error } = await supabase
-        .from("user_rounds")
-        .select("remaining")
-        .eq("user_id", user.id)
-        .single();
+  try {
+    const { data, error } = await supabase.rpc('get_my_round_credits');
 
-      if (!error && data) {
-        setUserRounds(data.remaining || 0);
-      } else {
-        setUserRounds(0);
-      }
-    } catch (err) {
-      console.error("User rounds fetch error:", err);
+    if (!error && data !== null) {
+      setUserRounds(data);
+    } else {
       setUserRounds(0);
     }
-  }, [user]);
+  } catch (err) {
+    console.error("User rounds fetch error:", err);
+    setUserRounds(0);
+  }
+}, [user]);
 
   // Initial Load with smooth fade in
   useEffect(() => {
