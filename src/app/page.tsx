@@ -420,28 +420,20 @@ export default function HomePage() {
 
   // Real-time Active Players with Dynamic Variation
   const fetchActivePlayers = useCallback(async () => {
-    try {
-      const { count, error } = await supabase
-  .from("active_sessions")
-  .select("*", { count: "exact", head: true });
-
-if (!error && count !== null) {
-  const realCount = count || 0;
-        // Base: 600 + real count + random variation (-50 to +150)
-        const variation = Math.floor(Math.random() * 200) - 50;
-        const finalCount = Math.max(600, 600 + realCount + variation);
-        setActivePlayers(finalCount);
-      } else {
-        // If Supabase error, generate dynamic number
-        const variation = Math.floor(Math.random() * 200) - 50;
-        setActivePlayers(Math.max(600, 600 + variation));
-      }
-    } catch (err) {
-      console.error("Active players fetch error:", err);
-      const variation = Math.floor(Math.random() * 200) - 50;
-      setActivePlayers(Math.max(600, 600 + variation));
+  try {
+    const { data, error } = await supabase.rpc('get_active_players_count');
+    
+    if (!error && data !== null) {
+      // Minimum 100 göster (boş görünmesin)
+      setActivePlayers(Math.max(100, data));
+    } else {
+      setActivePlayers(100);
     }
-  }, []);
+  } catch (err) {
+    console.error("Active players fetch error:", err);
+    setActivePlayers(100);
+  }
+}, []);
 
  // Fetch Champions from Supabase (Optimized with proper error handling)
 const fetchChampions = useCallback(async () => {
@@ -627,6 +619,12 @@ useEffect(() => {
 
     return () => sub.subscription.unsubscribe();
   }, [router]);
+// Update user session on page load
+useEffect(() => {
+  if (user) {
+    supabase.rpc('upsert_user_session', { p_user_id: user.id });
+  }
+}, [user]);
 
    // Music Toggle
   const toggleMusic = useCallback(() => {
