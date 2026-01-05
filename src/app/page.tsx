@@ -532,20 +532,16 @@ if (!error && count !== null) {
 
   // Load initial global round state from overlay table
   const loadGlobalRoundState = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from("overlay_round_state")
-        .select("*")
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .single();
-      if (!error && data) {
-        setGlobalTimeLeft(data.time_left);
-      }
-    } catch (error) {
-      console.error("Failed to load overlay state:", error);
+  try {
+    const { data, error } = await supabase.rpc("get_current_live_round");
+    
+    if (!error && data && data.length > 0) {
+      setGlobalTimeLeft(data[0].time_until_start);
     }
-  }, []);
+  } catch (error) {
+    console.error("Failed to load round state:", error);
+  }
+}, []);
 
   // Initial Load
   useEffect(() => {
@@ -575,25 +571,27 @@ useEffect(() => {
 
   // Realtime listener that pauses local countdown briefly
   const channel = supabase
-    .channel("home-overlay-countdown")
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "overlay_round_state" },
-      (payload) => {
-        const newData = (payload.new || {}) as { time_left?: number | null };
-        if (typeof newData.time_left === "number") {
-          // Pause local countdown for 2 seconds when DB update arrives
+  .channel("home-rounds-countdown")
+  .on(
+    "postgres_changes",
+    { event: "*", schema: "public", table: "rounds" },
+    async (payload) => {
+      // Yeni round oluşturuldu veya güncellendi, RPC'yi tekrar çağır
+      try {
+        const { data, error } = await supabase.rpc("get_current_live_round");
+        if (!error && data && data.length > 0) {
           pauseCountdown = true;
-          setGlobalTimeLeft(newData.time_left);
+          setGlobalTimeLeft(data[0].time_until_start);
           setTimeout(() => {
             pauseCountdown = false;
           }, 2000);
-        } else {
-          setGlobalTimeLeft(null);
         }
+      } catch (err) {
+        console.error("Realtime round update error:", err);
       }
-    )
-    .subscribe();
+    }
+  )
+  .subscribe();
 
   return () => {
     clearInterval(playersInterval);
