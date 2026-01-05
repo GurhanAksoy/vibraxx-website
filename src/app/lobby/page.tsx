@@ -157,49 +157,6 @@ export default function LobbyPage() {
     }
   }, []);
 
-  // === JOIN ROUND ===
-  const joinRound = useCallback(async () => {
-    if (!user || !currentRound || hasJoined) return;
-
-    try {
-      console.log("🎯 Joining round:", currentRound.round_id);
-      
-      const { data, error } = await supabase.rpc("join_round", {
-        p_round_id: currentRound.round_id,
-        p_user_id: user.id,
-        p_round_type: "live",
-      });
-
-      if (error) {
-        console.error("❌ Join round error:", error);
-        
-        // Error handling
-        if (error.message?.includes("no_credits")) {
-          router.push("/buy");
-        }
-        return;
-      }
-
-      const result = data as { success: boolean; error?: string };
-      
-      if (result.success) {
-        console.log("✅ Successfully joined round");
-        setHasJoined(true);
-        
-        // Round credits güncelle
-        setUserRounds((prev) => prev - 1);
-      } else {
-        console.error("❌ Join failed:", result.error);
-        
-        if (result.error === "no_credits") {
-          router.push("/buy");
-        }
-      }
-    } catch (err) {
-      console.error("Join round error:", err);
-    }
-  }, [user, currentRound, hasJoined, router]);
-
   // === FETCH LOBBY PLAYERS ===
   const fetchLobbyPlayers = useCallback(async () => {
     if (!currentRound) return;
@@ -262,14 +219,17 @@ export default function LobbyPage() {
     };
   }, [user, isLoading, loadCurrentRound]);
 
-  // === JOIN ROUND WHEN READY ===
+  // ✅ === LOBBY SESSION TRACKING (ROUND DÜŞMEZ) ===
   useEffect(() => {
-    if (currentRound && !hasJoined && user) {
-      joinRound();
+    if (currentRound && user && !hasJoined) {
+      // Sadece lobby'de olduğunu kaydet (round hakkı düşmez!)
+      console.log("✅ User in lobby, waiting for quiz start");
+      supabase.rpc('upsert_user_session', { p_user_id: user.id });
+      setHasJoined(true); // UI için flag
     }
-  }, [currentRound, hasJoined, user, joinRound]);
+  }, [currentRound, user, hasJoined]);
 
-  // === FETCH PLAYERS WHEN JOINED ===
+  // === FETCH PLAYERS WHEN IN LOBBY ===
   useEffect(() => {
     if (!hasJoined || !currentRound) return;
 
@@ -334,17 +294,52 @@ export default function LobbyPage() {
     }
   }, [globalTimeLeft, isPlaying]);
 
-  // === START GAME HANDLER ===
+  // ✅ === START GAME & JOIN ROUND (BURADA ROUND DÜŞER) ===
   const handleStartGame = async () => {
     if (isRedirecting) return;
     setIsRedirecting(true);
 
-    console.log("🚀 Redirecting to quiz...");
+    console.log("🚀 Quiz starting, joining round now...");
+    
+    // ✅ Quiz başlarken round join (BURADA ROUND DÜŞER!)
+    if (currentRound && user) {
+      try {
+        const { data, error } = await supabase.rpc("join_round", {
+          p_round_id: currentRound.round_id,
+          p_user_id: user.id,
+          p_round_type: "live",
+        });
+
+        if (error) {
+          console.error("❌ Join round error:", error);
+          if (error.message?.includes("no_credits")) {
+            router.push("/buy");
+            return;
+          }
+        }
+
+        const result = data as { success: boolean; error?: string };
+        
+        if (!result.success) {
+          console.error("❌ Join failed:", result.error);
+          if (result.error === "no_credits") {
+            router.push("/buy");
+            return;
+          }
+        }
+        
+        console.log("✅ Round joined successfully, credits deducted");
+      } catch (err) {
+        console.error("Join round error:", err);
+      }
+    }
+    
     router.push("/quiz");
   };
 
   // === HANDLE BACK BUTTON ===
   const handleBack = async () => {
+    console.log("✅ User left lobby, round NOT deducted");
     router.push("/");
   };
 
