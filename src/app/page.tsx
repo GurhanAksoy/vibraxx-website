@@ -539,47 +539,70 @@ return {
     loadData();
   }, [fetchActivePlayers, fetchChampions, loadGlobalRoundState]);
 
-  // ✅ FIX 2: Real-time Updates with countdown jump prevention
+  // ✅ PRODUCTION: Hybrid countdown (Client NTP + Server validation)
 useEffect(() => {
+  // Active players her 8 saniyede güncelle
   const playersInterval = setInterval(fetchActivePlayers, 8000);
   
-  let pauseCountdown = false;
+  // Client-side countdown hesaplama (UTC bazlı)
+  const calculateTimeLeft = () => {
+    const now = new Date();
+    const utcNow = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
+    
+    // Sonraki 15 dakika başlangıcı hesapla (00, 15, 30, 45)
+    const minutes = utcNow.getMinutes();
+    const nextRoundMinute = Math.ceil(minutes / 15) * 15;
+    
+    const nextRound = new Date(utcNow);
+    nextRound.setMinutes(nextRoundMinute, 0, 0);
+    
+    // Eğer nextRound geçmişse, bir sonraki saate geç
+    if (nextRound <= utcNow) {
+      nextRound.setHours(nextRound.getHours() + 1);
+      nextRound.setMinutes(0, 0, 0);
+    }
+    
+    // Kalan süre (saniye)
+    const timeLeft = Math.max(0, Math.floor((nextRound.getTime() - utcNow.getTime()) / 1000));
+    return timeLeft;
+  };
+  
+  // Client-side countdown (her saniye - smooth)
   const countdownInterval = setInterval(() => {
-    if (!pauseCountdown) {
-      setGlobalTimeLeft((prev) =>
-        prev !== null && prev > 0 ? prev - 1 : prev
-      );
-    }
+    setGlobalTimeLeft(calculateTimeLeft());
   }, 1000);
-
-  // Realtime listener that pauses local countdown briefly
-  const channel = supabase
-  .channel("home-rounds-countdown")
-  .on(
-    "postgres_changes",
-    { event: "*", schema: "public", table: "rounds" },
-    async (payload) => {
-      // Yeni round oluşturuldu veya güncellendi, RPC'yi tekrar çağır
-      try {
-        const { data, error } = await supabase.rpc("get_current_live_round");
-        if (!error && data && data.length > 0) {
-          pauseCountdown = true;
-          setGlobalTimeLeft(data[0].time_until_start);
-          setTimeout(() => {
-            pauseCountdown = false;
-          }, 2000);
+  
+  // Server validation (her 15 saniyede kontrol - güvenlik)
+  const serverValidation = async () => {
+    try {
+      const { data, error } = await supabase.rpc("get_current_live_round");
+      
+      if (!error && data && data.length > 0) {
+        const serverTime = data[0].time_until_start;
+        const clientTime = calculateTimeLeft();
+        
+        // Eğer 5+ saniye fark varsa server'ı dinle (saat yanlış olabilir)
+        if (Math.abs(clientTime - serverTime) > 5) {
+          console.warn(`Clock drift detected: ${Math.abs(clientTime - serverTime)}s difference. Syncing with server.`);
+          setGlobalTimeLeft(serverTime);
         }
-      } catch (err) {
-        console.error("Realtime round update error:", err);
       }
+    } catch (err) {
+      console.error("Server validation error:", err);
+      // Hata olsa bile client-side devam eder
     }
-  )
-  .subscribe();
-
+  };
+  
+  // İlk validation
+  serverValidation();
+  
+  // Her 15 saniyede validation
+  const validationInterval = setInterval(serverValidation, 15000);
+  
   return () => {
     clearInterval(playersInterval);
     clearInterval(countdownInterval);
-    supabase.removeChannel(channel);
+    clearInterval(validationInterval);
   };
 }, [fetchActivePlayers]);
 
