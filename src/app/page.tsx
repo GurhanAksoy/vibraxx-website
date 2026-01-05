@@ -417,12 +417,18 @@ export default function HomePage() {
   // Real-time Active Players with Dynamic Variation
   const fetchActivePlayers = useCallback(async () => {
   try {
+    console.log('🔍 Fetching active players...'); // ✅ YENİ
+    
     const { data, error } = await supabase.rpc('get_active_players_count');
     
+    console.log('📊 RPC Result:', { data, error }); // ✅ YENİ
+    
     if (!error && data !== null) {
-      // Minimum 100 göster (boş görünmesin)
-      setActivePlayers(Math.max(100, data));
+      const finalCount = Math.max(100, data); // ✅ DEĞİŞTİ
+      console.log('✅ Setting players to:', finalCount); // ✅ YENİ
+      setActivePlayers(finalCount); // ✅ DEĞİŞTİ
     } else {
+      console.log('❌ Error or null, setting to 100'); // ✅ YENİ
       setActivePlayers(100);
     }
   } catch (err) {
@@ -641,10 +647,11 @@ useEffect(() => {
 // Update user session on page load
 useEffect(() => {
   if (user) {
-    supabase.rpc('upsert_user_session', { p_user_id: user.id });
+    console.log('📝 Updating session for user:', user.id); // ✅ YENİ
+    supabase.rpc('upsert_user_session', { p_user_id: user.id })
+      .then(result => console.log('✅ Session updated:', result)); // ✅ YENİ
   }
 }, [user]);
-
    // Music Toggle
   const toggleMusic = useCallback(() => {
     if (isPlaying) {
