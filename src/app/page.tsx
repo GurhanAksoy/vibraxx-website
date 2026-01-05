@@ -71,15 +71,20 @@ const ChampionCard = memo(({ champion }: any) => {
         {champion.period} Champion
       </div>
       
-      {/* Name - white */}
-      <div style={{ 
-        fontSize: 18, 
-        fontWeight: 700, 
-        marginBottom: 8,
-        color: "#ffffff",
-      }}>
-        {champion.name}
-      </div>
+      {/* Name + Country - white */}
+<div style={{ 
+  fontSize: 18, 
+  fontWeight: 700, 
+  marginBottom: 8,
+  color: "#ffffff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "8px"
+}}>
+  <span style={{ fontSize: 24 }}>{champion.country}</span>
+  {champion.name}
+</div>
       
       {/* Score - colored accent */}
       <div style={{ 
@@ -438,55 +443,45 @@ if (!error && count !== null) {
     }
   }, []);
 
-  // Fetch Champions from Supabase (Optimized with proper error handling)
-  const fetchChampions = useCallback(async () => {
-    try {
-      const periods = ["daily", "weekly", "monthly"];
-      const championsData = await Promise.all(
-        periods.map(async (period, index) => {
-          try {
-            const { data, error } = await supabase
-              .from("leaderboard")
-              .select(`
-                user_id,
-                score,
-                users:user_id (
-                  full_name,
-                  avatar_url
-                )
-              `)
-              .eq("period", period)
-              .order("score", { ascending: false })
-              .limit(1)
-              .single();
+ // Fetch Champions from Supabase (Optimized with proper error handling)
+const fetchChampions = useCallback(async () => {
+  try {
+    const periods = ["daily", "weekly", "monthly"];
+    const championsData = await Promise.all(
+      periods.map(async (period, index) => {
+        try {
+          const { data, error } = await supabase.rpc('get_leaderboard', {
+            p_type: period,
+            p_limit: 1
+          });
 
-            if (error) {
-              console.warn(`No ${period} champion data:`, error.message);
-              return null;
-            }
+          if (error) {
+            console.warn(`No ${period} champion data:`, error.message);
+            return null;
+          }
 
-            if (!data) return null;
+          if (!data || data.length === 0) return null;
 
-            const icons = [Crown, Trophy, Sparkles];
-            const gradients = [
-              "linear-gradient(to bottom right, #eab308, #f97316)",
-              "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
-              "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
-            ];
-            const colors = ["#facc15", "#c084fc", "#22d3ee"];
+          const champion = data[0];
+          const icons = [Crown, Trophy, Sparkles];
+          const gradients = [
+            "linear-gradient(to bottom right, #eab308, #f97316)",
+            "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
+            "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
+          ];
+          const colors = ["#facc15", "#c084fc", "#22d3ee"];
 
             // Safely access nested user data
-            const userData = data.users as any;
-            const userName = userData?.full_name || "Anonymous Player";
-
-            return {
-              period: period.charAt(0).toUpperCase() + period.slice(1),
-              name: userName,
-              score: data.score || 0,
-              gradient: gradients[index],
-              color: colors[index],
-              icon: icons[index],
-            };
+            // RPC'den gelen data farklı format!
+return {
+  period: period.charAt(0).toUpperCase() + period.slice(1),
+  name: champion.full_name || "Anonymous Player",
+  country: champion.country || "🌍",  // ✅ BAYRAK!
+  score: champion.points || 0,  // score değil points!
+  gradient: gradients[index],
+  color: colors[index],
+  icon: icons[index],
+};
           } catch (err) {
             console.error(`Error fetching ${period} champion:`, err);
             return null;
