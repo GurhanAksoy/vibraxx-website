@@ -18,13 +18,8 @@ import {
   CheckCircle,
   AlertCircle,
 } from "lucide-react";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabaseClient"; // ✅ FIX 1: Tek client
 import { playMenuMusic, stopMenuMusic } from "@/lib/audioManager";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 // ✅ PREMIUM: Memoized Components
 const StatCard = memo(({ icon: Icon, value, label }: any) => (
@@ -545,28 +540,37 @@ return {
     loadData();
   }, [fetchActivePlayers, fetchChampions, loadGlobalRoundState]);
 
-  // ✅ PRODUCTION: Hybrid countdown (Client NTP + Server validation)
+  // ✅ FIX 2: COUNTDOWN BUG FIXED (60dk sorun gitti)
 useEffect(() => {
   // Active players her 8 saniyede güncelle
   const playersInterval = setInterval(fetchActivePlayers, 8000);
   
-  // Client-side countdown hesaplama (UTC bazlı)
+  // Client-side countdown hesaplama (UTC bazlı) - BUG FIXED!
   const calculateTimeLeft = () => {
     const now = new Date();
     const utcNow = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
     
-    // Sonraki 15 dakika başlangıcı hesapla (00, 15, 30, 45)
     const minutes = utcNow.getMinutes();
-    const nextRoundMinute = Math.ceil(minutes / 15) * 15;
+    const seconds = utcNow.getSeconds();
+    
+    // Şu anki slot (0, 15, 30, 45)
+    const currentSlot = Math.floor(minutes / 15) * 15;
+    
+    // Sonraki slot
+    let nextSlot = currentSlot + 15;
+    let nextHour = utcNow.getHours();
+    
+    // Eğer 60'ı geçerse bir sonraki saate geç
+    if (nextSlot >= 60) {
+      nextSlot = 0;
+      nextHour = (nextHour + 1) % 24;
+    }
     
     const nextRound = new Date(utcNow);
-    nextRound.setMinutes(nextRoundMinute, 0, 0);
-    
-    // Eğer nextRound geçmişse, bir sonraki saate geç
-    if (nextRound <= utcNow) {
-      nextRound.setHours(nextRound.getHours() + 1);
-      nextRound.setMinutes(0, 0, 0);
-    }
+    nextRound.setHours(nextHour);
+    nextRound.setMinutes(nextSlot);
+    nextRound.setSeconds(0);
+    nextRound.setMilliseconds(0);
     
     // Kalan süre (saniye)
     const timeLeft = Math.max(0, Math.floor((nextRound.getTime() - utcNow.getTime()) / 1000));
@@ -644,14 +648,16 @@ useEffect(() => {
 
     return () => sub.subscription.unsubscribe();
   }, [router]);
+  
 // Update user session on page load
 useEffect(() => {
   if (user) {
-    console.log('📝 Updating session for user:', user.id); // ✅ YENİ
+    console.log('📝 Updating session for user:', user.id);
     supabase.rpc('upsert_user_session', { p_user_id: user.id })
-      .then(result => console.log('✅ Session updated:', result)); // ✅ YENİ
+      .then(result => console.log('✅ Session updated:', result));
   }
 }, [user]);
+
    // Music Toggle
   const toggleMusic = useCallback(() => {
     if (isPlaying) {
@@ -675,18 +681,36 @@ useEffect(() => {
     return () => stopMenuMusic();
   }, []);
 
-  // Auth Actions
+  // ✅ FIX 3: GOOGLE LOGIN FIXED (mobil sorun gitti)
   const handleSignIn = useCallback(async (redirectPath?: string) => {
-    const redirectUrl = redirectPath 
-      ? `${window.location.origin}${redirectPath}`
-      : `${window.location.origin}/auth/callback`;
+    try {
+      const redirectUrl = redirectPath 
+        ? `${window.location.origin}${redirectPath}`
+        : `${window.location.origin}/auth/callback`;
       
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: redirectUrl,
-      },
-    });
+      console.log('🔐 Starting Google OAuth, redirect:', redirectUrl);
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+      
+      if (error) {
+        console.error('❌ OAuth error:', error);
+        alert('Login failed. Please try again.');
+      } else {
+        console.log('✅ OAuth initiated:', data);
+      }
+    } catch (err) {
+      console.error('❌ Login error:', err);
+      alert('Login failed. Please try again.');
+    }
   }, []);
 
   const handleSignOut = useCallback(async () => {
