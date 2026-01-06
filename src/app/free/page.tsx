@@ -107,6 +107,7 @@ export default function FreeQuizPage() {
           console.error("❌ Free Quiz Error:", freeRoundError);
           setShowAlreadyPlayedModal(true);
           setIsVerifying(false);
+          setIsLoading(false);
           return;
         }
 
@@ -122,6 +123,7 @@ export default function FreeQuizPage() {
           console.error("❌ No free quiz available today");
           setShowAlreadyPlayedModal(true);
           setIsVerifying(false);
+          setIsLoading(false);
           return;
         }
 
@@ -130,6 +132,7 @@ export default function FreeQuizPage() {
           console.log("❌ Free Quiz Security: Already played today");
           setShowAlreadyPlayedModal(true);
           setIsVerifying(false);
+          setIsLoading(false);
           return;
         }
 
@@ -144,6 +147,7 @@ export default function FreeQuizPage() {
           console.error("❌ No questions in free round!");
           setShowAlreadyPlayedModal(true);
           setIsVerifying(false);
+          setIsLoading(false);
           return;
         }
 
@@ -158,6 +162,7 @@ export default function FreeQuizPage() {
           console.error("❌ Error fetching questions:", questionsError);
           setShowAlreadyPlayedModal(true);
           setIsVerifying(false);
+          setIsLoading(false);
           return;
         }
 
@@ -188,6 +193,7 @@ export default function FreeQuizPage() {
         console.error("❌ Free Quiz Security: Verification error", error);
         setShowAlreadyPlayedModal(true);
         setIsVerifying(false);
+        setIsLoading(false);
       }
     };
 
