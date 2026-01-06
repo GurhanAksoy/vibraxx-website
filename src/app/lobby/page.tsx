@@ -266,17 +266,20 @@ export default function LobbyPage() {
   }, [user, isLoading, loadCurrentRound]);
 
   // ✅ === LOBBY SESSION TRACKING (ROUND DÜŞMEZ) ===
-  useEffect(() => {
-    if (currentRound && user && !hasJoinedRef.current) {
-      // Sadece lobby'de olduğunu kaydet (round hakkı düşmez!)
+ useEffect(() => {
+  if (currentRound && user && !hasJoined) {
+    (async () => {
       console.log("✅ User in lobby, waiting for quiz start");
-      supabase
-        .rpc("upsert_user_session", { p_user_id: user.id })
-        .catch((err) => console.error("upsert_user_session error:", err));
 
-      setHasJoined(true); // UI için flag
-    }
-  }, [currentRound, user]);
+      const { error } = await supabase.rpc("upsert_user_session", { p_user_id: user.id });
+      if (error) {
+        console.error("upsert_user_session error:", error);
+      }
+
+      setHasJoined(true);
+    })();
+  }
+}, [currentRound, user, hasJoined]);
 
   // === FETCH PLAYERS WHEN IN LOBBY ===
   useEffect(() => {
