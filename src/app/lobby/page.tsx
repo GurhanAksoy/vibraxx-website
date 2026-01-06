@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Users,
   Clock,
@@ -54,6 +54,34 @@ export default function LobbyPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const alarmRef = useRef<HTMLAudioElement | null>(null);
   const countdownBeepRef = useRef<HTMLAudioElement | null>(null);
+
+  // ✅ Hard locks & safety refs
+  const joinLockRef = useRef(false);
+  const mountedRef = useRef(false);
+  const currentRoundIdRef = useRef<string | null>(null);
+  const hasJoinedRef = useRef(false);
+  const redirectingRef = useRef(false);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Keep refs in sync (avoid stale closures without changing UI)
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    hasJoinedRef.current = hasJoined;
+  }, [hasJoined]);
+
+  useEffect(() => {
+    redirectingRef.current = isRedirecting;
+  }, [isRedirecting]);
+
+  useEffect(() => {
+    currentRoundIdRef.current = currentRound?.round_id ?? null;
+  }, [currentRound?.round_id]);
 
   // === AUDIO INITIALIZATION ===
   useEffect(() => {
@@ -139,19 +167,38 @@ export default function LobbyPage() {
   // === LOAD CURRENT ROUND ===
   const loadCurrentRound = useCallback(async () => {
     try {
-      const { data, error } = await supabase.rpc("get_current_live_round");
+      const { data, error } = await supabase.rpc("get_current_live_round_json");
 
       if (error) {
         console.error("Load current round error:", error);
         return;
       }
 
-      if (data && data.length > 0) {
-        const round = data[0];
-        setCurrentRound(round);
-        setGlobalTimeLeft(round.time_until_start);
-        console.log("✅ Current round loaded:", round.round_id);
+      if (!data || !data.round_id) return;
+
+      const round = data as CurrentRound;
+
+      // ✅ Round changed → reset lobby join flag
+      const prevRoundId = currentRoundIdRef.current;
+      if (prevRoundId && prevRoundId !== round.round_id) {
+        // new round came in
+        if (mountedRef.current) setHasJoined(false);
       }
+
+      if (mountedRef.current) setCurrentRound(round);
+
+      // ✅ Keep UI countdown stable (avoid jitter)
+      if (mountedRef.current) {
+        setGlobalTimeLeft((prev) => {
+          const next = Math.max(round.time_until_start ?? 0, 0);
+          if (prev === null) return next;
+          // If drift is significant, resync; else keep smooth local tick
+          if (Math.abs(prev - next) > 1) return next;
+          return prev;
+        });
+      }
+
+      console.log("✅ Current round loaded:", round.round_id);
     } catch (err) {
       console.error("loadCurrentRound error:", err);
     }
@@ -159,11 +206,12 @@ export default function LobbyPage() {
 
   // === FETCH LOBBY PLAYERS ===
   const fetchLobbyPlayers = useCallback(async () => {
-    if (!currentRound) return;
+    const roundId = currentRoundIdRef.current;
+    if (!roundId) return;
 
     try {
       const { data, error } = await supabase.rpc("get_lobby_participants", {
-        p_round_id: currentRound.round_id,
+        p_round_id: roundId,
       });
 
       if (error) {
@@ -171,21 +219,22 @@ export default function LobbyPage() {
         return;
       }
 
-      if (data) {
+      if (data && mountedRef.current) {
         setPlayers(data);
       }
     } catch (err) {
       console.error("Fetch lobby players error:", err);
     }
-  }, [currentRound]);
+  }, []);
 
   // === FETCH TOTAL PARTICIPANTS ===
   const fetchTotalParticipants = useCallback(async () => {
-    if (!currentRound) return;
+    const roundId = currentRoundIdRef.current;
+    if (!roundId) return;
 
     try {
       const { data, error } = await supabase.rpc("get_round_participant_count", {
-        p_round_id: currentRound.round_id,
+        p_round_id: roundId,
       });
 
       if (error) {
@@ -193,23 +242,20 @@ export default function LobbyPage() {
         return;
       }
 
-      if (typeof data === "number") {
+      if (typeof data === "number" && mountedRef.current) {
         setTotalPlayers(data);
       }
     } catch (err) {
       console.error("Fetch total participants error:", err);
     }
-  }, [currentRound]);
+  }, []);
 
   // === INITIAL DATA LOAD ===
   useEffect(() => {
     if (!user || isLoading) return;
 
-    const loadLobbyData = async () => {
-      await loadCurrentRound();
-    };
-
-    loadLobbyData();
+    // initial load
+    loadCurrentRound();
 
     // Polling: Round'u her 3 saniyede kontrol et
     const roundInterval = setInterval(loadCurrentRound, 3000);
@@ -221,13 +267,16 @@ export default function LobbyPage() {
 
   // ✅ === LOBBY SESSION TRACKING (ROUND DÜŞMEZ) ===
   useEffect(() => {
-    if (currentRound && user && !hasJoined) {
+    if (currentRound && user && !hasJoinedRef.current) {
       // Sadece lobby'de olduğunu kaydet (round hakkı düşmez!)
       console.log("✅ User in lobby, waiting for quiz start");
-      supabase.rpc('upsert_user_session', { p_user_id: user.id });
+      supabase
+        .rpc("upsert_user_session", { p_user_id: user.id })
+        .catch((err) => console.error("upsert_user_session error:", err));
+
       setHasJoined(true); // UI için flag
     }
-  }, [currentRound, user, hasJoined]);
+  }, [currentRound, user]);
 
   // === FETCH PLAYERS WHEN IN LOBBY ===
   useEffect(() => {
@@ -249,26 +298,102 @@ export default function LobbyPage() {
     };
   }, [hasJoined, currentRound, fetchLobbyPlayers, fetchTotalParticipants]);
 
-  // === LOCAL COUNTDOWN ===
+  // === LOCAL COUNTDOWN (optimized: single interval, no re-create per second) ===
   useEffect(() => {
-    if (globalTimeLeft === null || globalTimeLeft <= 0) return;
+    // Start ticking only when we have a countdown
+    if (globalTimeLeft === null) return;
 
-    const timer = setInterval(() => {
+    // Clear any previous interval
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+
+    countdownIntervalRef.current = setInterval(() => {
       setGlobalTimeLeft((prev) => {
-        if (prev === null || prev <= 0) return 0;
+        if (prev === null) return null;
+        if (prev <= 0) return 0;
         return prev - 1;
       });
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [globalTimeLeft]);
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+    };
+  }, [globalTimeLeft !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ✅ === START GAME & JOIN ROUND (BURADA ROUND DÜŞER) ===
+  const handleStartGame = useCallback(async () => {
+    if (joinLockRef.current) return; // 🟢 gerçek kilit
+    joinLockRef.current = true;
+
+    if (redirectingRef.current) return;
+    setIsRedirecting(true);
+
+    console.log("🚀 Quiz starting, joining round now...");
+
+    let joinSuccess = false;
+
+    const roundId = currentRoundIdRef.current;
+    if (roundId && user) {
+      try {
+        const { data, error } = await supabase.rpc("join_round", {
+          p_round_id: roundId,
+          p_user_id: user.id,
+          p_round_type: "live",
+        });
+
+        if (error) {
+          console.error("❌ Join round error:", error);
+          if (error.message?.includes("no_credits")) {
+            joinLockRef.current = false;
+            setIsRedirecting(false);
+            router.push("/buy");
+            return;
+          }
+        }
+
+        const result = data as { success: boolean; error?: string };
+
+        if (!result?.success) {
+          console.error("❌ Join failed:", result?.error);
+          if (result?.error === "no_credits") {
+            joinLockRef.current = false;
+            setIsRedirecting(false);
+            router.push("/buy");
+            return;
+          }
+        } else {
+          joinSuccess = true;
+          console.log("✅ Round joined successfully, credits deducted");
+        }
+      } catch (err) {
+        console.error("Join round error:", err);
+        joinLockRef.current = false;
+        setIsRedirecting(false);
+        return;
+      }
+    }
+
+    if (joinSuccess) {
+      router.push("/quiz");
+    } else {
+      joinLockRef.current = false;
+      setIsRedirecting(false);
+    }
+  }, [router, user]);
 
   // === AUTO START WHEN COUNTDOWN ENDS ===
   useEffect(() => {
-    if (globalTimeLeft === 0 && !isRedirecting && hasJoined) {
-      handleStartGame();
-    }
-  }, [globalTimeLeft, isRedirecting, hasJoined]);
+    if (!currentRound) return;
+    if (isRedirecting) return;
+    if (globalTimeLeft !== 0) return;
+    if (joinLockRef.current) return;
+    handleStartGame();
+  }, [globalTimeLeft, isRedirecting, currentRound, handleStartGame]);
 
   // === WARNING & SOUND EFFECTS ===
   useEffect(() => {
@@ -294,77 +419,35 @@ export default function LobbyPage() {
     }
   }, [globalTimeLeft, isPlaying]);
 
-  // ✅ === START GAME & JOIN ROUND (BURADA ROUND DÜŞER) ===
-  const handleStartGame = async () => {
-    if (isRedirecting) return;
-    setIsRedirecting(true);
-
-    console.log("🚀 Quiz starting, joining round now...");
-    
-    // ✅ Quiz başlarken round join (BURADA ROUND DÜŞER!)
-    if (currentRound && user) {
-      try {
-        const { data, error } = await supabase.rpc("join_round", {
-          p_round_id: currentRound.round_id,
-          p_user_id: user.id,
-          p_round_type: "live",
-        });
-
-        if (error) {
-          console.error("❌ Join round error:", error);
-          if (error.message?.includes("no_credits")) {
-            router.push("/buy");
-            return;
-          }
-        }
-
-        const result = data as { success: boolean; error?: string };
-        
-        if (!result.success) {
-          console.error("❌ Join failed:", result.error);
-          if (result.error === "no_credits") {
-            router.push("/buy");
-            return;
-          }
-        }
-        
-        console.log("✅ Round joined successfully, credits deducted");
-      } catch (err) {
-        console.error("Join round error:", err);
-      }
-    }
-    
-    router.push("/quiz");
-  };
-
   // === HANDLE BACK BUTTON ===
-  const handleBack = async () => {
+  const handleBack = useCallback(() => {
     console.log("✅ User left lobby, round NOT deducted");
     router.push("/");
-  };
+  }, [router]);
 
   // === FORMAT TIME ===
-  const formatTime = (seconds: number | null) => {
+  const formatTime = useCallback((seconds: number | null) => {
     if (seconds === null) return "--:--";
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
+  }, []);
 
   // === PROGRESS CALCULATION ===
-  const progress =
-    globalTimeLeft !== null
-      ? ((900 - Math.max(Math.min(globalTimeLeft, 900), 0)) / 900) * 100
-      : 0;
+  const progress = useMemo(() => {
+    if (globalTimeLeft === null) return 0;
+    const clamped = Math.max(Math.min(globalTimeLeft, 900), 0);
+    return ((900 - clamped) / 900) * 100;
+  }, [globalTimeLeft]);
 
   // === WARNING HELPERS ===
-  const getWarningMessage = () => {
+  const getWarningMessage = useCallback(() => {
     if (globalTimeLeft === null) return "Quiz Starting Soon";
     if (globalTimeLeft <= 3) return "🚀 QUIZ STARTING NOW!";
     if (globalTimeLeft <= 5) return "⚡ GET READY!";
     if (globalTimeLeft <= 10) return "⏰ FINAL COUNTDOWN!";
     return "Quiz Starting Soon";
-  };
+  }, [globalTimeLeft]);
 
   // === LOADING STATE ===
   if (isLoading) {
