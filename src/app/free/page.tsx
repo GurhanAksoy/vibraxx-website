@@ -13,6 +13,7 @@ import {
   Zap,
   Volume2,
   VolumeX,
+  AlertCircle,
 } from "lucide-react";
 
 const TOTAL_QUESTIONS = 50; // 🎮 FREE PRACTICE MODE
@@ -66,6 +67,7 @@ export default function FreeQuizPage() {
 
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [showAlreadyPlayedModal, setShowAlreadyPlayedModal] = useState(false);
 
   // Ses ref'leri
   const correctSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -103,8 +105,8 @@ export default function FreeQuizPage() {
 
         if (freeRoundError) {
           console.error("❌ Free Quiz Error:", freeRoundError);
-          alert("Error loading free quiz. Please try again.");
-          router.push("/");
+          setShowAlreadyPlayedModal(true);
+          setIsVerifying(false);
           return;
         }
 
@@ -118,16 +120,16 @@ export default function FreeQuizPage() {
         // ✅ Check if free round exists
         if (!freeRound || !freeRound.round_id) {
           console.error("❌ No free quiz available today");
-          alert("No free quiz available today. Please try again later.");
-          router.push("/");
+          setShowAlreadyPlayedModal(true);
+          setIsVerifying(false);
           return;
         }
 
         // CHECK 3: Has user already played today?
         if (freeRound.has_played) {
           console.log("❌ Free Quiz Security: Already played today");
-          alert("You've already played your free quiz today! Come back tomorrow.");
-          router.push("/");
+          setShowAlreadyPlayedModal(true);
+          setIsVerifying(false);
           return;
         }
 
@@ -140,8 +142,8 @@ export default function FreeQuizPage() {
         // ✅ Validate questions exist
         if (!questionIds || questionIds.length === 0) {
           console.error("❌ No questions in free round!");
-          alert("Free quiz has no questions. Please try again later.");
-          router.push("/");
+          setShowAlreadyPlayedModal(true);
+          setIsVerifying(false);
           return;
         }
 
@@ -154,8 +156,8 @@ export default function FreeQuizPage() {
 
         if (questionsError || !questionsData) {
           console.error("❌ Error fetching questions:", questionsError);
-          alert("Error loading quiz questions.");
-          router.push("/");
+          setShowAlreadyPlayedModal(true);
+          setIsVerifying(false);
           return;
         }
 
@@ -184,8 +186,8 @@ export default function FreeQuizPage() {
 
       } catch (error) {
         console.error("❌ Free Quiz Security: Verification error", error);
-        alert("An unexpected error occurred. Please try again.");
-        router.push("/");
+        setShowAlreadyPlayedModal(true);
+        setIsVerifying(false);
       }
     };
 
@@ -505,6 +507,137 @@ export default function FreeQuizPage() {
           >
             {isVerifying ? "Verifying Access..." : "Loading Free Quiz..."}
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ ALREADY PLAYED MODAL
+  if (showAlreadyPlayedModal) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "linear-gradient(to bottom right, #0a1628, #064e3b, #0f172a)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "20px",
+        }}
+      >
+        <div
+          className="animate-slide-up"
+          style={{
+            width: "min(460px, 95vw)",
+            padding: "32px 28px",
+            borderRadius: 28,
+            background: "radial-gradient(circle at top, rgba(15,23,42,1), rgba(6,8,20,1))",
+            border: "1px solid rgba(251,191,36,0.3)",
+            boxShadow: "0 0 50px rgba(251,191,36,0.25)",
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              width: 80,
+              height: 80,
+              margin: "0 auto 24px",
+              borderRadius: "50%",
+              background: "rgba(251,191,36,0.15)",
+              border: "2px solid rgba(251,191,36,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 0 30px rgba(251,191,36,0.3)",
+            }}
+          >
+            <AlertCircle style={{ width: 44, height: 44, color: "#fbbf24" }} />
+          </div>
+
+          <h2
+            style={{
+              fontSize: 26,
+              fontWeight: 900,
+              marginBottom: 12,
+              background: "linear-gradient(to right, #fbbf24, #f59e0b)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              letterSpacing: "0.02em",
+            }}
+          >
+            Already Played Today! 🎮
+          </h2>
+
+          <p style={{ fontSize: 15, color: "#cbd5e1", lineHeight: 1.7, marginBottom: 8 }}>
+            You've completed your free quiz for today.
+          </p>
+
+          <p style={{ fontSize: 14, color: "#94a3b8", marginBottom: 28 }}>
+            Come back tomorrow for a new set of questions, or join our live competitions to keep playing! 🏆
+          </p>
+
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+            <button
+              onClick={() => router.push("/")}
+              style={{
+                flex: 1,
+                minWidth: 140,
+                maxWidth: 180,
+                padding: "14px 24px",
+                borderRadius: 9999,
+                border: "none",
+                background: "linear-gradient(135deg, #7c3aed, #a855f7)",
+                color: "white",
+                fontSize: 14,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                cursor: "pointer",
+                boxShadow: "0 0 20px rgba(124,58,237,0.5)",
+                transition: "all 0.3s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 0 30px rgba(124,58,237,0.7)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 0 20px rgba(124,58,237,0.5)";
+              }}
+            >
+              Go Home
+            </button>
+
+            <button
+              onClick={() => router.push("/lobby")}
+              style={{
+                flex: 1,
+                minWidth: 140,
+                maxWidth: 180,
+                padding: "14px 24px",
+                borderRadius: 9999,
+                border: "1px solid rgba(167,139,250,0.6)",
+                background: "transparent",
+                color: "#e5e7eb",
+                fontSize: 14,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                cursor: "pointer",
+                transition: "all 0.3s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(124,58,237,0.1)";
+                e.currentTarget.style.borderColor = "#a78bfa";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.borderColor = "rgba(167,139,250,0.6)";
+              }}
+            >
+              Live Quiz
+            </button>
+          </div>
         </div>
       </div>
     );
