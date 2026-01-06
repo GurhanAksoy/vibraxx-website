@@ -99,6 +99,8 @@ export default function FreeQuizPage() {
           "get_today_free_round"
         );
 
+        console.log("🔍 Free Round Raw Data:", freeRoundData); // DEBUG
+
         if (freeRoundError) {
           console.error("❌ Free Quiz Error:", freeRoundError);
           alert("Error loading free quiz. Please try again.");
@@ -106,8 +108,23 @@ export default function FreeQuizPage() {
           return;
         }
 
+        // ✅ FIXED: Handle array response from RPC (RETURNS TABLE)
+        const freeRound = Array.isArray(freeRoundData) && freeRoundData.length > 0 
+          ? freeRoundData[0] 
+          : freeRoundData;
+
+        console.log("🔍 Free Round Parsed:", freeRound); // DEBUG
+
+        // ✅ Check if free round exists
+        if (!freeRound || !freeRound.round_id) {
+          console.error("❌ No free quiz available today");
+          alert("No free quiz available today. Please try again later.");
+          router.push("/");
+          return;
+        }
+
         // CHECK 3: Has user already played today?
-        if (freeRoundData.has_played) {
+        if (freeRound.has_played) {
           console.log("❌ Free Quiz Security: Already played today");
           alert("You've already played your free quiz today! Come back tomorrow.");
           router.push("/");
@@ -115,10 +132,19 @@ export default function FreeQuizPage() {
         }
 
         console.log("✅ Free Quiz Security: Free quiz available!");
-        setRoundId(freeRoundData.round_id);
+        setRoundId(freeRound.round_id);
 
         // FETCH QUESTIONS from the free round
-        const questionIds = freeRoundData.questions as number[];
+        const questionIds = (freeRound.questions || []) as number[];
+
+        // ✅ Validate questions exist
+        if (!questionIds || questionIds.length === 0) {
+          console.error("❌ No questions in free round!");
+          alert("Free quiz has no questions. Please try again later.");
+          router.push("/");
+          return;
+        }
+
         console.log(`✅ Free round has ${questionIds.length} questions`);
 
         const { data: questionsData, error: questionsError } = await supabase.rpc(
@@ -158,6 +184,7 @@ export default function FreeQuizPage() {
 
       } catch (error) {
         console.error("❌ Free Quiz Security: Verification error", error);
+        alert("An unexpected error occurred. Please try again.");
         router.push("/");
       }
     };
@@ -206,7 +233,7 @@ export default function FreeQuizPage() {
       startTick();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [securityPassed]);
 
   // Ana TIMER (6 → 0)
   useEffect(() => {
@@ -491,7 +518,6 @@ export default function FreeQuizPage() {
         }
         .animate-spin {
           animation: spin 1s linear infinite;
-        }
         }
         @media (max-width: 768px) {
           .header-wrap {
