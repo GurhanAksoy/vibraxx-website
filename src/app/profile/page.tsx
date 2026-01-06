@@ -188,23 +188,19 @@ export default function ProfilePage() {
           .order("completed_at", { ascending: false })
           .limit(10);
 
-        // ✅ Fetch today's stats from leaderboard_daily
-        const today = new Date().toISOString().split('T')[0];
-        const { data: todayStats } = await supabase
-          .from("leaderboard_daily")
-          .select("*")
-          .eq("user_id", authUser.id)
-          .eq("date_key", today)
-          .single();
+        // ✅ FIX: Fetch today's stats using RPC (secure, no 406 error)
+        const { data: todayStatsArray } = await supabase.rpc('get_user_leaderboard_position', {
+          p_user_id: authUser.id,
+          p_period: 'daily'
+        });
+        const todayStats = todayStatsArray && todayStatsArray.length > 0 ? todayStatsArray[0] : null;
 
-        // ✅ Fetch this month's stats from leaderboard_monthly
-        const monthKey = new Date().toISOString().substring(0, 7); // YYYY-MM
-        const { data: monthStats } = await supabase
-          .from("leaderboard_monthly")
-          .select("*")
-          .eq("user_id", authUser.id)
-          .eq("month_key", monthKey)
-          .single();
+        // ✅ FIX: Fetch this month's stats using RPC (secure, no 406 error)
+        const { data: monthStatsArray } = await supabase.rpc('get_user_leaderboard_position', {
+          p_user_id: authUser.id,
+          p_period: 'monthly'
+        });
+        const monthStats = monthStatsArray && monthStatsArray.length > 0 ? monthStatsArray[0] : null;
 
         // Set overall stats (from all-time leaderboard)
         if (alltimeStats) {
@@ -249,7 +245,7 @@ export default function ProfilePage() {
           setHistory([]);
         }
 
-        // Set detailed stats (today & month)
+        // Set detailed stats (today & month) - Using RPC data
         setDetailedStats({
           today: {
             rounds_played: todayStats?.rounds_played || 0,
@@ -289,6 +285,7 @@ export default function ProfilePage() {
 
     fetchUserData();
   }, [securityPassed, router]);
+  
   // Save profile changes
   const handleSaveProfile = async () => {
     if (!user || !editName.trim()) return;
