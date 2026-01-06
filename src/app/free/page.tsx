@@ -99,7 +99,7 @@ export default function FreeQuizPage() {
           "get_today_free_round"
         );
 
-        console.log("🔍 Free Round Raw Data:", freeRoundData); // DEBUG
+        console.log("🔍 Free Round Raw Data:", freeRoundData);
 
         if (freeRoundError) {
           console.error("❌ Free Quiz Error:", freeRoundError);
@@ -113,7 +113,7 @@ export default function FreeQuizPage() {
           ? freeRoundData[0] 
           : freeRoundData;
 
-        console.log("🔍 Free Round Parsed:", freeRound); // DEBUG
+        console.log("🔍 Free Round Parsed:", freeRound);
 
         // ✅ Check if free round exists
         if (!freeRound || !freeRound.round_id) {
@@ -319,6 +319,34 @@ export default function FreeQuizPage() {
     stopTick();
     playSound(gameoverSoundRef.current);
 
+    // ✅ SUBMIT FREE QUIZ RESULT
+    const submitResult = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user && roundId) {
+          console.log("📊 Submitting free quiz result...");
+          
+          const { data, error } = await supabase.rpc("submit_free_quiz_result", {
+            p_user_id: user.id,
+            p_round_id: roundId,
+            p_correct_answers: correctCount,
+            p_wrong_answers: wrongCount,
+          });
+
+          if (error) {
+            console.error("❌ Error submitting result:", error);
+          } else {
+            console.log("✅ Free quiz result submitted successfully:", data);
+          }
+        }
+      } catch (error) {
+        console.error("❌ Submit result error:", error);
+      }
+    };
+
+    submitResult();
+
     let remaining = FINAL_SCORE_DURATION;
     setFinalCountdown(remaining);
 
@@ -337,7 +365,7 @@ export default function FreeQuizPage() {
       clearInterval(interval);
       clearTimeout(timeout);
     };
-  }, [showFinalScore, router]);
+  }, [showFinalScore, router, correctCount, wrongCount, roundId]);
 
   // Ses toggle
   useEffect(() => {
@@ -393,11 +421,30 @@ export default function FreeQuizPage() {
     setShowExitConfirm(true);
   };
 
-  const handleExitConfirmYes = () => {
+  const handleExitConfirmYes = async () => {
     playClick();
     stopTick();
     setShowExitConfirm(false);
-    setShowFinalScore(true); // erken çıkışta da final ekranı
+
+    // ✅ SUBMIT RESULT BEFORE EXIT
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user && roundId) {
+        console.log("📊 Submitting result before exit...");
+        
+        await supabase.rpc("submit_free_quiz_result", {
+          p_user_id: user.id,
+          p_round_id: roundId,
+          p_correct_answers: correctCount,
+          p_wrong_answers: wrongCount,
+        });
+      }
+    } catch (error) {
+      console.error("❌ Exit submit error:", error);
+    }
+
+    setShowFinalScore(true);
   };
 
   const handleExitConfirmNo = () => {
