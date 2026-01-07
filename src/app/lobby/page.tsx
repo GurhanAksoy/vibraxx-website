@@ -326,7 +326,7 @@ export default function LobbyPage() {
         countdownIntervalRef.current = null;
       }
     };
-  }, [globalTimeLeft !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [globalTimeLeft]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ✅ === START GAME & JOIN ROUND (BURADA ROUND DÜŞER) ===
   const handleStartGame = useCallback(async () => {
