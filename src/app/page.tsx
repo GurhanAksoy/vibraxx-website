@@ -367,30 +367,51 @@ export default function HomePage() {
   const mountedRef = useRef<boolean>(false);
   const resumeIntentHandledRef = useRef<boolean>(false);
 
-  // ✅ Fetch user's available rounds from user_rounds table
-  const fetchUserRounds = useCallback(async () => {
-    if (!user) {
-      setUserRounds(0);
-      return;
-    }
+// ✅ Fetch user's available rounds from user_rounds table
+const fetchUserRounds = useCallback(async () => {
+  if (!user) {
+    setUserRounds(0);
+    return;
+  }
 
-    try {
-      const { data, error } = await supabase
-        .from("user_rounds")
-        .select("remaining")
-        .eq("user_id", user.id)
-        .single();
+  try {
+    const { data, error } = await supabase
+      .from("user_rounds")
+      .select("remaining")
+      .eq("user_id", user.id)
+      .single();
 
-      if (!error && data) {
-        setUserRounds(data.remaining || 0);
-      } else {
-        setUserRounds(0);
-      }
-    } catch (err) {
-      console.error("User rounds fetch error:", err);
+    if (!error && data) {
+      setUserRounds(data.remaining || 0);
+    } else {
       setUserRounds(0);
     }
-  }, [user]);
+  } catch (err) {
+    console.error("User rounds fetch error:", err);
+    setUserRounds(0);
+  }
+}, [user]);
+
+// ✅ Always-fresh authoritative rounds check (no stale React state)
+const getFreshUserRounds = useCallback(async (): Promise<number> => {
+  if (!user) return 0;
+
+  try {
+    const { data, error } = await supabase
+      .from("user_rounds")
+      .select("remaining")
+      .eq("user_id", user.id)
+      .single();
+
+    if (error || !data) return 0;
+
+    return data.remaining ?? 0;
+  } catch (err) {
+    console.error("Fresh rounds fetch error:", err);
+    return 0;
+  }
+}, [user]);
+
 
   // Initial Load with smooth fade in
   useEffect(() => {
