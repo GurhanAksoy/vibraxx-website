@@ -18,13 +18,8 @@ import {
   CheckCircle,
   AlertCircle,
 } from "lucide-react";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabaseClient";
 import { playMenuMusic, stopMenuMusic } from "@/lib/audioManager";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 // ✅ PREMIUM: Memoized Components
 const StatCard = memo(({ icon: Icon, value, label }: any) => (
@@ -506,79 +501,85 @@ const getFreshUserRounds = useCallback(async (): Promise<number | "error"> => {
     []
   );
 
-  // Fetch Champions from Supabase
-  const fetchChampions = useCallback(async () => {
-    try {
-      const periods = ["daily", "weekly", "monthly"];
-      const championsData = await Promise.all(
-        periods.map(async (period, index) => {
-          try {
-            const { data, error } = await supabase
-              .from("leaderboard")
-              .select(
-                `
-                user_id,
-                score,
-                users:user_id (
-                  full_name,
-                  avatar_url
-                )
+  // Fetch Champions from Supabase (safe: no .single(), array-safe)
+const fetchChampions = useCallback(async () => {
+  try {
+    const periods = ["daily", "weekly", "monthly"];
+
+    const championsData = await Promise.all(
+      periods.map(async (period, index) => {
+        try {
+          const { data, error } = await supabase
+            .from("leaderboard")
+            .select(
               `
+              user_id,
+              score,
+              users:user_id (
+                full_name,
+                avatar_url
               )
-              .eq("period", period)
-              .order("score", { ascending: false })
-              .limit(1)
-              .single();
+            `
+            )
+            .eq("period", period)
+            .order("score", { ascending: false })
+            .limit(1);
 
-            if (error || !data) return null;
+          if (error || !data || data.length === 0) return null;
 
-            const icons = [Crown, Trophy, Sparkles];
-            const gradients = [
-              "linear-gradient(to bottom right, #eab308, #f97316)",
-              "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
-              "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
-            ];
-            const colors = ["#facc15", "#c084fc", "#22d3ee"];
+          const row = data[0];
 
-            const userData = data.users as any;
-            const userName = userData?.full_name || "Anonymous Player";
+          const icons = [Crown, Trophy, Sparkles];
+          const gradients = [
+            "linear-gradient(to bottom right, #eab308, #f97316)",
+            "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
+            "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
+          ];
+          const colors = ["#facc15", "#c084fc", "#22d3ee"];
 
-            return {
-              period: period.charAt(0).toUpperCase() + period.slice(1),
-              name: userName,
-              score: data.score || 0,
-              gradient: gradients[index],
-              color: colors[index],
-              icon: icons[index],
-            };
-          } catch (err) {
-            console.error(`Error fetching ${period} champion:`, err);
-            return null;
-          }
-        })
-      );
+          const userData = row.users as any;
+          const userName = userData?.full_name || "Anonymous Player";
 
-      const validChampions = championsData.filter(Boolean) as any[];
-      setChampions(validChampions.length > 0 ? validChampions : getDefaultChampions());
-    } catch (err) {
-      console.error("Champions fetch error:", err);
-      setChampions(getDefaultChampions());
-    }
-  }, [getDefaultChampions]);
+          return {
+            period: period.charAt(0).toUpperCase() + period.slice(1),
+            name: userName,
+            score: row.score || 0,
+            gradient: gradients[index],
+            color: colors[index],
+            icon: icons[index],
+          };
+        } catch (err) {
+          console.error(`Error fetching ${period} champion:`, err);
+          return null;
+        }
+      })
+    );
+
+    const validChampions = championsData.filter(Boolean) as any[];
+    setChampions(validChampions.length > 0 ? validChampions : getDefaultChampions());
+  } catch (err) {
+    console.error("Champions fetch error:", err);
+    setChampions(getDefaultChampions());
+  }
+}, [getDefaultChampions]);
 
   // Load initial global round state from overlay table
   // ✅ YENİ
 const loadGlobalRoundState = useCallback(async () => {
   try {
-    const { data, error } = await supabase.rpc("get_next_round");
+    const { data, error } = await supabase
+  .from("overlay_round_state")
+  .select("time_left")
+  .eq("id", true)
+  .limit(1);
 
-    if (error || !data || !data[0]) {
-      console.warn("No upcoming round found");
-      setGlobalTimeLeft(null);
-      return;
-    }
+    if (error || !data || data.length === 0) {
+  console.warn("No global round state found", error);
+  setGlobalTimeLeft(null);
+  return;
+}
 
-    const seconds = Math.floor(Number(data[0].time_until_start_seconds));
+const seconds = Math.floor(Number(data[0].time_left));
 
     if (Number.isFinite(seconds) && seconds >= 0) {
       setGlobalTimeLeft(seconds);
@@ -586,7 +587,7 @@ const loadGlobalRoundState = useCallback(async () => {
       setGlobalTimeLeft(null);
     }
   } catch (err) {
-    console.error("Failed to load next round:", err);
+    console.error("Failed to load global round state:", err);
     setGlobalTimeLeft(null);
   }
 }, []);
@@ -750,27 +751,34 @@ useEffect(() => {
     resumeIntentHandledRef.current = false;
   }, []);
 
-  // Age Verification Handler
-  const handleAgeVerification = useCallback(async () => {
+  // Age Verification Handler (race-safe)
+const handleAgeVerification = useCallback(async () => {
   localStorage.setItem("vibraxx_age_verified", "true");
+
+  const action = pendingAction; // snapshot al
+  setPendingAction(null);
   setShowAgeModal(false);
 
-  if (pendingAction === "live") {
+  if (action === "live") {
     const remaining = await getFreshUserRounds();
 
-if (remaining === "error") {
-  alert("Round balance could not be verified. Please refresh and try again.");
-  return;
-}
+    if (remaining === "error") {
+      alert("Round balance could not be verified. Please refresh and try again.");
+      return;
+    }
 
-if (remaining <= 0) setShowNoRoundsModal(true);
-else router.push("/lobby");
+    if (remaining <= 0) {
+      setShowNoRoundsModal(true);
+      return;
+    }
 
-  } else if (pendingAction === "free") {
+    router.push("/lobby");
+  } 
+  
+  if (action === "free") {
     router.push("/free");
   }
 
-  setPendingAction(null);
 }, [pendingAction, getFreshUserRounds, router]);
 
   // Check if user is verified 18+
