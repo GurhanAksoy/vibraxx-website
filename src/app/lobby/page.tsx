@@ -149,7 +149,7 @@ export default function LobbyPage() {
       if (data && data.length > 0) {
         const round = data[0];
         setCurrentRound(round);
-        setGlobalTimeLeft(Math.max(0, Math.floor(round.time_until_start_seconds)));
+        setGlobalTimeLeft(Math.max(0, Math.floor(round.time_until_start)));
         console.log("✅ Current round loaded:", round.round_id);
       }
     } catch (err) {
@@ -269,10 +269,16 @@ useEffect(() => {
 
   // === AUTO START WHEN COUNTDOWN ENDS ===
   useEffect(() => {
-    if (globalTimeLeft !== null && globalTimeLeft <= 0 && !isRedirecting && hasJoined) {
-      handleStartGame();
-    }
-  }, [globalTimeLeft, isRedirecting, hasJoined]);
+  if (
+    globalTimeLeft !== null &&
+    globalTimeLeft <= 0 &&
+    currentRound?.status === "scheduled" &&
+    !isRedirecting &&
+    hasJoined
+  ) {
+    handleStartGame();
+  }
+}, [globalTimeLeft, currentRound, isRedirecting, hasJoined]);
 
   // === WARNING & SOUND EFFECTS ===
   useEffect(() => {
