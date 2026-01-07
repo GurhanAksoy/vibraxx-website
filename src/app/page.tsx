@@ -367,7 +367,7 @@ export default function HomePage() {
   const mountedRef = useRef<boolean>(false);
   const resumeIntentHandledRef = useRef<boolean>(false);
 
-// ✅ Fetch user's available rounds from user_rounds table
+// ✅ Fetch user's available rounds from user_rounds table (safe: no .single())
 const fetchUserRounds = useCallback(async () => {
   if (!user) {
     setUserRounds(0);
@@ -379,39 +379,51 @@ const fetchUserRounds = useCallback(async () => {
       .from("user_rounds")
       .select("remaining")
       .eq("user_id", user.id)
-      .single();
+      .limit(1);
 
-    if (!error && data) {
-      setUserRounds(data.remaining || 0);
-    } else {
+    if (error) {
+      console.error("User rounds fetch error:", error);
       setUserRounds(0);
+      return;
     }
+
+    if (!data || data.length === 0) {
+      // satır yoksa 0 kabul et
+      setUserRounds(0);
+      return;
+    }
+
+    setUserRounds(data[0].remaining ?? 0);
   } catch (err) {
     console.error("User rounds fetch error:", err);
     setUserRounds(0);
   }
 }, [user]);
 
-// ✅ Always-fresh authoritative rounds check (no stale React state)
-const getFreshUserRounds = useCallback(async (): Promise<number> => {
-  if (!user) return 0;
+// ✅ Always-fresh authoritative rounds check (returns number OR "error")
+const getFreshUserRounds = useCallback(async (): Promise<number | "error"> => {
+  if (!user) return "error";
 
   try {
     const { data, error } = await supabase
       .from("user_rounds")
       .select("remaining")
       .eq("user_id", user.id)
-      .single();
+      .limit(1);
 
-    if (error || !data) return 0;
+    if (error) {
+      console.error("Fresh rounds fetch error:", error);
+      return "error";
+    }
 
-    return data.remaining ?? 0;
+    if (!data || data.length === 0) return 0;
+
+    return data[0].remaining ?? 0;
   } catch (err) {
     console.error("Fresh rounds fetch error:", err);
-    return 0;
+    return "error";
   }
 }, [user]);
-
 
   // Initial Load with smooth fade in
   useEffect(() => {
@@ -682,10 +694,17 @@ useEffect(() => {
   getFreshUserRounds().then((remaining) => {
     if (!mountedRef.current) return;
 
+    if (remaining === "error") {
+      alert("Round balance could not be verified. Please refresh and try again.");
+      return;
+    }
+
     if (remaining <= 0) setShowNoRoundsModal(true);
     else router.push("/lobby");
   });
-} else {
+}
+
+    else {
   router.push("/free");
 }
 
@@ -739,8 +758,14 @@ useEffect(() => {
   if (pendingAction === "live") {
     const remaining = await getFreshUserRounds();
 
-    if (remaining <= 0) setShowNoRoundsModal(true);
-    else router.push("/lobby");
+if (remaining === "error") {
+  alert("Round balance could not be verified. Please refresh and try again.");
+  return;
+}
+
+if (remaining <= 0) setShowNoRoundsModal(true);
+else router.push("/lobby");
+
   } else if (pendingAction === "free") {
     router.push("/free");
   }
@@ -769,12 +794,18 @@ useEffect(() => {
 
   const remaining = await getFreshUserRounds();
 
-  if (remaining <= 0) {
-    setShowNoRoundsModal(true);
-    return;
-  }
+if (remaining === "error") {
+  alert("Round balance could not be verified. Please refresh and try again.");
+  return;
+}
 
-  router.push("/lobby");
+if (remaining <= 0) {
+  setShowNoRoundsModal(true);
+  return;
+}
+
+router.push("/lobby");
+
 }, [user, handleSignIn, checkAgeVerification, getFreshUserRounds, router]);
 
   // Start Free Quiz
