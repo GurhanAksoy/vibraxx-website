@@ -172,9 +172,10 @@ export default function LobbyPage() {
       lastRoundIdRef.current = round.round_id;
 
       const rawSeconds =
-        (round as any).time_until_start_seconds ??
-        (round as any).time_until_start ??
-        0;
+  (round as any).time_until_next_round_seconds ??
+  (round as any).time_until_start_seconds ??
+  (round as any).time_until_start ??
+  null;
 
       const seconds = Number(rawSeconds);
 
