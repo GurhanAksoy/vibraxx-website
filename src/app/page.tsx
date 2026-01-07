@@ -18,8 +18,13 @@ import {
   CheckCircle,
   AlertCircle,
 } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient"; // ✅ FIX 1: Tek client
+import { createClient } from "@supabase/supabase-js";
 import { playMenuMusic, stopMenuMusic } from "@/lib/audioManager";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 // ✅ PREMIUM: Memoized Components
 const StatCard = memo(({ icon: Icon, value, label }: any) => (
@@ -66,20 +71,15 @@ const ChampionCard = memo(({ champion }: any) => {
         {champion.period} Champion
       </div>
       
-      {/* Name + Country - white */}
-<div style={{ 
-  fontSize: 18, 
-  fontWeight: 700, 
-  marginBottom: 8,
-  color: "#ffffff",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: "8px"
-}}>
-  <span style={{ fontSize: 24 }}>{champion.country}</span>
-  {champion.name}
-</div>
+      {/* Name - white */}
+      <div style={{ 
+        fontSize: 18, 
+        fontWeight: 700, 
+        marginBottom: 8,
+        color: "#ffffff",
+      }}>
+        {champion.name}
+      </div>
       
       {/* Score - colored accent */}
       <div style={{ 
@@ -363,24 +363,28 @@ export default function HomePage() {
 
   // ✅ FIXED: Fetch user's available rounds from user_rounds table
   const fetchUserRounds = useCallback(async () => {
-  if (!user) {
-    setUserRounds(0);
-    return;
-  }
+    if (!user) {
+      setUserRounds(0);
+      return;
+    }
 
-  try {
-    const { data, error } = await supabase.rpc('get_my_round_credits');
+    try {
+      const { data, error } = await supabase
+        .from("user_rounds")
+        .select("remaining")
+        .eq("user_id", user.id)
+        .single();
 
-    if (!error && data !== null) {
-      setUserRounds(data);
-    } else {
+      if (!error && data) {
+        setUserRounds(data.remaining || 0);
+      } else {
+        setUserRounds(0);
+      }
+    } catch (err) {
+      console.error("User rounds fetch error:", err);
       setUserRounds(0);
     }
-  } catch (err) {
-    console.error("User rounds fetch error:", err);
-    setUserRounds(0);
-  }
-}, [user]);
+  }, [user]);
 
   // Initial Load with smooth fade in
   useEffect(() => {
@@ -411,66 +415,78 @@ export default function HomePage() {
 
   // Real-time Active Players with Dynamic Variation
   const fetchActivePlayers = useCallback(async () => {
-  try {
-    console.log('🔍 Fetching active players...'); // ✅ YENİ
-    
-    const { data, error } = await supabase.rpc('get_active_players_count');
-    
-    console.log('📊 RPC Result:', { data, error }); // ✅ YENİ
-    
-    if (!error && data !== null) {
-      const finalCount = Math.max(100, data); // ✅ DEĞİŞTİ
-      console.log('✅ Setting players to:', finalCount); // ✅ YENİ
-      setActivePlayers(finalCount); // ✅ DEĞİŞTİ
-    } else {
-      console.log('❌ Error or null, setting to 100'); // ✅ YENİ
-      setActivePlayers(100);
+    try {
+      const { count, error } = await supabase
+  .from("active_sessions")
+  .select("*", { count: "exact", head: true });
+
+if (!error && count !== null) {
+  const realCount = count || 0;
+        // Base: 600 + real count + random variation (-50 to +150)
+        const variation = Math.floor(Math.random() * 200) - 50;
+        const finalCount = Math.max(600, 600 + realCount + variation);
+        setActivePlayers(finalCount);
+      } else {
+        // If Supabase error, generate dynamic number
+        const variation = Math.floor(Math.random() * 200) - 50;
+        setActivePlayers(Math.max(600, 600 + variation));
+      }
+    } catch (err) {
+      console.error("Active players fetch error:", err);
+      const variation = Math.floor(Math.random() * 200) - 50;
+      setActivePlayers(Math.max(600, 600 + variation));
     }
-  } catch (err) {
-    console.error("Active players fetch error:", err);
-    setActivePlayers(100);
-  }
-}, []);
+  }, []);
 
- // Fetch Champions from Supabase (Optimized with proper error handling)
-const fetchChampions = useCallback(async () => {
-  try {
-    const periods = ["daily", "weekly", "monthly"];
-    const championsData = await Promise.all(
-      periods.map(async (period, index) => {
-        try {
-          const { data, error } = await supabase.rpc('get_leaderboard', {
-            p_type: period,
-            p_limit: 1
-          });
+  // Fetch Champions from Supabase (Optimized with proper error handling)
+  const fetchChampions = useCallback(async () => {
+    try {
+      const periods = ["daily", "weekly", "monthly"];
+      const championsData = await Promise.all(
+        periods.map(async (period, index) => {
+          try {
+            const { data, error } = await supabase
+              .from("leaderboard")
+              .select(`
+                user_id,
+                score,
+                users:user_id (
+                  full_name,
+                  avatar_url
+                )
+              `)
+              .eq("period", period)
+              .order("score", { ascending: false })
+              .limit(1)
+              .single();
 
-          if (error) {
-            console.warn(`No ${period} champion data:`, error.message);
-            return null;
-          }
+            if (error) {
+              console.warn(`No ${period} champion data:`, error.message);
+              return null;
+            }
 
-          if (!data || data.length === 0) return null;
+            if (!data) return null;
 
-          const champion = data[0];
-          const icons = [Crown, Trophy, Sparkles];
-          const gradients = [
-            "linear-gradient(to bottom right, #eab308, #f97316)",
-            "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
-            "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
-          ];
-          const colors = ["#facc15", "#c084fc", "#22d3ee"];
+            const icons = [Crown, Trophy, Sparkles];
+            const gradients = [
+              "linear-gradient(to bottom right, #eab308, #f97316)",
+              "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
+              "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
+            ];
+            const colors = ["#facc15", "#c084fc", "#22d3ee"];
 
             // Safely access nested user data
-            // RPC'den gelen data farklı format!
-return {
-  period: period.charAt(0).toUpperCase() + period.slice(1),
-  name: champion.full_name || "Anonymous Player",
-  country: champion.country || "🌍",  // ✅ BAYRAK!
-  score: champion.points || 0,  // score değil points!
-  gradient: gradients[index],
-  color: colors[index],
-  icon: icons[index],
-};
+            const userData = data.users as any;
+            const userName = userData?.full_name || "Anonymous Player";
+
+            return {
+              period: period.charAt(0).toUpperCase() + period.slice(1),
+              name: userName,
+              score: data.score || 0,
+              gradient: gradients[index],
+              color: colors[index],
+              icon: icons[index],
+            };
           } catch (err) {
             console.error(`Error fetching ${period} champion:`, err);
             return null;
@@ -516,16 +532,20 @@ return {
 
   // Load initial global round state from overlay table
   const loadGlobalRoundState = useCallback(async () => {
-  try {
-    const { data, error } = await supabase.rpc("get_current_live_round");
-    
-    if (!error && data && data.length > 0) {
-      setGlobalTimeLeft(data[0].time_until_start);
+    try {
+      const { data, error } = await supabase
+        .from("overlay_round_state")
+        .select("*")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .single();
+      if (!error && data) {
+        setGlobalTimeLeft(data.time_left);
+      }
+    } catch (error) {
+      console.error("Failed to load overlay state:", error);
     }
-  } catch (error) {
-    console.error("Failed to load round state:", error);
-  }
-}, []);
+  }, []);
 
   // Initial Load
   useEffect(() => {
@@ -540,79 +560,45 @@ return {
     loadData();
   }, [fetchActivePlayers, fetchChampions, loadGlobalRoundState]);
 
-  // ✅ FIX 2: COUNTDOWN BUG FIXED (60dk sorun gitti)
+  // ✅ FIX 2: Real-time Updates with countdown jump prevention
 useEffect(() => {
-  // Active players her 8 saniyede güncelle
   const playersInterval = setInterval(fetchActivePlayers, 8000);
   
-  // Client-side countdown hesaplama (UTC bazlı) - BUG FIXED!
-  const calculateTimeLeft = () => {
-    const now = new Date();
-    const utcNow = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
-    
-    const minutes = utcNow.getMinutes();
-    const seconds = utcNow.getSeconds();
-    
-    // Şu anki slot (0, 15, 30, 45)
-    const currentSlot = Math.floor(minutes / 15) * 15;
-    
-    // Sonraki slot
-    let nextSlot = currentSlot + 15;
-    let nextHour = utcNow.getHours();
-    
-    // Eğer 60'ı geçerse bir sonraki saate geç
-    if (nextSlot >= 60) {
-      nextSlot = 0;
-      nextHour = (nextHour + 1) % 24;
-    }
-    
-    const nextRound = new Date(utcNow);
-    nextRound.setHours(nextHour);
-    nextRound.setMinutes(nextSlot);
-    nextRound.setSeconds(0);
-    nextRound.setMilliseconds(0);
-    
-    // Kalan süre (saniye)
-    const timeLeft = Math.max(0, Math.floor((nextRound.getTime() - utcNow.getTime()) / 1000));
-    return timeLeft;
-  };
-  
-  // Client-side countdown (her saniye - smooth)
+  let pauseCountdown = false;
   const countdownInterval = setInterval(() => {
-    setGlobalTimeLeft(calculateTimeLeft());
+    if (!pauseCountdown) {
+      setGlobalTimeLeft((prev) =>
+        prev !== null && prev > 0 ? prev - 1 : prev
+      );
+    }
   }, 1000);
-  
-  // Server validation (her 15 saniyede kontrol - güvenlik)
-  const serverValidation = async () => {
-    try {
-      const { data, error } = await supabase.rpc("get_current_live_round");
-      
-      if (!error && data && data.length > 0) {
-        const serverTime = data[0].time_until_start;
-        const clientTime = calculateTimeLeft();
-        
-        // Eğer 5+ saniye fark varsa server'ı dinle (saat yanlış olabilir)
-        if (Math.abs(clientTime - serverTime) > 5) {
-          console.warn(`Clock drift detected: ${Math.abs(clientTime - serverTime)}s difference. Syncing with server.`);
-          setGlobalTimeLeft(serverTime);
+
+  // Realtime listener that pauses local countdown briefly
+  const channel = supabase
+    .channel("home-overlay-countdown")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "overlay_round_state" },
+      (payload) => {
+        const newData = (payload.new || {}) as { time_left?: number | null };
+        if (typeof newData.time_left === "number") {
+          // Pause local countdown for 2 seconds when DB update arrives
+          pauseCountdown = true;
+          setGlobalTimeLeft(newData.time_left);
+          setTimeout(() => {
+            pauseCountdown = false;
+          }, 2000);
+        } else {
+          setGlobalTimeLeft(null);
         }
       }
-    } catch (err) {
-      console.error("Server validation error:", err);
-      // Hata olsa bile client-side devam eder
-    }
-  };
-  
-  // İlk validation
-  serverValidation();
-  
-  // Her 15 saniyede validation
-  const validationInterval = setInterval(serverValidation, 15000);
-  
+    )
+    .subscribe();
+
   return () => {
     clearInterval(playersInterval);
     clearInterval(countdownInterval);
-    clearInterval(validationInterval);
+    supabase.removeChannel(channel);
   };
 }, [fetchActivePlayers]);
 
@@ -648,15 +634,6 @@ useEffect(() => {
 
     return () => sub.subscription.unsubscribe();
   }, [router]);
-  
-// Update user session on page load
-useEffect(() => {
-  if (user) {
-    console.log('📝 Updating session for user:', user.id);
-    supabase.rpc('upsert_user_session', { p_user_id: user.id })
-      .then(result => console.log('✅ Session updated:', result));
-  }
-}, [user]);
 
    // Music Toggle
   const toggleMusic = useCallback(() => {
@@ -681,36 +658,18 @@ useEffect(() => {
     return () => stopMenuMusic();
   }, []);
 
-  // ✅ FIX 3: GOOGLE LOGIN FIXED (mobil sorun gitti)
+  // Auth Actions
   const handleSignIn = useCallback(async (redirectPath?: string) => {
-    try {
-      const redirectUrl = redirectPath 
-        ? `${window.location.origin}${redirectPath}`
-        : `${window.location.origin}/auth/callback`;
+    const redirectUrl = redirectPath 
+      ? `${window.location.origin}${redirectPath}`
+      : `${window.location.origin}/auth/callback`;
       
-      console.log('🔐 Starting Google OAuth, redirect:', redirectUrl);
-      
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: redirectUrl,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        },
-      });
-      
-      if (error) {
-        console.error('❌ OAuth error:', error);
-        alert('Login failed. Please try again.');
-      } else {
-        console.log('✅ OAuth initiated:', data);
-      }
-    } catch (err) {
-      console.error('❌ Login error:', err);
-      alert('Login failed. Please try again.');
-    }
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: redirectUrl,
+      },
+    });
   }, []);
 
   const handleSignOut = useCallback(async () => {
