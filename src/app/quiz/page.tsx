@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
@@ -25,6 +25,7 @@ const FINAL_SCORE_DURATION = 10; // seconds - 10 seconds for user to see results
 
 type OptionId = "A" | "B" | "C" | "D";
 type AnswerStatus = "none" | "correct" | "wrong";
+type Phase = "READY" | "QUESTION" | "INTERMISSION";
 
 interface Question {
   id: number;
@@ -68,15 +69,14 @@ export default function QuizGamePage() {
   const [userRounds, setUserRounds] = useState(0);
   const [user, setUser] = useState<any>(null); // User state for share buttons
 
-  // 🔥 NEW: Live sync state variables
-  const [phase, setPhase] = useState<string>("READY");
+  // 🔥 Live sync state variables (kept for compatibility)
+  const [phase, setPhase] = useState<Phase>("READY");
   const [roundId, setRoundId] = useState<string | null>(null);
-  const [questionStart, setQuestionStart] = useState<string | null>(null);
 
   // Stats only once guard
   const statsSavedRef = useRef(false);
-  
-  // ✅ FIXED: Timeout double-trigger protection
+
+  // ✅ Timeout double-trigger protection
   const timeoutTriggeredRef = useRef(false);
 
   // === AUDIO REFS ===
@@ -87,7 +87,36 @@ export default function QuizGamePage() {
   const whooshSoundRef = useRef<HTMLAudioElement | null>(null);
   const tickSoundRef = useRef<HTMLAudioElement | null>(null);
 
-  const currentQ = questions[currentIndex];
+  const currentQ = questions[currentIndex] ?? null;
+
+  // === SOUND HELPERS ===
+  const playSound = useCallback(
+    (audio: HTMLAudioElement | null, options?: { loop?: boolean }) => {
+      if (!isSoundEnabled || !audio) return;
+      try {
+        audio.loop = !!options?.loop;
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      } catch {}
+    },
+    [isSoundEnabled]
+  );
+
+  const stopSound = useCallback((audio: HTMLAudioElement | null) => {
+    if (!audio) return;
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.loop = false;
+    } catch {}
+  }, []);
+
+  const playClick = useCallback(() => playSound(clickSoundRef.current), [playSound]);
+  const startTick = useCallback(
+    () => playSound(tickSoundRef.current, { loop: true }),
+    [playSound]
+  );
+  const stopTick = useCallback(() => stopSound(tickSoundRef.current), [stopSound]);
 
   // 🔐 === SECURITY CHECK - MUST RUN FIRST ===
   useEffect(() => {
@@ -132,24 +161,29 @@ export default function QuizGamePage() {
           "get_current_live_round"
         );
 
-        if (roundError || !roundData) {
-          console.error("❌ No active round found:", roundError);
+        const roundRow = Array.isArray(roundData) ? roundData[0] : roundData ?? null;
+
+        if (
+          roundError ||
+          !roundRow ||
+          !["active", "scheduled"].includes(roundRow.status)
+        ) {
+          console.error("❌ No active round found:", roundError, roundData);
           setIsLoading(false);
           return;
         }
 
-        console.log("✅ Active round found:", roundData.round_id);
-        setRoundId(roundData.round_id);
+        setRoundId(roundRow.round_id);
 
         // 2️⃣ Get round details with questions
         const { data: round, error: roundFetchError } = await supabase
           .from("rounds")
           .select("questions_selected, scheduled_start, status")
-          .eq("id", roundData.round_id)
-          .single();
+          .eq("id", roundRow.round_id)
+          .maybeSingle();
 
-        if (roundFetchError || !round || !round.questions_selected) {
-          console.error("❌ Error fetching round questions:", roundFetchError);
+        if (roundFetchError || !Array.isArray(round?.questions_selected)) {
+          console.error("❌ Error fetching round questions:", roundFetchError, round);
           setIsLoading(false);
           return;
         }
@@ -161,20 +195,20 @@ export default function QuizGamePage() {
         console.log("🔍 Fetching question details for IDs:", questionIds);
         console.log("🔍 Question IDs count:", questionIds.length);
         console.log("🔍 First 5 IDs:", questionIds.slice(0, 5));
-        
+
         const { data: questionData, error: questionsError } = await supabase.rpc(
           "get_question_details",
           { p_question_ids: questionIds }
         );
 
-        console.log("📊 RPC Response - Data:", questionData);
-        console.log("📊 RPC Response - Error:", questionsError);
-        console.log("📊 Data is array?", Array.isArray(questionData));
-        console.log("📊 Data length:", questionData?.length);
-
-        if (questionsError || !questionData) {
+        if (questionsError) {
           console.error("❌ Error fetching question details:", questionsError);
-          console.error("❌ QuestionData:", questionData);
+          setIsLoading(false);
+          return;
+        }
+
+        if (!Array.isArray(questionData) || questionData.length !== questionIds.length) {
+          console.error("❌ Question list mismatch:", questionData, questionIds);
           setIsLoading(false);
           return;
         }
@@ -200,10 +234,12 @@ export default function QuizGamePage() {
 
         // Initialize answers array
         setAnswers(Array(formattedQuestions.length).fill("none"));
-        
+
         // Set phase to QUESTION (since we don't have realtime sync)
         setPhase("QUESTION");
         setCurrentIndex(0);
+        setTimeLeft(QUESTION_DURATION);
+        timeoutTriggeredRef.current = false;
       } catch (err) {
         console.error("❌ Error in fetchLiveQuestions:", err);
       } finally {
@@ -237,7 +273,7 @@ export default function QuizGamePage() {
   }, []);
 
   // === SUBMIT ROUND RESULT (replaces saveAnswer, updateUserStats, saveStatsOnce) ===
-  const submitRoundResult = async () => {
+  const submitRoundResult = useCallback(async () => {
     if (!roundId || statsSavedRef.current) {
       console.log("📊 Round result already submitted or no roundId");
       return;
@@ -271,187 +307,10 @@ export default function QuizGamePage() {
     } catch (err) {
       console.error("❌ Error in result submission:", err);
     }
-  };
-
-  // === SOUND HELPERS ===
-  const playSound = (
-    audio: HTMLAudioElement | null,
-    options?: { loop?: boolean }
-  ) => {
-    if (!isSoundEnabled || !audio) return;
-    try {
-      audio.loop = !!options?.loop;
-      audio.currentTime = 0;
-      audio.play().catch(() => {});
-    } catch {}
-  };
-
-  const stopSound = (audio: HTMLAudioElement | null) => {
-    if (!audio) return;
-    try {
-      audio.pause();
-      audio.currentTime = 0;
-      audio.loop = false;
-    } catch {}
-  };
-
-  const playClick = () => playSound(clickSoundRef.current);
-  const startTick = () => playSound(tickSoundRef.current, { loop: true });
-  const stopTick = () => stopSound(tickSoundRef.current);
-
-  // === SIMPLE QUESTION TIMER (replaces realtime sync) ===
-  useEffect(() => {
-    if (isLoading || showExplanation || showFinalScore || !currentQ || phase !== "QUESTION") return;
-
-    if (timeLeft > 0 && !isAnswerLocked) {
-      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-      return () => clearTimeout(timer);
-    } else if (timeLeft === 0 && !isAnswerLocked && !timeoutTriggeredRef.current) {
-      // Time's up - auto submit wrong answer
-      console.log("⏱️ Time expired, auto-submitting...");
-      timeoutTriggeredRef.current = true;
-      handleTimeout();
-    }
-  }, [timeLeft, isLoading, showExplanation, showFinalScore, isAnswerLocked, currentQ, phase]);
-
-  // Start/stop tick by UI state
-  useEffect(() => {
-    if (
-      phase === "QUESTION" &&
-      !isAnswerLocked &&
-      isSoundEnabled &&
-      !showFinalScore &&
-      !showExplanation &&
-      timeLeft > 0
-    ) {
-      startTick();
-    } else {
-      stopTick();
-    }
-  }, [
-    phase,
-    isAnswerLocked,
-    isSoundEnabled,
-    showFinalScore,
-    showExplanation,
-    timeLeft,
-  ]);
-
-  // === EXPLANATION TIMER (5 seconds) ===
-  useEffect(() => {
-    if (showExplanation && !showFinalScore) {
-      const timer = setTimeout(() => {
-        // Move to next question or finish quiz
-        if (currentIndex < totalQuestions - 1) {
-          playSound(whooshSoundRef.current);
-          setCurrentIndex(currentIndex + 1);
-          setTimeLeft(QUESTION_DURATION);
-          setSelectedAnswer(null);
-          setIsAnswerLocked(false);
-          setShowExplanation(false);
-          timeoutTriggeredRef.current = false;
-        } else {
-          // Quiz finished - submit results
-          submitRoundResult();
-          setShowFinalScore(true);
-        }
-      }, 5000); // 5 seconds explanation
-
-      return () => clearTimeout(timer);
-    }
-  }, [showExplanation, showFinalScore, currentIndex, totalQuestions]);
-
-
-  // ✅ FIXED: Stabilized final score countdown
-  useEffect(() => {
-    if (!showFinalScore) return;
-
-    console.log("🏁 Final score screen activated");
-    stopTick();
-    playSound(gameoverSoundRef.current);
-
-    let remaining = FINAL_SCORE_DURATION;
-    setFinalCountdown(remaining);
-
-    const interval = setInterval(() => {
-      remaining -= 1;
-      setFinalCountdown(Math.max(0, remaining));
-      
-      if (remaining <= 0) {
-        clearInterval(interval);
-      }
-    }, 1000);
-
-    const timeout = setTimeout(() => {
-      console.log("🏠 Auto-redirecting to home...");
-      router.push("/");
-    }, FINAL_SCORE_DURATION * 1000);
-
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
-    };
-  }, [showFinalScore, router]);
-
-  // Sound toggle effect
-  useEffect(() => {
-    if (!isSoundEnabled) {
-      stopTick();
-      return;
-    }
-    if (phase === "QUESTION" && timeLeft > 0) {
-      startTick();
-    }
-  }, [isSoundEnabled, phase, timeLeft]);
-
-  // Stop tick safety
-  useEffect(() => {
-    if (showFinalScore || showExplanation || timeLeft <= 0) {
-      stopTick();
-    }
-  }, [showFinalScore, showExplanation, timeLeft]);
+  }, [roundId, correctCount, wrongCount]);
 
   // === HANDLERS ===
-  const handleAnswerClick = (optionId: OptionId) => {
-    if (isAnswerLocked || showExplanation || showFinalScore) return;
-    if (!currentQ) return;
-
-    console.log("✅ Answer selected:", optionId);
-    playClick();
-    setSelectedAnswer(optionId);
-    setIsAnswerLocked(true);
-    timeoutTriggeredRef.current = true; // ✅ Prevent timeout after manual answer
-
-    const correctFlag = optionId === currentQ.correctAnswer;
-    setIsCorrect(correctFlag);
-
-    setAnswers((prev) => {
-      const next = prev.length
-        ? [...prev]
-        : (Array(totalQuestions).fill("none") as AnswerStatus[]);
-      if (currentIndex >= 0 && currentIndex < next.length) {
-        next[currentIndex] = correctFlag ? "correct" : "wrong";
-      }
-      return next;
-    });
-
-    if (correctFlag) {
-      setCorrectCount((c) => c + 1);
-      const newStreak = streak + 1;
-      setStreak(newStreak);
-      setMaxStreak((max) => Math.max(max, newStreak));
-      playSound(correctSoundRef.current);
-    } else {
-      setWrongCount((w) => w + 1);
-      setStreak(0);
-      playSound(wrongSoundRef.current);
-    }
-
-    // Show explanation immediately
-    setShowExplanation(true);
-  };
-
-  const handleTimeout = () => {
+  const handleTimeout = useCallback(() => {
     if (isAnswerLocked || showExplanation || showFinalScore) return;
     if (!currentQ) return;
 
@@ -473,33 +332,225 @@ export default function QuizGamePage() {
     playSound(wrongSoundRef.current);
     // Show explanation immediately
     setShowExplanation(true);
-  };
+  }, [
+    isAnswerLocked,
+    showExplanation,
+    showFinalScore,
+    currentQ,
+    totalQuestions,
+    currentIndex,
+    playSound,
+  ]);
 
-  const handleExitClick = () => {
+  const handleAnswerClick = useCallback(
+    (optionId: OptionId) => {
+      if (isAnswerLocked || showExplanation || showFinalScore) return;
+      if (!currentQ) return;
+
+      console.log("✅ Answer selected:", optionId);
+      playClick();
+      setSelectedAnswer(optionId);
+      setIsAnswerLocked(true);
+      timeoutTriggeredRef.current = true; // ✅ Prevent timeout after manual answer
+
+      const correctFlag = optionId === currentQ.correctAnswer;
+      setIsCorrect(correctFlag);
+
+      setAnswers((prev) => {
+        const next = prev.length
+          ? [...prev]
+          : (Array(totalQuestions).fill("none") as AnswerStatus[]);
+        if (currentIndex >= 0 && currentIndex < next.length) {
+          next[currentIndex] = correctFlag ? "correct" : "wrong";
+        }
+        return next;
+      });
+
+      if (correctFlag) {
+        setCorrectCount((c) => c + 1);
+        const newStreak = streak + 1;
+        setStreak(newStreak);
+        setMaxStreak((max) => Math.max(max, newStreak));
+        playSound(correctSoundRef.current);
+      } else {
+        setWrongCount((w) => w + 1);
+        setStreak(0);
+        playSound(wrongSoundRef.current);
+      }
+
+      // Show explanation immediately
+      setShowExplanation(true);
+    },
+    [
+      isAnswerLocked,
+      showExplanation,
+      showFinalScore,
+      currentQ,
+      totalQuestions,
+      currentIndex,
+      playClick,
+      streak,
+      playSound,
+    ]
+  );
+
+  const handleExitClick = useCallback(() => {
     if (showFinalScore) return;
     playClick();
     setShowExitConfirm(true);
-  };
+  }, [showFinalScore, playClick]);
 
-  const handleExitConfirmYes = async () => {
+  const handleExitConfirmYes = useCallback(async () => {
     console.log("🚪 User confirmed exit");
     playClick();
     stopTick();
     setShowExitConfirm(false);
     await submitRoundResult();
     setShowFinalScore(true);
-  };
+  }, [playClick, stopTick, submitRoundResult]);
 
-  const handleExitConfirmNo = () => {
+  const handleExitConfirmNo = useCallback(() => {
     console.log("↩️ User cancelled exit");
     playClick();
     setShowExitConfirm(false);
-  };
+  }, [playClick]);
 
-  const handleSoundToggle = () => {
+  const handleSoundToggle = useCallback(() => {
     if (isSoundEnabled) playClick();
     setIsSoundEnabled((prev) => !prev);
-  };
+  }, [isSoundEnabled, playClick]);
+
+  // === SIMPLE QUESTION TIMER (replaces realtime sync) ===
+  useEffect(() => {
+    if (isLoading || showExplanation || showFinalScore || !currentQ || phase !== "QUESTION")
+      return;
+
+    if (timeLeft > 0 && !isAnswerLocked) {
+      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+      return () => clearTimeout(timer);
+    } else if (
+      timeLeft === 0 &&
+      !isAnswerLocked &&
+      !timeoutTriggeredRef.current
+    ) {
+      // Time's up - auto submit wrong answer
+      console.log("⏱️ Time expired, auto-submitting...");
+      timeoutTriggeredRef.current = true;
+      handleTimeout();
+    }
+  }, [
+    timeLeft,
+    isLoading,
+    showExplanation,
+    showFinalScore,
+    isAnswerLocked,
+    currentQ,
+    phase,
+    handleTimeout,
+  ]);
+
+  // Start/stop tick by UI state
+  useEffect(() => {
+    const shouldTick =
+      phase === "QUESTION" &&
+      !isAnswerLocked &&
+      isSoundEnabled &&
+      !showFinalScore &&
+      !showExplanation &&
+      timeLeft > 0;
+
+    if (shouldTick) startTick();
+    else stopTick();
+  }, [
+    phase,
+    isAnswerLocked,
+    isSoundEnabled,
+    showFinalScore,
+    showExplanation,
+    timeLeft,
+    startTick,
+    stopTick,
+  ]);
+
+  // === EXPLANATION TIMER (5 seconds) ===
+  useEffect(() => {
+    if (!showExplanation || showFinalScore) return;
+
+    const timer = setTimeout(() => {
+      // Move to next question or finish quiz
+      if (currentIndex < totalQuestions - 1) {
+        playSound(whooshSoundRef.current);
+        setCurrentIndex(currentIndex + 1);
+        setTimeLeft(QUESTION_DURATION);
+        timeoutTriggeredRef.current = false;
+        setSelectedAnswer(null);
+        setIsAnswerLocked(false);
+        setShowExplanation(false);
+      } else {
+        // Quiz finished - submit results
+        submitRoundResult();
+        setShowFinalScore(true);
+      }
+    }, 5000); // 5 seconds explanation
+
+    return () => clearTimeout(timer);
+  }, [
+    showExplanation,
+    showFinalScore,
+    currentIndex,
+    totalQuestions,
+    playSound,
+    submitRoundResult,
+  ]);
+
+  // ✅ FIXED: Stabilized final score countdown
+  useEffect(() => {
+    if (!showFinalScore) return;
+
+    console.log("🏁 Final score screen activated");
+    stopTick();
+    playSound(gameoverSoundRef.current);
+
+    let remaining = FINAL_SCORE_DURATION;
+    setFinalCountdown(remaining);
+
+    const interval = setInterval(() => {
+      remaining -= 1;
+      setFinalCountdown(Math.max(0, remaining));
+
+      if (remaining <= 0) {
+        clearInterval(interval);
+      }
+    }, 1000);
+
+    const timeout = setTimeout(() => {
+      console.log("🏠 Auto-redirecting to home...");
+      router.push("/");
+    }, FINAL_SCORE_DURATION * 1000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [showFinalScore, router, stopTick, playSound]);
+
+  // Sound toggle effect
+  useEffect(() => {
+    if (!isSoundEnabled) {
+      stopTick();
+      return;
+    }
+    if (phase === "QUESTION" && timeLeft > 0) {
+      startTick();
+    }
+  }, [isSoundEnabled, phase, timeLeft, startTick, stopTick]);
+
+  // Stop tick safety
+  useEffect(() => {
+    if (showFinalScore || showExplanation || timeLeft <= 0) {
+      stopTick();
+    }
+  }, [showFinalScore, showExplanation, timeLeft, stopTick]);
 
   // === HELPERS ===
   const getTimeColor = () => {
@@ -509,9 +560,7 @@ export default function QuizGamePage() {
   };
 
   const accuracy =
-    totalQuestions > 0
-      ? Math.round((correctCount / totalQuestions) * 100)
-      : 0;
+    totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
   const score = correctCount * 2;
 
   // 🔐 === SECURITY VERIFICATION SCREEN ===
@@ -597,7 +646,7 @@ export default function QuizGamePage() {
   }
 
   // === NO QUESTIONS FALLBACK ===
-  if (!currentQ) {
+  if (!isLoading && questions.length === 0) {
     return (
       <div
         style={{
@@ -937,8 +986,7 @@ export default function QuizGamePage() {
                     height: "clamp(62px, 13vw, 78px)",
                     borderRadius: "50%",
                     padding: 2,
-                    background:
-                      "linear-gradient(135deg, #7c3aed, #d946ef)",
+                    background: "linear-gradient(135deg, #7c3aed, #d946ef)",
                     boxShadow: "0 0 20px rgba(124, 58, 237, 0.7)",
                     flexShrink: 0,
                   }}
@@ -967,12 +1015,7 @@ export default function QuizGamePage() {
                   </div>
                 </div>
 
-                <div
-                  className="brand-text"
-                  style={{
-                    display: "none",
-                  }}
-                >
+                <div className="brand-text" style={{ display: "none" }}>
                   <div
                     style={{
                       fontSize: "clamp(10px, 2.2vw, 13px)",
@@ -1018,8 +1061,7 @@ export default function QuizGamePage() {
                     fontWeight: 900,
                     letterSpacing: "0.15em",
                     textTransform: "uppercase",
-                    background:
-                      "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)",
+                    background: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)",
                     backgroundSize: "200% auto",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
@@ -1073,14 +1115,10 @@ export default function QuizGamePage() {
                   flexShrink: 0,
                 }}
               >
-                <div
-                  className="score-pills"
-                  style={{ display: "flex", gap: "clamp(4px, 1.5vw, 6px)" }}
-                >
+                <div className="score-pills" style={{ display: "flex", gap: "clamp(4px, 1.5vw, 6px)" }}>
                   <div
                     style={{
-                      padding:
-                        "clamp(4px, 1.5vw, 6px) clamp(8px, 2.5vw, 12px)",
+                      padding: "clamp(4px, 1.5vw, 6px) clamp(8px, 2.5vw, 12px)",
                       borderRadius: "999px",
                       background:
                         "linear-gradient(135deg, rgba(22,163,74,0.15), rgba(21,128,61,0.15))",
@@ -1110,8 +1148,7 @@ export default function QuizGamePage() {
                   </div>
                   <div
                     style={{
-                      padding:
-                        "clamp(4px, 1.5vw, 6px) clamp(8px, 2.5vw, 12px)",
+                      padding: "clamp(4px, 1.5vw, 6px) clamp(8px, 2.5vw, 12px)",
                       borderRadius: "999px",
                       background:
                         "linear-gradient(135deg, rgba(220,38,38,0.15), rgba(185,28,28,0.15))",
@@ -1157,8 +1194,7 @@ export default function QuizGamePage() {
                     alignItems: "center",
                     justifyContent: "center",
                     cursor: "pointer",
-                    transition:
-                      "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                     flexShrink: 0,
                   }}
                 >
@@ -1186,8 +1222,7 @@ export default function QuizGamePage() {
                     onClick={handleExitClick}
                     className="neon-border"
                     style={{
-                      padding:
-                        "clamp(8px, 2.5vw, 10px) clamp(12px, 4vw, 20px)",
+                      padding: "clamp(8px, 2.5vw, 10px) clamp(12px, 4vw, 20px)",
                       borderRadius: "999px",
                       border: "2px solid rgba(239,68,68,0.6)",
                       background:
@@ -1201,15 +1236,12 @@ export default function QuizGamePage() {
                       alignItems: "center",
                       gap: "6px",
                       cursor: "pointer",
-                      transition:
-                        "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                       flexShrink: 0,
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.transform =
-                        "translateY(-2px)";
-                      e.currentTarget.style.boxShadow =
-                        "0 0 30px rgba(239,68,68,0.6)";
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.boxShadow = "0 0 30px rgba(239,68,68,0.6)";
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = "translateY(0)";
@@ -1336,12 +1368,7 @@ export default function QuizGamePage() {
                 overflow: "hidden",
               }}
             >
-              <div
-                style={{
-                  display: "inline-block",
-                  marginBottom: "clamp(16px, 3vw, 20px)",
-                }}
-              >
+              <div style={{ display: "inline-block", marginBottom: "clamp(16px, 3vw, 20px)" }}>
                 <Trophy
                   style={{
                     width: "clamp(48px, 10vw, 64px)",
@@ -1405,8 +1432,7 @@ export default function QuizGamePage() {
                       color: "#22c55e",
                       lineHeight: 1,
                       marginBottom: "clamp(4px, 1vw, 6px)",
-                      textShadow:
-                        "0 0 15px rgba(34,197,94,0.6)",
+                      textShadow: "0 0 15px rgba(34,197,94,0.6)",
                     }}
                   >
                     {correctCount}
@@ -1450,8 +1476,7 @@ export default function QuizGamePage() {
                       color: "#ef4444",
                       lineHeight: 1,
                       marginBottom: "clamp(4px, 1vw, 6px)",
-                      textShadow:
-                        "0 0 15px rgba(239,68,68,0.6)",
+                      textShadow: "0 0 15px rgba(239,68,68,0.6)",
                     }}
                   >
                     {wrongCount}
@@ -1471,15 +1496,24 @@ export default function QuizGamePage() {
               </div>
 
               {/* ✨ SHARE YOUR SCORE */}
-              <div style={{ marginTop: 'clamp(20px, 4vw, 24px)', marginBottom: 'clamp(20px, 4vw, 24px)', width: '100%' }}>
+              <div
+                style={{
+                  marginTop: "clamp(20px, 4vw, 24px)",
+                  marginBottom: "clamp(20px, 4vw, 24px)",
+                  width: "100%",
+                }}
+              >
                 <ShareButtons
                   scoreData={{
-                    score: correctCount * 2,
+                    score,
                     correct: correctCount,
                     wrong: wrongCount,
-                    accuracy: Math.round((correctCount / TOTAL_QUESTIONS) * 100),
-                    userName: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Anonymous',
-                    userCountry: user?.user_metadata?.country || '🌍',
+                    accuracy,
+                    userName:
+                      user?.user_metadata?.full_name ||
+                      user?.email?.split("@")[0] ||
+                      "Anonymous",
+                    userCountry: user?.user_metadata?.country || "🌍",
                     userId: user?.id,
                     roundId: roundId || undefined,
                   }}
@@ -1489,8 +1523,7 @@ export default function QuizGamePage() {
 
               <div
                 style={{
-                  padding:
-                    "clamp(12px, 2.5vw, 14px) clamp(16px, 3.5vw, 20px)",
+                  padding: "clamp(12px, 2.5vw, 14px) clamp(16px, 3.5vw, 20px)",
                   borderRadius: "clamp(12px, 2.5vw, 14px)",
                   background: "rgba(124,58,237,0.15)",
                   border: "1px solid rgba(139,92,246,0.4)",
@@ -1515,8 +1548,7 @@ export default function QuizGamePage() {
                     fontSize: "clamp(18px, 4vw, 22px)",
                     fontWeight: 900,
                     color: "#a78bfa",
-                    textShadow:
-                      "0 0 10px rgba(167,139,250,0.6)",
+                    textShadow: "0 0 10px rgba(167,139,250,0.6)",
                   }}
                 >
                   {userRounds}
@@ -1547,8 +1579,7 @@ export default function QuizGamePage() {
                   }}
                   style={{
                     width: "100%",
-                    padding:
-                      "clamp(12px, 3vw, 14px) clamp(20px, 4vw, 24px)",
+                    padding: "clamp(12px, 3vw, 14px) clamp(20px, 4vw, 24px)",
                     borderRadius: "clamp(12px, 2.5vw, 14px)",
                     border: "none",
                     background:
@@ -1556,8 +1587,7 @@ export default function QuizGamePage() {
                         ? "linear-gradient(135deg, #7c3aed, #d946ef)"
                         : "linear-gradient(135deg, #f59e0b, #fbbf24)",
                     color: "white",
-                    fontSize:
-                      "clamp(14px, 3.2vw, 16px)",
+                    fontSize: "clamp(14px, 3.2vw, 16px)",
                     fontWeight: 800,
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
@@ -1573,8 +1603,7 @@ export default function QuizGamePage() {
                     transition: "all 0.3s",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.transform =
-                      "translateY(-2px)";
+                    e.currentTarget.style.transform = "translateY(-2px)";
                     e.currentTarget.style.boxShadow =
                       userRounds > 0
                         ? "0 12px 35px rgba(139,92,246,0.6)"
@@ -1608,14 +1637,12 @@ export default function QuizGamePage() {
                   }}
                   style={{
                     width: "100%",
-                    padding:
-                      "clamp(12px, 3vw, 14px) clamp(20px, 4vw, 24px)",
+                    padding: "clamp(12px, 3vw, 14px) clamp(20px, 4vw, 24px)",
                     borderRadius: "clamp(12px, 2.5vw, 14px)",
                     border: "2px solid rgba(148,163,253,0.4)",
                     background: "rgba(15,23,42,0.6)",
                     color: "white",
-                    fontSize:
-                      "clamp(14px, 3.2vw, 16px)",
+                    fontSize: "clamp(14px, 3.2vw, 16px)",
                     fontWeight: 800,
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
@@ -1627,19 +1654,14 @@ export default function QuizGamePage() {
                     transition: "all 0.3s",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.transform =
-                      "translateY(-2px)";
-                    e.currentTarget.style.borderColor =
-                      "rgba(139,92,246,0.6)";
-                    e.currentTarget.style.background =
-                      "rgba(139,92,246,0.15)";
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                    e.currentTarget.style.borderColor = "rgba(139,92,246,0.6)";
+                    e.currentTarget.style.background = "rgba(139,92,246,0.15)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.borderColor =
-                      "rgba(148,163,253,0.4)";
-                    e.currentTarget.style.background =
-                      "rgba(15,23,42,0.6)";
+                    e.currentTarget.style.borderColor = "rgba(148,163,253,0.4)";
+                    e.currentTarget.style.background = "rgba(15,23,42,0.6)";
                   }}
                 >
                   <Star style={{ width: "18px", height: "18px" }} />
@@ -1649,8 +1671,7 @@ export default function QuizGamePage() {
 
               <div
                 style={{
-                  padding:
-                    "clamp(10px, 2vw, 12px) clamp(14px, 3vw, 16px)",
+                  padding: "clamp(10px, 2vw, 12px) clamp(14px, 3vw, 16px)",
                   borderRadius: "clamp(10px, 2vw, 12px)",
                   background: "rgba(139,92,246,0.1)",
                   border: "1px solid rgba(139,92,246,0.3)",
@@ -1668,8 +1689,7 @@ export default function QuizGamePage() {
                     style={{
                       color: "#a78bfa",
                       fontWeight: 900,
-                      fontSize:
-                        "clamp(13px, 3vw, 16px)",
+                      fontSize: "clamp(13px, 3vw, 16px)",
                     }}
                   >
                     {finalCountdown}
@@ -1686,8 +1706,7 @@ export default function QuizGamePage() {
                   style={{
                     padding:
                       "clamp(24px, 5vw, 32px) clamp(20px, 4vw, 28px)",
-                    borderRadius:
-                      "clamp(24px, 5vw, 32px)",
+                    borderRadius: "clamp(24px, 5vw, 32px)",
                     border: "2px solid rgba(139,92,246,0.4)",
                     background:
                       "linear-gradient(135deg, rgba(30,27,75,0.95) 0%, rgba(15,23,42,0.95) 100%)",
@@ -1710,14 +1729,12 @@ export default function QuizGamePage() {
                         width: "24px",
                         height: "24px",
                         color: "#22d3ee",
-                        filter:
-                          "drop-shadow(0 0 8px #22d3ee)",
+                        filter: "drop-shadow(0 0 8px #22d3ee)",
                       }}
                     />
                     <span
                       style={{
-                        fontSize:
-                          "clamp(11px, 2.3vw, 14px)",
+                        fontSize: "clamp(11px, 2.3vw, 14px)",
                         color: "#22d3ee",
                         fontWeight: 800,
                         letterSpacing: "0.15em",
@@ -1749,16 +1766,12 @@ export default function QuizGamePage() {
                     }}
                   >
                     {currentQ.options.map((opt) => {
-                      const isSelected =
-                        selectedAnswer === opt.id;
-                      const isCorrectOpt =
-                        opt.id === currentQ.correctAnswer;
+                      const isSelected = selectedAnswer === opt.id;
+                      const isCorrectOpt = opt.id === currentQ.correctAnswer;
                       const locked = isAnswerLocked;
 
-                      let borderColor =
-                        "rgba(139,92,246,0.5)";
-                      let boxShadow =
-                        "0 4px 20px rgba(0,0,0,0.3)";
+                      let borderColor = "rgba(139,92,246,0.5)";
+                      let boxShadow = "0 4px 20px rgba(0,0,0,0.3)";
                       let bg =
                         "linear-gradient(135deg, rgba(30,27,75,0.8), rgba(15,23,42,0.9))";
 
@@ -1769,20 +1782,15 @@ export default function QuizGamePage() {
                             "0 0 25px rgba(34,197,94,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                           bg =
                             "linear-gradient(135deg, rgba(22,163,74,0.3), rgba(21,128,61,0.2))";
-                        } else if (
-                          isSelected &&
-                          !isCorrectOpt
-                        ) {
+                        } else if (isSelected && !isCorrectOpt) {
                           borderColor = "#ef4444";
                           boxShadow =
                             "0 0 25px rgba(239,68,68,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                           bg =
                             "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))";
                         } else {
-                          borderColor =
-                            "rgba(75,85,99,0.4)";
-                          boxShadow =
-                            "0 4px 15px rgba(0,0,0,0.2)";
+                          borderColor = "rgba(75,85,99,0.4)";
+                          boxShadow = "0 4px 15px rgba(0,0,0,0.2)";
                           bg =
                             "linear-gradient(135deg, rgba(30,27,75,0.5), rgba(15,23,42,0.6))";
                         }
@@ -1797,37 +1805,25 @@ export default function QuizGamePage() {
                       return (
                         <button
                           key={opt.id}
-                          onClick={() =>
-                            handleAnswerClick(opt.id)
-                          }
+                          onClick={() => handleAnswerClick(opt.id)}
                           disabled={locked}
                           style={{
                             position: "relative",
                             padding:
                               "clamp(16px, 3vw, 20px) clamp(14px, 3vw, 18px)",
-                            borderRadius:
-                              "clamp(16px, 3vw, 20px)",
+                            borderRadius: "clamp(16px, 3vw, 20px)",
                             border: `3px solid ${borderColor}`,
                             background: bg,
                             color: "#f8fafc",
                             textAlign: "left",
-                            cursor: locked
-                              ? "default"
-                              : "pointer",
+                            cursor: locked ? "default" : "pointer",
                             boxShadow,
-                            transition:
-                              "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                             overflow: "hidden",
                             opacity:
-                              locked &&
-                              !isSelected &&
-                              !isCorrectOpt
-                                ? 0.4
-                                : 1,
+                              locked && !isSelected && !isCorrectOpt ? 0.4 : 1,
                             transform:
-                              isSelected && !locked
-                                ? "scale(1.02)"
-                                : "scale(1)",
+                              isSelected && !locked ? "scale(1.02)" : "scale(1)",
                           }}
                           onMouseEnter={(e) => {
                             if (!locked) {
@@ -1839,10 +1835,8 @@ export default function QuizGamePage() {
                           }}
                           onMouseLeave={(e) => {
                             if (!locked) {
-                              e.currentTarget.style.transform =
-                                "translateY(0) scale(1)";
-                              e.currentTarget.style.boxShadow =
-                                boxShadow;
+                              e.currentTarget.style.transform = "translateY(0) scale(1)";
+                              e.currentTarget.style.boxShadow = boxShadow;
                             }
                           }}
                         >
@@ -1856,8 +1850,7 @@ export default function QuizGamePage() {
                                 height: "100%",
                                 background:
                                   "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)",
-                                animation:
-                                  "shine 3s infinite",
+                                animation: "shine 3s infinite",
                                 pointerEvents: "none",
                               }}
                             />
@@ -1874,30 +1867,21 @@ export default function QuizGamePage() {
                           >
                             <div
                               style={{
-                                width:
-                                  "clamp(36px, 7vw, 44px)",
-                                height:
-                                  "clamp(36px, 7vw, 44px)",
+                                width: "clamp(36px, 7vw, 44px)",
+                                height: "clamp(36px, 7vw, 44px)",
                                 borderRadius: "12px",
                                 border: `2px solid ${borderColor}`,
                                 display: "flex",
                                 alignItems: "center",
-                                justifyContent:
-                                  "center",
-                                fontSize:
-                                  "clamp(16px, 3vw, 20px)",
+                                justifyContent: "center",
+                                fontSize: "clamp(16px, 3vw, 20px)",
                                 fontWeight: 900,
-                                background:
-                                  "rgba(15,23,42,0.9)",
-                                boxShadow:
-                                  "inset 0 2px 8px rgba(0,0,0,0.3)",
+                                background: "rgba(15,23,42,0.9)",
+                                boxShadow: "inset 0 2px 8px rgba(0,0,0,0.3)",
                                 color:
-                                  isCorrectOpt &&
-                                  locked
+                                  isCorrectOpt && locked
                                     ? "#22c55e"
-                                    : isSelected &&
-                                      locked &&
-                                      !isCorrectOpt
+                                    : isSelected && locked && !isCorrectOpt
                                     ? "#ef4444"
                                     : "#a78bfa",
                                 flexShrink: 0,
@@ -1908,8 +1892,7 @@ export default function QuizGamePage() {
 
                             <div
                               style={{
-                                fontSize:
-                                  "clamp(14px, 3vw, 16px)",
+                                fontSize: "clamp(14px, 3vw, 16px)",
                                 fontWeight: 600,
                                 color: "#f8fafc",
                                 lineHeight: 1.4,
@@ -1929,8 +1912,7 @@ export default function QuizGamePage() {
                   style={{
                     padding:
                       "clamp(24px, 5vw, 32px) clamp(20px, 4vw, 28px)",
-                    borderRadius:
-                      "clamp(24px, 5vw, 32px)",
+                    borderRadius: "clamp(24px, 5vw, 32px)",
                     border: "2px solid rgba(56,189,248,0.5)",
                     background:
                       "linear-gradient(135deg, rgba(8,47,73,0.95), rgba(6,8,20,0.95))",
@@ -1956,18 +1938,15 @@ export default function QuizGamePage() {
                             width: "32px",
                             height: "32px",
                             color: "#22c55e",
-                            filter:
-                              "drop-shadow(0 0 10px #22c55e)",
+                            filter: "drop-shadow(0 0 10px #22c55e)",
                           }}
                         />
                         <span
                           style={{
-                            fontSize:
-                              "clamp(20px, 4vw, 26px)",
+                            fontSize: "clamp(20px, 4vw, 26px)",
                             fontWeight: 900,
                             color: "#22c55e",
-                            textShadow:
-                              "0 0 10px rgba(34,197,94,0.5)",
+                            textShadow: "0 0 10px rgba(34,197,94,0.5)",
                           }}
                         >
                           Correct Answer!
@@ -1980,18 +1959,15 @@ export default function QuizGamePage() {
                             width: "32px",
                             height: "32px",
                             color: "#ef4444",
-                            filter:
-                              "drop-shadow(0 0 10px #ef4444)",
+                            filter: "drop-shadow(0 0 10px #ef4444)",
                           }}
                         />
                         <span
                           style={{
-                            fontSize:
-                              "clamp(20px, 4vw, 26px)",
+                            fontSize: "clamp(20px, 4vw, 26px)",
                             fontWeight: 900,
                             color: "#ef4444",
-                            textShadow:
-                              "0 0 10px rgba(239,68,68,0.5)",
+                            textShadow: "0 0 10px rgba(239,68,68,0.5)",
                           }}
                         >
                           Incorrect
@@ -2005,15 +1981,13 @@ export default function QuizGamePage() {
                       padding: "14px 18px",
                       borderRadius: "16px",
                       background: "rgba(22,163,74,0.15)",
-                      border:
-                        "2px solid rgba(34,197,94,0.4)",
+                      border: "2px solid rgba(34,197,94,0.4)",
                       marginBottom: "16px",
                     }}
                   >
                     <span
                       style={{
-                        fontSize:
-                          "clamp(13px, 2.8vw, 15px)",
+                        fontSize: "clamp(13px, 2.8vw, 15px)",
                         color: "#86efac",
                         fontWeight: 700,
                       }}
@@ -2023,8 +1997,7 @@ export default function QuizGamePage() {
                         style={{
                           color: "#22c55e",
                           fontWeight: 900,
-                          fontSize:
-                            "clamp(15px, 3.2vw, 18px)",
+                          fontSize: "clamp(15px, 3.2vw, 18px)",
                         }}
                       >
                         {currentQ.correctAnswer}
@@ -2049,15 +2022,13 @@ export default function QuizGamePage() {
                       padding: "14px 20px",
                       borderRadius: "16px",
                       background: "rgba(15,23,42,0.9)",
-                      border:
-                        "1px solid rgba(56,189,248,0.3)",
+                      border: "1px solid rgba(56,189,248,0.3)",
                       textAlign: "center",
                     }}
                   >
                     <p
                       style={{
-                        fontSize:
-                          "clamp(12px, 2.5vw, 14px)",
+                        fontSize: "clamp(12px, 2.5vw, 14px)",
                         color: "#94a3b8",
                         fontWeight: 600,
                       }}
@@ -2079,48 +2050,37 @@ export default function QuizGamePage() {
                   padding: "0 16px",
                 }}
               >
-                {Array.from({ length: totalQuestions }).map(
-                  (_, i) => {
-                    const st = answers[i];
-                    let bg =
-                      "rgba(75,85,99,0.4)";
-                    let shadow = "none";
+                {Array.from({ length: totalQuestions }).map((_, i) => {
+                  const st = answers[i];
+                  let bg = "rgba(75,85,99,0.4)";
+                  let shadow = "none";
 
-                    if (i === currentIndex) {
-                      bg = "#a78bfa";
-                      shadow =
-                        "0 0 10px rgba(167,139,250,0.8)";
-                    } else if (st === "correct") {
-                      bg = "#22c55e";
-                      shadow =
-                        "0 0 8px rgba(34,197,94,0.6)";
-                    } else if (st === "wrong") {
-                      bg = "#ef4444";
-                      shadow =
-                        "0 0 8px rgba(239,68,68,0.6)";
-                    }
-
-                    return (
-                      <div
-                        key={i}
-                        style={{
-                          width:
-                            "clamp(6px, 1.5vw, 8px)",
-                          height:
-                            "clamp(6px, 1.5vw, 8px)",
-                          borderRadius: "50%",
-                          background: bg,
-                          boxShadow: shadow,
-                          transition: "all 0.3s ease",
-                          transform:
-                            i === currentIndex
-                              ? "scale(1.3)"
-                              : "scale(1)",
-                        }}
-                      />
-                    );
+                  if (i === currentIndex) {
+                    bg = "#a78bfa";
+                    shadow = "0 0 10px rgba(167,139,250,0.8)";
+                  } else if (st === "correct") {
+                    bg = "#22c55e";
+                    shadow = "0 0 8px rgba(34,197,94,0.6)";
+                  } else if (st === "wrong") {
+                    bg = "#ef4444";
+                    shadow = "0 0 8px rgba(239,68,68,0.6)";
                   }
-                )}
+
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        width: "clamp(6px, 1.5vw, 8px)",
+                        height: "clamp(6px, 1.5vw, 8px)",
+                        borderRadius: "50%",
+                        background: bg,
+                        boxShadow: shadow,
+                        transition: "all 0.3s ease",
+                        transform: i === currentIndex ? "scale(1.3)" : "scale(1)",
+                      }}
+                    />
+                  );
+                })}
               </div>
             </>
           )}
@@ -2164,8 +2124,7 @@ export default function QuizGamePage() {
                     borderRadius: "50%",
                     background:
                       "linear-gradient(135deg, rgba(239,68,68,0.2), rgba(220,38,38,0.1))",
-                    border:
-                      "2px solid rgba(239,68,68,0.5)",
+                    border: "2px solid rgba(239,68,68,0.5)",
                     marginBottom: "20px",
                   }}
                 >
@@ -2174,8 +2133,7 @@ export default function QuizGamePage() {
                       width: "32px",
                       height: "32px",
                       color: "#ef4444",
-                      filter:
-                        "drop-shadow(0 0 10px #ef4444)",
+                      filter: "drop-shadow(0 0 10px #ef4444)",
                     }}
                   />
                 </div>
@@ -2199,46 +2157,34 @@ export default function QuizGamePage() {
                     lineHeight: 1.6,
                   }}
                 >
-                  Your current progress will be saved and
-                  you'll see your final score.
+                  Your current progress will be saved and you'll see your final score.
                 </p>
 
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "12px",
-                  }}
-                >
+                <div style={{ display: "flex", gap: "12px" }}>
                   <button
                     onClick={handleExitConfirmNo}
                     style={{
                       flex: 1,
                       padding: "14px 20px",
                       borderRadius: "999px",
-                      border:
-                        "2px solid rgba(139,92,246,0.6)",
+                      border: "2px solid rgba(139,92,246,0.6)",
                       background:
                         "linear-gradient(135deg, rgba(124,58,237,0.3), rgba(79,70,229,0.2))",
                       color: "#f8fafc",
                       fontWeight: 800,
-                      fontSize:
-                        "clamp(13px, 2.8vw, 15px)",
+                      fontSize: "clamp(13px, 2.8vw, 15px)",
                       cursor: "pointer",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
                       transition: "all 0.3s ease",
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.transform =
-                        "translateY(-2px)";
-                      e.currentTarget.style.boxShadow =
-                        "0 0 25px rgba(139,92,246,0.6)";
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.boxShadow = "0 0 25px rgba(139,92,246,0.6)";
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.transform =
-                        "translateY(0)";
-                      e.currentTarget.style.boxShadow =
-                        "none";
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "none";
                     }}
                   >
                     Continue Quiz
@@ -2250,30 +2196,24 @@ export default function QuizGamePage() {
                       flex: 1,
                       padding: "14px 20px",
                       borderRadius: "999px",
-                      border:
-                        "2px solid rgba(239,68,68,0.6)",
+                      border: "2px solid rgba(239,68,68,0.6)",
                       background:
                         "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))",
                       color: "#f8fafc",
                       fontWeight: 800,
-                      fontSize:
-                        "clamp(13px, 2.8vw, 15px)",
+                      fontSize: "clamp(13px, 2.8vw, 15px)",
                       cursor: "pointer",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
                       transition: "all 0.3s ease",
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.transform =
-                        "translateY(-2px)";
-                      e.currentTarget.style.boxShadow =
-                        "0 0 25px rgba(239,68,68,0.6)";
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.boxShadow = "0 0 25px rgba(239,68,68,0.6)";
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.transform =
-                        "translateY(0)";
-                      e.currentTarget.style.boxShadow =
-                        "none";
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "none";
                     }}
                   >
                     Yes, Exit
