@@ -149,7 +149,7 @@ export default function LobbyPage() {
       if (data && data.length > 0) {
         const round = data[0];
         setCurrentRound(round);
-        setGlobalTimeLeft(round.time_until_start_seconds);
+        setGlobalTimeLeft(Math.max(0, Math.floor(round.time_until_start_seconds)));
         console.log("✅ Current round loaded:", round.round_id);
       }
     } catch (err) {
