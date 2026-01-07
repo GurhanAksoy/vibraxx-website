@@ -20,7 +20,7 @@ interface CurrentRound {
   round_number: number;
   scheduled_start: string;
   status: string;
-  time_until_start: number;
+  time_until_start_seconds: number;
 }
 
 interface LobbyPlayer {
@@ -149,7 +149,7 @@ export default function LobbyPage() {
       if (data && data.length > 0) {
         const round = data[0];
         setCurrentRound(round);
-        setGlobalTimeLeft(round.time_until_start);
+        setGlobalTimeLeft(round.time_until_start_seconds);
         console.log("✅ Current round loaded:", round.round_id);
       }
     } catch (err) {
@@ -221,51 +221,55 @@ export default function LobbyPage() {
 
   // ✅ === LOBBY SESSION TRACKING (ROUND DÜŞMEZ) ===
   useEffect(() => {
-    if (currentRound && user && !hasJoined) {
+    if (currentRound && user) {
       // Sadece lobby'de olduğunu kaydet (round hakkı düşmez!)
       console.log("✅ User in lobby, waiting for quiz start");
       supabase.rpc('upsert_user_session', { p_user_id: user.id });
       setHasJoined(true); // UI için flag
     }
-  }, [currentRound, user, hasJoined]);
+  }, [currentRound?.round_id, user?.id]);
 
   // === FETCH PLAYERS WHEN IN LOBBY ===
-  useEffect(() => {
-    if (!hasJoined || !currentRound) return;
+useEffect(() => {
+  if (!hasJoined || !currentRound) return;
 
-    const loadParticipants = async () => {
-      await Promise.all([fetchLobbyPlayers(), fetchTotalParticipants()]);
-    };
+  const loadParticipants = async () => {
+    await Promise.all([fetchLobbyPlayers(), fetchTotalParticipants()]);
+  };
 
-    loadParticipants();
+  loadParticipants();
 
-    // Polling: Katılımcıları her 5 saniyede güncelle
-    const playersInterval = setInterval(fetchLobbyPlayers, 5000);
-    const countInterval = setInterval(fetchTotalParticipants, 5000);
+  // Polling: Katılımcıları her 5 saniyede güncelle
+  fetchLobbyPlayers();
+  fetchTotalParticipants();
+  const playersInterval = setInterval(fetchLobbyPlayers, 5000);
+  const countInterval = setInterval(fetchTotalParticipants, 5000);
 
-    return () => {
-      clearInterval(playersInterval);
-      clearInterval(countInterval);
-    };
-  }, [hasJoined, currentRound, fetchLobbyPlayers, fetchTotalParticipants]);
+  return () => {
+    clearInterval(playersInterval);
+    clearInterval(countInterval);
+  };
+}, [hasJoined, currentRound?.round_id, fetchLobbyPlayers, fetchTotalParticipants]);
 
   // === LOCAL COUNTDOWN ===
   useEffect(() => {
-    if (globalTimeLeft === null || globalTimeLeft <= 0) return;
+  if (globalTimeLeft === null) return;
 
-    const timer = setInterval(() => {
-      setGlobalTimeLeft((prev) => {
-        if (prev === null || prev <= 0) return 0;
-        return prev - 1;
-      });
-    }, 1000);
+  if (globalTimeLeft <= 0) {
+    setGlobalTimeLeft(0);
+    return;
+  }
 
-    return () => clearInterval(timer);
-  }, [globalTimeLeft]);
+  const timer = setInterval(() => {
+    setGlobalTimeLeft(prev => (prev && prev > 0 ? prev - 1 : 0));
+  }, 1000);
+
+  return () => clearInterval(timer);
+}, [globalTimeLeft]);
 
   // === AUTO START WHEN COUNTDOWN ENDS ===
   useEffect(() => {
-    if (globalTimeLeft === 0 && !isRedirecting && hasJoined) {
+    if (globalTimeLeft !== null && globalTimeLeft <= 0 && !isRedirecting && hasJoined) {
       handleStartGame();
     }
   }, [globalTimeLeft, isRedirecting, hasJoined]);
