@@ -55,6 +55,9 @@ export default function LobbyPage() {
   const alarmRef = useRef<HTMLAudioElement | null>(null);
   const countdownBeepRef = useRef<HTMLAudioElement | null>(null);
 
+  // 👇 round değişimini yakalamak için
+  const lastRoundIdRef = useRef<string | null>(null);
+
   // === AUDIO INITIALIZATION ===
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -136,51 +139,65 @@ export default function LobbyPage() {
     checkAuth();
   }, [router]);
 
- // === LOAD CURRENT ROUND ===
-const loadCurrentRound = useCallback(async () => {
-  try {
-    const { data, error } = await supabase.rpc("get_current_live_round");
+  // === LOAD CURRENT ROUND ===
+  const loadCurrentRound = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.rpc("get_current_live_round");
 
-    if (error) {
-      console.error("❌ Load current round error:", error);
-      return;
+      if (error) {
+        console.error("❌ Load current round error:", error);
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        console.log("ℹ️ No live round found");
+        setCurrentRound(null);
+        setGlobalTimeLeft(null);
+        // round yoksa join flag'i de temizle ki yeni round gelince tekrar session yazsın
+        setHasJoined(false);
+        lastRoundIdRef.current = null;
+        return;
+      }
+
+      const round = data[0] as CurrentRound;
+
+      // ✅ Round değiştiyse: lobby state reset (sayaç 0'da takılma bug'ı buradan geliyordu)
+      if (lastRoundIdRef.current && lastRoundIdRef.current !== round.round_id) {
+        setHasJoined(false);
+        setShowWarning(false);
+        setIsRedirecting(false);
+        setPlayers([]);
+        setTotalPlayers(0);
+      }
+      lastRoundIdRef.current = round.round_id;
+
+      const rawSeconds =
+        (round as any).time_until_start_seconds ??
+        (round as any).time_until_start ??
+        0;
+
+      const seconds = Number(rawSeconds);
+
+      if (!Number.isFinite(seconds)) {
+        console.warn("⚠️ Invalid time_until_start:", rawSeconds);
+        setGlobalTimeLeft(null);
+      } else {
+        // server'dan gelen saniyeyi her poll'de clamp'le
+        setGlobalTimeLeft(Math.max(0, Math.floor(seconds)));
+      }
+
+      setCurrentRound(round);
+
+      console.log("✅ Current round loaded:", {
+        id: round.round_id,
+        status: round.status,
+        scheduled_start: round.scheduled_start,
+        seconds,
+      });
+    } catch (err) {
+      console.error("❌ loadCurrentRound exception:", err);
     }
-
-    if (!data || data.length === 0) {
-      console.log("ℹ️ No live round found");
-      setCurrentRound(null);
-      setGlobalTimeLeft(null);
-      return;
-    }
-
-    const round = data[0];
-
-    const rawSeconds =
-      round.time_until_start_seconds ??
-      round.time_until_start ??
-      0;
-
-    const seconds = Number(rawSeconds);
-
-    if (!Number.isFinite(seconds)) {
-      console.warn("⚠️ Invalid time_until_start:", rawSeconds);
-      setGlobalTimeLeft(null);
-    } else {
-      setGlobalTimeLeft(Math.max(0, Math.floor(seconds)));
-    }
-
-    setCurrentRound(round);
-
-    console.log("✅ Current round loaded:", {
-      id: round.round_id,
-      status: round.status,
-      scheduled_start: round.scheduled_start,
-      seconds,
-    });
-  } catch (err) {
-    console.error("❌ loadCurrentRound exception:", err);
-  }
-}, []);
+  }, []);
 
   // === FETCH LOBBY PLAYERS ===
   const fetchLobbyPlayers = useCallback(async () => {
@@ -202,7 +219,7 @@ const loadCurrentRound = useCallback(async () => {
     } catch (err) {
       console.error("Fetch lobby players error:", err);
     }
-  }, [currentRound]);
+  }, [currentRound?.round_id]);
 
   // === FETCH TOTAL PARTICIPANTS ===
   const fetchTotalParticipants = useCallback(async () => {
@@ -224,17 +241,13 @@ const loadCurrentRound = useCallback(async () => {
     } catch (err) {
       console.error("Fetch total participants error:", err);
     }
-  }, [currentRound]);
+  }, [currentRound?.round_id]);
 
   // === INITIAL DATA LOAD ===
   useEffect(() => {
     if (!user || isLoading) return;
 
-    const loadLobbyData = async () => {
-      await loadCurrentRound();
-    };
-
-    loadLobbyData();
+    loadCurrentRound();
 
     // Polling: Round'u her 3 saniyede kontrol et
     const roundInterval = setInterval(loadCurrentRound, 3000);
@@ -246,64 +259,64 @@ const loadCurrentRound = useCallback(async () => {
 
   // ✅ === LOBBY SESSION TRACKING (ROUND DÜŞMEZ) ===
   useEffect(() => {
-    if (currentRound && user) {
-      // Sadece lobby'de olduğunu kaydet (round hakkı düşmez!)
+    if (currentRound && user && !hasJoined) {
       console.log("✅ User in lobby, waiting for quiz start");
-      supabase.rpc('upsert_user_session', { p_user_id: user.id });
-      setHasJoined(true); // UI için flag
+      supabase.rpc("upsert_user_session", { p_user_id: user.id });
+      setHasJoined(true);
     }
-  }, [currentRound?.round_id, user?.id]);
+  }, [currentRound?.round_id, user?.id, hasJoined]);
 
   // === FETCH PLAYERS WHEN IN LOBBY ===
-useEffect(() => {
-  if (!hasJoined || !currentRound) return;
+  useEffect(() => {
+    if (!hasJoined || !currentRound) return;
 
-  const loadParticipants = async () => {
-    await Promise.all([fetchLobbyPlayers(), fetchTotalParticipants()]);
-  };
+    const loadParticipants = async () => {
+      await Promise.all([fetchLobbyPlayers(), fetchTotalParticipants()]);
+    };
 
-  loadParticipants();
+    loadParticipants();
 
-  // Polling: Katılımcıları her 5 saniyede güncelle
-  fetchLobbyPlayers();
-  fetchTotalParticipants();
-  const playersInterval = setInterval(fetchLobbyPlayers, 5000);
-  const countInterval = setInterval(fetchTotalParticipants, 5000);
+    // Polling: Katılımcıları her 5 saniyede güncelle
+    const playersInterval = setInterval(fetchLobbyPlayers, 5000);
+    const countInterval = setInterval(fetchTotalParticipants, 5000);
 
-  return () => {
-    clearInterval(playersInterval);
-    clearInterval(countInterval);
-  };
-}, [hasJoined, currentRound?.round_id, fetchLobbyPlayers, fetchTotalParticipants]);
+    return () => {
+      clearInterval(playersInterval);
+      clearInterval(countInterval);
+    };
+  }, [hasJoined, currentRound?.round_id, fetchLobbyPlayers, fetchTotalParticipants]);
 
   // === LOCAL COUNTDOWN ===
   useEffect(() => {
-  if (globalTimeLeft === null) return;
+    if (globalTimeLeft === null) return;
+    if (globalTimeLeft <= 0) {
+      setGlobalTimeLeft(0);
+      return;
+    }
 
-  if (globalTimeLeft <= 0) {
-    setGlobalTimeLeft(0);
-    return;
-  }
+    const timer = setInterval(() => {
+      setGlobalTimeLeft((prev) => {
+        if (prev === null) return null;
+        return prev > 0 ? prev - 1 : 0;
+      });
+    }, 1000);
 
-  const timer = setInterval(() => {
-    setGlobalTimeLeft(prev => (prev && prev > 0 ? prev - 1 : 0));
-  }, 1000);
-
-  return () => clearInterval(timer);
-}, [globalTimeLeft]);
+    return () => clearInterval(timer);
+  }, [globalTimeLeft]);
 
   // === AUTO START WHEN COUNTDOWN ENDS ===
   useEffect(() => {
-  if (
-    globalTimeLeft !== null &&
-    globalTimeLeft <= 0 &&
-    currentRound?.status === "scheduled" &&
-    !isRedirecting &&
-    hasJoined
-  ) {
-    handleStartGame();
-  }
-}, [globalTimeLeft, currentRound, isRedirecting, hasJoined]);
+    if (
+      globalTimeLeft !== null &&
+      globalTimeLeft <= 0 &&
+      currentRound?.status === "scheduled" &&
+      !isRedirecting &&
+      hasJoined
+    ) {
+      handleStartGame();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globalTimeLeft, currentRound?.round_id, currentRound?.status, isRedirecting, hasJoined]);
 
   // === WARNING & SOUND EFFECTS ===
   useEffect(() => {
@@ -335,8 +348,7 @@ useEffect(() => {
     setIsRedirecting(true);
 
     console.log("🚀 Quiz starting, joining round now...");
-    
-    // ✅ Quiz başlarken round join (BURADA ROUND DÜŞER!)
+
     if (currentRound && user) {
       try {
         const { data, error } = await supabase.rpc("join_round", {
@@ -347,28 +359,28 @@ useEffect(() => {
 
         if (error) {
           console.error("❌ Join round error:", error);
-          if (error.message?.includes("no_credits")) {
+          if ((error as any).message?.includes("no_credits")) {
             router.push("/buy");
             return;
           }
         }
 
         const result = data as { success: boolean; error?: string };
-        
-        if (!result.success) {
-          console.error("❌ Join failed:", result.error);
-          if (result.error === "no_credits") {
+
+        if (!result?.success) {
+          console.error("❌ Join failed:", result?.error);
+          if (result?.error === "no_credits") {
             router.push("/buy");
             return;
           }
         }
-        
+
         console.log("✅ Round joined successfully, credits deducted");
       } catch (err) {
         console.error("Join round error:", err);
       }
     }
-    
+
     router.push("/quiz");
   };
 
@@ -735,13 +747,9 @@ useEffect(() => {
                 }}
               >
                 {isPlaying ? (
-                  <Volume2
-                    style={{ width: 20, height: 20, color: "#a78bfa" }}
-                  />
+                  <Volume2 style={{ width: 20, height: 20, color: "#a78bfa" }} />
                 ) : (
-                  <VolumeX
-                    style={{ width: 20, height: 20, color: "#6b7280" }}
-                  />
+                  <VolumeX style={{ width: 20, height: 20, color: "#6b7280" }} />
                 )}
               </button>
             </div>
@@ -819,8 +827,7 @@ useEffect(() => {
                   style={{
                     fontSize: "clamp(16px, 3.5vw, 22px)",
                     fontWeight: 900,
-                    backgroundImage:
-                      "linear-gradient(135deg, #a78bfa, #f0abfc)",
+                    backgroundImage: "linear-gradient(135deg, #a78bfa, #f0abfc)",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                     backgroundClip: "text",
@@ -907,8 +914,7 @@ useEffect(() => {
                   const container = img.parentElement as HTMLDivElement;
                   if (container) {
                     container.style.display = "none";
-                    const placeholder =
-                      container.nextElementSibling as HTMLDivElement;
+                    const placeholder = container.nextElementSibling as HTMLDivElement;
                     if (placeholder) placeholder.style.display = "block";
                   }
                 }}
@@ -936,9 +942,7 @@ useEffect(() => {
                   marginBottom: "10px",
                 }}
               >
-                <Sparkles
-                  style={{ width: 12, height: 12, color: "#fbbf24" }}
-                />
+                <Sparkles style={{ width: 12, height: 12, color: "#fbbf24" }} />
                 <span
                   style={{
                     fontSize: "clamp(9px, 1.8vw, 11px)",
@@ -956,8 +960,7 @@ useEffect(() => {
                 style={{
                   fontSize: "clamp(18px, 4.5vw, 32px)",
                   fontWeight: 900,
-                  backgroundImage:
-                    "linear-gradient(135deg, #fbbf24, #f59e0b)",
+                  backgroundImage: "linear-gradient(135deg, #fbbf24, #f59e0b)",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
                   backgroundClip: "text",
@@ -1003,8 +1006,7 @@ useEffect(() => {
                       color: "#cbd5e1",
                     }}
                   >
-                    📊{" "}
-                    <strong style={{ color: "#fbbf24" }}>12K+</strong> Players
+                    📊 <strong style={{ color: "#fbbf24" }}>12K+</strong> Players
                   </span>
                 </div>
                 <div
@@ -1021,8 +1023,7 @@ useEffect(() => {
                       color: "#cbd5e1",
                     }}
                   >
-                    🎯{" "}
-                    <strong style={{ color: "#fbbf24" }}>Premium</strong> Spot
+                    🎯 <strong style={{ color: "#fbbf24" }}>Premium</strong> Spot
                   </span>
                 </div>
                 <div
@@ -1039,8 +1040,7 @@ useEffect(() => {
                       color: "#cbd5e1",
                     }}
                   >
-                    💰{" "}
-                    <strong style={{ color: "#fbbf24" }}>High</strong> ROI
+                    💰 <strong style={{ color: "#fbbf24" }}>High</strong> ROI
                   </span>
                 </div>
               </div>
@@ -1277,8 +1277,7 @@ useEffect(() => {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns:
-                    "repeat(auto-fit, minmax(150px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
                   gap: "clamp(14px, 3.5vw, 20px)",
                 }}
               >
@@ -1416,8 +1415,8 @@ useEffect(() => {
                     fontWeight: 600,
                   }}
                 >
-                  💡 <strong style={{ color: "white" }}>Pro Tip:</strong> In a
-                  tie, the fastest correct responder wins the monthly prize!
+                  💡 <strong style={{ color: "white" }}>Pro Tip:</strong> In a tie, the
+                  fastest correct responder wins the monthly prize!
                 </div>
               </div>
             </div>
@@ -1505,18 +1504,14 @@ useEffect(() => {
                         boxShadow: "0 0 15px rgba(0, 0, 0, 0.2)",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background =
-                          "rgba(139, 92, 246, 0.1)";
+                        e.currentTarget.style.background = "rgba(139, 92, 246, 0.1)";
                         e.currentTarget.style.transform = "translateX(8px)";
-                        e.currentTarget.style.borderColor =
-                          "rgba(139, 92, 246, 0.4)";
+                        e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.4)";
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.background =
-                          "rgba(255, 255, 255, 0.04)";
+                        e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)";
                         e.currentTarget.style.transform = "translateX(0)";
-                        e.currentTarget.style.borderColor =
-                          "rgba(255, 255, 255, 0.12)";
+                        e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)";
                       }}
                     >
                       <div
@@ -1574,13 +1569,7 @@ useEffect(() => {
                                 boxShadow: "0 0 10px rgba(239, 68, 68, 0.3)",
                               }}
                             >
-                              <Flame
-                                style={{
-                                  width: 13,
-                                  height: 13,
-                                  color: "#fca5a5",
-                                }}
-                              />
+                              <Flame style={{ width: 13, height: 13, color: "#fca5a5" }} />
                               <span
                                 style={{
                                   fontSize: "11px",
