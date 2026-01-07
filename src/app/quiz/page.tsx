@@ -71,8 +71,7 @@ export default function QuizGamePage() {
   // 🔥 NEW: Live sync state variables
   const [phase, setPhase] = useState<string>("READY");
   const [roundId, setRoundId] = useState<string | null>(null);
-  const [questionStart, setQuestionStart] = useState<string | null>(null);
-
+  
   // Stats only once guard
   const statsSavedRef = useRef(false);
   
@@ -87,7 +86,7 @@ export default function QuizGamePage() {
   const whooshSoundRef = useRef<HTMLAudioElement | null>(null);
   const tickSoundRef = useRef<HTMLAudioElement | null>(null);
 
-  const currentQ = questions[currentIndex];
+  const currentQ = questions[currentIndex] ?? null;
 
   // 🔐 === SECURITY CHECK - MUST RUN FIRST ===
   useEffect(() => {
@@ -128,34 +127,33 @@ export default function QuizGamePage() {
     const fetchLiveQuestions = async () => {
       try {
         // 1️⃣ Get current live round using RPC
-        const { data: roundData, error: roundError } = await supabase.rpc(
-          "get_current_live_round"
-        );
+      const { data: roundData, error: roundError } = await supabase.rpc("get_current_live_round");
 
-        if (roundError || !roundData) {
-          console.error("❌ No active round found:", roundError);
-          setIsLoading(false);
-          return;
-        }
+const roundRow = Array.isArray(roundData) ? roundData[0] : roundData ?? null;
 
-        console.log("✅ Active round found:", roundData.round_id);
-        setRoundId(roundData.round_id);
+if (roundError || !roundRow || !["active", "scheduled"].includes(roundRow.status)) {
+  console.error("❌ No active round found:", roundError, roundData);
+  setIsLoading(false);
+  return;
+}
+
+setRoundId(roundRow.round_id);
 
         // 2️⃣ Get round details with questions
         const { data: round, error: roundFetchError } = await supabase
-          .from("rounds")
-          .select("questions_selected, scheduled_start, status")
-          .eq("id", roundData.round_id)
-          .single();
+  .from("rounds")
+  .select("questions_selected, scheduled_start, status")
+  .eq("id", roundRow.round_id)
+  .maybeSingle();
 
-        if (roundFetchError || !round || !round.questions_selected) {
-          console.error("❌ Error fetching round questions:", roundFetchError);
-          setIsLoading(false);
-          return;
-        }
+if (roundFetchError || !Array.isArray(round?.questions_selected)) {
+  console.error("❌ Error fetching round questions:", roundFetchError, round);
+  setIsLoading(false);
+  return;
+}
 
-        const questionIds = round.questions_selected as number[];
-        console.log(`✅ Round has ${questionIds.length} questions`);
+const questionIds = round.questions_selected as number[];
+console.log(`✅ Round has ${questionIds.length} questions`);
 
         // 3️⃣ Fetch question details using RPC
         console.log("🔍 Fetching question details for IDs:", questionIds);
@@ -163,23 +161,24 @@ export default function QuizGamePage() {
         console.log("🔍 First 5 IDs:", questionIds.slice(0, 5));
         
         const { data: questionData, error: questionsError } = await supabase.rpc(
-          "get_question_details",
-          { p_question_ids: questionIds }
-        );
+  "get_question_details",
+  { p_question_ids: questionIds }
+);
 
-        console.log("📊 RPC Response - Data:", questionData);
-        console.log("📊 RPC Response - Error:", questionsError);
-        console.log("📊 Data is array?", Array.isArray(questionData));
-        console.log("📊 Data length:", questionData?.length);
+if (questionsError) {
+  console.error("❌ Error fetching question details:", questionsError);
+  setIsLoading(false);
+  return;
+}
 
-        if (questionsError || !questionData) {
-          console.error("❌ Error fetching question details:", questionsError);
-          console.error("❌ QuestionData:", questionData);
-          setIsLoading(false);
-          return;
-        }
+if (!Array.isArray(questionData) || questionData.length !== questionIds.length) {
+  console.error("❌ Question list mismatch:", questionData, questionIds);
+  setIsLoading(false);
+  return;
+}
 
-        console.log(`✅ Loaded ${questionData.length} question details`);
+console.log(`✅ Loaded ${questionData.length} question details`);
+
 
         // 4️⃣ Format questions (same as before)
         const formattedQuestions: Question[] = questionData.map((item: any) => ({
@@ -204,6 +203,8 @@ export default function QuizGamePage() {
         // Set phase to QUESTION (since we don't have realtime sync)
         setPhase("QUESTION");
         setCurrentIndex(0);
+    setTimeLeft(QUESTION_DURATION);
+    timeoutTriggeredRef.current = false;
       } catch (err) {
         console.error("❌ Error in fetchLiveQuestions:", err);
       } finally {
@@ -346,10 +347,10 @@ export default function QuizGamePage() {
           playSound(whooshSoundRef.current);
           setCurrentIndex(currentIndex + 1);
           setTimeLeft(QUESTION_DURATION);
+          timeoutTriggeredRef.current = false;
           setSelectedAnswer(null);
           setIsAnswerLocked(false);
-          setShowExplanation(false);
-          timeoutTriggeredRef.current = false;
+          setShowExplanation(false);         
         } else {
           // Quiz finished - submit results
           submitRoundResult();
@@ -597,7 +598,7 @@ export default function QuizGamePage() {
   }
 
   // === NO QUESTIONS FALLBACK ===
-  if (!currentQ) {
+ if (!isLoading && questions.length === 0) {
     return (
       <div
         style={{
@@ -1477,7 +1478,7 @@ export default function QuizGamePage() {
                     score: correctCount * 2,
                     correct: correctCount,
                     wrong: wrongCount,
-                    accuracy: Math.round((correctCount / TOTAL_QUESTIONS) * 100),
+                    accuracy: Math.round((correctCount / totalQuestions) * 100),
                     userName: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Anonymous',
                     userCountry: user?.user_metadata?.country || '🌍',
                     userId: user?.id,
