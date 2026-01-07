@@ -651,20 +651,18 @@ const loadGlobalRoundState = useCallback(async () => {
     }
 
     if (intent === "live") {
-      // ensure rounds are fresh
-      fetchUserRounds().finally(() => {
-        if (!mountedRef.current) return;
-        // NOTE: fetchUserRounds updates state async; use current state after a short micro-delay
-        setTimeout(() => {
-          if (!mountedRef.current) return;
-          if (userRounds <= 0) setShowNoRoundsModal(true);
-          else router.push("/lobby");
-        }, 0);
-      });
-    } else {
-      router.push("/free");
-    }
-  }, [user, router, fetchUserRounds, userRounds]);
+  getFreshUserRounds().then((remaining) => {
+    if (!mountedRef.current) return;
+
+    if (remaining <= 0) setShowNoRoundsModal(true);
+    else router.push("/lobby");
+  });
+} else {
+  router.push("/free");
+}
+
+  }, [user, router, getFreshUserRounds]);
+
 
   // Music Toggle
   const toggleMusic = useCallback(() => {
@@ -706,21 +704,21 @@ const loadGlobalRoundState = useCallback(async () => {
   }, []);
 
   // Age Verification Handler
-  const handleAgeVerification = useCallback(() => {
-    localStorage.setItem("vibraxx_age_verified", "true");
-    setShowAgeModal(false);
+  const handleAgeVerification = useCallback(async () => {
+  localStorage.setItem("vibraxx_age_verified", "true");
+  setShowAgeModal(false);
 
-    if (pendingAction === "live") {
-      if (userRounds <= 0) {
-        setShowNoRoundsModal(true);
-      } else {
-        router.push("/lobby");
-      }
-    } else if (pendingAction === "free") {
-      router.push("/free");
-    }
-    setPendingAction(null);
-  }, [pendingAction, userRounds, router]);
+  if (pendingAction === "live") {
+    const remaining = await getFreshUserRounds();
+
+    if (remaining <= 0) setShowNoRoundsModal(true);
+    else router.push("/lobby");
+  } else if (pendingAction === "free") {
+    router.push("/free");
+  }
+
+  setPendingAction(null);
+}, [pendingAction, getFreshUserRounds, router]);
 
   // Check if user is verified 18+
   const checkAgeVerification = useCallback(() => {
@@ -729,26 +727,27 @@ const loadGlobalRoundState = useCallback(async () => {
 
   // Start Live Quiz
   const handleStartLiveQuiz = useCallback(async () => {
-    if (!user) {
-      // resume after login
-      sessionStorage.setItem("postLoginIntent", "live");
-      await handleSignIn();
-      return;
-    }
+  if (!user) {
+    sessionStorage.setItem("postLoginIntent", "live");
+    await handleSignIn();
+    return;
+  }
 
-    if (!checkAgeVerification()) {
-      setPendingAction("live");
-      setShowAgeModal(true);
-      return;
-    }
+  if (!checkAgeVerification()) {
+    setPendingAction("live");
+    setShowAgeModal(true);
+    return;
+  }
 
-    if (userRounds <= 0) {
-      setShowNoRoundsModal(true);
-      return;
-    }
+  const remaining = await getFreshUserRounds();
 
-    router.push("/lobby");
-  }, [user, handleSignIn, checkAgeVerification, userRounds, router]);
+  if (remaining <= 0) {
+    setShowNoRoundsModal(true);
+    return;
+  }
+
+  router.push("/lobby");
+}, [user, handleSignIn, checkAgeVerification, getFreshUserRounds, router]);
 
   // Start Free Quiz
   const handleStartFreeQuiz = useCallback(async () => {
