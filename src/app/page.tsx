@@ -1,6 +1,6 @@
-﻿"use client";
+﻿ "use client";
 
-import { useState, useEffect, useCallback, useMemo, memo } from "react";
+import { useState, useEffect, useCallback, useMemo, memo, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -40,7 +40,6 @@ const ChampionCard = memo(({ champion }: any) => {
   const Icon = champion.icon;
   return (
     <div className="vx-champ-card">
-      {/* Premium icon container with subtle accent */}
       <div
         style={{
           width: 64,
@@ -56,8 +55,7 @@ const ChampionCard = memo(({ champion }: any) => {
       >
         <Icon style={{ width: 28, height: 28, color: champion.color }} />
       </div>
-      
-      {/* Period label */}
+
       <div
         style={{
           fontSize: 10,
@@ -70,24 +68,26 @@ const ChampionCard = memo(({ champion }: any) => {
       >
         {champion.period} Champion
       </div>
-      
-      {/* Name - white */}
-      <div style={{ 
-        fontSize: 18, 
-        fontWeight: 700, 
-        marginBottom: 8,
-        color: "#ffffff",
-      }}>
+
+      <div
+        style={{
+          fontSize: 18,
+          fontWeight: 700,
+          marginBottom: 8,
+          color: "#ffffff",
+        }}
+      >
         {champion.name}
       </div>
-      
-      {/* Score - colored accent */}
-      <div style={{ 
-        fontSize: 24, 
-        fontWeight: 800, 
-        color: champion.color,
-        lineHeight: 1,
-      }}>
+
+      <div
+        style={{
+          fontSize: 24,
+          fontWeight: 800,
+          color: champion.color,
+          lineHeight: 1,
+        }}
+      >
         {champion.score.toLocaleString()} pts
       </div>
     </div>
@@ -272,7 +272,8 @@ const NoRoundsModal = memo(({ onBuyRounds, onCancel }: any) => (
           No Rounds Available
         </h3>
         <p style={{ fontSize: 15, color: "#94a3b8", lineHeight: 1.6 }}>
-          You need to purchase rounds to enter the Live Quiz lobby and compete for the <strong style={{ color: "#fbbf24" }}>£1000 monthly prize</strong>!
+          You need to purchase rounds to enter the Live Quiz lobby and compete for the{" "}
+          <strong style={{ color: "#fbbf24" }}>£1000 monthly prize</strong>!
         </p>
       </div>
 
@@ -348,20 +349,25 @@ NoRoundsModal.displayName = "NoRoundsModal";
 
 export default function HomePage() {
   const router = useRouter();
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [globalTimeLeft, setGlobalTimeLeft] = useState<number | null>(null);
   const [activePlayers, setActivePlayers] = useState(600);
   const [user, setUser] = useState<any>(null);
   const [champions, setChampions] = useState<any[]>([]);
-  const [stats, setStats] = useState({ totalQuestions: 2800000, roundsPerDay: 96 });
-  const [isLoading, setIsLoading] = useState(true);
+  const [stats] = useState({ totalQuestions: 2800000, roundsPerDay: 96 });
   const [showAgeModal, setShowAgeModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<"live" | "free" | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [userRounds, setUserRounds] = useState(0);
   const [showNoRoundsModal, setShowNoRoundsModal] = useState(false);
 
-  // ✅ FIXED: Fetch user's available rounds from user_rounds table
+  // Refs to prevent race conditions / stale closures
+  const countdownPauseUntilRef = useRef<number>(0);
+  const mountedRef = useRef<boolean>(false);
+  const resumeIntentHandledRef = useRef<boolean>(false);
+
+  // ✅ Fetch user's available rounds from user_rounds table
   const fetchUserRounds = useCallback(async () => {
     if (!user) {
       setUserRounds(0);
@@ -388,19 +394,21 @@ export default function HomePage() {
 
   // Initial Load with smooth fade in
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsInitialLoad(false);
-    }, 100);
-    return () => clearTimeout(timer);
+    mountedRef.current = true;
+    const timer = setTimeout(() => setIsInitialLoad(false), 100);
+    return () => {
+      mountedRef.current = false;
+      clearTimeout(timer);
+    };
   }, []);
 
   useEffect(() => {
-    // Smooth fade in for neon orbs after page loads
     if (!isInitialLoad) {
-      const orbs = document.querySelectorAll('.animate-float');
+      const orbs = document.querySelectorAll(".animate-float");
       orbs.forEach((orb, index) => {
         setTimeout(() => {
-          (orb as HTMLElement).style.opacity = index === 0 ? '0.28' : '0.22';
+          if (!mountedRef.current) return;
+          (orb as HTMLElement).style.opacity = index === 0 ? "0.28" : "0.22";
         }, 300 + index * 200);
       });
     }
@@ -408,26 +416,22 @@ export default function HomePage() {
 
   // Fetch user rounds when user changes
   useEffect(() => {
-    if (user) {
-      fetchUserRounds();
-    }
+    if (user) fetchUserRounds();
   }, [user, fetchUserRounds]);
 
   // Real-time Active Players with Dynamic Variation
   const fetchActivePlayers = useCallback(async () => {
     try {
       const { count, error } = await supabase
-  .from("active_sessions")
-  .select("*", { count: "exact", head: true });
+        .from("active_sessions")
+        .select("*", { count: "exact", head: true });
 
-if (!error && count !== null) {
-  const realCount = count || 0;
-        // Base: 600 + real count + random variation (-50 to +150)
+      if (!error && count !== null) {
+        const realCount = count || 0;
         const variation = Math.floor(Math.random() * 200) - 50;
         const finalCount = Math.max(600, 600 + realCount + variation);
         setActivePlayers(finalCount);
       } else {
-        // If Supabase error, generate dynamic number
         const variation = Math.floor(Math.random() * 200) - 50;
         setActivePlayers(Math.max(600, 600 + variation));
       }
@@ -438,7 +442,38 @@ if (!error && count !== null) {
     }
   }, []);
 
-  // Fetch Champions from Supabase (Optimized with proper error handling)
+  // Default Champions (fallback)
+  const getDefaultChampions = useCallback(
+    () => [
+      {
+        period: "Daily",
+        name: "TBA",
+        score: 0,
+        gradient: "linear-gradient(to bottom right, #eab308, #f97316)",
+        color: "#facc15",
+        icon: Crown,
+      },
+      {
+        period: "Weekly",
+        name: "TBA",
+        score: 0,
+        gradient: "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
+        color: "#c084fc",
+        icon: Trophy,
+      },
+      {
+        period: "Monthly",
+        name: "TBA",
+        score: 0,
+        gradient: "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
+        color: "#22d3ee",
+        icon: Sparkles,
+      },
+    ],
+    []
+  );
+
+  // Fetch Champions from Supabase
   const fetchChampions = useCallback(async () => {
     try {
       const periods = ["daily", "weekly", "monthly"];
@@ -447,25 +482,22 @@ if (!error && count !== null) {
           try {
             const { data, error } = await supabase
               .from("leaderboard")
-              .select(`
+              .select(
+                `
                 user_id,
                 score,
                 users:user_id (
                   full_name,
                   avatar_url
                 )
-              `)
+              `
+              )
               .eq("period", period)
               .order("score", { ascending: false })
               .limit(1)
               .single();
 
-            if (error) {
-              console.warn(`No ${period} champion data:`, error.message);
-              return null;
-            }
-
-            if (!data) return null;
+            if (error || !data) return null;
 
             const icons = [Crown, Trophy, Sparkles];
             const gradients = [
@@ -475,7 +507,6 @@ if (!error && count !== null) {
             ];
             const colors = ["#facc15", "#c084fc", "#22d3ee"];
 
-            // Safely access nested user data
             const userData = data.users as any;
             const userName = userData?.full_name || "Anonymous Player";
 
@@ -494,41 +525,13 @@ if (!error && count !== null) {
         })
       );
 
-      const validChampions = championsData.filter((c) => c !== null);
+      const validChampions = championsData.filter(Boolean) as any[];
       setChampions(validChampions.length > 0 ? validChampions : getDefaultChampions());
     } catch (err) {
       console.error("Champions fetch error:", err);
       setChampions(getDefaultChampions());
     }
-  }, []);
-
-  // Default Champions (removed fake names, will be populated from DB)
-  const getDefaultChampions = () => [
-    {
-      period: "Daily",
-      name: "TBA",
-      score: 0,
-      gradient: "linear-gradient(to bottom right, #eab308, #f97316)",
-      color: "#facc15",
-      icon: Crown,
-    },
-    {
-      period: "Weekly",
-      name: "TBA",
-      score: 0,
-      gradient: "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
-      color: "#c084fc",
-      icon: Trophy,
-    },
-    {
-      period: "Monthly",
-      name: "TBA",
-      score: 0,
-      gradient: "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
-      color: "#22d3ee",
-      icon: Sparkles,
-    },
-  ];
+  }, [getDefaultChampions]);
 
   // Load initial global round state from overlay table
   const loadGlobalRoundState = useCallback(async () => {
@@ -539,7 +542,8 @@ if (!error && count !== null) {
         .order("updated_at", { ascending: false })
         .limit(1)
         .single();
-      if (!error && data) {
+
+      if (!error && data && typeof data.time_left === "number") {
         setGlobalTimeLeft(data.time_left);
       }
     } catch (error) {
@@ -549,71 +553,72 @@ if (!error && count !== null) {
 
   // Initial Load
   useEffect(() => {
+    let cancelled = false;
+
     const loadData = async () => {
-      setIsLoading(false);
-      await Promise.all([
-        fetchActivePlayers(),
-        fetchChampions(),
-        loadGlobalRoundState(),
-      ]);
-    };
-    loadData();
-  }, [fetchActivePlayers, fetchChampions, loadGlobalRoundState]);
-
-  // ✅ FIX 2: Real-time Updates with countdown jump prevention
-useEffect(() => {
-  const playersInterval = setInterval(fetchActivePlayers, 8000);
-  
-  let pauseCountdown = false;
-  const countdownInterval = setInterval(() => {
-    if (!pauseCountdown) {
-      setGlobalTimeLeft((prev) =>
-        prev !== null && prev > 0 ? prev - 1 : prev
-      );
-    }
-  }, 1000);
-
-  // Realtime listener that pauses local countdown briefly
-  const channel = supabase
-    .channel("home-overlay-countdown")
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "overlay_round_state" },
-      (payload) => {
-        const newData = (payload.new || {}) as { time_left?: number | null };
-        if (typeof newData.time_left === "number") {
-          // Pause local countdown for 2 seconds when DB update arrives
-          pauseCountdown = true;
-          setGlobalTimeLeft(newData.time_left);
-          setTimeout(() => {
-            pauseCountdown = false;
-          }, 2000);
-        } else {
-          setGlobalTimeLeft(null);
+      try {
+        await Promise.all([fetchActivePlayers(), fetchChampions(), loadGlobalRoundState()]);
+      } finally {
+        if (!cancelled) {
+          // nothing else needed; keeping logic minimal to avoid UI changes
         }
       }
-    )
-    .subscribe();
+    };
 
-  return () => {
-    clearInterval(playersInterval);
-    clearInterval(countdownInterval);
-    supabase.removeChannel(channel);
-  };
-}, [fetchActivePlayers]);
+    loadData();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchActivePlayers, fetchChampions, loadGlobalRoundState]);
 
-  // Auth Listener
+  // ✅ Real-time Updates with countdown jump prevention (ref-based, no race)
+  useEffect(() => {
+    const playersInterval = setInterval(fetchActivePlayers, 8000);
+
+    const countdownInterval = setInterval(() => {
+      const now = Date.now();
+      if (now < countdownPauseUntilRef.current) return;
+
+      setGlobalTimeLeft((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
+    }, 1000);
+
+    const channel = supabase
+      .channel("home-overlay-countdown")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "overlay_round_state" },
+        (payload) => {
+          const newData = (payload.new || {}) as { time_left?: number | null };
+          if (typeof newData.time_left === "number") {
+            countdownPauseUntilRef.current = Date.now() + 2000;
+            setGlobalTimeLeft(newData.time_left);
+          } else if (newData.time_left === null) {
+            // only set null if explicitly null (avoid flicker on partial payloads)
+            setGlobalTimeLeft(null);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(playersInterval);
+      clearInterval(countdownInterval);
+      supabase.removeChannel(channel);
+    };
+  }, [fetchActivePlayers]);
+
+  // Auth Listener + Resume intent after login
   useEffect(() => {
     const loadUser = async () => {
       const { data } = await supabase.auth.getUser();
       setUser(data.user || null);
-      
-      // Check if user has pending buy rounds action after login
-      if (data.user && sessionStorage.getItem('pendingBuyRounds') === 'true') {
-        sessionStorage.removeItem('pendingBuyRounds');
-        // Small delay for auth to fully load
+
+      // pending buy rounds after login
+      if (data.user && sessionStorage.getItem("pendingBuyRounds") === "true") {
+        sessionStorage.removeItem("pendingBuyRounds");
         setTimeout(() => {
-          router.push('/buy');
+          if (!mountedRef.current) return;
+          router.push("/buy");
         }, 300);
       }
     };
@@ -621,21 +626,58 @@ useEffect(() => {
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null);
-      
-      // Also check on auth state change (login event)
-      if (event === 'SIGNED_IN' && session?.user && sessionStorage.getItem('pendingBuyRounds') === 'true') {
-        sessionStorage.removeItem('pendingBuyRounds');
-        // Small delay for auth to fully load
-        setTimeout(() => {
-          router.push('/buy');
-        }, 300);
+
+      if (event === "SIGNED_IN" && session?.user) {
+        if (sessionStorage.getItem("pendingBuyRounds") === "true") {
+          sessionStorage.removeItem("pendingBuyRounds");
+          setTimeout(() => {
+            if (!mountedRef.current) return;
+            router.push("/buy");
+          }, 300);
+        }
       }
     });
 
     return () => sub.subscription.unsubscribe();
   }, [router]);
 
-   // Music Toggle
+  // Resume "live/free" intent once user becomes available after redirect
+  useEffect(() => {
+    if (!user) return;
+    if (resumeIntentHandledRef.current) return;
+
+    const intent = sessionStorage.getItem("postLoginIntent");
+    if (intent !== "live" && intent !== "free") return;
+
+    resumeIntentHandledRef.current = true;
+    sessionStorage.removeItem("postLoginIntent");
+
+    // replicate original flow without changing UI: if age not verified -> open modal, else route.
+    const ageOk = localStorage.getItem("vibraxx_age_verified") === "true";
+
+    if (!ageOk) {
+      setPendingAction(intent);
+      setShowAgeModal(true);
+      return;
+    }
+
+    if (intent === "live") {
+      // ensure rounds are fresh
+      fetchUserRounds().finally(() => {
+        if (!mountedRef.current) return;
+        // NOTE: fetchUserRounds updates state async; use current state after a short micro-delay
+        setTimeout(() => {
+          if (!mountedRef.current) return;
+          if (userRounds <= 0) setShowNoRoundsModal(true);
+          else router.push("/lobby");
+        }, 0);
+      });
+    } else {
+      router.push("/free");
+    }
+  }, [user, router, fetchUserRounds, userRounds]);
+
+  // Music Toggle
   const toggleMusic = useCallback(() => {
     if (isPlaying) {
       stopMenuMusic();
@@ -659,31 +701,27 @@ useEffect(() => {
   }, []);
 
   // Auth Actions
-  const handleSignIn = useCallback(async (redirectPath?: string) => {
-    const redirectUrl = redirectPath 
-      ? `${window.location.origin}${redirectPath}`
-      : `${window.location.origin}/auth/callback`;
-      
+  const handleSignIn = useCallback(async () => {
+    const redirectUrl = `${window.location.origin}/auth/callback`;
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: redirectUrl,
-      },
+      options: { redirectTo: redirectUrl },
     });
   }, []);
 
   const handleSignOut = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
+    // allow future login intent to run again
+    resumeIntentHandledRef.current = false;
   }, []);
 
   // Age Verification Handler
   const handleAgeVerification = useCallback(() => {
     localStorage.setItem("vibraxx_age_verified", "true");
     setShowAgeModal(false);
-    
+
     if (pendingAction === "live") {
-      // Re-check rounds after age verification
       if (userRounds <= 0) {
         setShowNoRoundsModal(true);
       } else {
@@ -703,6 +741,8 @@ useEffect(() => {
   // Start Live Quiz
   const handleStartLiveQuiz = useCallback(async () => {
     if (!user) {
+      // resume after login
+      sessionStorage.setItem("postLoginIntent", "live");
       await handleSignIn();
       return;
     }
@@ -713,19 +753,18 @@ useEffect(() => {
       return;
     }
 
-    // Check if user has available rounds
     if (userRounds <= 0) {
       setShowNoRoundsModal(true);
       return;
     }
 
-    // User has rounds, go to lobby
     router.push("/lobby");
   }, [user, handleSignIn, checkAgeVerification, userRounds, router]);
 
   // Start Free Quiz
   const handleStartFreeQuiz = useCallback(async () => {
     if (!user) {
+      sessionStorage.setItem("postLoginIntent", "free");
       await handleSignIn();
       return;
     }
@@ -741,13 +780,14 @@ useEffect(() => {
 
   // Format Time
   const formatTime = useCallback((seconds: number | null) => {
-    if (seconds === null) return "--:--";
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
+    if (seconds === null || typeof seconds !== "number" || Number.isNaN(seconds)) return "--:--";
+    const safe = Math.max(0, seconds);
+    const m = Math.floor(safe / 60);
+    const s = safe % 60;
     return `${m}:${s.toString().padStart(2, "0")}`;
   }, []);
 
-  // ✅ PREMIUM: Stats Cards (no color prop)
+  // ✅ PREMIUM: Stats Cards
   const statsCards = useMemo(
     () => [
       {
@@ -981,7 +1021,6 @@ useEffect(() => {
           .vx-hero-subtitle { font-size: 18px; margin-bottom: 40px; }
         }
 
-        /* ✅ PREMIUM: Countdown Timer with Hover */
         .vx-countdown-panel {
           margin: 24px auto 28px;
           max-width: 380px;
@@ -1074,7 +1113,6 @@ useEffect(() => {
           }
         }
 
-        /* ✅ PREMIUM: Stats Card */
         .vx-stat-card {
           position: relative;
           display: flex;
@@ -1092,7 +1130,6 @@ useEffect(() => {
           overflow: hidden;
         }
 
-        /* Premium shine effect */
         .vx-stat-card::before {
           content: '';
           position: absolute;
@@ -1160,11 +1197,10 @@ useEffect(() => {
           }
         }
 
-        /* ✅ PREMIUM: Champion Card */
         .vx-champ-card {
-  position: relative;
-  padding: 24px;
-  border-radius: 16px;
+          position: relative;
+          padding: 24px;
+          border-radius: 16px;
           border: 1px solid rgba(255, 255, 255, 0.08);
           background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
           backdrop-filter: blur(20px);
@@ -1174,7 +1210,6 @@ useEffect(() => {
           box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
         }
 
-        /* Premium shine effect */
         .vx-champ-card::before {
           content: '';
           position: absolute;
@@ -1195,7 +1230,6 @@ useEffect(() => {
           .vx-champ-card { padding: 28px; }
         }
 
-        /* Footer */
         .vx-footer {
           border-top: 1px solid rgba(255, 255, 255, 0.12);
           background: rgba(9, 9, 13, 0.96);
@@ -1255,7 +1289,6 @@ useEffect(() => {
           .vx-footer-company { font-size: 12px; }
         }
 
-        /* ✅ MOBILE OPTIMIZATIONS */
         @media (max-width: 640px) {
           .vx-hero-title {
             font-size: 36px !important;
@@ -1281,7 +1314,6 @@ useEffect(() => {
             font-size: 14px !important;
           }
           
-          /* Premium countdown mobile */
           .vx-hero-countdown-container {
             margin: 20px auto !important;
             padding: 16px 20px !important;
@@ -1292,7 +1324,6 @@ useEffect(() => {
             font-size: 32px !important;
           }
           
-          /* Live banner mobile */
           .vx-livebar {
             padding: 10px 0 !important;
           }
@@ -1308,19 +1339,16 @@ useEffect(() => {
             font-size: 11px !important;
           }
           
-          /* Stats grid mobile */
           .vx-stats-grid {
             grid-template-columns: 1fr !important;
             gap: 12px !important;
           }
           
-          /* Champions grid mobile */
           .vx-champions-grid {
             grid-template-columns: 1fr !important;
             gap: 16px !important;
           }
           
-          /* Footer mobile */
           .vx-footer-links {
             flex-direction: column !important;
             gap: 8px !important;
@@ -1422,10 +1450,12 @@ useEffect(() => {
           <NoRoundsModal
             onBuyRounds={async () => {
               setShowNoRoundsModal(false);
-              
+
               if (!user) {
-                alert("Please sign in with Google to purchase rounds. You will be redirected to the login page.");
-                sessionStorage.setItem('pendingBuyRounds', 'true');
+                alert(
+                  "Please sign in with Google to purchase rounds. You will be redirected to the login page."
+                );
+                sessionStorage.setItem("pendingBuyRounds", "true");
                 await supabase.auth.signInWithOAuth({
                   provider: "google",
                   options: {
@@ -1434,7 +1464,7 @@ useEffect(() => {
                 });
                 return;
               }
-              
+
               router.push("/buy");
             }}
             onCancel={() => setShowNoRoundsModal(false)}
@@ -1541,7 +1571,8 @@ useEffect(() => {
                     padding: "8px 16px",
                     borderRadius: 12,
                     border: "1px solid rgba(251,191,36,0.3)",
-                    background: "linear-gradient(135deg, rgba(251,191,36,0.1), rgba(245,158,11,0.1))",
+                    background:
+                      "linear-gradient(135deg, rgba(251,191,36,0.1), rgba(245,158,11,0.1))",
                     color: "#fbbf24",
                     fontSize: 13,
                     fontWeight: 600,
@@ -1712,13 +1743,15 @@ useEffect(() => {
                     boxShadow: "0 0 12px #22c55e, 0 0 24px rgba(34, 197, 94, 0.4)",
                   }}
                 />
-                <span style={{ 
-                  color: "#22c55e", 
-                  fontWeight: 700,
-                  fontSize: 15,
-                  textShadow: "0 0 20px rgba(34, 197, 94, 0.5)",
-                  letterSpacing: "0.1em",
-                }}>
+                <span
+                  style={{
+                    color: "#22c55e",
+                    fontWeight: 700,
+                    fontSize: 15,
+                    textShadow: "0 0 20px rgba(34, 197, 94, 0.5)",
+                    letterSpacing: "0.1em",
+                  }}
+                >
                   LIVE
                 </span>
               </div>
@@ -1732,9 +1765,7 @@ useEffect(() => {
                 }}
               >
                 <Globe style={{ width: 14, height: 14, color: "#a78bfa" }} />
-                <span style={{ fontWeight: 700, color: "white" }}>
-                  {activePlayers.toLocaleString()}
-                </span>
+                <span style={{ fontWeight: 700, color: "white" }}>{activePlayers.toLocaleString()}</span>
                 <span>players online</span>
               </div>
             </div>
@@ -1776,11 +1807,9 @@ useEffect(() => {
               <span className="vx-hero-neon">The Next Generation Live Quiz</span>
             </h1>
 
-            <p className="vx-hero-subtitle">
-              The world's number one educational and award-winning quiz!
-            </p>
+            <p className="vx-hero-subtitle">The world's number one educational and award-winning quiz!</p>
 
-            {/* ✅ PREMIUM: Compact Countdown Timer */}
+            {/* Countdown */}
             <div className="vx-countdown-panel">
               <div
                 style={{
@@ -1792,7 +1821,7 @@ useEffect(() => {
                   background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)",
                 }}
               />
-              
+
               <div
                 style={{
                   position: "absolute",
@@ -1806,7 +1835,7 @@ useEffect(() => {
                   pointerEvents: "none",
                 }}
               />
-              
+
               <div style={{ position: "relative", zIndex: 10 }}>
                 <div
                   style={{
@@ -1821,15 +1850,8 @@ useEffect(() => {
                 >
                   Next Round
                 </div>
-                
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginBottom: 14,
-                  }}
-                >
+
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
                   <div
                     style={{
                       fontSize: 42,
@@ -1844,15 +1866,8 @@ useEffect(() => {
                     {formatTime(globalTimeLeft)}
                   </div>
                 </div>
-                
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginBottom: 12,
-                  }}
-                >
+
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
                   <div
                     style={{
                       display: "inline-flex",
@@ -1888,7 +1903,7 @@ useEffect(() => {
                     </span>
                   </div>
                 </div>
-                
+
                 <div
                   style={{
                     display: "flex",
@@ -1900,17 +1915,8 @@ useEffect(() => {
                     fontWeight: 500,
                   }}
                 >
-                  <div
-                    style={{
-                      width: 4,
-                      height: 4,
-                      borderRadius: "50%",
-                      background: "#22c55e",
-                    }}
-                  />
-                  <span style={{ color: "#ffffff", fontWeight: 600 }}>
-                    {activePlayers.toLocaleString()}
-                  </span>
+                  <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#22c55e" }} />
+                  <span style={{ color: "#ffffff", fontWeight: 600 }}>{activePlayers.toLocaleString()}</span>
                   <span>players ready</span>
                 </div>
               </div>
@@ -1918,249 +1924,19 @@ useEffect(() => {
 
             {/* CTA Buttons */}
             <div className="vx-cta-wrap">
-              <button
-                className="vx-cta-btn vx-cta-live"
-                onClick={handleStartLiveQuiz}
-                aria-label="Start live quiz with prizes"
-              >
-                <div
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    background: "linear-gradient(to right,#7c3aed,#d946ef)",
-                  }}
-                />
-                <Play
-                  style={{
-                    position: "relative",
-                    zIndex: 10,
-                    width: 20,
-                    height: 20,
-                  }}
-                />
+              <button className="vx-cta-btn vx-cta-live" onClick={handleStartLiveQuiz} aria-label="Start live quiz with prizes">
+                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right,#7c3aed,#d946ef)" }} />
+                <Play style={{ position: "relative", zIndex: 10, width: 20, height: 20 }} />
                 <span style={{ position: "relative", zIndex: 10 }}>Start Live Quiz</span>
-                <ArrowRight
-                  style={{
-                    position: "relative",
-                    zIndex: 10,
-                    width: 20,
-                    height: 20,
-                  }}
-                />
+                <ArrowRight style={{ position: "relative", zIndex: 10, width: 20, height: 20 }} />
               </button>
 
-              <button
-                className="vx-cta-btn vx-cta-free"
-                onClick={handleStartFreeQuiz}
-                aria-label="Start free practice quiz"
-              >
-                <div
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    background: "linear-gradient(to right,#06b6d4,#22d3ee)",
-                  }}
-                />
-                <Gift
-                  style={{
-                    position: "relative",
-                    zIndex: 10,
-                    width: 20,
-                    height: 20,
-                  }}
-                />
+              <button className="vx-cta-btn vx-cta-free" onClick={handleStartFreeQuiz} aria-label="Start free practice quiz">
+                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right,#06b6d4,#22d3ee)" }} />
+                <Gift style={{ position: "relative", zIndex: 10, width: 20, height: 20 }} />
                 <span style={{ position: "relative", zIndex: 10 }}>Start Free Quiz</span>
-                <ArrowRight
-                  style={{
-                    position: "relative",
-                    zIndex: 10,
-                    width: 20,
-                    height: 20,
-                  }}
-                />
+                <ArrowRight style={{ position: "relative", zIndex: 10, width: 20, height: 20 }} />
               </button>
-            </div>
-
-            {/* ✅ PREMIUM: Pricing Info Section */}
-            <div
-              style={{
-                maxWidth: 640,
-                margin: "0 auto 48px",
-                padding: "32px 24px",
-                borderRadius: 20,
-                background: "linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                backdropFilter: "blur(20px)",
-                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)",
-                position: "relative",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: -100,
-                  right: -100,
-                  height: 1,
-                  background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
-                }}
-              />
-
-              <div style={{ position: "relative", zIndex: 10 }}>
-                <div style={{ textAlign: "center", marginBottom: 24 }}>
-                  <h3
-                    style={{
-                      fontSize: 18,
-                      fontWeight: 700,
-                      color: "#ffffff",
-                      marginBottom: 8,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                    }}
-                  >
-                    <ShoppingCart style={{ width: 20, height: 20, color: "#9ca3af" }} />
-                    Round Pricing
-                  </h3>
-                  <p style={{ fontSize: 13, color: "#6b7280", margin: 0, fontWeight: 500 }}>
-                    Affordable entry to compete for £1000 monthly prize
-                  </p>
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 12,
-                    marginBottom: 20,
-                  }}
-                >
-                  <div
-                    style={{
-                      padding: "20px 16px",
-                      borderRadius: 16,
-                      background: "rgba(255, 255, 255, 0.03)",
-                      border: "1px solid rgba(255, 255, 255, 0.08)",
-                      textAlign: "center",
-                      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
-                      e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)";
-                      e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 8, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                      Single Round
-                    </div>
-                    <div style={{ fontSize: 32, fontWeight: 800, color: "#fbbf24", marginBottom: 4, lineHeight: 1 }}>
-                      £2
-                    </div>
-                    <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 500 }}>per round</div>
-                  </div>
-
-                  <div
-                    style={{
-                      padding: "20px 16px",
-                      borderRadius: 16,
-                      background: "linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.05))",
-                      border: "2px solid rgba(251, 191, 36, 0.3)",
-                      textAlign: "center",
-                      position: "relative",
-                      boxShadow: "0 0 30px rgba(251, 191, 36, 0.15)",
-                      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = "rgba(251, 191, 36, 0.5)";
-                      e.currentTarget.style.boxShadow = "0 0 40px rgba(251, 191, 36, 0.25)";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = "rgba(251, 191, 36, 0.3)";
-                      e.currentTarget.style.boxShadow = "0 0 30px rgba(251, 191, 36, 0.15)";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: -10,
-                        right: -10,
-                        background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
-                        color: "#0a0a0a",
-                        fontSize: 10,
-                        fontWeight: 700,
-                        padding: "4px 8px",
-                        borderRadius: 6,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                        boxShadow: "0 2px 8px rgba(251, 191, 36, 0.4)",
-                      }}
-                    >
-                      Save 18%
-                    </div>
-                    <div style={{ fontSize: 12, color: "#fbbf24", marginBottom: 8, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                      Value Pack
-                    </div>
-                    <div style={{ fontSize: 32, fontWeight: 800, color: "#fbbf24", marginBottom: 4, lineHeight: 1 }}>
-                      £49
-                    </div>
-                    <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500 }}>30 rounds 
-		   </div>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    padding: "16px",
-                    borderRadius: 12,
-                    background: "rgba(255, 255, 255, 0.02)",
-                    border: "1px solid rgba(255, 255, 255, 0.06)",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "start", gap: 10, marginBottom: 10 }}>
-                    <AlertCircle
-                      style={{
-                        width: 16,
-                        height: 16,
-                        color: "#9ca3af",
-                        flexShrink: 0,
-                        marginTop: 2,
-                      }}
-                    />
-                    <div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: "#ffffff", marginBottom: 4 }}>
-                        Prize Pool Activation
-                      </div>
-                      <p style={{ fontSize: 11, color: "#6b7280", margin: 0, lineHeight: 1.6, fontWeight: 500 }}>
-                        The <strong style={{ color: "#fbbf24" }}>£1000 monthly prize</strong> activates when we reach{" "}
-                        <strong style={{ color: "#ffffff" }}>3000+ active participants</strong>. This ensures platform sustainability and full prize delivery.
-                      </p>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "start", gap: 10 }}>
-                    <CheckCircle
-                      style={{
-                        width: 16,
-                        height: 16,
-                        color: "#22c55e",
-                        flexShrink: 0,
-                        marginTop: 2,
-                      }}
-                    />
-                    <p style={{ fontSize: 11, color: "#6b7280", margin: 0, lineHeight: 1.6, fontWeight: 500 }}>
-                      <strong style={{ color: "#22c55e" }}>Fair & Transparent:</strong> All rounds contribute to the prize pool. The more players, the bigger the rewards!
-                    </p>
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* Stats */}
@@ -2184,127 +1960,99 @@ useEffect(() => {
           </div>
         </main>
 
-        {/* ✅ PREMIUM: Trust Elements */}
-        <div style={{
-          borderTop: "1px solid rgba(255, 255, 255, 0.05)",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
-          background: "rgba(255, 255, 255, 0.01)",
-          padding: "32px 0",
-        }}>
+        {/* Trust Elements */}
+        <div
+          style={{
+            borderTop: "1px solid rgba(255, 255, 255, 0.05)",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
+            background: "rgba(255, 255, 255, 0.01)",
+            padding: "32px 0",
+          }}
+        >
           <div className="vx-container">
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              gap: 24,
-              maxWidth: 1024,
-              margin: "0 auto",
-            }}>
-              <div style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 8,
-                padding: 16,
-              }}>
-                <div style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
-                  background: "rgba(34, 197, 94, 0.1)",
-                  border: "1px solid rgba(34, 197, 94, 0.2)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: 24,
+                maxWidth: 1024,
+                margin: "0 auto",
+              }}
+            >
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    background: "rgba(34, 197, 94, 0.1)",
+                    border: "1px solid rgba(34, 197, 94, 0.2)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
                   <CheckCircle style={{ width: 20, height: 20, color: "#22c55e" }} />
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>
-                  SSL Encrypted
-                </div>
-                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>
-                  Bank-level security
-                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>SSL Encrypted</div>
+                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>Bank-level security</div>
               </div>
 
-              <div style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 8,
-                padding: 16,
-              }}>
-                <div style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
-                  background: "rgba(139, 92, 246, 0.1)",
-                  border: "1px solid rgba(139, 92, 246, 0.2)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    background: "rgba(139, 92, 246, 0.1)",
+                    border: "1px solid rgba(139, 92, 246, 0.2)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
                   <ShoppingCart style={{ width: 20, height: 20, color: "#8b5cf6" }} />
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>
-                  Stripe Verified
-                </div>
-                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>
-                  Secure payments
-                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>Stripe Verified</div>
+                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>Secure payments</div>
               </div>
 
-              <div style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 8,
-                padding: 16,
-              }}>
-                <div style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
-                  background: "rgba(251, 191, 36, 0.1)",
-                  border: "1px solid rgba(251, 191, 36, 0.2)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    background: "rgba(251, 191, 36, 0.1)",
+                    border: "1px solid rgba(251, 191, 36, 0.2)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
                   <AlertCircle style={{ width: 20, height: 20, color: "#fbbf24" }} />
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>
-                  18+ Only
-                </div>
-                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>
-                  Age verified
-                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>18+ Only</div>
+                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>Age verified</div>
               </div>
 
-              <div style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 8,
-                padding: 16,
-              }}>
-                <div style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
-                  background: "rgba(6, 182, 212, 0.1)",
-                  border: "1px solid rgba(6, 182, 212, 0.2)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    background: "rgba(6, 182, 212, 0.1)",
+                    border: "1px solid rgba(6, 182, 212, 0.2)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
                   <Globe style={{ width: 20, height: 20, color: "#06b6d4" }} />
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>
-                  Global Arena
-                </div>
-                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>
-                  Worldwide players
-                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>Global Arena</div>
+                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>Worldwide players</div>
               </div>
             </div>
           </div>
@@ -2314,9 +2062,8 @@ useEffect(() => {
         <footer className="vx-footer">
           <div className="vx-container">
             <div className="vx-footer-legal">
-              <strong style={{ color: "#94a3b8" }}>Educational Quiz Competition.</strong> 18+ only. 
-              This is a 100% skill-based knowledge competition with no element of chance. 
-              Entry fees apply. Prize pool activates with 3000+ monthly participants. See{" "}
+              <strong style={{ color: "#94a3b8" }}>Educational Quiz Competition.</strong> 18+ only. This is a 100% skill-based
+              knowledge competition with no element of chance. Entry fees apply. Prize pool activates with 3000+ monthly participants. See{" "}
               <a href="/terms" style={{ color: "#a78bfa", textDecoration: "underline" }}>
                 Terms & Conditions
               </a>{" "}
@@ -2346,36 +2093,24 @@ useEffect(() => {
             </nav>
 
             <div className="vx-footer-company">
-              <div style={{ marginBottom: 8, textAlign: "center" }}>
-                © 2025 VibraXX. Operated by Sermin Limited (UK)
-              </div>
+              <div style={{ marginBottom: 8, textAlign: "center" }}>© 2025 VibraXX. Operated by Sermin Limited (UK)</div>
               <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8, textAlign: "center" }}>
                 Registered in England & Wales | All rights reserved
               </div>
               <div style={{ marginBottom: 10, textAlign: "center" }}>
-                <a 
+                <a
                   href="mailto:team@vibraxx.com"
-                  style={{ 
-                    color: "#a78bfa", 
-                    textDecoration: "none",
-                    fontSize: 12,
-                    fontWeight: 600,
-                  }}
+                  style={{ color: "#a78bfa", textDecoration: "none", fontSize: 12, fontWeight: 600 }}
                 >
                   team@vibraxx.com
                 </a>
               </div>
               <div style={{ fontSize: 11, textAlign: "center" }}>
                 Payment processing by{" "}
-                <a 
-                  href="https://stripe.com" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  style={{ color: "#a78bfa", textDecoration: "none" }}
-                >
+                <a href="https://stripe.com" target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa", textDecoration: "none" }}>
                   Stripe
-                </a>
-                {" "}| Secure SSL encryption | Skill-based competition - Not gambling
+                </a>{" "}
+                | Secure SSL encryption | Skill-based competition - Not gambling
               </div>
             </div>
           </div>
