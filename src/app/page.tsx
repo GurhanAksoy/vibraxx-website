@@ -558,24 +558,23 @@ const getFreshUserRounds = useCallback(async (): Promise<number> => {
   // ✅ YENİ
 const loadGlobalRoundState = useCallback(async () => {
   try {
-    const { data, error } = await supabase.rpc("get_current_live_round");
+    const { data, error } = await supabase.rpc("get_next_round");
 
-    if (error) {
-      console.error("Failed to load round state:", error);
+    if (error || !data || !data[0]) {
+      console.warn("No upcoming round found");
       setGlobalTimeLeft(null);
       return;
     }
 
-    const round = data?.[0];
-    const seconds = Number(round?.time_until_next_round_seconds ?? null);
+    const seconds = Math.floor(Number(data[0].time_until_start_seconds));
 
-    if (Number.isFinite(seconds)) {
-      setGlobalTimeLeft(Math.floor(seconds));
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      setGlobalTimeLeft(seconds);
     } else {
       setGlobalTimeLeft(null);
     }
   } catch (err) {
-    console.error("Failed to load round state:", err);
+    console.error("Failed to load next round:", err);
     setGlobalTimeLeft(null);
   }
 }, []);
@@ -599,6 +598,14 @@ const loadGlobalRoundState = useCallback(async () => {
       cancelled = true;
     };
   }, [fetchActivePlayers, fetchChampions, loadGlobalRoundState]);
+     // ✅ Poll next round every 5 seconds to keep countdown authoritative
+useEffect(() => {
+  const interval = setInterval(() => {
+    loadGlobalRoundState();
+  }, 5000);
+
+  return () => clearInterval(interval);
+}, [loadGlobalRoundState]);
 
   // ✅ Real-time Updates with countdown jump prevention (ref-based, no race)
   useEffect(() => {
