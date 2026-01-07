@@ -136,26 +136,51 @@ export default function LobbyPage() {
     checkAuth();
   }, [router]);
 
-  // === LOAD CURRENT ROUND ===
-  const loadCurrentRound = useCallback(async () => {
-    try {
-      const { data, error } = await supabase.rpc("get_current_live_round");
+ // === LOAD CURRENT ROUND ===
+const loadCurrentRound = useCallback(async () => {
+  try {
+    const { data, error } = await supabase.rpc("get_current_live_round");
 
-      if (error) {
-        console.error("Load current round error:", error);
-        return;
-      }
-
-      if (data && data.length > 0) {
-        const round = data[0];
-        setCurrentRound(round);
-        setGlobalTimeLeft(Math.max(0, Math.floor(round.time_until_start)));
-        console.log("✅ Current round loaded:", round.round_id);
-      }
-    } catch (err) {
-      console.error("loadCurrentRound error:", err);
+    if (error) {
+      console.error("❌ Load current round error:", error);
+      return;
     }
-  }, []);
+
+    if (!data || data.length === 0) {
+      console.log("ℹ️ No live round found");
+      setCurrentRound(null);
+      setGlobalTimeLeft(null);
+      return;
+    }
+
+    const round = data[0];
+
+    const rawSeconds =
+      round.time_until_start_seconds ??
+      round.time_until_start ??
+      0;
+
+    const seconds = Number(rawSeconds);
+
+    if (!Number.isFinite(seconds)) {
+      console.warn("⚠️ Invalid time_until_start:", rawSeconds);
+      setGlobalTimeLeft(null);
+    } else {
+      setGlobalTimeLeft(Math.max(0, Math.floor(seconds)));
+    }
+
+    setCurrentRound(round);
+
+    console.log("✅ Current round loaded:", {
+      id: round.round_id,
+      status: round.status,
+      scheduled_start: round.scheduled_start,
+      seconds,
+    });
+  } catch (err) {
+    console.error("❌ loadCurrentRound exception:", err);
+  }
+}, []);
 
   // === FETCH LOBBY PLAYERS ===
   const fetchLobbyPlayers = useCallback(async () => {
