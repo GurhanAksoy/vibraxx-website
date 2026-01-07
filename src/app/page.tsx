@@ -534,22 +534,30 @@ export default function HomePage() {
   }, [getDefaultChampions]);
 
   // Load initial global round state from overlay table
-  const loadGlobalRoundState = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from("overlay_round_state")
-        .select("*")
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .single();
+  // ✅ YENİ
+const loadGlobalRoundState = useCallback(async () => {
+  try {
+    const { data, error } = await supabase.rpc("get_current_live_round");
 
-      if (!error && data && typeof data.time_left === "number") {
-        setGlobalTimeLeft(data.time_left);
-      }
-    } catch (error) {
-      console.error("Failed to load overlay state:", error);
+    if (error) {
+      console.error("Failed to load round state:", error);
+      setGlobalTimeLeft(null);
+      return;
     }
-  }, []);
+
+    const round = data?.[0];
+    const seconds = Number(round?.time_until_next_round_seconds ?? null);
+
+    if (Number.isFinite(seconds)) {
+      setGlobalTimeLeft(Math.floor(seconds));
+    } else {
+      setGlobalTimeLeft(null);
+    }
+  } catch (err) {
+    console.error("Failed to load round state:", err);
+    setGlobalTimeLeft(null);
+  }
+}, []);
 
   // Initial Load
   useEffect(() => {
@@ -582,29 +590,10 @@ export default function HomePage() {
       setGlobalTimeLeft((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
     }, 1000);
 
-    const channel = supabase
-      .channel("home-overlay-countdown")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "overlay_round_state" },
-        (payload) => {
-          const newData = (payload.new || {}) as { time_left?: number | null };
-          if (typeof newData.time_left === "number") {
-            countdownPauseUntilRef.current = Date.now() + 2000;
-            setGlobalTimeLeft(newData.time_left);
-          } else if (newData.time_left === null) {
-            // only set null if explicitly null (avoid flicker on partial payloads)
-            setGlobalTimeLeft(null);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
+      return () => {
       clearInterval(playersInterval);
       clearInterval(countdownInterval);
-      supabase.removeChannel(channel);
-    };
+          };
   }, [fetchActivePlayers]);
 
   // Auth Listener + Resume intent after login
