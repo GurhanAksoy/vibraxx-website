@@ -420,25 +420,14 @@ export default function HomePage() {
   try {
     const { data, error } = await supabase
       .from("overlay_round_state")
-      .select("ends_at")
+      .select("time_left, server_time") // ✅ Add server_time for drift correction
       .order("updated_at", { ascending: false })
       .limit(1);
 
     if (error || !data || data.length === 0) return;
 
-    const endsAt = new Date(data[0].ends_at).getTime();
-    const now = Date.now();
-    const serverSeconds = Math.floor((endsAt - now) / 1000);
-
+    const serverSeconds = Math.floor(Number(data[0].time_left));
     if (!Number.isFinite(serverSeconds) || serverSeconds < 0) return;
-
-    setGlobalTimeLeft(serverSeconds);
-  } catch (err) {
-    console.error("[Countdown] Fetch failed:", err);
-  }
-}, []);
-
-
 
       // ✅ Pause local countdown briefly to prevent visual stutter
       countdownPauseUntilRef.current = Date.now() + 200;
