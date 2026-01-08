@@ -563,7 +563,7 @@ const fetchChampions = useCallback(async () => {
 
         return {
           period: periods[i][0].toUpperCase() + periods[i].slice(1),
-          name: "Top Player"
+          name: "Top Player",
           score: row.points || 0,
           gradient: gradients[i],
           color: colors[i],
