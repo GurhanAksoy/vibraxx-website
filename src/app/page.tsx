@@ -544,54 +544,52 @@ export default function HomePage() {
   );
 
   // ✅ OPTIMIZED: Champions with JOIN (3 queries instead of 6)
-  const fetchChampions = useCallback(async () => {
-    try {
-      const periods = ["daily", "weekly", "monthly"];
+const fetchChampions = useCallback(async () => {
+  try {
+    const periods = ["daily", "weekly", "monthly"];
 
-      // ✅ Single query per period with JOIN
-      const results = await Promise.all(
-        periods.map((period) =>
-          supabase
-            .from(`leaderboard_${period}`)
-            .select(`
-              score,
-              profiles!inner(full_name, avatar_url)
-            `)
-            .order("score", { ascending: false })
-            .limit(1)
-        )
-      );
+    const results = await Promise.all(
+      periods.map((period) =>
+        supabase
+          .from(`leaderboard_${period}`)
+          .select(`score, profiles(full_name, avatar_url)`)
+          .order("score", { ascending: false })
+          .limit(1)
+      )
+    );
 
-      const icons = [Crown, Trophy, Sparkles];
-      const colors = ["#facc15", "#c084fc", "#22d3ee"];
-      const gradients = [
-        "linear-gradient(to bottom right, #eab308, #f97316)",
-        "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
-        "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
-      ];
+    const icons = [Crown, Trophy, Sparkles];
+    const colors = ["#facc15", "#c084fc", "#22d3ee"];
+    const gradients = [
+      "linear-gradient(to bottom right, #eab308, #f97316)",
+      "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
+      "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
+    ];
 
-      const mapped = results
-        .map((res, i) => {
-          const row = res.data?.[0];
-          if (!row) return null;
+    const mapped = results
+      .map((res, i) => {
+        const row = res.data?.[0];
+        if (!row) return null;
 
-          return {
-            period: periods[i][0].toUpperCase() + periods[i].slice(1),
-            name: row.profiles?.full_name || "Anonymous Player",
-            score: row.score || 0,
-            gradient: gradients[i],
-            color: colors[i],
-            icon: icons[i],
-          };
-        })
-        .filter(Boolean);
+        const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
 
-      setChampions(mapped.length > 0 ? mapped : getDefaultChampions());
-    } catch (err) {
-      console.error("[Champions] Fetch failed:", err);
-      setChampions(getDefaultChampions());
-    }
-  }, [getDefaultChampions]);
+        return {
+          period: periods[i][0].toUpperCase() + periods[i].slice(1),
+          name: profile?.full_name || "Anonymous Player",
+          score: row.score || 0,
+          gradient: gradients[i],
+          color: colors[i],
+          icon: icons[i],
+        };
+      })
+      .filter(Boolean);
+
+    setChampions(mapped.length > 0 ? mapped : getDefaultChampions());
+  } catch (err) {
+    console.error("[Champions] Fetch failed:", err);
+    setChampions(getDefaultChampions());
+  }
+}, [getDefaultChampions]);
 
   // Initial load
   useEffect(() => {
