@@ -432,17 +432,7 @@ const loadGlobalRoundState = useCallback(async () => {
 
     if (!Number.isFinite(seconds) || seconds < 0) return;
 
-    setGlobalTimeLeft((prev) => {
-      if (prev === null) return seconds;
-
-      // Reset gibi yukarı zıplıyorsa ignore
-      if (seconds > prev + 2) return prev;
-
-      // Büyük drift varsa sync et
-      if (Math.abs(seconds - prev) >= 5) return seconds;
-
-      return prev;
-    });
+    setGlobalTimeLeft(seconds);
   } catch (err) {
     console.error("[Countdown] Fetch failed:", err);
   }
