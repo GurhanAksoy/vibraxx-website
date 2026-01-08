@@ -552,8 +552,8 @@ const fetchChampions = useCallback(async () => {
       periods.map((period) =>
         supabase
           .from(`leaderboard_${period}`)
-          .select(`user_id, score`)
-          .order("score", { ascending: false })
+          .select("user_id, points")
+          .order("points", { ascending: false })
           .limit(1)
       )
     );
@@ -573,8 +573,8 @@ const fetchChampions = useCallback(async () => {
 
         return {
           period: periods[i][0].toUpperCase() + periods[i].slice(1),
-          name: "Top Player", // geçici
-          score: row.score || 0,
+          name: row.user_id || "Anonymous Player", // profil yoksa user_id fallback
+          score: row.points || 0,
           gradient: gradients[i],
           color: colors[i],
           icon: icons[i],
@@ -582,7 +582,7 @@ const fetchChampions = useCallback(async () => {
       })
       .filter(Boolean);
 
-    setChampions(mapped.length > 0 ? mapped : getDefaultChampions());
+    setChampions(mapped.length ? mapped : getDefaultChampions());
   } catch (err) {
     console.error("[Champions] Fetch failed:", err);
     setChampions(getDefaultChampions());
