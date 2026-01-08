@@ -420,43 +420,34 @@ const loadGlobalRoundState = useCallback(async () => {
   try {
     const { data, error } = await supabase
       .from("overlay_round_state")
-      .select("ends_at")
+      .select("ends_at, status")
       .order("updated_at", { ascending: false })
       .limit(1);
 
     if (error || !data || data.length === 0) return;
 
-    const endsAt = new Date(data[0].ends_at).getTime();
+    const row = data[0];
+
+    // ⛔ Eğer aktif değilse sayaç göstermiyoruz
+    if (row.status !== "active") {
+      setGlobalTimeLeft(null);
+      return;
+    }
+
+    const endsAt = new Date(row.ends_at).getTime();
     const now = Date.now();
     const seconds = Math.floor((endsAt - now) / 1000);
 
-    if (!Number.isFinite(seconds) || seconds < 0) return;
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+      setGlobalTimeLeft(null);
+      return;
+    }
 
-    setGlobalTimeLeft((prev) => {
-      if (prev === null) return seconds;
-
-      // Reset gibi yukarı zıplıyorsa ignore
-      if (seconds > prev + 2) return prev;
-
-      // Büyük drift varsa sync et
-      if (Math.abs(seconds - prev) >= 5) return seconds;
-
-      return prev;
-    });
+    setGlobalTimeLeft(seconds);
   } catch (err) {
     console.error("[Countdown] Fetch failed:", err);
   }
 }, []);
-
-  // Initial mount
-  useEffect(() => {
-    mountedRef.current = true;
-    const timer = setTimeout(() => setIsInitialLoad(false), 100);
-    return () => {
-      mountedRef.current = false;
-      clearTimeout(timer);
-    };
-  }, []);
 
   // Fade in orbs
   useEffect(() => {
