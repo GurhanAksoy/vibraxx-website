@@ -450,18 +450,15 @@ const getFreshUserRounds = useCallback(async (): Promise<number | "error"> => {
   // Real-time Active Players with Dynamic Variation
   const fetchActivePlayers = useCallback(async () => {
   try {
-    const { count, error } = await supabase
+    const { count } = await supabase
       .from("active_sessions")
-      .select("id", { count: "exact" });
+      .select("*", { count: "exact", head: true });
 
-    if (error) throw error;
-
-    const realCount = count || 0;
-    const variation = Math.floor(Math.random() * 200) - 50;
-    setActivePlayers(Math.max(600, 600 + realCount + variation));
-  } catch (err) {
-    console.error("Active players fetch error:", err);
-    const variation = Math.floor(Math.random() * 200) - 50;
+    const base = 600;
+    const variation = Math.floor(Math.random() * 100) - 50;
+    setActivePlayers(Math.max(base, base + (count || 0) + variation));
+  } catch {
+    const variation = Math.floor(Math.random() * 100) - 50;
     setActivePlayers(Math.max(600, 600 + variation));
   }
 }, []);
@@ -498,60 +495,54 @@ const getFreshUserRounds = useCallback(async (): Promise<number | "error"> => {
   );
 
   // Fetch Champions from Supabase (safe: no .single(), array-safe)
+
 const fetchChampions = useCallback(async () => {
   try {
     const periods = ["daily", "weekly", "monthly"];
 
     const championsData = await Promise.all(
       periods.map(async (period, index) => {
-        try {
-          const { data, error } = await supabase
-  .from(`leaderboard_${period}`)
-  .select(`
-  user_id,
-  score,
-  profiles:user_id (
-    full_name,
-    avatar_url
-  )
-`)
-  .order("score", { ascending: false })
-  .limit(1);
+        const { data, error } = await supabase
+          .from(`leaderboard_${period}`)
+          .select(`
+            user_id,
+            score,
+            profiles (
+              full_name,
+              avatar_url
+            )
+          `)
+          .order("score", { ascending: false })
+          .limit(1);
 
-          if (error || !data || data.length === 0) return null;
+        if (error || !data || data.length === 0) return null;
 
-          const row = data[0];
+        const row = data[0];
+        const userProfile = row.profiles?.[0];
 
-          const icons = [Crown, Trophy, Sparkles];
-          const gradients = [
-            "linear-gradient(to bottom right, #eab308, #f97316)",
-            "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
-            "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
-          ];
-          const colors = ["#facc15", "#c084fc", "#22d3ee"];
+        const icons = [Crown, Trophy, Sparkles];
+        const colors = ["#facc15", "#c084fc", "#22d3ee"];
+        const gradients = [
+          "linear-gradient(to bottom right, #eab308, #f97316)",
+          "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
+          "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
+        ];
 
-          const userData = row.profiles?.[0] || null;
-          const userName = userData?.full_name || "Anonymous Player";
-
-          return {
-            period: period.charAt(0).toUpperCase() + period.slice(1),
-            name: userName,
-            score: row.score || 0,
-            gradient: gradients[index],
-            color: colors[index],
-            icon: icons[index],
-          };
-        } catch (err) {
-          console.error(`Error fetching ${period} champion:`, err);
-          return null;
-        }
+        return {
+          period: period.charAt(0).toUpperCase() + period.slice(1),
+          name: userProfile?.full_name || "Anonymous Player",
+          score: row.score || 0,
+          gradient: gradients[index],
+          color: colors[index],
+          icon: icons[index],
+        };
       })
     );
 
-    const validChampions = championsData.filter(Boolean) as any[];
-    setChampions(validChampions.length > 0 ? validChampions : getDefaultChampions());
-  } catch (err) {
-    console.error("Champions fetch error:", err);
+    const valid = championsData.filter(Boolean);
+    setChampions(valid.length ? valid : getDefaultChampions());
+  } catch (e) {
+    console.error("Champion fetch failed", e);
     setChampions(getDefaultChampions());
   }
 }, [getDefaultChampions]);
