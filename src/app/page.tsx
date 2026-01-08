@@ -418,23 +418,17 @@ export default function HomePage() {
   // ✅ OPTIMIZED: Stable round state loader with drift protection
 const loadGlobalRoundState = useCallback(async () => {
   try {
-    const { data, error } = await supabase
-      .from("overlay_round_state")
-      .select("ends_at")
-      .order("updated_at", { ascending: false })
-      .limit(1);
+    const { data, error } = await supabase.rpc("get_current_live_round");
 
-    if (error || !data || data.length === 0) return;
+    if (error || !data || !data[0]) return;
 
-    const endsAt = new Date(data[0].ends_at).getTime();
-    const now = Date.now();
-    const seconds = Math.floor((endsAt - now) / 1000);
+    const seconds = data[0].time_until_start_seconds;
 
-    if (!Number.isFinite(seconds)) return;
+    if (typeof seconds !== "number" || !Number.isFinite(seconds)) return;
 
     setGlobalTimeLeft(Math.max(0, seconds));
   } catch (err) {
-    console.error("[Countdown] Fetch failed:", err);
+    console.error("[Countdown] RPC failed:", err);
   }
 }, []);
 
