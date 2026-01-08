@@ -552,7 +552,7 @@ const fetchChampions = useCallback(async () => {
       periods.map((period) =>
         supabase
           .from(`leaderboard_${period}`)
-          .select(`score, profiles(full_name, avatar_url)`)
+          .select(`user_id, score`)
           .order("score", { ascending: false })
           .limit(1)
       )
@@ -571,11 +571,9 @@ const fetchChampions = useCallback(async () => {
         const row = res.data?.[0];
         if (!row) return null;
 
-        const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
-
         return {
           period: periods[i][0].toUpperCase() + periods[i].slice(1),
-          name: profile?.full_name || "Anonymous Player",
+          name: "Top Player", // geçici
           score: row.score || 0,
           gradient: gradients[i],
           color: colors[i],
