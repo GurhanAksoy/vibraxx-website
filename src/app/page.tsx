@@ -552,20 +552,6 @@ const fetchChampions = useCallback(async () => {
 const loadGlobalRoundState = useCallback(async () => {
   try {
     const { data, error } = await supabase
-  .from("overlay_round_state")
-  .select("time_left")
-  .order("updated_at", { ascending: false })
-  .limit(1);
-
-    if (error || !data || data.length === 0) {
-  console.warn("No global round state found", error);
-  setGlobalTimeLeft(null);
-  return;
-}
-
-const loadGlobalRoundState = useCallback(async () => {
-  try {
-    const { data, error } = await supabase
       .from("overlay_round_state")
       .select("time_left")
       .order("updated_at", { ascending: false })
@@ -581,21 +567,9 @@ const loadGlobalRoundState = useCallback(async () => {
 
     setGlobalTimeLeft((prev) => {
       if (!Number.isFinite(seconds) || seconds < 0) return null;
-
-      // İlk kez geliyorsa al
       if (prev === null) return seconds;
-
-      // Eğer server değeri local'den büyük geliyorsa (reset gibi) ignore et
-      if (seconds > prev + 2) {
-        return prev;
-      }
-
-      // Eğer arada büyük fark varsa (round değişti vs) kabul et
-      if (Math.abs(seconds - prev) >= 5) {
-        return seconds;
-      }
-
-      // Küçük farklarda local devam et
+      if (seconds > prev + 2) return prev;
+      if (Math.abs(seconds - prev) >= 5) return seconds;
       return prev;
     });
   } catch (err) {
