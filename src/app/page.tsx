@@ -430,9 +430,9 @@ const loadGlobalRoundState = useCallback(async () => {
     const now = Date.now();
     const seconds = Math.floor((endsAt - now) / 1000);
 
-    if (!Number.isFinite(seconds) || seconds < 0) return;
+    if (!Number.isFinite(seconds)) return;
 
-    setGlobalTimeLeft(seconds);
+    setGlobalTimeLeft(Math.max(0, seconds));
   } catch (err) {
     console.error("[Countdown] Fetch failed:", err);
   }
