@@ -530,7 +530,7 @@ const fetchChampions = useCallback(async () => {
           ];
           const colors = ["#facc15", "#c084fc", "#22d3ee"];
 
-          const userData = row.users as any;
+          const userData = row.profiles?.[0] || null;
           const userName = userData?.full_name || "Anonymous Player";
 
           return {
