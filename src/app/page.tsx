@@ -420,7 +420,6 @@ const loadGlobalRoundState = useCallback(async () => {
   try {
     const { data, error } = await supabase
       .from("overlay_round_state")
-      .select("time_left")
       .order("updated_at", { ascending: false })
       .limit(1);
 
