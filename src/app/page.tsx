@@ -449,26 +449,22 @@ const getFreshUserRounds = useCallback(async (): Promise<number | "error"> => {
 
   // Real-time Active Players with Dynamic Variation
   const fetchActivePlayers = useCallback(async () => {
-    try {
-      const { count, error } = await supabase
-        .from("active_sessions")
-        .select("*", { count: "exact", head: true });
+  try {
+    const { count, error } = await supabase
+      .from("active_sessions")
+      .select("id", { count: "exact" });
 
-      if (!error && count !== null) {
-        const realCount = count || 0;
-        const variation = Math.floor(Math.random() * 200) - 50;
-        const finalCount = Math.max(600, 600 + realCount + variation);
-        setActivePlayers(finalCount);
-      } else {
-        const variation = Math.floor(Math.random() * 200) - 50;
-        setActivePlayers(Math.max(600, 600 + variation));
-      }
-    } catch (err) {
-      console.error("Active players fetch error:", err);
-      const variation = Math.floor(Math.random() * 200) - 50;
-      setActivePlayers(Math.max(600, 600 + variation));
-    }
-  }, []);
+    if (error) throw error;
+
+    const realCount = count || 0;
+    const variation = Math.floor(Math.random() * 200) - 50;
+    setActivePlayers(Math.max(600, 600 + realCount + variation));
+  } catch (err) {
+    console.error("Active players fetch error:", err);
+    const variation = Math.floor(Math.random() * 200) - 50;
+    setActivePlayers(Math.max(600, 600 + variation));
+  }
+}, []);
 
   // Default Champions (fallback)
   const getDefaultChampions = useCallback(
@@ -510,20 +506,17 @@ const fetchChampions = useCallback(async () => {
       periods.map(async (period, index) => {
         try {
           const { data, error } = await supabase
-            .from("leaderboard")
-            .select(
-              `
-              user_id,
-              score,
-              users:user_id (
-                full_name,
-                avatar_url
-              )
-            `
-            )
-            .eq("period", period)
-            .order("score", { ascending: false })
-            .limit(1);
+  .from(`leaderboard_${period}`)
+  .select(`
+  user_id,
+  score,
+  profiles:user_id (
+    full_name,
+    avatar_url
+  )
+`)
+  .order("score", { ascending: false })
+  .limit(1);
 
           if (error || !data || data.length === 0) return null;
 
@@ -570,7 +563,7 @@ const loadGlobalRoundState = useCallback(async () => {
     const { data, error } = await supabase
   .from("overlay_round_state")
   .select("time_left")
-  .eq("id", true)
+  .order("updated_at", { ascending: false })
   .limit(1);
 
     if (error || !data || data.length === 0) {
