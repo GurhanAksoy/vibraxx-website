@@ -420,27 +420,26 @@ const loadGlobalRoundState = useCallback(async () => {
   try {
     const { data, error } = await supabase
       .from("overlay_round_state")
-      .select("time_left")
+      .select("ends_at")
       .order("updated_at", { ascending: false })
       .limit(1);
 
     if (error || !data || data.length === 0) return;
 
-    const serverSeconds = Math.floor(Number(data[0].time_left));
-    if (!Number.isFinite(serverSeconds) || serverSeconds < 0) return;
+    const endsAt = new Date(data[0].ends_at).getTime();
+    const now = Date.now();
+    const seconds = Math.floor((endsAt - now) / 1000);
 
-    countdownPauseUntilRef.current = Date.now() + 200;
+    if (!Number.isFinite(seconds) || seconds < 0) return;
 
     setGlobalTimeLeft((prev) => {
-      if (prev === null) return serverSeconds;
+      if (prev === null) return seconds;
 
-      if (serverSeconds > prev + 2 && prev > 10) {
-        console.log("[Countdown] Ignoring reset");
-        return prev;
-      }
+      // Reset gibi yukarı zıplıyorsa ignore
+      if (seconds > prev + 2) return prev;
 
-      const drift = Math.abs(serverSeconds - prev);
-      if (drift >= 5) return serverSeconds;
+      // Büyük drift varsa sync et
+      if (Math.abs(seconds - prev) >= 5) return seconds;
 
       return prev;
     });
