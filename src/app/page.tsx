@@ -580,25 +580,30 @@ const fetchChampions = useCallback(async () => {
 }, [getDefaultChampions]);
 
   // Initial load
-  useEffect(() => {
-    
-    const loadData = async () => {
-      try {
-        await Promise.all([
-          fetchActivePlayers(),
-          fetchChampions(),
-          loadGlobalRoundState(),
-        ]);
-      } catch (err) {
-        console.error("[InitialLoad] Error:", err);
-      }
-    };
+ useEffect(() => {
+  let cancelled = false; // ✅ EKLE
 
-    loadData();
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchActivePlayers, fetchChampions, loadGlobalRoundState]);
+  const loadData = async () => {
+    try {
+      if (cancelled) return;
+
+      await Promise.all([
+        fetchActivePlayers(),
+        fetchChampions(),
+        loadGlobalRoundState(),
+      ]);
+    } catch (err) {
+      console.error("[InitialLoad] Error:", err);
+    }
+  };
+
+  loadData();
+
+  return () => {
+    cancelled = true; // artık tanımlı
+  };
+}, [fetchActivePlayers, fetchChampions, loadGlobalRoundState]);
+
 
   // ✅ Poll backend every 5s for countdown sync
   useEffect(() => {
