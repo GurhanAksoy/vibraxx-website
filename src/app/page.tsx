@@ -1,4 +1,4 @@
-﻿ "use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback, useMemo, memo, useRef } from "react";
 import Image from "next/image";
@@ -21,7 +21,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { playMenuMusic, stopMenuMusic } from "@/lib/audioManager";
 
-// ✅ PREMIUM: Memoized Components
+// ✅ OPTIMIZED: Memoized Components
 const StatCard = memo(({ icon: Icon, value, label }: any) => (
   <div className="vx-stat-card">
     <Icon style={{ width: 20, height: 20, color: "#6b7280", marginBottom: 8 }} />
@@ -90,7 +90,6 @@ const ChampionCard = memo(({ champion }: any) => {
 });
 ChampionCard.displayName = "ChampionCard";
 
-// Age Verification Modal Component
 const AgeVerificationModal = memo(({ onConfirm, onCancel }: any) => (
   <div
     style={{
@@ -213,7 +212,6 @@ const AgeVerificationModal = memo(({ onConfirm, onCancel }: any) => (
 ));
 AgeVerificationModal.displayName = "AgeVerificationModal";
 
-// No Rounds Modal Component
 const NoRoundsModal = memo(({ onBuyRounds, onCancel }: any) => (
   <div
     style={{
@@ -350,77 +348,118 @@ export default function HomePage() {
   const [activePlayers, setActivePlayers] = useState(600);
   const [user, setUser] = useState<any>(null);
   const [champions, setChampions] = useState<any[]>([]);
-  const [stats] = useState({ totalQuestions: 2800000, roundsPerDay: 96 });
   const [showAgeModal, setShowAgeModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<"live" | "free" | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [userRounds, setUserRounds] = useState(0);
   const [showNoRoundsModal, setShowNoRoundsModal] = useState(false);
 
-  // Refs to prevent race conditions / stale closures
+  // ✅ OPTIMIZED: Constants as useMemo instead of useState
+  const stats = useMemo(
+    () => ({ totalQuestions: 2800000, roundsPerDay: 96 }),
+    []
+  );
+
+  // Refs to prevent race conditions
   const countdownPauseUntilRef = useRef<number>(0);
   const mountedRef = useRef<boolean>(false);
   const resumeIntentHandledRef = useRef<boolean>(false);
 
-// ✅ Fetch user's available rounds from user_rounds table (safe: no .single())
-const fetchUserRounds = useCallback(async () => {
-  if (!user) {
-    setUserRounds(0);
-    return;
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from("user_rounds")
-      .select("remaining")
-      .eq("user_id", user.id)
-      .limit(1);
-
-    if (error) {
-      console.error("User rounds fetch error:", error);
+  // ✅ OPTIMIZED: Fetch user rounds (safe, no .single())
+  const fetchUserRounds = useCallback(async () => {
+    if (!user) {
       setUserRounds(0);
       return;
     }
 
-    if (!data || data.length === 0) {
-      // satır yoksa 0 kabul et
+    try {
+      const { data, error } = await supabase
+        .from("user_rounds")
+        .select("remaining")
+        .eq("user_id", user.id)
+        .limit(1);
+
+      if (error) {
+        console.error("[UserRounds] Fetch error:", error);
+        setUserRounds(0);
+        return;
+      }
+
+      setUserRounds(data?.[0]?.remaining ?? 0);
+    } catch (err) {
+      console.error("[UserRounds] Fetch error:", err);
       setUserRounds(0);
-      return;
     }
+  }, [user]);
 
-    setUserRounds(data[0].remaining ?? 0);
-  } catch (err) {
-    console.error("User rounds fetch error:", err);
-    setUserRounds(0);
-  }
-}, [user]);
+  // ✅ OPTIMIZED: Fresh rounds check
+  const getFreshUserRounds = useCallback(async (): Promise<number | "error"> => {
+    if (!user) return "error";
 
-// ✅ Always-fresh authoritative rounds check (returns number OR "error")
-const getFreshUserRounds = useCallback(async (): Promise<number | "error"> => {
-  if (!user) return "error";
+    try {
+      const { data, error } = await supabase
+        .from("user_rounds")
+        .select("remaining")
+        .eq("user_id", user.id)
+        .limit(1);
 
-  try {
-    const { data, error } = await supabase
-      .from("user_rounds")
-      .select("remaining")
-      .eq("user_id", user.id)
-      .limit(1);
+      if (error) {
+        console.error("[FreshRounds] Error:", error);
+        return "error";
+      }
 
-    if (error) {
-      console.error("Fresh rounds fetch error:", error);
+      return data?.[0]?.remaining ?? 0;
+    } catch (err) {
+      console.error("[FreshRounds] Error:", err);
       return "error";
     }
+  }, [user]);
 
-    if (!data || data.length === 0) return 0;
+  // ✅ OPTIMIZED: Stable round state loader with drift protection
+  const loadGlobalRoundState = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("overlay_round_state")
+        .select("time_left")
+        .order("updated_at", { ascending: false })
+        .limit(1);
 
-    return data[0].remaining ?? 0;
-  } catch (err) {
-    console.error("Fresh rounds fetch error:", err);
-    return "error";
-  }
-}, [user]);
+      if (error || !data || data.length === 0) return;
 
-  // Initial Load with smooth fade in
+      const serverSeconds = Math.floor(Number(data[0].time_left));
+      if (!Number.isFinite(serverSeconds) || serverSeconds < 0) return;
+
+      // ✅ Pause local countdown briefly to prevent visual stutter
+      countdownPauseUntilRef.current = Date.now() + 200;
+
+      setGlobalTimeLeft((prev) => {
+        // First load
+        if (prev === null) return serverSeconds;
+
+        // ✅ CRITICAL: Ignore resets (backend started new round)
+        // If server jumped UP by 2+ seconds, it's a new round
+        // Keep local countdown running to avoid visual jump
+        if (serverSeconds > prev + 2) {
+          console.log("[Countdown] Ignoring reset, local countdown continues");
+          return prev;
+        }
+
+        // ✅ Only sync if drift is significant (5+ seconds)
+        const drift = Math.abs(serverSeconds - prev);
+        if (drift >= 5) {
+          console.log(`[Countdown] Drift correction: ${drift}s`);
+          return serverSeconds;
+        }
+
+        // ✅ Small drift: keep local (smoother UX)
+        return prev;
+      });
+    } catch (err) {
+      console.error("[Countdown] Fetch failed:", err);
+    }
+  }, []);
+
+  // Initial mount
   useEffect(() => {
     mountedRef.current = true;
     const timer = setTimeout(() => setIsInitialLoad(false), 100);
@@ -430,6 +469,7 @@ const getFreshUserRounds = useCallback(async (): Promise<number | "error"> => {
     };
   }, []);
 
+  // Fade in orbs
   useEffect(() => {
     if (!isInitialLoad) {
       const orbs = document.querySelectorAll(".animate-float");
@@ -447,23 +487,32 @@ const getFreshUserRounds = useCallback(async (): Promise<number | "error"> => {
     if (user) fetchUserRounds();
   }, [user, fetchUserRounds]);
 
-  // Real-time Active Players with Dynamic Variation
+  // ✅ OPTIMIZED: Smooth active players update (no jumps)
   const fetchActivePlayers = useCallback(async () => {
-  try {
-    const { count } = await supabase
-      .from("active_sessions")
-      .select("*", { count: "exact", head: true });
+    try {
+      const { count } = await supabase
+        .from("active_sessions")
+        .select("*", { count: "exact", head: true });
 
-    const base = 600;
-    const variation = Math.floor(Math.random() * 100) - 50;
-    setActivePlayers(Math.max(base, base + (count || 0) + variation));
-  } catch {
-    const variation = Math.floor(Math.random() * 100) - 50;
-    setActivePlayers(Math.max(600, 600 + variation));
-  }
-}, []);
+      const base = 600;
+      const variation = Math.floor(Math.random() * 100) - 50;
+      const newCount = Math.max(base, base + (count || 0) + variation);
 
-  // Default Champions (fallback)
+      // ✅ Smooth transition (avoid jarring jumps)
+      setActivePlayers((prev) => {
+        const diff = Math.abs(newCount - prev);
+        if (diff > 100) return newCount; // Big change: immediate
+
+        // Small change: gradual (+/- 10 max per tick)
+        return prev + Math.sign(newCount - prev) * Math.min(10, diff);
+      });
+    } catch {
+      const variation = Math.floor(Math.random() * 100) - 50;
+      setActivePlayers((prev) => Math.max(600, prev + variation));
+    }
+  }, []);
+
+  // Default champions fallback
   const getDefaultChampions = useCallback(
     () => [
       {
@@ -494,70 +543,69 @@ const getFreshUserRounds = useCallback(async (): Promise<number | "error"> => {
     []
   );
 
-  // Fetch Champions from Supabase (safe: no .single(), array-safe)
+  // ✅ OPTIMIZED: Champions with JOIN (3 queries instead of 6)
+  const fetchChampions = useCallback(async () => {
+    try {
+      const periods = ["daily", "weekly", "monthly"];
 
-const fetchChampions = useCallback(async () => {
-  try {
-    const periods = ["daily", "weekly", "monthly"];
+      // ✅ Single query per period with JOIN
+      const results = await Promise.all(
+        periods.map((period) =>
+          supabase
+            .from(`leaderboard_${period}`)
+            .select(`
+              score,
+              profiles!inner(full_name, avatar_url)
+            `)
+            .order("score", { ascending: false })
+            .limit(1)
+        )
+      );
 
-    const championsData = await Promise.all(
-      periods.map(async (period, index) => {
-        const { data: rows, error } = await supabase
-          .from(`leaderboard_${period}`)
-          .select("user_id, score")
-          .order("score", { ascending: false })
-          .limit(1);
+      const icons = [Crown, Trophy, Sparkles];
+      const colors = ["#facc15", "#c084fc", "#22d3ee"];
+      const gradients = [
+        "linear-gradient(to bottom right, #eab308, #f97316)",
+        "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
+        "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
+      ];
 
-        if (error || !rows || rows.length === 0) return null;
+      const mapped = results
+        .map((res, i) => {
+          const row = res.data?.[0];
+          if (!row) return null;
 
-        const row = rows[0];
+          return {
+            period: periods[i][0].toUpperCase() + periods[i].slice(1),
+            name: row.profiles?.full_name || "Anonymous Player",
+            score: row.score || 0,
+            gradient: gradients[i],
+            color: colors[i],
+            icon: icons[i],
+          };
+        })
+        .filter(Boolean);
 
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("full_name, avatar_url")
-          .eq("id", row.user_id)
-          .limit(1);
+      setChampions(mapped.length > 0 ? mapped : getDefaultChampions());
+    } catch (err) {
+      console.error("[Champions] Fetch failed:", err);
+      setChampions(getDefaultChampions());
+    }
+  }, [getDefaultChampions]);
 
-        const profile = profiles?.[0];
-
-        const icons = [Crown, Trophy, Sparkles];
-        const colors = ["#facc15", "#c084fc", "#22d3ee"];
-        const gradients = [
-          "linear-gradient(to bottom right, #eab308, #f97316)",
-          "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
-          "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
-        ];
-
-        return {
-          period: period.charAt(0).toUpperCase() + period.slice(1),
-          name: profile?.full_name || "Anonymous Player",
-          score: row.score || 0,
-          gradient: gradients[index],
-          color: colors[index],
-          icon: icons[index],
-        };
-      })
-    );
-
-    const valid = championsData.filter(Boolean) as any[];
-    setChampions(valid.length > 0 ? valid : getDefaultChampions());
-  } catch (err) {
-    console.error("Champion fetch failed", err);
-    setChampions(getDefaultChampions());
-  }
-}, [getDefaultChampions]);
-
-  // Initial Load
+  // Initial load
   useEffect(() => {
     let cancelled = false;
 
     const loadData = async () => {
       try {
-        await Promise.all([fetchActivePlayers(), fetchChampions(), loadGlobalRoundState()]);
-      } finally {
-        if (!cancelled) {
-          // nothing else needed; keeping logic minimal to avoid UI changes
-        }
+        await Promise.all([
+          fetchActivePlayers(),
+          fetchChampions(),
+          loadGlobalRoundState(),
+        ]);
+      } catch (err) {
+        console.error("[InitialLoad] Error:", err);
       }
     };
 
@@ -566,39 +614,36 @@ const fetchChampions = useCallback(async () => {
       cancelled = true;
     };
   }, [fetchActivePlayers, fetchChampions, loadGlobalRoundState]);
-     // ✅ Poll next round every 5 seconds to keep countdown authoritative
-useEffect(() => {
-  const interval = setInterval(() => {
-    loadGlobalRoundState();
-  }, 5000);
 
-  return () => clearInterval(interval);
-}, [loadGlobalRoundState]);
+  // ✅ Poll backend every 5s for countdown sync
+  useEffect(() => {
+    const interval = setInterval(loadGlobalRoundState, 5000);
+    return () => clearInterval(interval);
+  }, [loadGlobalRoundState]);
 
-  // ✅ Real-time Updates with countdown jump prevention (ref-based, no race)
+  // ✅ Real-time intervals (players + local countdown tick)
   useEffect(() => {
     const playersInterval = setInterval(fetchActivePlayers, 8000);
 
     const countdownInterval = setInterval(() => {
       const now = Date.now();
-      if (now < countdownPauseUntilRef.current) return;
+      if (now < countdownPauseUntilRef.current) return; // Respect pause
 
-      setGlobalTimeLeft((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
+      setGlobalTimeLeft((prev) => (prev && prev > 0 ? prev - 1 : prev));
     }, 1000);
 
-      return () => {
+    return () => {
       clearInterval(playersInterval);
       clearInterval(countdownInterval);
-          };
+    };
   }, [fetchActivePlayers]);
 
-  // Auth Listener + Resume intent after login
+  // Auth listener + resume intent after login
   useEffect(() => {
     const loadUser = async () => {
       const { data } = await supabase.auth.getUser();
       setUser(data.user || null);
 
-      // pending buy rounds after login
       if (data.user && sessionStorage.getItem("pendingBuyRounds") === "true") {
         sessionStorage.removeItem("pendingBuyRounds");
         setTimeout(() => {
@@ -626,10 +671,9 @@ useEffect(() => {
     return () => sub.subscription.unsubscribe();
   }, [router]);
 
-  // Resume "live/free" intent once user becomes available after redirect
+  // Resume live/free intent after login
   useEffect(() => {
-    if (!user) return;
-    if (resumeIntentHandledRef.current) return;
+    if (!user || resumeIntentHandledRef.current) return;
 
     const intent = sessionStorage.getItem("postLoginIntent");
     if (intent !== "live" && intent !== "free") return;
@@ -637,7 +681,6 @@ useEffect(() => {
     resumeIntentHandledRef.current = true;
     sessionStorage.removeItem("postLoginIntent");
 
-    // replicate original flow without changing UI: if age not verified -> open modal, else route.
     const ageOk = localStorage.getItem("vibraxx_age_verified") === "true";
 
     if (!ageOk) {
@@ -647,27 +690,23 @@ useEffect(() => {
     }
 
     if (intent === "live") {
-  getFreshUserRounds().then((remaining) => {
-    if (!mountedRef.current) return;
+      getFreshUserRounds().then((remaining) => {
+        if (!mountedRef.current) return;
 
-    if (remaining === "error") {
-      alert("Round balance could not be verified. Please refresh and try again.");
-      return;
+        if (remaining === "error") {
+          alert("Round balance could not be verified. Please refresh and try again.");
+          return;
+        }
+
+        if (remaining <= 0) setShowNoRoundsModal(true);
+        else router.push("/lobby");
+      });
+    } else {
+      router.push("/free");
     }
-
-    if (remaining <= 0) setShowNoRoundsModal(true);
-    else router.push("/lobby");
-  });
-}
-
-    else {
-  router.push("/free");
-}
-
   }, [user, router, getFreshUserRounds]);
 
-
-  // Music Toggle
+  // Music toggle
   const toggleMusic = useCallback(() => {
     if (isPlaying) {
       stopMenuMusic();
@@ -680,7 +719,7 @@ useEffect(() => {
     }
   }, [isPlaying]);
 
-  // Load Music Preference
+  // Load music preference
   useEffect(() => {
     const musicPref = localStorage.getItem("vibraxx_music");
     if (musicPref === "true") {
@@ -690,7 +729,7 @@ useEffect(() => {
     return () => stopMenuMusic();
   }, []);
 
-  // Auth Actions
+  // Auth actions
   const handleSignIn = useCallback(async () => {
     const redirectUrl = `${window.location.origin}/auth/callback`;
     await supabase.auth.signInWithOAuth({
@@ -702,19 +741,57 @@ useEffect(() => {
   const handleSignOut = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
-    // allow future login intent to run again
     resumeIntentHandledRef.current = false;
   }, []);
 
-  // Age Verification Handler (race-safe)
-const handleAgeVerification = useCallback(async () => {
-  localStorage.setItem("vibraxx_age_verified", "true");
+  // Age verification handler
+  const handleAgeVerification = useCallback(async () => {
+    localStorage.setItem("vibraxx_age_verified", "true");
 
-  const action = pendingAction; // snapshot al
-  setPendingAction(null);
-  setShowAgeModal(false);
+    const action = pendingAction;
+    setPendingAction(null);
+    setShowAgeModal(false);
 
-  if (action === "live") {
+    if (action === "live") {
+      const remaining = await getFreshUserRounds();
+
+      if (remaining === "error") {
+        alert("Round balance could not be verified. Please refresh and try again.");
+        return;
+      }
+
+      if (remaining <= 0) {
+        setShowNoRoundsModal(true);
+        return;
+      }
+
+      router.push("/lobby");
+    }
+
+    if (action === "free") {
+      router.push("/free");
+    }
+  }, [pendingAction, getFreshUserRounds, router]);
+
+  // Check age verification
+  const checkAgeVerification = useCallback(() => {
+    return localStorage.getItem("vibraxx_age_verified") === "true";
+  }, []);
+
+  // Start live quiz
+  const handleStartLiveQuiz = useCallback(async () => {
+    if (!user) {
+      sessionStorage.setItem("postLoginIntent", "live");
+      await handleSignIn();
+      return;
+    }
+
+    if (!checkAgeVerification()) {
+      setPendingAction("live");
+      setShowAgeModal(true);
+      return;
+    }
+
     const remaining = await getFreshUserRounds();
 
     if (remaining === "error") {
@@ -728,50 +805,9 @@ const handleAgeVerification = useCallback(async () => {
     }
 
     router.push("/lobby");
-  } 
-  
-  if (action === "free") {
-    router.push("/free");
-  }
+  }, [user, handleSignIn, checkAgeVerification, getFreshUserRounds, router]);
 
-}, [pendingAction, getFreshUserRounds, router]);
-
-  // Check if user is verified 18+
-  const checkAgeVerification = useCallback(() => {
-    return localStorage.getItem("vibraxx_age_verified") === "true";
-  }, []);
-
-  // Start Live Quiz
-  const handleStartLiveQuiz = useCallback(async () => {
-  if (!user) {
-    sessionStorage.setItem("postLoginIntent", "live");
-    await handleSignIn();
-    return;
-  }
-
-  if (!checkAgeVerification()) {
-    setPendingAction("live");
-    setShowAgeModal(true);
-    return;
-  }
-
-  const remaining = await getFreshUserRounds();
-
-if (remaining === "error") {
-  alert("Round balance could not be verified. Please refresh and try again.");
-  return;
-}
-
-if (remaining <= 0) {
-  setShowNoRoundsModal(true);
-  return;
-}
-
-router.push("/lobby");
-
-}, [user, handleSignIn, checkAgeVerification, getFreshUserRounds, router]);
-
-  // Start Free Quiz
+  // Start free quiz
   const handleStartFreeQuiz = useCallback(async () => {
     if (!user) {
       sessionStorage.setItem("postLoginIntent", "free");
@@ -788,16 +824,17 @@ router.push("/lobby");
     router.push("/free");
   }, [user, handleSignIn, checkAgeVerification, router]);
 
-  // Format Time
+  // Format time
   const formatTime = useCallback((seconds: number | null) => {
-    if (seconds === null || typeof seconds !== "number" || Number.isNaN(seconds)) return "--:--";
+    if (seconds === null || typeof seconds !== "number" || Number.isNaN(seconds))
+      return "--:--";
     const safe = Math.max(0, seconds);
     const m = Math.floor(safe / 60);
     const s = safe % 60;
     return `${m}:${s.toString().padStart(2, "0")}`;
   }, []);
 
-  // ✅ PREMIUM: Stats Cards
+  // ✅ OPTIMIZED: Stats cards memoized
   const statsCards = useMemo(
     () => [
       {
@@ -822,12 +859,12 @@ router.push("/lobby");
   return (
     <>
       <style jsx global>{`
-        :root { 
+        :root {
           color-scheme: dark;
           background-color: #020817;
         }
-        
-        * { 
+
+        * {
           box-sizing: border-box;
         }
 
@@ -838,39 +875,58 @@ router.push("/lobby");
         }
 
         @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-20px); }
+          0%,
+          100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-20px);
+          }
         }
 
         @keyframes glow {
-          0%, 100% { opacity: 0.3; }
-          50% { opacity: 0.6; }
+          0%,
+          100% {
+            opacity: 0.3;
+          }
+          50% {
+            opacity: 0.6;
+          }
         }
 
         @keyframes shimmer {
-          0% { background-position: -200% center; }
-          100% { background-position: 200% center; }
+          0% {
+            background-position: -200% center;
+          }
+          100% {
+            background-position: 200% center;
+          }
         }
 
         @keyframes pulse-slow {
-          0%, 100% { opacity: 0.5; }
-          50% { opacity: 0.8; }
+          0%,
+          100% {
+            opacity: 0.5;
+          }
+          50% {
+            opacity: 0.8;
+          }
         }
 
-        .animate-float { 
-          animation: float 6s ease-in-out infinite; 
+        .animate-float {
+          animation: float 6s ease-in-out infinite;
           will-change: transform;
           animation-delay: 0.3s;
           animation-fill-mode: backwards;
         }
-        
-        .animate-glow { 
+
+        .animate-glow {
           animation: glow 3s ease-in-out infinite;
           animation-delay: 0.5s;
           animation-fill-mode: backwards;
         }
-        
-        .animate-shimmer { 
+
+.animate-shimmer { 
           background-size: 200% 100%; 
           animation: shimmer 3s linear infinite;
           animation-delay: 0.2s;
