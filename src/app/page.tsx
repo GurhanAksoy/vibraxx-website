@@ -416,11 +416,11 @@ export default function HomePage() {
   }, [user]);
 
   // ✅ OPTIMIZED: Stable round state loader with drift protection
-  const loadGlobalRoundState = useCallback(async () => {
+const loadGlobalRoundState = useCallback(async () => {
   try {
     const { data, error } = await supabase
       .from("overlay_round_state")
-      .select("time_left, server_time") // ✅ Add server_time for drift correction
+      .select("time_left")
       .order("updated_at", { ascending: false })
       .limit(1);
 
@@ -429,35 +429,25 @@ export default function HomePage() {
     const serverSeconds = Math.floor(Number(data[0].time_left));
     if (!Number.isFinite(serverSeconds) || serverSeconds < 0) return;
 
-      // ✅ Pause local countdown briefly to prevent visual stutter
-      countdownPauseUntilRef.current = Date.now() + 200;
+    countdownPauseUntilRef.current = Date.now() + 200;
 
-      setGlobalTimeLeft((prev) => {
-        // First load
-        if (prev === null) return serverSeconds;
+    setGlobalTimeLeft((prev) => {
+      if (prev === null) return serverSeconds;
 
-        // ✅ CRITICAL: Ignore resets (backend started new round)
-        // If server jumped UP by 2+ seconds, it's a new round
-        // Keep local countdown running to avoid visual jump
-        if (serverSeconds > prev + 2) {
-          console.log("[Countdown] Ignoring reset, local countdown continues");
-          return prev;
-        }
-
-        // ✅ Only sync if drift is significant (5+ seconds)
-        const drift = Math.abs(serverSeconds - prev);
-        if (drift >= 5) {
-          console.log(`[Countdown] Drift correction: ${drift}s`);
-          return serverSeconds;
-        }
-
-        // ✅ Small drift: keep local (smoother UX)
+      if (serverSeconds > prev + 2 && prev > 10) {
+        console.log("[Countdown] Ignoring reset");
         return prev;
-      });
-    } catch (err) {
-      console.error("[Countdown] Fetch failed:", err);
-    }
-  }, []);
+      }
+
+      const drift = Math.abs(serverSeconds - prev);
+      if (drift >= 5) return serverSeconds;
+
+      return prev;
+    });
+  } catch (err) {
+    console.error("[Countdown] Fetch failed:", err);
+  }
+}, []);
 
   // Initial mount
   useEffect(() => {
@@ -573,7 +563,7 @@ const fetchChampions = useCallback(async () => {
 
         return {
           period: periods[i][0].toUpperCase() + periods[i].slice(1),
-          name: row.user_id || "Anonymous Player", // profil yoksa user_id fallback
+          name: "Top Player"
           score: row.points || 0,
           gradient: gradients[i],
           color: colors[i],
@@ -591,8 +581,7 @@ const fetchChampions = useCallback(async () => {
 
   // Initial load
   useEffect(() => {
-    let cancelled = false;
-
+    
     const loadData = async () => {
       try {
         await Promise.all([
