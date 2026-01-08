@@ -439,6 +439,7 @@ export default function HomePage() {
 }, []);
 
 
+
       // ✅ Pause local countdown briefly to prevent visual stutter
       countdownPauseUntilRef.current = Date.now() + 200;
 
