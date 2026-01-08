@@ -161,31 +161,48 @@ export default function LobbyPage() {
 
       const round = data[0] as CurrentRound;
 
-      // ✅ Round değiştiyse: lobby state reset (sayaç 0'da takılma bug'ı buradan geliyordu)
-      if (lastRoundIdRef.current && lastRoundIdRef.current !== round.round_id) {
-        setHasJoined(false);
-        setShowWarning(false);
-        setIsRedirecting(false);
-        setPlayers([]);
-        setTotalPlayers(0);
-      }
-      lastRoundIdRef.current = round.round_id;
+     // ✅ Round change detection + deterministic countdown
+if (lastRoundIdRef.current && lastRoundIdRef.current !== round.round_id) {
+  console.log("🔄 Round changed, resetting lobby state");
 
-      const rawSeconds =
-  (round as any).time_until_next_round_seconds ??
-  (round as any).time_until_start_seconds ??
-  (round as any).time_until_start ??
-  null;
+  setHasJoined(false);
+  setShowWarning(false);
+  setIsRedirecting(false);
+  setPlayers([]);
+  setTotalPlayers(0);
+}
 
-      const seconds = Number(rawSeconds);
+lastRoundIdRef.current = round.round_id;
 
-      if (!Number.isFinite(seconds)) {
-        console.warn("⚠️ Invalid time_until_start:", rawSeconds);
-        setGlobalTimeLeft(null);
-      } else {
-        // server'dan gelen saniyeyi her poll'de clamp'le
-        setGlobalTimeLeft(Math.max(0, Math.floor(seconds)));
-      }
+// ⏱️ Deterministic countdown from scheduled_start
+let seconds: number | null = null;
+
+if (round.scheduled_start) {
+  const startTime = new Date(round.scheduled_start).getTime();
+  const now = Date.now();
+
+  const diff = Math.floor((startTime - now) / 1000);
+  seconds = diff;
+}
+
+// ⛔ Safety checks
+if (seconds === null || !Number.isFinite(seconds)) {
+  console.warn("⚠️ Invalid scheduled_start or countdown:", round.scheduled_start);
+  setGlobalTimeLeft(null);
+} else {
+  // clamp: prevent negative drift spikes
+  setGlobalTimeLeft(Math.max(0, seconds));
+}
+
+setCurrentRound(round);
+
+console.log("✅ Current round loaded:", {
+  id: round.round_id,
+  status: round.status,
+  scheduled_start: round.scheduled_start,
+  seconds,
+});
+
 
       setCurrentRound(round);
 
