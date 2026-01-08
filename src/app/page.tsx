@@ -507,7 +507,7 @@ const fetchChampions = useCallback(async () => {
           .select(`
             user_id,
             score,
-            profiles (
+            profiles:user_id (
               full_name,
               avatar_url
             )
@@ -518,7 +518,7 @@ const fetchChampions = useCallback(async () => {
         if (error || !data || data.length === 0) return null;
 
         const row = data[0];
-        const userProfile = row.profiles?.[0];
+        const userProfile = row.profiles as any;
 
         const icons = [Crown, Trophy, Sparkles];
         const colors = ["#facc15", "#c084fc", "#22d3ee"];
@@ -539,10 +539,10 @@ const fetchChampions = useCallback(async () => {
       })
     );
 
-    const valid = championsData.filter(Boolean);
-    setChampions(valid.length ? valid : getDefaultChampions());
-  } catch (e) {
-    console.error("Champion fetch failed", e);
+    const validChampions = championsData.filter(Boolean) as any[];
+    setChampions(validChampions.length > 0 ? validChampions : getDefaultChampions());
+  } catch (err) {
+    console.error("Champion fetch failed", err);
     setChampions(getDefaultChampions());
   }
 }, [getDefaultChampions]);
@@ -563,13 +563,41 @@ const loadGlobalRoundState = useCallback(async () => {
   return;
 }
 
-const seconds = Math.floor(Number(data[0].time_left));
+const loadGlobalRoundState = useCallback(async () => {
+  try {
+    const { data, error } = await supabase
+      .from("overlay_round_state")
+      .select("time_left")
+      .order("updated_at", { ascending: false })
+      .limit(1);
 
-    if (Number.isFinite(seconds) && seconds >= 0) {
-      setGlobalTimeLeft(seconds);
-    } else {
+    if (error || !data || data.length === 0) {
+      console.warn("No global round state found", error);
       setGlobalTimeLeft(null);
+      return;
     }
+
+    const seconds = Math.floor(Number(data[0].time_left));
+
+    setGlobalTimeLeft((prev) => {
+      if (!Number.isFinite(seconds) || seconds < 0) return null;
+
+      // İlk kez geliyorsa al
+      if (prev === null) return seconds;
+
+      // Eğer server değeri local'den büyük geliyorsa (reset gibi) ignore et
+      if (seconds > prev + 2) {
+        return prev;
+      }
+
+      // Eğer arada büyük fark varsa (round değişti vs) kabul et
+      if (Math.abs(seconds - prev) >= 5) {
+        return seconds;
+      }
+
+      // Küçük farklarda local devam et
+      return prev;
+    });
   } catch (err) {
     console.error("Failed to load global round state:", err);
     setGlobalTimeLeft(null);
