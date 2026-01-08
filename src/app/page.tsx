@@ -502,23 +502,23 @@ const fetchChampions = useCallback(async () => {
 
     const championsData = await Promise.all(
       periods.map(async (period, index) => {
-        const { data, error } = await supabase
+        const { data: rows, error } = await supabase
           .from(`leaderboard_${period}`)
-          .select(`
-            user_id,
-            score,
-            profiles:user_id (
-              full_name,
-              avatar_url
-            )
-          `)
+          .select("user_id, score")
           .order("score", { ascending: false })
           .limit(1);
 
-        if (error || !data || data.length === 0) return null;
+        if (error || !rows || rows.length === 0) return null;
 
-        const row = data[0];
-        const userProfile = row.profiles as any;
+        const row = rows[0];
+
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("full_name, avatar_url")
+          .eq("id", row.user_id)
+          .limit(1);
+
+        const profile = profiles?.[0];
 
         const icons = [Crown, Trophy, Sparkles];
         const colors = ["#facc15", "#c084fc", "#22d3ee"];
@@ -530,7 +530,7 @@ const fetchChampions = useCallback(async () => {
 
         return {
           period: period.charAt(0).toUpperCase() + period.slice(1),
-          name: userProfile?.full_name || "Anonymous Player",
+          name: profile?.full_name || "Anonymous Player",
           score: row.score || 0,
           gradient: gradients[index],
           color: colors[index],
@@ -539,44 +539,13 @@ const fetchChampions = useCallback(async () => {
       })
     );
 
-    const validChampions = championsData.filter(Boolean) as any[];
-    setChampions(validChampions.length > 0 ? validChampions : getDefaultChampions());
+    const valid = championsData.filter(Boolean) as any[];
+    setChampions(valid.length > 0 ? valid : getDefaultChampions());
   } catch (err) {
     console.error("Champion fetch failed", err);
     setChampions(getDefaultChampions());
   }
 }, [getDefaultChampions]);
-
-  // Load initial global round state from overlay table
-  // ✅ YENİ
-const loadGlobalRoundState = useCallback(async () => {
-  try {
-    const { data, error } = await supabase
-      .from("overlay_round_state")
-      .select("time_left")
-      .order("updated_at", { ascending: false })
-      .limit(1);
-
-    if (error || !data || data.length === 0) {
-      console.warn("No global round state found", error);
-      setGlobalTimeLeft(null);
-      return;
-    }
-
-    const seconds = Math.floor(Number(data[0].time_left));
-
-    setGlobalTimeLeft((prev) => {
-      if (!Number.isFinite(seconds) || seconds < 0) return null;
-      if (prev === null) return seconds;
-      if (seconds > prev + 2) return prev;
-      if (Math.abs(seconds - prev) >= 5) return seconds;
-      return prev;
-    });
-  } catch (err) {
-    console.error("Failed to load global round state:", err);
-    setGlobalTimeLeft(null);
-  }
-}, []);
 
   // Initial Load
   useEffect(() => {
