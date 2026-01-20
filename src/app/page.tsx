@@ -1018,7 +1018,7 @@ const fetchChampions = useCallback(async () => {
           animation-fill-mode: backwards;
         }
 
-        .vx-container { max-width: 1280px; margin: 0 auto; padding: 0 16px; }
+        .vx-container { max-width: 1400px; margin: 0 auto; padding: 0 16px; }
         @media (min-width: 640px) { .vx-container { padding: 0 24px; } }
 
         .vx-header {
@@ -1631,8 +1631,8 @@ const fetchChampions = useCallback(async () => {
                 <div
                   style={{
                     position: "relative",
-                    width: 120,
-                    height: 120,
+                    width: 100,
+                    height: 100,
                     borderRadius: "9999px",
                     padding: 4,
                     background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)",
@@ -2077,17 +2077,17 @@ const fetchChampions = useCallback(async () => {
 
             {/* CTA Buttons */}
             <div className="vx-cta-wrap">
-              <button className="vx-cta-btn vx-cta-live" onClick={handleStartLiveQuiz} aria-label="Start live quiz with prizes">
+              <button className="vx-cta-btn vx-cta-live" onClick={handleStartLiveQuiz} aria-label="Enter live arena with prizes">
                 <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right,#7c3aed,#d946ef)" }} />
                 <Play style={{ position: "relative", zIndex: 10, width: 20, height: 20 }} />
-                <span style={{ position: "relative", zIndex: 10 }}>Start Live Quiz</span>
+                <span style={{ position: "relative", zIndex: 10 }}>Enter Live Arena</span>
                 <ArrowRight style={{ position: "relative", zIndex: 10, width: 20, height: 20 }} />
               </button>
 
-              <button className="vx-cta-btn vx-cta-free" onClick={handleStartFreeQuiz} aria-label="Start free practice quiz">
+              <button className="vx-cta-btn vx-cta-free" onClick={handleStartFreeQuiz} aria-label="Try free practice quiz">
                 <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right,#06b6d4,#22d3ee)" }} />
                 <Gift style={{ position: "relative", zIndex: 10, width: 20, height: 20 }} />
-                <span style={{ position: "relative", zIndex: 10 }}>Start Free Quiz</span>
+                <span style={{ position: "relative", zIndex: 10 }}>Try Free Quiz</span>
                 <ArrowRight style={{ position: "relative", zIndex: 10, width: 20, height: 20 }} />
               </button>
             </div>
