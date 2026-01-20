@@ -1,0 +1,69 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
+
+export default function VerifyAgePage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
+  const handleVerify = async () => {
+    setLoading(true);
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      router.push("/");
+      return;
+    }
+
+    await supabase
+      .from("profiles")
+      .update({ age_verified: true })
+      .eq("user_id", user.id);
+
+    router.push("/lobby");
+  };
+
+  return (
+    <div style={{ 
+      minHeight: "100vh", 
+      display: "flex", 
+      alignItems: "center", 
+      justifyContent: "center",
+      background: "#020817",
+      color: "#fff",
+      padding: "20px"
+    }}>
+      <div style={{ 
+        maxWidth: "400px", 
+        textAlign: "center",
+        padding: "40px",
+        background: "rgba(15, 23, 42, 0.9)",
+        borderRadius: "20px"
+      }}>
+        <h1 style={{ fontSize: "32px", marginBottom: "20px" }}>Age Verification</h1>
+        <p style={{ marginBottom: "30px", color: "#94a3b8" }}>
+          You must be 18+ to participate
+        </p>
+        <button
+          onClick={handleVerify}
+          disabled={loading}
+          style={{
+            width: "100%",
+            padding: "16px",
+            background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+            border: "none",
+            borderRadius: "12px",
+            color: "#fff",
+            fontSize: "18px",
+            fontWeight: 700,
+            cursor: "pointer"
+          }}
+        >
+          {loading ? "Verifying..." : "I am 18 or older"}
+        </button>
+      </div>
+    </div>
+  );
+}

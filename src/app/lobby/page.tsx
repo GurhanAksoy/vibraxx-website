@@ -1,23 +1,5 @@
 "use client";
 
-/**
- * LOBBY PAGE - OPTIMIZED & SECURED
- * 
- * ✅ Design 100% preserved (inline styles untouched)
- * ✅ 4-layer security system (URL protection removed for flexibility)
- * ✅ Browser-compliant music autoplay
- * ✅ Supabase migration (new schema)
- * ✅ Real-time subscriptions
- * ✅ useNextRound hook (DRY with homepage)
- * ✅ Anti-cheat mechanisms
- * 
- * SECURITY LAYERS:
- * Layer 1: Authentication check (Supabase auth)
- * Layer 2: Credits verification (user_credits table)
- * Layer 3: Age verification (UK legal compliance)
- * Layer 4: Round status validation (useNextRound hook)
- */
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Users,
@@ -31,59 +13,46 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { useNextRound } from "@/hooks/useNextRound";
 import Image from "next/image";
-
-// ==================== TYPES ====================
+import { useNextRound } from "@/hooks/useNextRound";
 
 interface LobbyPlayer {
   user_id: string;
   full_name: string;
   avatar_url: string;
+  total_score: number;
+  streak: number;
   joined_at: string;
 }
-
-// ==================== COMPONENT ====================
 
 export default function LobbyPage() {
   const router = useRouter();
 
-  // ==================== HOOKS ====================
-  
-  // Shared hook with homepage (DRY principle)
-  const { timeUntilStart, formattedCountdown, nextRound, lobbyStatus, reload } = useNextRound();
+  // ✅ Use shared hook (Homepage ile AYNI round!)
+  const { timeLeft: globalTimeLeft, roundId, roundData } = useNextRound();
 
-  // ==================== STATE ====================
-  
-  // Auth & User
+  // Core State
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [showWarning, setShowWarning] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [userCredits, setUserCredits] = useState(0);
-  const [isAgeVerified, setIsAgeVerified] = useState(false);
-  
-  // UI States
   const [isLoading, setIsLoading] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
-  const [showWarning, setShowWarning] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
-  const [isJoining, setIsJoining] = useState(false);
-  
+
   // Lobby Data
   const [players, setPlayers] = useState<LobbyPlayer[]>([]);
   const [totalPlayers, setTotalPlayers] = useState(0);
-  
-  // Music
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [hasInteracted, setHasInteracted] = useState(false);
 
-  // ==================== REFS ====================
-  
+  // Audio refs
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const alarmRef = useRef<HTMLAudioElement | null>(null);
   const countdownBeepRef = useRef<HTMLAudioElement | null>(null);
-  const lastRoundIdRef = useRef<number | null>(null);
 
-  // ==================== AUDIO INITIALIZATION ====================
-  
+  // Round change detection
+  const lastRoundIdRef = useRef<string | null>(null);
+
+  // === AUDIO INITIALIZATION ===
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -110,32 +79,7 @@ export default function LobbyPage() {
     };
   }, []);
 
-  // ==================== MUSIC AUTOPLAY (Browser-Compliant) ====================
-  
-  useEffect(() => {
-    const handleFirstInteraction = () => {
-      if (!hasInteracted) {
-        setHasInteracted(true);
-        
-        const savedPref = localStorage.getItem("vibraxx_music");
-        
-        if (savedPref !== "false") {
-          audioRef.current?.play().catch(() => {});
-          setIsPlaying(true);
-        }
-      }
-    };
-    
-    document.addEventListener("click", handleFirstInteraction, { once: true });
-    document.addEventListener("touchstart", handleFirstInteraction, { once: true });
-    
-    return () => {
-      document.removeEventListener("click", handleFirstInteraction);
-      document.removeEventListener("touchstart", handleFirstInteraction);
-    };
-  }, [hasInteracted]);
-
-  // Play/Pause control
+  // === PLAY / PAUSE CONTROL ===
   useEffect(() => {
     if (!audioRef.current) return;
     if (isPlaying) {
@@ -145,838 +89,1262 @@ export default function LobbyPage() {
     }
   }, [isPlaying]);
 
-  const toggleMusic = () => {
-    const newState = !isPlaying;
-    setIsPlaying(newState);
-    localStorage.setItem("vibraxx_music", String(newState));
-  };
-
-  // ==================== 🔐 SECURITY SYSTEM: 4-LAYER VALIDATION ====================
-  // Auth State Listener - Production-safe async auth handling
-  
+  // 🔐 === AUTH CHECK & CREDITS ===
   useEffect(() => {
-    let isMounted = true;
+    const checkAuth = async () => {
+      setIsLoading(true);
 
-    const runSecurityChecks = async (authUser: any) => {
-      if (!isMounted) return;
+      const {
+        data: { user: authUser },
+        error: authError,
+      } = await supabase.auth.getUser();
 
-      try {
-        setUser(authUser);
-        console.log("✅ [Security L1] User authenticated:", authUser.id);
-
-        // 🔐 LAYER 2: Credits Check
-        const { data: creditsData, error: creditsError } = await supabase
-          .from("user_credits")
-          .select("live_credits")
-          .eq("user_id", authUser.id)
-          .single();
-
-        if (!isMounted) return;
-
-        if (creditsError || !creditsData || creditsData.live_credits <= 0) {
-          console.error("🚫 [Security L2] Insufficient credits");
-          router.push("/buy");
-          return;
-        }
-
-        setUserCredits(creditsData.live_credits);
-        console.log("✅ [Security L2] Credits verified:", creditsData.live_credits);
-
-        // 🔐 LAYER 3: Age Verification (UK Legal Compliance)
-        const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
-          .select("age_verified")
-          .eq("user_id", authUser.id)
-          .single();
-
-        if (!isMounted) return;
-
-        if (profileError || !profileData?.age_verified) {
-          console.error("🚫 [Security L3] Age verification required");
-          router.push("/verify-age");
-          return;
-        }
-
-        setIsAgeVerified(true);
-        console.log("✅ [Security L3] Age verified");
-
-        // 🔐 LAYER 4: Round Status Check (handled by useNextRound hook)
-        // Will validate round availability and timing
-
-        // ✅ ALL SECURITY CHECKS PASSED
-        if (isMounted) {
-          setIsLoading(false);
-        }
-
-      } catch (err) {
-        console.error("🚫 [Security] Security checks failed:", err);
-        if (isMounted) {
-          router.push("/");
-        }
-      }
-    };
-
-    // 🔐 LAYER 1: Auth State Listener (Production-safe)
-    const initAuth = async () => {
-      // Initial session check (for already logged-in users)
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user && isMounted) {
-        console.log("[Auth] Initial session found:", session.user.id);
-        await runSecurityChecks(session.user);
+      if (authError || !authUser) {
+        console.log("[Lobby] Not authenticated");
+        router.push("/");
+        return;
       }
 
-      // Listen for auth changes
-      const { data: authListener } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
-          console.log(`[Auth] Event: ${event}, Session:`, session?.user?.id || 'none');
+      setUser(authUser);
 
-          // No session = redirect to homepage
-          if (!session?.user) {
-            console.warn("⏳ [Security L1] No active session - redirecting");
-            if (isMounted) {
-              router.push("/");
-            }
-            return;
-          }
+      // ✅ NEW: user_credits.live_credits (ESKİ: get_my_round_credits RPC)
+      const { data: creditsData, error: creditsError } = await supabase
+        .from("user_credits")
+        .select("live_credits")
+        .eq("user_id", authUser.id)
+        .single();
 
-          // Session exists - run security checks
-          await runSecurityChecks(session.user);
-        }
-      );
+      if (creditsError) {
+        console.error("[Lobby] Credits check error:", creditsError);
+        router.push("/buy");
+        return;
+      }
 
-      return authListener;
+      if (!creditsData || creditsData.live_credits <= 0) {
+        console.log("[Lobby] No remaining credits");
+        router.push("/buy");
+        return;
+      }
+
+      setUserCredits(creditsData.live_credits);
+      console.log("[Lobby] User credits:", creditsData.live_credits);
+      setIsLoading(false);
     };
 
-    // Start auth initialization
-    const authPromise = initAuth();
-
-    // Cleanup
-    return () => {
-      isMounted = false;
-      authPromise.then((listener) => {
-        listener?.subscription.unsubscribe();
-      });
-    };
+    checkAuth();
   }, [router]);
 
-  // ==================== ROUND CHANGE DETECTION ====================
-  
+  // ✅ === ROUND CHANGE DETECTION ===
   useEffect(() => {
-    if (!nextRound) return;
-
-    // Detect round change and reset state
-    if (lastRoundIdRef.current && lastRoundIdRef.current !== nextRound.id) {
-      console.log("🔄 Round changed, resetting lobby state");
-      
+    if (roundId && lastRoundIdRef.current && lastRoundIdRef.current !== roundId) {
+      console.log("[Lobby] Round changed, resetting state");
       setHasJoined(false);
       setShowWarning(false);
       setIsRedirecting(false);
       setPlayers([]);
       setTotalPlayers(0);
     }
+    lastRoundIdRef.current = roundId;
+  }, [roundId]);
 
-    lastRoundIdRef.current = nextRound.id;
-  }, [nextRound]);
+  // ✅ === LOBBY SESSION TRACKING (ROUND DÜŞMEZ) ===
+  useEffect(() => {
+    if (roundId && user && !hasJoined) {
+      console.log("[Lobby] User in lobby, waiting for quiz start");
+      supabase.rpc("upsert_user_session", { p_user_id: user.id });
+      setHasJoined(true);
+    }
+  }, [roundId, user?.id, hasJoined]);
 
-  // ==================== FETCH LOBBY PLAYERS ====================
-  
+  // === FETCH LOBBY PLAYERS ===
   const fetchLobbyPlayers = useCallback(async () => {
-    if (!nextRound?.id) return;
+    if (!roundId) return;
 
     try {
-      const { data, error } = await supabase
-        .from("round_participants")
-        .select(`
-          user_id,
-          joined_at,
-          profiles!inner (
-            full_name,
-            avatar_url
-          )
-        `)
-        .eq("round_id", nextRound.id)
-        .order("joined_at", { ascending: true })
-        .limit(50); // Top 50 players in lobby
-
-      if (error) {
-        console.error("[LobbyPlayers] Query error:", error);
-        return;
-      }
-
-      if (!data) {
-        setPlayers([]);
-        return;
-      }
-
-      // Transform data
-      const playerList: LobbyPlayer[] = data.map((p: any) => ({
-        user_id: p.user_id,
-        full_name: p.profiles?.full_name || "Anonymous",
-        avatar_url: p.profiles?.avatar_url || "/images/logo.png",
-        joined_at: p.joined_at,
-      }));
-
-      setPlayers(playerList);
-
-    } catch (err) {
-      console.error("[LobbyPlayers] Unexpected error:", err);
-    }
-  }, [nextRound?.id]);
-
-  // ==================== FETCH TOTAL PARTICIPANTS ====================
-  
-  const fetchTotalParticipants = useCallback(async () => {
-    if (!nextRound?.id) return;
-
-    try {
-      const { count, error } = await supabase
-        .from("round_participants")
-        .select("*", { count: "exact", head: true })
-        .eq("round_id", nextRound.id);
-
-      if (error) {
-        console.error("[TotalParticipants] Query error:", error);
-        return;
-      }
-
-      setTotalPlayers(count || 0);
-
-    } catch (err) {
-      console.error("[TotalParticipants] Unexpected error:", err);
-    }
-  }, [nextRound?.id]);
-
-  // ==================== CHECK IF ALREADY JOINED ====================
-  
-  const checkIfAlreadyJoined = useCallback(async () => {
-    if (!user || !nextRound?.id) return;
-
-    try {
-      const { data, error } = await supabase
-        .from("round_participants")
-        .select("user_id")
-        .eq("round_id", nextRound.id)
-        .eq("user_id", user.id)
-        .single();
-
-      if (data) {
-        setHasJoined(true);
-        console.log("✅ User already joined this round");
-      }
-
-    } catch (err) {
-      // Not joined yet (expected)
-    }
-  }, [user, nextRound?.id]);
-
-  // ==================== INITIAL DATA LOAD ====================
-  
-  useEffect(() => {
-    if (!nextRound?.id || !user) return;
-
-    fetchLobbyPlayers();
-    fetchTotalParticipants();
-    checkIfAlreadyJoined();
-  }, [nextRound?.id, user, fetchLobbyPlayers, fetchTotalParticipants, checkIfAlreadyJoined]);
-
-  // ==================== REAL-TIME SUBSCRIPTIONS ====================
-  
-  useEffect(() => {
-    if (!nextRound?.id) return;
-
-    // Subscribe to new participants
-    const channel = supabase
-      .channel(`lobby:${nextRound.id}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'round_participants',
-        filter: `round_id=eq.${nextRound.id}`
-      }, (payload) => {
-        console.log("[Realtime] New player joined:", payload);
-        
-        // Refresh player list and count
-        fetchLobbyPlayers();
-        fetchTotalParticipants();
-      })
-      .subscribe();
-
-    console.log("[Realtime] Subscribed to lobby updates");
-
-    return () => {
-      console.log("[Realtime] Unsubscribing from lobby");
-      channel.unsubscribe();
-    };
-  }, [nextRound?.id, fetchLobbyPlayers, fetchTotalParticipants]);
-
-  // ==================== WARNING SYSTEM (10s before start) ====================
-  
-  useEffect(() => {
-    if (timeUntilStart === 10 && !showWarning) {
-      setShowWarning(true);
-      alarmRef.current?.play().catch(() => {});
-      console.log("⚠️ 10 seconds warning!");
-    }
-
-    if (timeUntilStart === 3 && !isRedirecting) {
-      countdownBeepRef.current?.play().catch(() => {});
-      console.log("🔊 Final countdown beep!");
-    }
-  }, [timeUntilStart, showWarning, isRedirecting]);
-
-  // ==================== AUTO REDIRECT (when countdown hits 0) ====================
-  
-  useEffect(() => {
-    if (timeUntilStart === 0 && !isRedirecting && hasJoined) {
-      setIsRedirecting(true);
-      console.log("🚀 Redirecting to quiz...");
-      
-      setTimeout(() => {
-        router.push(`/quiz/live?round_id=${nextRound?.id}`);
-      }, 1000);
-    }
-  }, [timeUntilStart, isRedirecting, hasJoined, nextRound?.id, router]);
-
-  // ==================== JOIN ROUND HANDLER ====================
-  
-  const handleJoinRound = async () => {
-    if (!user || !nextRound || hasJoined || isJoining) return;
-    
-    if (timeUntilStart <= 0) {
-      alert("Round has started! Please wait for the next one.");
-      return;
-    }
-
-    try {
-      setIsJoining(true);
-
-      // Call join_round RPC
-      const { data, error } = await supabase.rpc("join_round", {
-        round_id: nextRound.id
+      const { data, error } = await supabase.rpc("get_lobby_participants", {
+        p_round_id: roundId,
       });
 
       if (error) {
-        // Handle specific errors
-        if (error.message.includes("already joined")) {
-          console.log("[JoinRound] Already joined");
-          setHasJoined(true);
-          return;
-        }
-        
-        console.error("[JoinRound] Error:", error);
-        alert("Failed to join round. Please try again.");
+        console.error("[Lobby] Fetch players error:", error);
         return;
       }
 
-      console.log("✅ Successfully joined round:", nextRound.id);
-      setHasJoined(true);
-      
-      // Refresh player list
-      fetchLobbyPlayers();
-      fetchTotalParticipants();
-
+      if (data) {
+        setPlayers(data);
+      }
     } catch (err) {
-      console.error("[JoinRound] Unexpected error:", err);
-      alert("An error occurred. Please try again.");
-    } finally {
-      setIsJoining(false);
+      console.error("[Lobby] Fetch players error:", err);
     }
+  }, [roundId]);
+
+  // === FETCH TOTAL PARTICIPANTS ===
+  const fetchTotalParticipants = useCallback(async () => {
+    if (!roundId) return;
+
+    try {
+      const { data, error } = await supabase.rpc("get_round_participant_count", {
+        p_round_id: roundId,
+      });
+
+      if (error) {
+        console.error("[Lobby] Fetch count error:", error);
+        return;
+      }
+
+      if (typeof data === "number") {
+        setTotalPlayers(data);
+      }
+    } catch (err) {
+      console.error("[Lobby] Fetch total error:", err);
+    }
+  }, [roundId]);
+
+  // === FETCH PLAYERS WHEN IN LOBBY ===
+  useEffect(() => {
+    if (!hasJoined || !roundId) return;
+
+    const loadParticipants = async () => {
+      await Promise.all([fetchLobbyPlayers(), fetchTotalParticipants()]);
+    };
+
+    loadParticipants();
+
+    const playersInterval = setInterval(fetchLobbyPlayers, 5000);
+    const countInterval = setInterval(fetchTotalParticipants, 5000);
+
+    return () => {
+      clearInterval(playersInterval);
+      clearInterval(countInterval);
+    };
+  }, [hasJoined, roundId, fetchLobbyPlayers, fetchTotalParticipants]);
+
+  // === AUTO START WHEN COUNTDOWN ENDS ===
+  useEffect(() => {
+    if (
+      globalTimeLeft !== null &&
+      globalTimeLeft <= 0 &&
+      roundData?.status === "scheduled" &&
+      !isRedirecting &&
+      hasJoined
+    ) {
+      handleStartGame();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globalTimeLeft, roundData?.status, isRedirecting, hasJoined]);
+
+  // === WARNING & SOUND EFFECTS ===
+  useEffect(() => {
+    if (globalTimeLeft === null) return;
+
+    if (globalTimeLeft === 10) {
+      setShowWarning(true);
+      if (isPlaying && alarmRef.current) {
+        alarmRef.current.currentTime = 0;
+        alarmRef.current.play().catch(() => {});
+      }
+    }
+
+    if (globalTimeLeft <= 10 && globalTimeLeft > 0) {
+      if (isPlaying && countdownBeepRef.current) {
+        countdownBeepRef.current.currentTime = 0;
+        countdownBeepRef.current.play().catch(() => {});
+      }
+    }
+
+    if (globalTimeLeft > 10) {
+      setShowWarning(false);
+    }
+  }, [globalTimeLeft, isPlaying]);
+
+  // ✅ === START GAME & JOIN ROUND (BURADA ROUND DÜŞER) ===
+  const handleStartGame = async () => {
+    if (isRedirecting) return;
+    setIsRedirecting(true);
+
+    console.log("[Lobby] Quiz starting, joining round now...");
+
+    if (roundId && user) {
+      try {
+        const { data, error } = await supabase.rpc("join_round", {
+          p_round_id: roundId,
+          p_user_id: user.id,
+          p_round_type: "live",
+        });
+
+        if (error) {
+          console.error("[Lobby] Join round error:", error);
+          if ((error as any).message?.includes("no_credits")) {
+            router.push("/buy");
+            return;
+          }
+        }
+
+        const result = data as { success: boolean; error?: string };
+
+        if (!result?.success) {
+          console.error("[Lobby] Join failed:", result?.error);
+          if (result?.error === "no_credits") {
+            router.push("/buy");
+            return;
+          }
+        }
+
+        console.log("[Lobby] Round joined successfully, credits deducted");
+      } catch (err) {
+        console.error("[Lobby] Join round error:", err);
+      }
+    }
+
+    router.push("/quiz");
   };
 
-  // ==================== LOADING STATE ====================
-  
+  // === HANDLE BACK BUTTON ===
+  const handleBack = async () => {
+    console.log("[Lobby] User left lobby, round NOT deducted");
+    router.push("/");
+  };
+
+  // === FORMAT TIME ===
+  const formatTime = (seconds: number | null) => {
+    if (seconds === null) return "--:--";
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  // === PROGRESS CALCULATION ===
+  const progress =
+    globalTimeLeft !== null
+      ? ((900 - Math.max(Math.min(globalTimeLeft, 900), 0)) / 900) * 100
+      : 0;
+
+  // === WARNING HELPERS ===
+  const getWarningMessage = () => {
+    if (globalTimeLeft === null) return "Quiz Starting Soon";
+    if (globalTimeLeft <= 3) return "🚀 QUIZ STARTING NOW!";
+    if (globalTimeLeft <= 5) return "⚡ GET READY!";
+    if (globalTimeLeft <= 10) return "⏰ FINAL COUNTDOWN!";
+    return "Quiz Starting Soon";
+  };
+
+  // === LOADING STATE ===
   if (isLoading) {
     return (
-      <div style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#020817"
-      }}>
-        <div style={{
-          fontSize: "24px",
-          color: "#c4b5fd",
-          fontWeight: 700
-        }}>
-          Loading lobby...
-        </div>
-      </div>
-    );
-  }
-
-  // ==================== NO ROUND STATE ====================
-  
-  if (!nextRound) {
-    return (
-      <div style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#020817",
-        padding: "20px"
-      }}>
-        <div style={{
-          textAlign: "center",
-          maxWidth: "500px"
-        }}>
-          <h2 style={{
-            fontSize: "32px",
-            color: "#c4b5fd",
-            marginBottom: "20px"
-          }}>
-            No Active Rounds
-          </h2>
-          <p style={{
-            fontSize: "18px",
-            color: "#94a3b8",
-            marginBottom: "30px"
-          }}>
-            Check back soon for the next round!
-          </p>
-          <button
-            onClick={() => router.push("/")}
-            style={{
-              padding: "16px 32px",
-              borderRadius: "12px",
-              background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-              color: "#fff",
-              fontSize: "18px",
-              fontWeight: 700,
-              border: "none",
-              cursor: "pointer"
-            }}
-          >
-            Go Home
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ==================== MAIN RENDER ====================
-  
-  return (
-    <>
       <div
         style={{
           minHeight: "100vh",
-          width: "100%",
-          background: "#020817",
-          color: "#fff",
-          fontFamily: "system-ui, -apple-system, sans-serif",
+          background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "white",
         }}
       >
-        {/* ==================== HEADER ==================== */}
+        <div style={{ textAlign: "center" }}>
+          <div
+            style={{
+              width: 120,
+              height: 120,
+              margin: "0 auto 24px",
+              position: "relative",
+              borderRadius: "50%",
+              padding: 4,
+              background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+              boxShadow: "0 0 40px rgba(124, 58, 237, 0.7)",
+            }}
+          >
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                height: "100%",
+                borderRadius: "50%",
+                backgroundColor: "#020817",
+                overflow: "hidden",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Image
+                src="/images/logo.png"
+                alt="VibraXX"
+                fill
+                sizes="120px"
+                style={{ objectFit: "contain", padding: "8px" }}
+                priority
+              />
+            </div>
+          </div>
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              margin: "0 auto 20px",
+              border: "4px solid rgba(139, 92, 246, 0.3)",
+              borderTop: "4px solid #a78bfa",
+              borderRadius: "50%",
+              animation: "spin 1s linear infinite",
+            }}
+          />
+          <p style={{ fontSize: 18, color: "#94a3b8", fontWeight: 600 }}>
+            Loading Premium Lobby...
+          </p>
+        </div>
+        <style jsx>{`
+          @keyframes spin {
+            to {
+              transform: rotate(360deg);
+            }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <style jsx global>{`
+        @keyframes pulse-ring {
+          0% {
+            transform: scale(0.95);
+            opacity: 1;
+          }
+          50% {
+            transform: scale(1);
+            opacity: 0.7;
+          }
+          100% {
+            transform: scale(0.95);
+            opacity: 1;
+          }
+        }
+        @keyframes float {
+          0%,
+          100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-20px);
+          }
+        }
+        @keyframes shimmer {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }
+        @keyframes slideIn {
+          from {
+            transform: translateY(20px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        @keyframes neonPulse {
+          0%,
+          100% {
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.6),
+              0 0 40px rgba(139, 92, 246, 0.4),
+              inset 0 0 20px rgba(139, 92, 246, 0.2);
+          }
+          50% {
+            box-shadow: 0 0 30px rgba(217, 70, 239, 0.9),
+              0 0 60px rgba(217, 70, 239, 0.6),
+              inset 0 0 30px rgba(217, 70, 239, 0.3);
+          }
+        }
+        @keyframes redAlarm {
+          0%,
+          100% {
+            box-shadow: 0 0 40px rgba(239, 68, 68, 0.8),
+              0 0 80px rgba(239, 68, 68, 0.6),
+              inset 0 0 40px rgba(239, 68, 68, 0.3);
+            border-color: rgba(239, 68, 68, 0.8);
+          }
+          50% {
+            box-shadow: 0 0 60px rgba(220, 38, 38, 1),
+              0 0 120px rgba(220, 38, 38, 0.8),
+              inset 0 0 60px rgba(220, 38, 38, 0.5);
+            border-color: rgba(220, 38, 38, 1);
+          }
+        }
+        @keyframes shake {
+          0%,
+          100% {
+            transform: translateX(0) rotate(0deg);
+          }
+          25% {
+            transform: translateX(-10px) rotate(-2deg);
+          }
+          75% {
+            transform: translateX(10px) rotate(2deg);
+          }
+        }
+        @keyframes warningPulse {
+          0%,
+          100% {
+            transform: scale(1);
+            opacity: 1;
+          }
+          50% {
+            transform: scale(1.08);
+            opacity: 0.9;
+          }
+        }
+        @keyframes glowPulse {
+          0%,
+          100% {
+            filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.6));
+          }
+          50% {
+            filter: drop-shadow(0 0 20px rgba(251, 191, 36, 1));
+          }
+        }
+
+        .animate-slide-in {
+          animation: slideIn 0.5s ease-out forwards;
+          opacity: 0;
+        }
+
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+
+        body {
+          overflow-x: hidden;
+        }
+      `}</style>
+
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+          color: "white",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        {/* Animated Background Orbs */}
+        <div
+          className="animate-float"
+          style={{
+            position: "fixed",
+            top: "-150px",
+            left: "-150px",
+            width: "500px",
+            height: "500px",
+            borderRadius: "50%",
+            background:
+              "radial-gradient(circle, rgba(139, 92, 246, 0.4), transparent)",
+            filter: "blur(90px)",
+            pointerEvents: "none",
+            zIndex: 0,
+          }}
+        />
+        <div
+          className="animate-float"
+          style={{
+            position: "fixed",
+            bottom: "-150px",
+            right: "-150px",
+            width: "500px",
+            height: "500px",
+            borderRadius: "50%",
+            background:
+              "radial-gradient(circle, rgba(217, 70, 239, 0.4), transparent)",
+            filter: "blur(90px)",
+            pointerEvents: "none",
+            zIndex: 0,
+            animationDelay: "2s",
+          }}
+        />
+
+        {/* RED WARNING Overlay */}
+        {showWarning && globalTimeLeft !== null && globalTimeLeft <= 10 && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: `radial-gradient(circle, rgba(239, 68, 68, 0.25), transparent)`,
+              pointerEvents: "none",
+              zIndex: 40,
+              animation: "warningPulse 0.6s ease-in-out infinite",
+            }}
+          />
+        )}
+
+        {/* Top Header Bar */}
         <header
           style={{
-            background: "rgba(15, 23, 42, 0.92)",
-            backdropFilter: "blur(12px)",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
             position: "sticky",
             top: 0,
             zIndex: 50,
+            background: "rgba(15, 23, 42, 0.95)",
+            backdropFilter: "blur(20px)",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
           }}
         >
           <div
             style={{
               maxWidth: "1400px",
               margin: "0 auto",
-              padding: "clamp(16px, 3vw, 24px) clamp(16px, 4vw, 40px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "20px",
+              padding: "clamp(12px, 3vw, 16px) clamp(16px, 4vw, 32px)",
+              position: "relative",
             }}
           >
-            {/* Logo */}
-            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-              <div
-                style={{
-                  width: "clamp(45px, 10vw, 60px)",
-                  height: "clamp(45px, 10vw, 60px)",
-                  position: "relative",
-                }}
-              >
-                <Image
-                  src="/images/logo.png"
-                  alt="VibraXX"
-                  fill
-                  sizes="60px"
-                  style={{ objectFit: "contain" }}
-                />
-              </div>
-              <h1
-                style={{
-                  fontSize: "clamp(20px, 4.5vw, 28px)",
-                  fontWeight: 900,
-                  background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}
-              >
-                VIBRAXX
-              </h1>
-            </div>
-
-            {/* Right Actions */}
-            <div style={{ display: "flex", alignItems: "center", gap: "clamp(12px, 2.5vw, 18px)" }}>
-              {/* Music Toggle */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              {/* Left: Back Button */}
               <button
-                onClick={toggleMusic}
+                onClick={handleBack}
                 style={{
-                  width: "clamp(42px, 9vw, 50px)",
-                  height: "clamp(42px, 9vw, 50px)",
-                  borderRadius: "12px",
-                  border: "2px solid rgba(139, 92, 246, 0.4)",
-                  background: isPlaying
-                    ? "linear-gradient(135deg, rgba(124, 58, 237, 0.25), rgba(217, 70, 239, 0.15))"
-                    : "rgba(15, 23, 42, 0.8)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  transition: "all 0.3s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "scale(1.1)";
-                  e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.7)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "scale(1)";
-                  e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.4)";
-                }}
-              >
-                {isPlaying ? (
-                  <Volume2 style={{ width: "clamp(18px, 4vw, 22px)", height: "clamp(18px, 4vw, 22px)", color: "#c4b5fd" }} />
-                ) : (
-                  <VolumeX style={{ width: "clamp(18px, 4vw, 22px)", height: "clamp(18px, 4vw, 22px)", color: "#64748b" }} />
-                )}
-              </button>
-
-              {/* Back Button */}
-              <button
-                onClick={() => router.push("/")}
-                style={{
-                  padding: "clamp(10px, 2.2vw, 14px) clamp(16px, 3.5vw, 22px)",
-                  borderRadius: "12px",
-                  border: "2px solid rgba(139, 92, 246, 0.4)",
-                  background: "rgba(15, 23, 42, 0.8)",
-                  color: "#c4b5fd",
-                  fontSize: "clamp(13px, 2.8vw, 15px)",
-                  fontWeight: 700,
-                  display: "flex",
+                  display: "inline-flex",
                   alignItems: "center",
                   gap: "8px",
+                  padding: "10px 16px",
+                  borderRadius: "12px",
+                  border: "1px solid rgba(148, 163, 253, 0.3)",
+                  background: "rgba(15, 23, 42, 0.8)",
+                  color: "white",
+                  fontSize: "clamp(13px, 2.5vw, 15px)",
+                  fontWeight: 600,
                   cursor: "pointer",
                   transition: "all 0.3s",
+                  zIndex: 21,
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(124, 58, 237, 0.2)";
-                  e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.7)";
+                  e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
+                  e.currentTarget.style.transform = "translateX(-4px)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "rgba(15, 23, 42, 0.8)";
-                  e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.4)";
+                  e.currentTarget.style.transform = "translateX(0)";
                 }}
               >
-                <ArrowLeft style={{ width: "clamp(16px, 3.5vw, 18px)", height: "clamp(16px, 3.5vw, 18px)" }} />
-                Back
+                <ArrowLeft style={{ width: 18, height: 18 }} />
+                <span className="hide-on-small">Back</span>
               </button>
+
+              {/* Right: Sound Toggle */}
+              <button
+                onClick={() => setIsPlaying(!isPlaying)}
+                style={{
+                  padding: "11px",
+                  borderRadius: "12px",
+                  border: "1px solid rgba(148, 163, 253, 0.3)",
+                  background: "rgba(15, 23, 42, 0.8)",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "all 0.3s",
+                  zIndex: 21,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(15, 23, 42, 0.8)";
+                }}
+              >
+                {isPlaying ? (
+                  <Volume2 style={{ width: 20, height: 20, color: "#a78bfa" }} />
+                ) : (
+                  <VolumeX style={{ width: 20, height: 20, color: "#6b7280" }} />
+                )}
+              </button>
+            </div>
+
+            {/* Center: Logo + LIVE QUIZ Text */}
+            <div
+              style={{
+                position: "absolute",
+                left: "50%",
+                top: "50%",
+                transform: "translate(-50%, -50%)",
+                zIndex: 20,
+                display: "flex",
+                alignItems: "center",
+                gap: "clamp(12px, 3vw, 16px)",
+              }}
+            >
+              {/* Logo */}
+              <div
+                style={{
+                  position: "relative",
+                  width: "clamp(70px, 14vw, 90px)",
+                  height: "clamp(70px, 14vw, 90px)",
+                  borderRadius: "50%",
+                  padding: 3,
+                  background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+                  boxShadow:
+                    "0 0 30px rgba(124, 58, 237, 0.7), 0 0 60px rgba(217, 70, 239, 0.4)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <div
+                  className="animate-glow"
+                  style={{
+                    position: "absolute",
+                    inset: -5,
+                    borderRadius: "50%",
+                    background: "radial-gradient(circle, #a855f7, transparent)",
+                    opacity: 0.5,
+                    filter: "blur(10px)",
+                    pointerEvents: "none",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "relative",
+                    width: "100%",
+                    height: "100%",
+                    borderRadius: "50%",
+                    backgroundColor: "#020817",
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: 10,
+                  }}
+                >
+                  <Image
+                    src="/images/logo.png"
+                    alt="VibraXX"
+                    fill
+                    sizes="90px"
+                    style={{ objectFit: "contain", padding: "5px" }}
+                    priority
+                  />
+                </div>
+              </div>
+
+              {/* LIVE QUIZ Text */}
+              <div>
+                <div
+                  style={{
+                    fontSize: "clamp(16px, 3.5vw, 22px)",
+                    fontWeight: 900,
+                    backgroundImage: "linear-gradient(135deg, #a78bfa, #f0abfc)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    lineHeight: 1.2,
+                    textShadow: "0 0 20px rgba(167, 139, 250, 0.5)",
+                  }}
+                >
+                  LIVE QUIZ
+                </div>
+              </div>
             </div>
           </div>
         </header>
 
-        {/* ==================== MAIN CONTENT ==================== */}
+        {/* Main Content */}
         <main
           style={{
+            position: "relative",
+            zIndex: 10,
             maxWidth: "1400px",
             margin: "0 auto",
-            padding: "clamp(24px, 5vw, 48px) clamp(16px, 4vw, 24px)",
+            padding: "clamp(24px, 5vw, 40px) clamp(16px, 4vw, 32px)",
           }}
         >
-          {/* Warning Banner */}
-          {showWarning && (
+          {/* Sponsor Banner */}
+          <div
+            style={{
+              marginBottom: "clamp(24px, 5vw, 36px)",
+              padding: "clamp(16px, 3.5vw, 28px)",
+              borderRadius: "20px",
+              background:
+                "linear-gradient(135deg, rgba(251, 191, 36, 0.18), rgba(245, 158, 11, 0.12))",
+              border: "2px solid rgba(251, 191, 36, 0.5)",
+              backdropFilter: "blur(20px)",
+              position: "relative",
+              overflow: "hidden",
+              boxShadow:
+                "0 0 30px rgba(251, 191, 36, 0.3), inset 0 0 40px rgba(251, 191, 36, 0.06)",
+              minHeight: "clamp(100px, 18vw, 160px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
             <div
               style={{
-                marginBottom: "clamp(20px, 4vw, 32px)",
-                padding: "clamp(16px, 3.5vw, 24px)",
-                borderRadius: "16px",
-                background: "linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.1))",
-                border: "2px solid rgba(239, 68, 68, 0.5)",
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "50%",
+                height: "100%",
+                background:
+                  "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent)",
+                animation: "shimmer 3s infinite",
+                pointerEvents: "none",
+              }}
+            />
+
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                height: "100%",
+                minHeight: "clamp(100px, 18vw, 160px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Image
+                src="/images/sponsor.png"
+                alt="Official Sponsor"
+                fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
+                style={{
+                  objectFit: "contain",
+                  padding: "clamp(12px, 3vw, 20px)",
+                }}
+                priority
+                onError={(e) => {
+                  const img = e.currentTarget;
+                  const container = img.parentElement as HTMLDivElement;
+                  if (container) {
+                    container.style.display = "none";
+                    const placeholder = container.nextElementSibling as HTMLDivElement;
+                    if (placeholder) placeholder.style.display = "block";
+                  }
+                }}
+              />
+            </div>
+
+            <div
+              id="sponsor-placeholder"
+              style={{
+                position: "relative",
+                zIndex: 10,
                 textAlign: "center",
-                animation: "pulse 1.5s infinite",
-                boxShadow: "0 0 30px rgba(239, 68, 68, 0.3)",
+                display: "none",
               }}
             >
               <div
                 style={{
-                  fontSize: "clamp(18px, 4vw, 24px)",
-                  fontWeight: 800,
-                  color: "#fca5a5",
-                  marginBottom: "8px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "4px 12px",
+                  borderRadius: "999px",
+                  background: "rgba(251, 191, 36, 0.25)",
+                  border: "1px solid rgba(251, 191, 36, 0.6)",
+                  marginBottom: "10px",
                 }}
               >
-                ⚠️ ROUND STARTING SOON!
+                <Sparkles style={{ width: 12, height: 12, color: "#fbbf24" }} />
+                <span
+                  style={{
+                    fontSize: "clamp(9px, 1.8vw, 11px)",
+                    fontWeight: 700,
+                    color: "#fbbf24",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                  }}
+                >
+                  Sponsor Space Available
+                </span>
               </div>
+
+              <h2
+                style={{
+                  fontSize: "clamp(18px, 4.5vw, 32px)",
+                  fontWeight: 900,
+                  backgroundImage: "linear-gradient(135deg, #fbbf24, #f59e0b)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                  marginBottom: "8px",
+                  textShadow: "0 0 30px rgba(251, 191, 36, 0.4)",
+                }}
+              >
+                Your Brand Here
+              </h2>
+
+              <p
+                style={{
+                  fontSize: "clamp(11px, 2.8vw, 14px)",
+                  color: "#fcd34d",
+                  fontWeight: 600,
+                  marginBottom: "12px",
+                  lineHeight: 1.4,
+                }}
+              >
+                Reach 12,000+ active quiz players daily!
+              </p>
+
               <div
                 style={{
-                  fontSize: "clamp(14px, 3vw, 16px)",
-                  color: "#fecaca",
-                  fontWeight: 600,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  flexWrap: "wrap",
+                  justifyContent: "center",
                 }}
               >
-                Get ready! The quiz will begin in {timeUntilStart} seconds
+                <div
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    background: "rgba(15, 23, 42, 0.6)",
+                    border: "1px solid rgba(251, 191, 36, 0.3)",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "clamp(9px, 2vw, 11px)",
+                      color: "#cbd5e1",
+                    }}
+                  >
+                    📊 <strong style={{ color: "#fbbf24" }}>12K+</strong> Players
+                  </span>
+                </div>
+                <div
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    background: "rgba(15, 23, 42, 0.6)",
+                    border: "1px solid rgba(251, 191, 36, 0.3)",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "clamp(9px, 2vw, 11px)",
+                      color: "#cbd5e1",
+                    }}
+                  >
+                    🎯 <strong style={{ color: "#fbbf24" }}>Premium</strong> Spot
+                  </span>
+                </div>
+                <div
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    background: "rgba(15, 23, 42, 0.6)",
+                    border: "1px solid rgba(251, 191, 36, 0.3)",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "clamp(9px, 2vw, 11px)",
+                      color: "#cbd5e1",
+                    }}
+                  >
+                    💰 <strong style={{ color: "#fbbf24" }}>High</strong> ROI
+                  </span>
+                </div>
               </div>
             </div>
-          )}
+          </div>
 
-          {/* Main Grid */}
           <div
             style={{
               display: "grid",
               gridTemplateColumns: "1fr",
-              gap: "clamp(20px, 4.5vw, 32px)",
+              gap: "clamp(24px, 5vw, 40px)",
             }}
           >
-            {/* Left Column - Round Info & Join */}
+            {/* Countdown Section */}
             <div
               style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "clamp(20px, 4.5vw, 28px)",
+                padding: "clamp(32px, 6vw, 56px)",
+                borderRadius: "28px",
+                border:
+                  globalTimeLeft !== null && globalTimeLeft <= 10
+                    ? "3px solid #ef4444"
+                    : "3px solid rgba(139, 92, 246, 0.6)",
+                background:
+                  globalTimeLeft !== null && globalTimeLeft <= 10
+                    ? "linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.1))"
+                    : "rgba(15, 23, 42, 0.85)",
+                backdropFilter: "blur(25px)",
+                textAlign: "center",
+                animation:
+                  showWarning && globalTimeLeft !== null && globalTimeLeft <= 10
+                    ? "redAlarm 0.8s ease-in-out infinite, shake 0.5s ease-in-out infinite"
+                    : "none",
+                boxShadow:
+                  globalTimeLeft !== null && globalTimeLeft <= 10
+                    ? "0 0 60px rgba(239, 68, 68, 0.6)"
+                    : "0 0 40px rgba(139, 92, 246, 0.4)",
               }}
             >
-              {/* Countdown Card */}
+              {/* Status Badge */}
               <div
                 style={{
-                  padding: "clamp(28px, 6vw, 42px)",
-                  borderRadius: "24px",
-                  background: "rgba(15, 23, 42, 0.92)",
-                  border: "2px solid rgba(139, 92, 246, 0.3)",
-                  boxShadow: "0 10px 40px -10px rgba(0, 0, 0, 0.3)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "10px 24px",
+                  borderRadius: "999px",
+                  background:
+                    globalTimeLeft !== null && globalTimeLeft <= 10
+                      ? "rgba(239, 68, 68, 0.25)"
+                      : "rgba(34, 197, 94, 0.25)",
+                  border:
+                    globalTimeLeft !== null && globalTimeLeft <= 10
+                      ? "2px solid rgba(239, 68, 68, 0.6)"
+                      : "2px solid rgba(34, 197, 94, 0.5)",
+                  marginBottom: "clamp(20px, 4vw, 32px)",
+                  boxShadow:
+                    globalTimeLeft !== null && globalTimeLeft <= 10
+                      ? "0 0 25px rgba(239, 68, 68, 0.5)"
+                      : "0 0 20px rgba(34, 197, 94, 0.4)",
+                }}
+              >
+                <Shield
+                  style={{
+                    width: 20,
+                    height: 20,
+                    color:
+                      globalTimeLeft !== null && globalTimeLeft <= 10
+                        ? "#ef4444"
+                        : "#4ade80",
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: "clamp(12px, 2.8vw, 14px)",
+                    fontWeight: 800,
+                    color:
+                      globalTimeLeft !== null && globalTimeLeft <= 10
+                        ? "#fca5a5"
+                        : "#4ade80",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                  }}
+                >
+                  {globalTimeLeft !== null && globalTimeLeft <= 10
+                    ? "🚨 STARTING NOW!"
+                    : "✓ You're in the Lobby"}
+                </span>
+              </div>
+
+              {/* Warning Message */}
+              {showWarning && globalTimeLeft !== null && globalTimeLeft <= 10 && (
+                <div
+                  style={{
+                    padding: "20px 28px",
+                    borderRadius: "20px",
+                    background:
+                      "linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(220, 38, 38, 0.2))",
+                    border: "3px solid #ef4444",
+                    marginBottom: "clamp(20px, 4vw, 32px)",
+                    animation: "neonPulse 0.6s ease-in-out infinite",
+                    boxShadow: "0 0 40px rgba(239, 68, 68, 0.8)",
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: "clamp(20px, 5vw, 32px)",
+                      fontWeight: 900,
+                      color: "#fca5a5",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.12em",
+                      textShadow: "0 0 30px #ef4444",
+                      margin: 0,
+                    }}
+                  >
+                    {getWarningMessage()}
+                  </p>
+                </div>
+              )}
+
+              {/* Countdown Title */}
+              <h1
+                style={{
+                  fontSize: "clamp(22px, 5.5vw, 36px)",
+                  fontWeight: 800,
+                  marginBottom: "clamp(16px, 3vw, 24px)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "14px",
+                  flexWrap: "wrap",
+                  color:
+                    globalTimeLeft !== null && globalTimeLeft <= 10
+                      ? "#fca5a5"
+                      : "white",
+                }}
+              >
+                <Clock
+                  style={{
+                    width: "clamp(28px, 7vw, 36px)",
+                    height: "clamp(28px, 7vw, 36px)",
+                    color:
+                      globalTimeLeft !== null && globalTimeLeft <= 10
+                        ? "#ef4444"
+                        : "#a78bfa",
+                  }}
+                />
+                Quiz Starting In
+              </h1>
+
+              {/* Countdown Timer */}
+              <div
+                style={{
+                  fontSize: "clamp(56px, 18vw, 120px)",
+                  fontWeight: 900,
+                  backgroundImage:
+                    globalTimeLeft !== null && globalTimeLeft <= 10
+                      ? "linear-gradient(135deg, #ef4444, #dc2626)"
+                      : "linear-gradient(135deg, #a78bfa, #f0abfc)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                  marginBottom: "clamp(24px, 5vw, 40px)",
+                  fontFamily: "monospace",
+                  textShadow:
+                    globalTimeLeft !== null && globalTimeLeft <= 10
+                      ? "0 0 50px rgba(239, 68, 68, 0.8)"
+                      : "0 0 50px rgba(167, 139, 250, 0.6)",
+                  animation:
+                    globalTimeLeft !== null && globalTimeLeft <= 10
+                      ? "warningPulse 0.4s ease-in-out infinite"
+                      : "none",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                {formatTime(globalTimeLeft)}
+              </div>
+
+              {/* Progress Bar */}
+              <div
+                style={{
+                  width: "100%",
+                  height: "14px",
+                  borderRadius: "999px",
+                  background: "rgba(30, 41, 59, 0.9)",
+                  overflow: "hidden",
+                  marginBottom: "clamp(24px, 5vw, 40px)",
+                  border:
+                    globalTimeLeft !== null && globalTimeLeft <= 10
+                      ? "2px solid rgba(239, 68, 68, 0.5)"
+                      : "2px solid rgba(139, 92, 246, 0.4)",
+                  boxShadow:
+                    globalTimeLeft !== null && globalTimeLeft <= 10
+                      ? "0 0 20px rgba(239, 68, 68, 0.5), inset 0 0 10px rgba(239, 68, 68, 0.3)"
+                      : "0 0 15px rgba(139, 92, 246, 0.4)",
                 }}
               >
                 <div
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    marginBottom: "clamp(20px, 4.5vw, 28px)",
+                    width: `${progress}%`,
+                    height: "100%",
+                    background:
+                      globalTimeLeft !== null && globalTimeLeft <= 10
+                        ? "linear-gradient(90deg, #ef4444, #dc2626)"
+                        : "linear-gradient(90deg, #7c3aed, #d946ef)",
+                    borderRadius: "999px",
+                    transition: "width 1s linear",
+                    boxShadow:
+                      globalTimeLeft !== null && globalTimeLeft <= 10
+                        ? "0 0 25px rgba(239, 68, 68, 1)"
+                        : "0 0 25px rgba(139, 92, 246, 0.9)",
+                  }}
+                />
+              </div>
+
+              {/* Info Message */}
+              <p
+                style={{
+                  fontSize: "clamp(14px, 3.2vw, 17px)",
+                  color:
+                    globalTimeLeft !== null && globalTimeLeft <= 10
+                      ? "#fca5a5"
+                      : "#cbd5e1",
+                  marginBottom: "clamp(28px, 6vw, 40px)",
+                  lineHeight: 1.7,
+                  fontWeight: 600,
+                }}
+              >
+                {globalTimeLeft !== null && globalTimeLeft <= 10
+                  ? "🔥 Get ready! You'll be automatically entered when the countdown ends!"
+                  : "You'll be automatically entered when the quiz begins. Get ready!"}
+              </p>
+
+              {/* Quiz Info Grid */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+                  gap: "clamp(14px, 3.5vw, 20px)",
+                }}
+              >
+                <div
+                  style={{
+                    padding: "clamp(14px, 3.5vw, 20px)",
+                    borderRadius: "16px",
+                    background: "rgba(139, 92, 246, 0.15)",
+                    border: "2px solid rgba(139, 92, 246, 0.3)",
+                    boxShadow: "0 0 15px rgba(139, 92, 246, 0.2)",
                   }}
                 >
-                  <Clock
+                  <div
                     style={{
-                      width: "clamp(26px, 6vw, 34px)",
-                      height: "clamp(26px, 6vw, 34px)",
+                      fontSize: "clamp(11px, 2.3vw, 13px)",
+                      color: "#94a3b8",
+                      marginBottom: "6px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Format
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "clamp(16px, 3.5vw, 20px)",
+                      fontWeight: 800,
                       color: "#c4b5fd",
                     }}
-                  />
-                  <h2
-                    style={{
-                      fontSize: "clamp(22px, 5vw, 30px)",
-                      fontWeight: 800,
-                      color: "#fff",
-                    }}
                   >
-                    Round Starts In
-                  </h2>
+                    Multiple Choice
+                  </div>
                 </div>
-
                 <div
                   style={{
-                    fontSize: "clamp(64px, 15vw, 96px)",
-                    fontWeight: 900,
-                    textAlign: "center",
-                    background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    backgroundClip: "text",
-                    marginBottom: "clamp(24px, 5vw, 36px)",
-                    fontFamily: "monospace",
-                    letterSpacing: "0.05em",
-                  }}
-                >
-                  {formattedCountdown}
-                </div>
-
-                {/* Round Info */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(2, 1fr)",
-                    gap: "clamp(14px, 3vw, 20px)",
-                    marginBottom: "clamp(24px, 5vw, 32px)",
+                    padding: "clamp(14px, 3.5vw, 20px)",
+                    borderRadius: "16px",
+                    background: "rgba(236, 72, 153, 0.15)",
+                    border: "2px solid rgba(236, 72, 153, 0.3)",
+                    boxShadow: "0 0 15px rgba(236, 72, 153, 0.2)",
                   }}
                 >
                   <div
                     style={{
-                      padding: "clamp(14px, 3vw, 18px)",
-                      borderRadius: "14px",
-                      background: "rgba(139, 92, 246, 0.12)",
-                      border: "1px solid rgba(139, 92, 246, 0.3)",
-                      textAlign: "center",
+                      fontSize: "clamp(11px, 2.3vw, 13px)",
+                      color: "#94a3b8",
+                      marginBottom: "6px",
+                      fontWeight: 600,
                     }}
                   >
-                    <div
-                      style={{
-                        fontSize: "clamp(12px, 2.5vw, 13px)",
-                        color: "#94a3b8",
-                        fontWeight: 600,
-                        marginBottom: "6px",
-                      }}
-                    >
-                      Your Credits
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "clamp(22px, 5vw, 28px)",
-                        fontWeight: 800,
-                        color: "#c4b5fd",
-                      }}
-                    >
-                      {userCredits}
-                    </div>
+                    Time Limit
                   </div>
-
                   <div
                     style={{
-                      padding: "clamp(14px, 3vw, 18px)",
-                      borderRadius: "14px",
-                      background: "rgba(6, 182, 212, 0.12)",
-                      border: "1px solid rgba(6, 182, 212, 0.3)",
-                      textAlign: "center",
+                      fontSize: "clamp(16px, 3.5vw, 20px)",
+                      fontWeight: 800,
+                      color: "#f9a8d4",
                     }}
                   >
-                    <div
-                      style={{
-                        fontSize: "clamp(12px, 2.5vw, 13px)",
-                        color: "#94a3b8",
-                        fontWeight: 600,
-                        marginBottom: "6px",
-                      }}
-                    >
-                      Duration
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "clamp(22px, 5vw, 28px)",
-                        fontWeight: 800,
-                        color: "#67e8f9",
-                      }}
-                    >
-                      {Math.floor((nextRound?.round_duration_seconds || 270) / 60)}m
-                    </div>
+                    6 seconds
                   </div>
                 </div>
-
-                {/* Join Button */}
-                {!hasJoined ? (
-                  <button
-                    onClick={handleJoinRound}
-                    disabled={isJoining || timeUntilStart <= 0}
-                    style={{
-                      width: "100%",
-                      padding: "clamp(18px, 4vw, 24px)",
-                      borderRadius: "16px",
-                      background: timeUntilStart > 0
-                        ? "linear-gradient(135deg, #7c3aed, #d946ef)"
-                        : "rgba(100, 116, 139, 0.5)",
-                      color: "#fff",
-                      fontSize: "clamp(17px, 3.8vw, 20px)",
-                      fontWeight: 800,
-                      border: "none",
-                      cursor: timeUntilStart > 0 ? "pointer" : "not-allowed",
-                      transition: "all 0.3s",
-                      boxShadow: timeUntilStart > 0
-                        ? "0 20px 40px -16px rgba(139, 92, 246, 0.6)"
-                        : "none",
-                      opacity: isJoining ? 0.6 : 1,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (timeUntilStart > 0 && !isJoining) {
-                        e.currentTarget.style.transform = "translateY(-2px)";
-                        e.currentTarget.style.boxShadow = "0 25px 50px -12px rgba(139, 92, 246, 0.7)";
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = timeUntilStart > 0
-                        ? "0 20px 40px -16px rgba(139, 92, 246, 0.6)"
-                        : "none";
-                    }}
-                  >
-                    {isJoining ? (
-                      "Joining..."
-                    ) : timeUntilStart <= 0 ? (
-                      "Round Started - Wait for Next"
-                    ) : (
-                      <>
-                        <Sparkles
-                          style={{
-                            width: "clamp(20px, 4.5vw, 24px)",
-                            height: "clamp(20px, 4.5vw, 24px)",
-                            display: "inline-block",
-                            marginRight: "10px",
-                            verticalAlign: "middle",
-                          }}
-                        />
-                        Join This Round
-                      </>
-                    )}
-                  </button>
-                ) : (
+                <div
+                  style={{
+                    padding: "clamp(14px, 3.5vw, 20px)",
+                    borderRadius: "16px",
+                    background: "rgba(34, 197, 94, 0.15)",
+                    border: "2px solid rgba(34, 197, 94, 0.3)",
+                    boxShadow: "0 0 15px rgba(34, 197, 94, 0.2)",
+                  }}
+                >
                   <div
                     style={{
-                      width: "100%",
-                      padding: "clamp(18px, 4vw, 24px)",
-                      borderRadius: "16px",
-                      background: "linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(22, 163, 74, 0.15))",
-                      border: "2px solid rgba(34, 197, 94, 0.5)",
+                      fontSize: "clamp(11px, 2.3vw, 13px)",
+                      color: "#94a3b8",
+                      marginBottom: "6px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Points
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "clamp(16px, 3.5vw, 20px)",
+                      fontWeight: 800,
                       color: "#86efac",
-                      fontSize: "clamp(17px, 3.8vw, 20px)",
-                      fontWeight: 800,
-                      textAlign: "center",
-                      boxShadow: "0 0 20px rgba(34, 197, 94, 0.3)",
                     }}
                   >
-                    ✅ Joined! Get ready...
+                    2 per correct
                   </div>
-                )}
-
-                {/* Security Badge */}
+                </div>
                 <div
                   style={{
-                    marginTop: "clamp(20px, 4vw, 28px)",
-                    padding: "clamp(12px, 2.5vw, 16px)",
-                    borderRadius: "12px",
-                    background: "rgba(34, 197, 94, 0.1)",
-                    border: "1px solid rgba(34, 197, 94, 0.3)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    fontSize: "clamp(12px, 2.5vw, 14px)",
-                    color: "#86efac",
+                    padding: "clamp(14px, 3.5vw, 20px)",
+                    borderRadius: "16px",
+                    background: "rgba(234, 179, 8, 0.15)",
+                    border: "2px solid rgba(234, 179, 8, 0.3)",
+                    boxShadow: "0 0 15px rgba(234, 179, 8, 0.2)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "clamp(11px, 2.3vw, 13px)",
+                      color: "#94a3b8",
+                      marginBottom: "6px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Questions
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "clamp(16px, 3.5vw, 20px)",
+                      fontWeight: 800,
+                      color: "#fde047",
+                    }}
+                  >
+                    50 Total
+                  </div>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  marginTop: "clamp(20px, 4.5vw, 28px)",
+                  padding: "clamp(14px, 3.5vw, 20px)",
+                  borderRadius: "14px",
+                  background: "rgba(59, 130, 246, 0.12)",
+                  border: "2px solid rgba(59, 130, 246, 0.25)",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "clamp(13px, 3vw, 15px)",
+                    color: "#bfdbfe",
                     fontWeight: 600,
                   }}
                 >
-                  <Shield style={{ width: "18px", height: "18px" }} />
-                  Verified & Secure
+                  💡 <strong style={{ color: "white" }}>Pro Tip:</strong> In a tie, the
+                  fastest correct responder wins the monthly prize!
                 </div>
               </div>
             </div>
 
-            {/* Right Column - Players */}
+            {/* Players Section */}
             <div
               style={{
                 padding: "clamp(28px, 6vw, 40px)",
-                borderRadius: "24px",
-                background: "rgba(15, 23, 42, 0.92)",
-                border: "2px solid rgba(139, 92, 246, 0.3)",
-                boxShadow: "0 10px 40px -10px rgba(0, 0, 0, 0.3)",
+                borderRadius: "28px",
+                border: "2px solid rgba(255, 255, 255, 0.12)",
+                background: "rgba(15, 23, 42, 0.7)",
+                backdropFilter: "blur(25px)",
+                boxShadow: "0 0 30px rgba(139, 92, 246, 0.2)",
               }}
             >
               <div
@@ -984,14 +1352,15 @@ export default function LobbyPage() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  marginBottom: "clamp(20px, 4.5vw, 28px)",
+                  marginBottom: "clamp(24px, 5vw, 32px)",
+                  flexWrap: "wrap",
+                  gap: "14px",
                 }}
               >
                 <h3
                   style={{
                     fontSize: "clamp(20px, 4.5vw, 26px)",
                     fontWeight: 800,
-                    color: "#fff",
                     display: "flex",
                     alignItems: "center",
                     gap: "12px",
@@ -1084,14 +1453,49 @@ export default function LobbyPage() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div
                           style={{
-                            fontSize: "clamp(15px, 3.5vw, 17px)",
-                            fontWeight: 700,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            marginBottom: "5px",
+                            flexWrap: "wrap",
                           }}
                         >
-                          {player.full_name || "Anonymous"}
+                          <span
+                            style={{
+                              fontSize: "clamp(15px, 3.5vw, 17px)",
+                              fontWeight: 700,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {player.full_name || "Anonymous"}
+                          </span>
+                          {player.streak >= 10 && (
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "5px",
+                                padding: "3px 10px",
+                                borderRadius: "8px",
+                                background: "rgba(239, 68, 68, 0.25)",
+                                border: "1px solid rgba(239, 68, 68, 0.4)",
+                                boxShadow: "0 0 10px rgba(239, 68, 68, 0.3)",
+                              }}
+                            >
+                              <Flame style={{ width: 13, height: 13, color: "#fca5a5" }} />
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  fontWeight: 800,
+                                  color: "#fca5a5",
+                                }}
+                              >
+                                {player.streak}
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <div
                           style={{
@@ -1100,7 +1504,7 @@ export default function LobbyPage() {
                             fontWeight: 600,
                           }}
                         >
-                          Joined {new Date(player.joined_at).toLocaleTimeString()}
+                          🏆 {player.total_score.toLocaleString()} points
                         </div>
                       </div>
                     </div>
@@ -1181,7 +1585,7 @@ export default function LobbyPage() {
 
         ::-webkit-scrollbar-track {
           background: rgba(15, 23, 42, 0.7);
-          border-radius: 10px;
+          borderRadius: 10px;
         }
 
         ::-webkit-scrollbar-thumb {
@@ -1190,7 +1594,7 @@ export default function LobbyPage() {
             rgba(139, 92, 246, 0.7),
             rgba(217, 70, 239, 0.5)
           );
-          border-radius: 10px;
+          borderRadius: 10px;
           border: 2px solid rgba(15, 23, 42, 0.7);
         }
 
@@ -1200,30 +1604,6 @@ export default function LobbyPage() {
             rgba(139, 92, 246, 0.9),
             rgba(217, 70, 239, 0.7)
           );
-        }
-
-        @keyframes pulse {
-          0%, 100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.8;
-          }
-        }
-
-        @keyframes slide-in {
-          from {
-            opacity: 0;
-            transform: translateX(-20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-
-        .animate-slide-in {
-          animation: slide-in 0.4s ease-out forwards;
         }
       `}</style>
     </>
