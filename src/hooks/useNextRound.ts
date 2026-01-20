@@ -1,22 +1,27 @@
 /**
- * useNextRound Hook
+ * useNextRound Hook - OPTIMIZED v2.0
  * 
- * Ana sayfa ve Lobby sayfası için senkronize countdown
- * - Aynı Supabase query
- * - Real-time subscription
- * - UTC+0 timezone consistency
+ * ✅ Briefing-compliant (rounds table)
+ * ✅ Real-time subscription (filtered)
+ * ✅ Client-side countdown (1s interval)
+ * ✅ Server sync (30s interval, drift prevention)
+ * ✅ Smart loading states (no UI jumps)
+ * ✅ Error handling with retry
+ * 
+ * USAGE:
+ * const { timeUntilStart, formattedCountdown, lobbyStatus, nextRound } = useNextRound();
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+
+// ==================== TYPES ====================
 
 interface NextRound {
   id: number;
-  round_number: number;
-  status: 'scheduled' | 'live' | 'finished';
   scheduled_start: string;
-  actual_start: string | null;
-  actual_end: string | null;
+  status: 'scheduled' | 'live' | 'finished';
+  round_duration_seconds: number;
 }
 
 interface UseNextRoundReturn {
@@ -26,128 +31,148 @@ interface UseNextRoundReturn {
   lobbyStatus: 'open' | 'closed' | 'loading';
   isLoading: boolean;
   error: string | null;
+  reload: () => Promise<void>;
 }
 
+// ==================== HOOK ====================
+
 export function useNextRound(): UseNextRoundReturn {
+  // State
   const [nextRound, setNextRound] = useState<NextRound | null>(null);
   const [timeUntilStart, setTimeUntilStart] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Initial fetch - Bir sonraki scheduled round
-  useEffect(() => {
-    const fetchNextRound = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('overlay_round_state')
-          .select('*')
-          .eq('status', 'scheduled')
-          .order('scheduled_start', { ascending: true })
-          .limit(1)
-          .single();
-
-        if (error) {
-          console.error('Error fetching next round:', error);
-          setError('Could not load next round');
-        } else if (data) {
-          setNextRound(data);
-          setError(null);
-        }
-      } catch (err) {
-        console.error('Unexpected error:', err);
-        setError('Unexpected error');
-      } finally {
-        setIsLoading(false);
+  // ==================== FETCH NEXT ROUND ====================
+  
+  const fetchNextRound = useCallback(async () => {
+    try {
+      // Only show loading on initial load (prevent UI jumps on sync)
+      if (isInitialLoad) {
+        setIsLoading(true);
       }
-    };
+      
+      const { data, error: queryError } = await supabase
+        .from('rounds')
+        .select('id, scheduled_start, status, round_duration_seconds')
+        .eq('status', 'scheduled')
+        .order('scheduled_start', { ascending: true })
+        .limit(1)
+        .single();
 
+      // Handle errors
+      if (queryError) {
+        // PGRST116 = No rows found (not an error, just no scheduled rounds)
+        if (queryError.code === 'PGRST116') {
+          console.log('[useNextRound] No scheduled rounds found');
+          setNextRound(null);
+          setTimeUntilStart(0);
+          setError(null);
+        } else {
+          console.error('[useNextRound] Query error:', queryError);
+          setError('Could not load next round');
+        }
+        return;
+      }
+
+      // Success - update round data
+      if (data) {
+        setNextRound(data);
+        setError(null);
+        
+        // Calculate initial countdown (deterministic from scheduled_start)
+        const startTime = new Date(data.scheduled_start).getTime();
+        const now = Date.now();
+        const seconds = Math.floor((startTime - now) / 1000);
+        
+        setTimeUntilStart(Math.max(0, seconds));
+        
+        console.log('[useNextRound] Round loaded:', {
+          id: data.id,
+          scheduled_start: data.scheduled_start,
+          countdown: seconds
+        });
+      }
+
+    } catch (err) {
+      console.error('[useNextRound] Unexpected error:', err);
+      setError('Unexpected error occurred');
+    } finally {
+      setIsLoading(false);
+      setIsInitialLoad(false);
+    }
+  }, [isInitialLoad]);
+
+  // ==================== INITIAL FETCH ====================
+  
+  useEffect(() => {
     fetchNextRound();
-  }, []);
+  }, [fetchNextRound]);
 
-  // Real-time subscription - Round state değişikliklerini dinle
+  // ==================== REAL-TIME SUBSCRIPTION ====================
+  
   useEffect(() => {
     const channel = supabase
       .channel('next_round_sync')
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
-          table: 'overlay_round_state',
+          table: 'rounds',
+          filter: 'status=eq.live' // 🎯 OPTIMIZED: Only listen for rounds going live
         },
         (payload) => {
-          // Yeni scheduled round geldi veya mevcut güncellendi
-          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            const newRound = payload.new as NextRound;
-            
-            // Sadece scheduled olanları al
-            if (newRound.status === 'scheduled') {
-              setNextRound(newRound);
-            }
-            
-            // Eğer mevcut round live oldu, bir sonrakini fetch et
-            if (payload.eventType === 'UPDATE' && newRound.status === 'live') {
-              fetchNextScheduled();
-            }
-          }
+          console.log('[useNextRound] Round went live, fetching next scheduled round');
+          fetchNextRound();
         }
       )
       .subscribe();
 
+    console.log('[useNextRound] Real-time subscription active');
+
     return () => {
+      console.log('[useNextRound] Unsubscribing from real-time');
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchNextRound]);
 
-  // Helper: Bir sonraki scheduled round'u fetch et
-  const fetchNextScheduled = async () => {
-    const { data } = await supabase
-      .from('overlay_round_state')
-      .select('*')
-      .eq('status', 'scheduled')
-      .order('scheduled_start', { ascending: true })
-      .limit(1)
-      .single();
-
-    if (data) {
-      setNextRound(data);
-    }
-  };
-
-  // Countdown timer - UTC+0 based, her saniye güncelle
+  // ==================== CLIENT-SIDE COUNTDOWN ====================
+  
   useEffect(() => {
-    if (!nextRound?.scheduled_start) {
-      setTimeUntilStart(0);
-      return;
-    }
-
-    const updateCountdown = () => {
-      const now = new Date();
-      const scheduledStart = new Date(nextRound.scheduled_start);
-      const diffMs = scheduledStart.getTime() - now.getTime();
-      const diffSec = Math.max(0, Math.floor(diffMs / 1000));
-      
-      setTimeUntilStart(diffSec);
-    };
-
-    // İlk güncelleme
-    updateCountdown();
-
-    // Her saniye güncelle
-    const interval = setInterval(updateCountdown, 1000);
+    const interval = setInterval(() => {
+      // 🎯 OPTIMIZED: Simple decrement, no fetch (30s sync handles it)
+      setTimeUntilStart(prev => Math.max(0, prev - 1));
+    }, 1000);
 
     return () => clearInterval(interval);
-  }, [nextRound]);
+  }, []);
 
-  // Format countdown: "04:21" veya "00:15"
+  // ==================== SERVER SYNC (30s) ====================
+  
+  useEffect(() => {
+    const syncInterval = setInterval(() => {
+      console.log('[useNextRound] 30s sync - preventing drift');
+      fetchNextRound();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(syncInterval);
+  }, [fetchNextRound]);
+
+  // ==================== DERIVED VALUES ====================
+
+  // Format countdown: MM:SS
   const formattedCountdown = formatCountdown(timeUntilStart);
 
-  // Lobby durumu
+  // Lobby status: open (countdown > 0), closed (0), loading
   const lobbyStatus = isLoading 
     ? 'loading' 
     : timeUntilStart > 0 
       ? 'open' 
       : 'closed';
+
+  // ==================== RETURN ====================
 
   return {
     nextRound,
@@ -156,11 +181,14 @@ export function useNextRound(): UseNextRoundReturn {
     lobbyStatus,
     isLoading,
     error,
+    reload: fetchNextRound,
   };
 }
 
+// ==================== HELPER FUNCTIONS ====================
+
 /**
- * Format saniye countdown'unu MM:SS formatına çevir
+ * Format countdown seconds to MM:SS
  */
 function formatCountdown(seconds: number): string {
   if (seconds <= 0) return '00:00';
@@ -172,11 +200,25 @@ function formatCountdown(seconds: number): string {
 }
 
 /**
- * UTC time'ı formatla: "18:15 UTC"
+ * Format UTC time from ISO string: "18:15 UTC"
  */
 export function formatUTCTime(isoString: string): string {
   const date = new Date(isoString);
   const hours = date.getUTCHours().toString().padStart(2, '0');
   const minutes = date.getUTCMinutes().toString().padStart(2, '0');
   return `${hours}:${minutes} UTC`;
+}
+
+/**
+ * Get human-readable time remaining
+ * Examples: "4 minutes", "30 seconds", "Starting soon!"
+ */
+export function getTimeRemainingText(seconds: number): string {
+  if (seconds <= 0) return 'Starting soon!';
+  if (seconds < 60) return `${seconds} seconds`;
+  
+  const mins = Math.floor(seconds / 60);
+  if (mins === 1) return '1 minute';
+  
+  return `${mins} minutes`;
 }
