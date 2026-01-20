@@ -1034,7 +1034,7 @@ const fetchChampions = useCallback(async () => {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 10px;
+          gap: 20px;
           padding: 8px 0;
           flex-wrap: wrap;
         }
