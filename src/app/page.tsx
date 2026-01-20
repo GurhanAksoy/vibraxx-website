@@ -17,6 +17,7 @@ import {
   ShoppingCart,
   CheckCircle,
   AlertCircle,
+  BookOpen, // 📚 EKLE: Öğretici platform için
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { playMenuMusic, stopMenuMusic } from "@/lib/audioManager";
@@ -33,6 +34,58 @@ StatCard.displayName = "StatCard";
 
 const ChampionCard = memo(({ champion }: any) => {
   const Icon = champion.icon;
+  
+  // ✅ EKLEME: Empty state handling
+  if (!champion.name || champion.name === "TBA" || champion.score === 0) {
+    return (
+      <div className="vx-champ-card">
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            margin: "0 auto 16px",
+            borderRadius: 16,
+            background: `linear-gradient(135deg, ${champion.color}15, ${champion.color}08)`,
+            border: `1px solid ${champion.color}30`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Icon style={{ width: 28, height: 28, color: champion.color }} />
+        </div>
+
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 600,
+            textTransform: "uppercase",
+            letterSpacing: "0.15em",
+            color: "#6b7280",
+            marginBottom: 8,
+          }}
+        >
+          {champion.period} Champion
+        </div>
+
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 600,
+            marginBottom: 8,
+            color: "#94a3b8",
+            textAlign: "center",
+            lineHeight: 1.4,
+          }}
+        >
+          {champion.period === "Daily" && "Next champion crowned at 00:00 UTC"}
+          {champion.period === "Weekly" && "Weekly rankings reset every Monday"}
+          {champion.period === "Monthly" && "Monthly rankings reset at month end (UTC)"}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="vx-champ-card">
       <div
@@ -354,6 +407,9 @@ export default function HomePage() {
   const [userRounds, setUserRounds] = useState(0);
   const [showNoRoundsModal, setShowNoRoundsModal] = useState(false);
 
+  // 🎵 EKLEME: Müzik autoplay için
+  const [hasInteracted, setHasInteracted] = useState(false);
+
   // ✅ OPTIMIZED: Constants as useMemo instead of useState
   const stats = useMemo(
     () => ({ totalQuestions: 2800000, roundsPerDay: 96 }),
@@ -374,8 +430,8 @@ export default function HomePage() {
 
     try {
       const { data, error } = await supabase
-        .from("user_rounds")
-        .select("remaining")
+        .from("user_credits")
+        .select("live_credits")
         .eq("user_id", user.id)
         .limit(1);
 
@@ -385,7 +441,7 @@ export default function HomePage() {
         return;
       }
 
-      setUserRounds(data?.[0]?.remaining ?? 0);
+      setUserRounds(data?.[0]?.live_credits ?? 0);
     } catch (err) {
       console.error("[UserRounds] Fetch error:", err);
       setUserRounds(0);
@@ -398,8 +454,8 @@ export default function HomePage() {
 
     try {
       const { data, error } = await supabase
-        .from("user_rounds")
-        .select("remaining")
+        .from("user_credits")
+        .select("live_credits")
         .eq("user_id", user.id)
         .limit(1);
 
@@ -408,7 +464,7 @@ export default function HomePage() {
         return "error";
       }
 
-      return data?.[0]?.remaining ?? 0;
+      return data?.[0]?.live_credits ?? 0;
     } catch (err) {
       console.error("[FreshRounds] Error:", err);
       return "error";
@@ -418,17 +474,25 @@ export default function HomePage() {
   // ✅ OPTIMIZED: Stable round state loader with drift protection
 const loadGlobalRoundState = useCallback(async () => {
   try {
-    const { data, error } = await supabase.rpc("get_current_live_round");
+    const { data, error } = await supabase
+      .from("rounds")
+      .select("scheduled_start")
+      .eq("status", "scheduled")
+      .order("scheduled_start", { ascending: true })
+      .limit(1)
+      .single();
 
-    if (error || !data || !data[0]) return;
+    if (error || !data) return;
 
-    const seconds = data[0].time_until_start_seconds;
+    const scheduledStart = new Date(data.scheduled_start).getTime();
+    const now = Date.now();
+    const seconds = Math.floor((scheduledStart - now) / 1000);
 
-    if (typeof seconds !== "number" || !Number.isFinite(seconds)) return;
+    if (!Number.isFinite(seconds)) return;
 
     setGlobalTimeLeft(Math.max(0, seconds));
   } catch (err) {
-    console.error("[Countdown] RPC failed:", err);
+    console.error("[Countdown] Round query failed:", err);
   }
 }, []);
 
@@ -460,16 +524,31 @@ const loadGlobalRoundState = useCallback(async () => {
     if (user) fetchUserRounds();
   }, [user, fetchUserRounds]);
 
-  // ✅ OPTIMIZED: Smooth active players update (no jumps)
+  // ✅ OPTIMIZED: Fetch next round's lobby participants
   const fetchActivePlayers = useCallback(async () => {
     try {
-      const { count } = await supabase
-        .from("active_sessions")
-        .select("*", { count: "exact", head: true });
+      // Get next scheduled round
+      const { data: nextRound } = await supabase
+        .from("rounds")
+        .select("id")
+        .eq("status", "scheduled")
+        .order("scheduled_start", { ascending: true })
+        .limit(1)
+        .single();
 
-      const base = 600;
-      const variation = Math.floor(Math.random() * 100) - 50;
-      const newCount = Math.max(base, base + (count || 0) + variation);
+      if (!nextRound) {
+        setActivePlayers(0);
+        return;
+      }
+
+      // Get participant count for that round
+      const { count } = await supabase
+        .from("round_participants")
+        .select("*", { count: "exact", head: true })
+        .eq("round_id", nextRound.id);
+
+      const base = 300; // Base count for UI
+      const newCount = Math.max(base, base + (count || 0));
 
       // ✅ Smooth transition (avoid jarring jumps)
       setActivePlayers((prev) => {
@@ -525,8 +604,8 @@ const fetchChampions = useCallback(async () => {
       periods.map((period) =>
         supabase
           .from(`leaderboard_${period}`)
-          .select("user_id, points")
-          .order("points", { ascending: false })
+          .select("user_id, full_name, total_score")
+          .order("total_score", { ascending: false })
           .limit(1)
       )
     );
@@ -546,8 +625,8 @@ const fetchChampions = useCallback(async () => {
 
         return {
           period: periods[i][0].toUpperCase() + periods[i].slice(1),
-          name: "Top Player",
-          score: row.points || 0,
+          name: row.full_name || "Top Player",
+          score: row.total_score || 0,
           gradient: gradients[i],
           color: colors[i],
           icon: icons[i],
@@ -564,7 +643,7 @@ const fetchChampions = useCallback(async () => {
 
   // Initial load
  useEffect(() => {
-  let cancelled = false; // ✅ EKLE
+  let cancelled = false;
 
   const loadData = async () => {
     try {
@@ -583,7 +662,7 @@ const fetchChampions = useCallback(async () => {
   loadData();
 
   return () => {
-    cancelled = true; // artık tanımlı
+    cancelled = true;
   };
 }, [fetchActivePlayers, fetchChampions, loadGlobalRoundState]);
 
@@ -679,6 +758,32 @@ const fetchChampions = useCallback(async () => {
     }
   }, [user, router, getFreshUserRounds]);
 
+  // 🎵 EKLEME: İlk tıklama handler - GLOBAL
+  useEffect(() => {
+    const handleFirstInteraction = () => {
+      if (!hasInteracted) {
+        setHasInteracted(true);
+
+        // Eğer user daha önce disable etmediyse çal
+        const savedPref = localStorage.getItem("vibraxx_music");
+        if (savedPref !== "false") {
+          playMenuMusic();
+          setIsPlaying(true);
+          localStorage.setItem("vibraxx_music", "true");
+        }
+      }
+    };
+
+    // CRITICAL: Music must NEVER autoplay without user interaction
+    document.addEventListener("click", handleFirstInteraction, { once: true });
+    document.addEventListener("touchstart", handleFirstInteraction, { once: true });
+
+    return () => {
+      document.removeEventListener("click", handleFirstInteraction);
+      document.removeEventListener("touchstart", handleFirstInteraction);
+    };
+  }, [hasInteracted]);
+
   // Music toggle
   const toggleMusic = useCallback(() => {
     if (isPlaying) {
@@ -696,7 +801,7 @@ const fetchChampions = useCallback(async () => {
   useEffect(() => {
     const musicPref = localStorage.getItem("vibraxx_music");
     if (musicPref === "true") {
-      playMenuMusic();
+      // ÖNCEKİ DAVRANIŞI KORUYORUZ - Ama autoplay yerine user interaction bekleyeceğiz
       setIsPlaying(true);
     }
     return () => stopMenuMusic();
@@ -807,18 +912,18 @@ const fetchChampions = useCallback(async () => {
     return `${m}:${s.toString().padStart(2, "0")}`;
   }, []);
 
-  // ✅ OPTIMIZED: Stats cards memoized
+  // ✅ DEĞİŞTİRİLDİ: Stats cards - Yanıltıcı stats kaldırıldı
   const statsCards = useMemo(
     () => [
       {
-        icon: Globe,
-        value: `${Math.floor(activePlayers / 1000)}K+`,
-        label: "Active Players",
+        icon: Sparkles,
+        value: "Fresh Questions",
+        label: "Smart rotation system",
       },
       {
-        icon: Sparkles,
-        value: `${(stats.totalQuestions / 1000000).toFixed(1)}M+`,
-        label: "Questions Answered",
+        icon: BookOpen,
+        value: "Learn & Compete",
+        label: "Detailed explanations",
       },
       {
         icon: Zap,
@@ -826,11 +931,12 @@ const fetchChampions = useCallback(async () => {
         label: "Live Rounds",
       },
     ],
-    [activePlayers, stats]
+    [stats]
   );
 
   return (
     <>
+      {/* ESKİ CSS - DEĞİŞİKLİK YOK */}
       <style jsx global>{`
         :root {
           color-scheme: dark;
@@ -927,7 +1033,7 @@ const fetchChampions = useCallback(async () => {
         .vx-header-inner {
           display: flex;
           align-items: center;
-          justify-content: space-between;
+          justifycontent: space-between;
           gap: 10px;
           padding: 8px 0;
           flex-wrap: wrap;
@@ -1423,6 +1529,7 @@ const fetchChampions = useCallback(async () => {
         }
       `}</style>
 
+      {/* ESKİ HTML - TASARIM KORUNDU, SADECE STATS DEĞİŞTİ */}
       <div
         style={{
           minHeight: "100vh",
@@ -1510,7 +1617,7 @@ const fetchChampions = useCallback(async () => {
           />
         )}
 
-        {/* HEADER */}
+        {/* HEADER - DEĞİŞMEDİ */}
         <header className="vx-header">
           <div className="vx-container">
             <div className="vx-header-inner">
@@ -1767,7 +1874,7 @@ const fetchChampions = useCallback(async () => {
           </div>
         </header>
 
-        {/* LIVE BANNER */}
+        {/* LIVE BANNER - DEĞİŞMEDİ */}
         <div className="vx-livebar">
           <div className="vx-container">
             <div className="vx-livebar-inner">
@@ -1811,7 +1918,7 @@ const fetchChampions = useCallback(async () => {
           </div>
         </div>
 
-        {/* HERO + CONTENT */}
+        {/* HERO + CONTENT - DEĞİŞMEDİ (Sadece stats kartları) */}
         <main className="vx-hero">
           <div className="vx-container">
             <div className="vx-hero-badge">
@@ -1978,14 +2085,14 @@ const fetchChampions = useCallback(async () => {
               </button>
             </div>
 
-            {/* Stats */}
+            {/* ✅ DEĞİŞTİRİLDİ: Stats Cards */}
             <div className="vx-stats-grid">
               {statsCards.map((stat, i) => (
                 <StatCard key={i} {...stat} />
               ))}
             </div>
 
-            {/* Champions */}
+            {/* ✅ DEĞİŞTİRİLDİ: Champions (Empty state handling) */}
             <h2 className="vx-champions-title">
               <Crown style={{ width: 24, height: 24, color: "#facc15" }} />
               Top Champions
@@ -1999,7 +2106,7 @@ const fetchChampions = useCallback(async () => {
           </div>
         </main>
 
-        {/* Trust Elements */}
+        {/* Trust Elements - DEĞİŞMEDİ */}
         <div
           style={{
             borderTop: "1px solid rgba(255, 255, 255, 0.05)",
@@ -2097,7 +2204,7 @@ const fetchChampions = useCallback(async () => {
           </div>
         </div>
 
-        {/* Footer */}
+        {/* Footer - DEĞİŞMEDİ */}
         <footer className="vx-footer">
           <div className="vx-container">
             <div className="vx-footer-legal">
