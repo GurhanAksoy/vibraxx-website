@@ -29,7 +29,7 @@ export default function LobbyPage() {
   const router = useRouter();
 
   // ✅ Use shared hook (Homepage ile AYNI round!)
-  const { timeLeft: globalTimeLeft, roundId, roundData } = useNextRound();
+  const { nextRound, timeUntilStart, formattedCountdown, lobbyStatus } = useNextRound();
 
   // Core State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -50,7 +50,7 @@ export default function LobbyPage() {
   const countdownBeepRef = useRef<HTMLAudioElement | null>(null);
 
   // Round change detection
-  const lastRoundIdRef = useRef<string | null>(null);
+  const lastRoundIdRef = useRef<number | null>(null);
 
   // === AUDIO INITIALIZATION ===
   useEffect(() => {
@@ -136,7 +136,7 @@ export default function LobbyPage() {
 
   // ✅ === ROUND CHANGE DETECTION ===
   useEffect(() => {
-    if (roundId && lastRoundIdRef.current && lastRoundIdRef.current !== roundId) {
+    if (nextRound?.id && lastRoundIdRef.current && lastRoundIdRef.current !== nextRound.id) {
       console.log("[Lobby] Round changed, resetting state");
       setHasJoined(false);
       setShowWarning(false);
@@ -144,25 +144,25 @@ export default function LobbyPage() {
       setPlayers([]);
       setTotalPlayers(0);
     }
-    lastRoundIdRef.current = roundId;
-  }, [roundId]);
+    lastRoundIdRef.current = nextRound?.id || null;
+  }, [nextRound?.id]);
 
   // ✅ === LOBBY SESSION TRACKING (ROUND DÜŞMEZ) ===
   useEffect(() => {
-    if (roundId && user && !hasJoined) {
+    if (nextRound?.id && user && !hasJoined) {
       console.log("[Lobby] User in lobby, waiting for quiz start");
       supabase.rpc("upsert_user_session", { p_user_id: user.id });
       setHasJoined(true);
     }
-  }, [roundId, user?.id, hasJoined]);
+  }, [nextRound?.id, user?.id, hasJoined]);
 
   // === FETCH LOBBY PLAYERS ===
   const fetchLobbyPlayers = useCallback(async () => {
-    if (!roundId) return;
+    if (!nextRound?.id) return;
 
     try {
       const { data, error } = await supabase.rpc("get_lobby_participants", {
-        p_round_id: roundId,
+        p_round_id: nextRound.id,
       });
 
       if (error) {
@@ -176,15 +176,15 @@ export default function LobbyPage() {
     } catch (err) {
       console.error("[Lobby] Fetch players error:", err);
     }
-  }, [roundId]);
+  }, [nextRound?.id]);
 
   // === FETCH TOTAL PARTICIPANTS ===
   const fetchTotalParticipants = useCallback(async () => {
-    if (!roundId) return;
+    if (!nextRound?.id) return;
 
     try {
       const { data, error } = await supabase.rpc("get_round_participant_count", {
-        p_round_id: roundId,
+        p_round_id: nextRound.id,
       });
 
       if (error) {
@@ -198,11 +198,11 @@ export default function LobbyPage() {
     } catch (err) {
       console.error("[Lobby] Fetch total error:", err);
     }
-  }, [roundId]);
+  }, [nextRound?.id]);
 
   // === FETCH PLAYERS WHEN IN LOBBY ===
   useEffect(() => {
-    if (!hasJoined || !roundId) return;
+    if (!hasJoined || !nextRound?.id) return;
 
     const loadParticipants = async () => {
       await Promise.all([fetchLobbyPlayers(), fetchTotalParticipants()]);
@@ -217,27 +217,24 @@ export default function LobbyPage() {
       clearInterval(playersInterval);
       clearInterval(countInterval);
     };
-  }, [hasJoined, roundId, fetchLobbyPlayers, fetchTotalParticipants]);
+  }, [hasJoined, nextRound?.id, fetchLobbyPlayers, fetchTotalParticipants]);
 
   // === AUTO START WHEN COUNTDOWN ENDS ===
   useEffect(() => {
     if (
-      globalTimeLeft !== null &&
-      globalTimeLeft <= 0 &&
-      roundData?.status === "scheduled" &&
+      timeUntilStart <= 0 &&
+      nextRound?.status === "scheduled" &&
       !isRedirecting &&
       hasJoined
     ) {
       handleStartGame();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [globalTimeLeft, roundData?.status, isRedirecting, hasJoined]);
+  }, [timeUntilStart, nextRound?.status, isRedirecting, hasJoined]);
 
   // === WARNING & SOUND EFFECTS ===
   useEffect(() => {
-    if (globalTimeLeft === null) return;
-
-    if (globalTimeLeft === 10) {
+    if (timeUntilStart === 10) {
       setShowWarning(true);
       if (isPlaying && alarmRef.current) {
         alarmRef.current.currentTime = 0;
@@ -245,17 +242,17 @@ export default function LobbyPage() {
       }
     }
 
-    if (globalTimeLeft <= 10 && globalTimeLeft > 0) {
+    if (timeUntilStart <= 10 && timeUntilStart > 0) {
       if (isPlaying && countdownBeepRef.current) {
         countdownBeepRef.current.currentTime = 0;
         countdownBeepRef.current.play().catch(() => {});
       }
     }
 
-    if (globalTimeLeft > 10) {
+    if (timeUntilStart > 10) {
       setShowWarning(false);
     }
-  }, [globalTimeLeft, isPlaying]);
+  }, [timeUntilStart, isPlaying]);
 
   // ✅ === START GAME & JOIN ROUND (BURADA ROUND DÜŞER) ===
   const handleStartGame = async () => {
@@ -264,10 +261,10 @@ export default function LobbyPage() {
 
     console.log("[Lobby] Quiz starting, joining round now...");
 
-    if (roundId && user) {
+    if (nextRound?.id && user) {
       try {
         const { data, error } = await supabase.rpc("join_round", {
-          p_round_id: roundId,
+          p_round_id: nextRound.id,
           p_user_id: user.id,
           p_round_type: "live",
         });
@@ -305,26 +302,14 @@ export default function LobbyPage() {
     router.push("/");
   };
 
-  // === FORMAT TIME ===
-  const formatTime = (seconds: number | null) => {
-    if (seconds === null) return "--:--";
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
   // === PROGRESS CALCULATION ===
-  const progress =
-    globalTimeLeft !== null
-      ? ((900 - Math.max(Math.min(globalTimeLeft, 900), 0)) / 900) * 100
-      : 0;
+  const progress = ((900 - Math.max(Math.min(timeUntilStart, 900), 0)) / 900) * 100;
 
   // === WARNING HELPERS ===
   const getWarningMessage = () => {
-    if (globalTimeLeft === null) return "Quiz Starting Soon";
-    if (globalTimeLeft <= 3) return "🚀 QUIZ STARTING NOW!";
-    if (globalTimeLeft <= 5) return "⚡ GET READY!";
-    if (globalTimeLeft <= 10) return "⏰ FINAL COUNTDOWN!";
+    if (timeUntilStart <= 3) return "🚀 QUIZ STARTING NOW!";
+    if (timeUntilStart <= 5) return "⚡ GET READY!";
+    if (timeUntilStart <= 10) return "⏰ FINAL COUNTDOWN!";
     return "Quiz Starting Soon";
   };
 
@@ -569,7 +554,7 @@ export default function LobbyPage() {
         />
 
         {/* RED WARNING Overlay */}
-        {showWarning && globalTimeLeft !== null && globalTimeLeft <= 10 && (
+        {showWarning && timeUntilStart <= 10 && (
           <div
             style={{
               position: "fixed",
@@ -975,21 +960,21 @@ export default function LobbyPage() {
                 padding: "clamp(32px, 6vw, 56px)",
                 borderRadius: "28px",
                 border:
-                  globalTimeLeft !== null && globalTimeLeft <= 10
+                  timeUntilStart <= 10
                     ? "3px solid #ef4444"
                     : "3px solid rgba(139, 92, 246, 0.6)",
                 background:
-                  globalTimeLeft !== null && globalTimeLeft <= 10
+                  timeUntilStart <= 10
                     ? "linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.1))"
                     : "rgba(15, 23, 42, 0.85)",
                 backdropFilter: "blur(25px)",
                 textAlign: "center",
                 animation:
-                  showWarning && globalTimeLeft !== null && globalTimeLeft <= 10
+                  showWarning && timeUntilStart <= 10
                     ? "redAlarm 0.8s ease-in-out infinite, shake 0.5s ease-in-out infinite"
                     : "none",
                 boxShadow:
-                  globalTimeLeft !== null && globalTimeLeft <= 10
+                  timeUntilStart <= 10
                     ? "0 0 60px rgba(239, 68, 68, 0.6)"
                     : "0 0 40px rgba(139, 92, 246, 0.4)",
               }}
@@ -1003,16 +988,16 @@ export default function LobbyPage() {
                   padding: "10px 24px",
                   borderRadius: "999px",
                   background:
-                    globalTimeLeft !== null && globalTimeLeft <= 10
+                    timeUntilStart <= 10
                       ? "rgba(239, 68, 68, 0.25)"
                       : "rgba(34, 197, 94, 0.25)",
                   border:
-                    globalTimeLeft !== null && globalTimeLeft <= 10
+                    timeUntilStart <= 10
                       ? "2px solid rgba(239, 68, 68, 0.6)"
                       : "2px solid rgba(34, 197, 94, 0.5)",
                   marginBottom: "clamp(20px, 4vw, 32px)",
                   boxShadow:
-                    globalTimeLeft !== null && globalTimeLeft <= 10
+                    timeUntilStart <= 10
                       ? "0 0 25px rgba(239, 68, 68, 0.5)"
                       : "0 0 20px rgba(34, 197, 94, 0.4)",
                 }}
@@ -1022,7 +1007,7 @@ export default function LobbyPage() {
                     width: 20,
                     height: 20,
                     color:
-                      globalTimeLeft !== null && globalTimeLeft <= 10
+                      timeUntilStart <= 10
                         ? "#ef4444"
                         : "#4ade80",
                   }}
@@ -1032,21 +1017,21 @@ export default function LobbyPage() {
                     fontSize: "clamp(12px, 2.8vw, 14px)",
                     fontWeight: 800,
                     color:
-                      globalTimeLeft !== null && globalTimeLeft <= 10
+                      timeUntilStart <= 10
                         ? "#fca5a5"
                         : "#4ade80",
                     textTransform: "uppercase",
                     letterSpacing: "0.06em",
                   }}
                 >
-                  {globalTimeLeft !== null && globalTimeLeft <= 10
+                  {timeUntilStart <= 10
                     ? "🚨 STARTING NOW!"
                     : "✓ You're in the Lobby"}
                 </span>
               </div>
 
               {/* Warning Message */}
-              {showWarning && globalTimeLeft !== null && globalTimeLeft <= 10 && (
+              {showWarning && timeUntilStart <= 10 && (
                 <div
                   style={{
                     padding: "20px 28px",
@@ -1087,7 +1072,7 @@ export default function LobbyPage() {
                   gap: "14px",
                   flexWrap: "wrap",
                   color:
-                    globalTimeLeft !== null && globalTimeLeft <= 10
+                    timeUntilStart <= 10
                       ? "#fca5a5"
                       : "white",
                 }}
@@ -1097,7 +1082,7 @@ export default function LobbyPage() {
                     width: "clamp(28px, 7vw, 36px)",
                     height: "clamp(28px, 7vw, 36px)",
                     color:
-                      globalTimeLeft !== null && globalTimeLeft <= 10
+                      timeUntilStart <= 10
                         ? "#ef4444"
                         : "#a78bfa",
                   }}
@@ -1111,7 +1096,7 @@ export default function LobbyPage() {
                   fontSize: "clamp(56px, 18vw, 120px)",
                   fontWeight: 900,
                   backgroundImage:
-                    globalTimeLeft !== null && globalTimeLeft <= 10
+                    timeUntilStart <= 10
                       ? "linear-gradient(135deg, #ef4444, #dc2626)"
                       : "linear-gradient(135deg, #a78bfa, #f0abfc)",
                   WebkitBackgroundClip: "text",
@@ -1120,17 +1105,17 @@ export default function LobbyPage() {
                   marginBottom: "clamp(24px, 5vw, 40px)",
                   fontFamily: "monospace",
                   textShadow:
-                    globalTimeLeft !== null && globalTimeLeft <= 10
+                    timeUntilStart <= 10
                       ? "0 0 50px rgba(239, 68, 68, 0.8)"
                       : "0 0 50px rgba(167, 139, 250, 0.6)",
                   animation:
-                    globalTimeLeft !== null && globalTimeLeft <= 10
+                    timeUntilStart <= 10
                       ? "warningPulse 0.4s ease-in-out infinite"
                       : "none",
                   letterSpacing: "0.05em",
                 }}
               >
-                {formatTime(globalTimeLeft)}
+                {formattedCountdown}
               </div>
 
               {/* Progress Bar */}
@@ -1143,11 +1128,11 @@ export default function LobbyPage() {
                   overflow: "hidden",
                   marginBottom: "clamp(24px, 5vw, 40px)",
                   border:
-                    globalTimeLeft !== null && globalTimeLeft <= 10
+                    timeUntilStart <= 10
                       ? "2px solid rgba(239, 68, 68, 0.5)"
                       : "2px solid rgba(139, 92, 246, 0.4)",
                   boxShadow:
-                    globalTimeLeft !== null && globalTimeLeft <= 10
+                    timeUntilStart <= 10
                       ? "0 0 20px rgba(239, 68, 68, 0.5), inset 0 0 10px rgba(239, 68, 68, 0.3)"
                       : "0 0 15px rgba(139, 92, 246, 0.4)",
                 }}
@@ -1157,13 +1142,13 @@ export default function LobbyPage() {
                     width: `${progress}%`,
                     height: "100%",
                     background:
-                      globalTimeLeft !== null && globalTimeLeft <= 10
+                      timeUntilStart <= 10
                         ? "linear-gradient(90deg, #ef4444, #dc2626)"
                         : "linear-gradient(90deg, #7c3aed, #d946ef)",
                     borderRadius: "999px",
                     transition: "width 1s linear",
                     boxShadow:
-                      globalTimeLeft !== null && globalTimeLeft <= 10
+                      timeUntilStart <= 10
                         ? "0 0 25px rgba(239, 68, 68, 1)"
                         : "0 0 25px rgba(139, 92, 246, 0.9)",
                   }}
@@ -1175,7 +1160,7 @@ export default function LobbyPage() {
                 style={{
                   fontSize: "clamp(14px, 3.2vw, 17px)",
                   color:
-                    globalTimeLeft !== null && globalTimeLeft <= 10
+                    timeUntilStart <= 10
                       ? "#fca5a5"
                       : "#cbd5e1",
                   marginBottom: "clamp(28px, 6vw, 40px)",
@@ -1183,7 +1168,7 @@ export default function LobbyPage() {
                   fontWeight: 600,
                 }}
               >
-                {globalTimeLeft !== null && globalTimeLeft <= 10
+                {timeUntilStart <= 10
                   ? "🔥 Get ready! You'll be automatically entered when the countdown ends!"
                   : "You'll be automatically entered when the quiz begins. Get ready!"}
               </p>
