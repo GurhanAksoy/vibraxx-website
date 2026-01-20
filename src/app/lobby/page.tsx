@@ -1308,8 +1308,7 @@ export default function LobbyPage() {
                     fontWeight: 600,
                   }}
                 >
-                  💡 <strong style={{ color: "white" }}>Pro Tip:</strong> In a tie, the
-                  fastest correct responder wins the monthly prize!
+                  💡 <strong style={{ color: "white" }}>Pro Tip:</strong> Speed matters. Answer fast and accurately to dominate the leaderboard.
                 </div>
               </div>
             </div>
