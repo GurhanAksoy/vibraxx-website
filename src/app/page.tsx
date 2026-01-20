@@ -567,14 +567,7 @@ const loadGlobalRoundState = useCallback(async () => {
   // Default champions fallback
   const getDefaultChampions = useCallback(
     () => [
-      {
-        period: "Daily",
-        name: "TBA",
-        score: 0,
-        gradient: "linear-gradient(to bottom right, #eab308, #f97316)",
-        color: "#facc15",
-        icon: Crown,
-      },
+      
       {
         period: "Weekly",
         name: "TBA",
@@ -598,7 +591,7 @@ const loadGlobalRoundState = useCallback(async () => {
   // ✅ OPTIMIZED: Champions with JOIN (3 queries instead of 6)
 const fetchChampions = useCallback(async () => {
   try {
-    const periods = ["daily", "weekly", "monthly"];
+    const periods = ["weekly", "monthly"];
 
     const results = await Promise.all(
       periods.map((period) =>
@@ -1034,7 +1027,7 @@ const fetchChampions = useCallback(async () => {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 20px;
+          gap: 10px;
           padding: 8px 0;
           flex-wrap: wrap;
         }
