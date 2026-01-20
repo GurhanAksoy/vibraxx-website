@@ -1033,7 +1033,7 @@ const fetchChampions = useCallback(async () => {
         .vx-header-inner {
           display: flex;
           align-items: center;
-          justifycontent: space-between;
+          justify-content: space-between;
           gap: 10px;
           padding: 8px 0;
           flex-wrap: wrap;
@@ -1526,7 +1526,13 @@ const fetchChampions = useCallback(async () => {
           .vx-champ-card {
             padding: 20px !important;
           }
+          
+          .vx-logo-container > div:first-child { 
+            width: 70px !important; 
+            height: 70px !important; 
+          }
         }
+
       `}</style>
 
       {/* ESKİ HTML - TASARIM KORUNDU, SADECE STATS DEĞİŞTİ */}
@@ -1621,12 +1627,12 @@ const fetchChampions = useCallback(async () => {
         <header className="vx-header">
           <div className="vx-container">
             <div className="vx-header-inner">
-              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }} className="vx-logo-container">
                 <div
                   style={{
                     position: "relative",
-                    width: 90,
-                    height: 90,
+                    width: 120,
+                    height: 120,
                     borderRadius: "9999px",
                     padding: 4,
                     background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)",
@@ -1923,7 +1929,7 @@ const fetchChampions = useCallback(async () => {
           <div className="vx-container">
             <div className="vx-hero-badge">
               <Crown style={{ width: 16, height: 16, color: "#fbbf24" }} />
-              Knowledge Quiz with a £1000 Monthly Prize
+              Skill-based quiz. £1,000 monthly prize
               <Trophy style={{ width: 16, height: 16, color: "#fbbf24" }} />
             </div>
 
@@ -1945,7 +1951,7 @@ const fetchChampions = useCallback(async () => {
                 }}
               >
                 <AlertCircle style={{ width: 15, height: 15 }} />
-                See Terms & Conditions for full details
+                *Terms apply
               </div>
             </div>
 
@@ -1953,7 +1959,8 @@ const fetchChampions = useCallback(async () => {
               <span className="vx-hero-neon">The Next Generation Live Quiz</span>
             </h1>
 
-            <p className="vx-hero-subtitle">The world's number one educational and award-winning quiz!</p>
+            <p className="vx-hero-subtitle">Global skill-based quiz competition
+</p>
 
             {/* Countdown */}
             <div className="vx-countdown-panel">
