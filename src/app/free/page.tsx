@@ -16,10 +16,11 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-const TOTAL_QUESTIONS = 50; // 🎮 FREE PRACTICE MODE
+const TOTAL_QUESTIONS = 20; // 🎮 FREE PRACTICE MODE (✅ YENİ: 20 soru!)
 const QUESTION_DURATION = 6; // saniye
-const EXPLANATION_DURATION = 5; // saniye
-const FINAL_SCORE_DURATION = 5; // saniye
+const EXPLANATION_DURATION = 6; // saniye (✅ YENİ: 6sn açıklama)
+const FINAL_SCORE_DURATION = 30; // saniye (✅ YENİ: 30sn final)
+const INITIAL_COUNTDOWN = 6; // ✅ YENİ: Quiz başlangıç countdown
 
 type OptionId = "A" | "B" | "C" | "D";
 type AnswerStatus = "none" | "correct" | "wrong";
@@ -39,6 +40,10 @@ export default function FreeQuizPage() {
   const [isVerifying, setIsVerifying] = useState(true);
   const [securityPassed, setSecurityPassed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // ✅ YENİ: INITIAL COUNTDOWN (6sn Logo + "Quiz Starting...")
+  const [showInitialCountdown, setShowInitialCountdown] = useState(false);
+  const [initialCountdown, setInitialCountdown] = useState(INITIAL_COUNTDOWN);
 
   // 🎮 QUESTIONS STATE (will be loaded from database)
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -76,6 +81,7 @@ export default function FreeQuizPage() {
   const gameoverSoundRef = useRef<HTMLAudioElement | null>(null);
   const whooshSoundRef = useRef<HTMLAudioElement | null>(null);
   const tickSoundRef = useRef<HTMLAudioElement | null>(null);
+  const startSoundRef = useRef<HTMLAudioElement | null>(null); // ✅ YENİ!
 
   const currentQ = questions[currentIndex];
 
@@ -84,6 +90,15 @@ export default function FreeQuizPage() {
     const verifyAndFetchFreeQuiz = async () => {
       try {
         console.log("🔐 Free Quiz Security: Starting verification...");
+
+        // ✅ CHECK 0: Navigation kontrolü (direkt URL yasak!)
+        const searchParams = new URLSearchParams(window.location.search);
+        const fromNavigation = searchParams.get("from");
+        if (fromNavigation !== "homepage") {
+          console.log("❌ Free Quiz Security: Direct URL access denied");
+          router.push("/");
+          return;
+        }
 
         // CHECK 1: User authentication
         const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -96,39 +111,52 @@ export default function FreeQuizPage() {
 
         console.log("✅ Free Quiz Security: User authenticated -", user.id);
 
-        // CHECK 2: Get today's free round
-        const { data: freeRoundData, error: freeRoundError } = await supabase.rpc(
-          "get_today_free_round"
-        );
+        // ✅ CHECK 2: Get today's free round (YENİ ŞEMA!)
+        const todayStart = new Date();
+        todayStart.setUTCHours(0, 0, 0, 0);
+        const todayEnd = new Date();
+        todayEnd.setUTCHours(23, 59, 59, 999);
 
-        console.log("🔍 Free Round Raw Data:", freeRoundData);
+        const { data: freeRounds, error: roundError } = await supabase
+          .from("rounds")
+          .select("id, scheduled_start, questions")
+          .eq("type", "free")
+          .eq("status", "scheduled")
+          .gte("scheduled_start", todayStart.toISOString())
+          .lte("scheduled_start", todayEnd.toISOString())
+          .order("scheduled_start", { ascending: true })
+          .limit(1);
 
-        if (freeRoundError) {
-          console.error("❌ Free Quiz Error:", freeRoundError);
+        if (roundError || !freeRounds || freeRounds.length === 0) {
+          console.error("❌ No free quiz available today:", roundError);
           setShowAlreadyPlayedModal(true);
           setIsVerifying(false);
           setIsLoading(false);
           return;
         }
 
-        // ✅ FIXED: Handle array response from RPC (RETURNS TABLE)
-        const freeRound = Array.isArray(freeRoundData) && freeRoundData.length > 0 
-          ? freeRoundData[0] 
-          : freeRoundData;
+        const freeRound = freeRounds[0];
+        console.log("✅ Free round found:", freeRound.id);
 
-        console.log("🔍 Free Round Parsed:", freeRound);
+        // ✅ CHECK 3: Has user already played today? (score_ledger kontrolü)
+        const { data: existingScore, error: scoreError } = await supabase
+          .from("score_ledger")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("round_id", freeRound.id)
+          .gte("created_at", todayStart.toISOString())
+          .lte("created_at", todayEnd.toISOString())
+          .maybeSingle();
 
-        // ✅ Check if free round exists
-        if (!freeRound || !freeRound.round_id) {
-          console.error("❌ No free quiz available today");
+        if (scoreError && scoreError.code !== "PGRST116") {
+          console.error("❌ Error checking play history:", scoreError);
           setShowAlreadyPlayedModal(true);
           setIsVerifying(false);
           setIsLoading(false);
           return;
         }
 
-        // CHECK 3: Has user already played today?
-        if (freeRound.has_played) {
+        if (existingScore) {
           console.log("❌ Free Quiz Security: Already played today");
           setShowAlreadyPlayedModal(true);
           setIsVerifying(false);
@@ -137,12 +165,11 @@ export default function FreeQuizPage() {
         }
 
         console.log("✅ Free Quiz Security: Free quiz available!");
-        setRoundId(freeRound.round_id);
+        setRoundId(freeRound.id.toString());
 
-        // FETCH QUESTIONS from the free round
+        // ✅ FETCH QUESTIONS (YENİ: direkt questions tablosundan)
         const questionIds = (freeRound.questions || []) as number[];
 
-        // ✅ Validate questions exist
         if (!questionIds || questionIds.length === 0) {
           console.error("❌ No questions in free round!");
           setShowAlreadyPlayedModal(true);
@@ -153,10 +180,10 @@ export default function FreeQuizPage() {
 
         console.log(`✅ Free round has ${questionIds.length} questions`);
 
-        const { data: questionsData, error: questionsError } = await supabase.rpc(
-          "get_question_details",
-          { p_question_ids: questionIds }
-        );
+        const { data: questionsData, error: questionsError } = await supabase
+          .from("questions")
+          .select("id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation")
+          .in("id", questionIds);
 
         if (questionsError || !questionsData) {
           console.error("❌ Error fetching questions:", questionsError);
@@ -187,6 +214,9 @@ export default function FreeQuizPage() {
         setIsVerifying(false);
         setIsLoading(false);
 
+        // ✅ Show initial countdown before quiz starts
+        setShowInitialCountdown(true);
+
         console.log("✅ Free Quiz: Ready to play!");
 
       } catch (error) {
@@ -199,6 +229,26 @@ export default function FreeQuizPage() {
 
     verifyAndFetchFreeQuiz();
   }, [router]);
+
+  // ✅ YENİ: INITIAL COUNTDOWN (6→1→0 → START!)
+  useEffect(() => {
+    if (!showInitialCountdown) return;
+
+    const interval = setInterval(() => {
+      setInitialCountdown((prev) => {
+        if (prev <= 1) {
+          // Countdown bitti → Start sesi + Quiz başla!
+          clearInterval(interval);
+          playSound(startSoundRef.current);
+          setShowInitialCountdown(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [showInitialCountdown]);
 
   // Ses helper
   const playSound = (
@@ -234,18 +284,17 @@ export default function FreeQuizPage() {
     stopSound(tickSoundRef.current);
   };
 
-  // İlk soru: tick başlat
+  // ✅ YENİ: TICK SESİ SYNC (Her saniye çal, loop değil!)
   useEffect(() => {
-    if (!securityPassed) return; // 🔐 Wait for security
-    if (!showFinalScore && !showExplanation && timeLeft > 0) {
-      startTick();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [securityPassed]);
+    if (showInitialCountdown || showFinalScore || showExplanation || timeLeft <= 0) return;
+    
+    // Her timeLeft değişiminde 1 tick çal
+    playSound(tickSoundRef.current);
+  }, [timeLeft, showInitialCountdown, showFinalScore, showExplanation]);
 
   // Ana TIMER (6 → 0)
   useEffect(() => {
-    if (showFinalScore || showExplanation) return;
+    if (showInitialCountdown || showFinalScore || showExplanation) return;
     if (timeLeft <= 0) return;
 
     const interval = setInterval(() => {
@@ -253,15 +302,12 @@ export default function FreeQuizPage() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [timeLeft, showExplanation, showFinalScore]);
+  }, [timeLeft, showExplanation, showFinalScore, showInitialCountdown]);
 
-  // timeLeft 0 olduğunda → tick dur, gerekiyorsa yanlış say, explanation aç
+  // timeLeft 0 olduğunda → yanlış say, explanation aç
   useEffect(() => {
-    if (showFinalScore || showExplanation) return;
+    if (showInitialCountdown || showFinalScore || showExplanation) return;
     if (timeLeft !== 0) return;
-
-    // süre biter bitmez tick kes
-    stopTick();
 
     // cevap seçilmemişse yanlış
     if (!isAnswerLocked) {
@@ -280,7 +326,7 @@ export default function FreeQuizPage() {
     playSound(whooshSoundRef.current);
     setShowExplanation(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft, showExplanation, showFinalScore]);
+  }, [timeLeft, showExplanation, showFinalScore, showInitialCountdown]);
 
   // EXPLANATION COUNTDOWN
   useEffect(() => {
@@ -305,10 +351,6 @@ export default function FreeQuizPage() {
         setIsAnswerLocked(false);
         setIsCorrect(false);
         setShowExplanation(false);
-
-        if (isSoundEnabled) {
-          startTick();
-        }
       } else {
         setShowFinalScore(true);
       }
@@ -327,7 +369,7 @@ export default function FreeQuizPage() {
     stopTick();
     playSound(gameoverSoundRef.current);
 
-    // ✅ SUBMIT FREE QUIZ RESULT
+    // ✅ SUBMIT FREE QUIZ RESULT (YENİ ŞEMA!)
     const submitResult = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -335,17 +377,23 @@ export default function FreeQuizPage() {
         if (user && roundId) {
           console.log("📊 Submitting free quiz result...");
           
-          const { data, error } = await supabase.rpc("submit_free_quiz_result", {
-            p_user_id: user.id,
-            p_round_id: roundId,
-            p_correct_answers: correctCount,
-            p_wrong_answers: wrongCount,
-          });
+          const totalScore = correctCount * 10; // Her doğru 10 puan
+          
+          const { error } = await supabase
+            .from("score_ledger")
+            .insert({
+              user_id: user.id,
+              round_id: parseInt(roundId),
+              score: totalScore,
+              correct_answers: correctCount,
+              wrong_answers: wrongCount,
+              source: "free",
+            });
 
           if (error) {
             console.error("❌ Error submitting result:", error);
           } else {
-            console.log("✅ Free quiz result submitted successfully:", data);
+            console.log("✅ Free quiz result submitted successfully");
           }
         }
       } catch (error) {
@@ -374,26 +422,6 @@ export default function FreeQuizPage() {
       clearTimeout(timeout);
     };
   }, [showFinalScore, router, correctCount, wrongCount, roundId]);
-
-  // Ses toggle
-  useEffect(() => {
-    if (!isSoundEnabled) {
-      stopTick();
-      return;
-    }
-    if (!showFinalScore && !showExplanation && timeLeft > 0) {
-      startTick();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSoundEnabled]);
-
-  // Güvenlik: explanation veya finalde ya da süre 0'da tick kapalı
-  useEffect(() => {
-    if (showFinalScore || showExplanation || timeLeft <= 0) {
-      stopTick();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showFinalScore, showExplanation, timeLeft]);
 
   const handleAnswerClick = (optionId: OptionId) => {
     if (isAnswerLocked || showExplanation || showFinalScore) return;
@@ -434,19 +462,25 @@ export default function FreeQuizPage() {
     stopTick();
     setShowExitConfirm(false);
 
-    // ✅ SUBMIT RESULT BEFORE EXIT
+    // ✅ SUBMIT RESULT BEFORE EXIT (YENİ ŞEMA!)
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user && roundId) {
         console.log("📊 Submitting result before exit...");
         
-        await supabase.rpc("submit_free_quiz_result", {
-          p_user_id: user.id,
-          p_round_id: roundId,
-          p_correct_answers: correctCount,
-          p_wrong_answers: wrongCount,
-        });
+        const totalScore = correctCount * 10;
+        
+        await supabase
+          .from("score_ledger")
+          .insert({
+            user_id: user.id,
+            round_id: parseInt(roundId),
+            score: totalScore,
+            correct_answers: correctCount,
+            wrong_answers: wrongCount,
+            source: "free",
+          });
       }
     } catch (error) {
       console.error("❌ Exit submit error:", error);
@@ -649,6 +683,120 @@ export default function FreeQuizPage() {
     );
   }
 
+  // ✅ YENİ: INITIAL COUNTDOWN (6sn Logo + "Quiz Starting...")
+  if (showInitialCountdown) {
+    return (
+      <>
+        <style jsx global>{`
+          @keyframes pulseGlow {
+            0%, 100% {
+              opacity: 1;
+              transform: scale(1);
+            }
+            50% {
+              opacity: 0.8;
+              transform: scale(1.05);
+            }
+          }
+          @keyframes fadeIn {
+            from {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          .animate-pulse-glow {
+            animation: pulseGlow 2s ease-in-out infinite;
+          }
+          .animate-fade-in {
+            animation: fadeIn 0.5s ease-out;
+          }
+        `}</style>
+
+        <div
+          style={{
+            minHeight: "100vh",
+            background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          {/* Logo */}
+          <div
+            className="animate-pulse-glow"
+            style={{
+              width: "120px",
+              height: "120px",
+              marginBottom: "32px",
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #7c3aed, #a855f7)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 0 60px rgba(124,58,237,0.8)",
+            }}
+          >
+            <Zap style={{ width: 60, height: 60, color: "white" }} />
+          </div>
+
+          {/* Quiz Starting Text */}
+          <h1
+            className="animate-fade-in"
+            style={{
+              fontSize: "32px",
+              fontWeight: 900,
+              marginBottom: "16px",
+              background: "linear-gradient(to right, #a855f7, #06b6d4)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              textAlign: "center",
+              letterSpacing: "0.05em",
+            }}
+          >
+            QUIZ STARTING...
+          </h1>
+
+          {/* Countdown Number */}
+          <div
+            className="animate-pulse-glow"
+            style={{
+              fontSize: "80px",
+              fontWeight: 900,
+              color: "#22c55e",
+              textShadow: "0 0 40px rgba(34,197,94,0.8)",
+              marginTop: "24px",
+            }}
+          >
+            {initialCountdown}
+          </div>
+
+          {/* Get Ready Text */}
+          <p
+            style={{
+              fontSize: "16px",
+              color: "#94a3b8",
+              marginTop: "24px",
+              textAlign: "center",
+              textTransform: "uppercase",
+              letterSpacing: "0.15em",
+            }}
+          >
+            Get Ready!
+          </p>
+        </div>
+
+        {/* ✅ Audio elements (start sesi!) */}
+        <audio ref={startSoundRef} src="/sounds/start.mp3" />
+      </>
+    );
+  }
+
   return (
     <>
       <style jsx global>{`
@@ -734,6 +882,7 @@ export default function FreeQuizPage() {
       <audio ref={gameoverSoundRef} src="/sounds/gameover.mp3" />
       <audio ref={whooshSoundRef} src="/sounds/whoosh.mp3" />
       <audio ref={tickSoundRef} src="/sounds/tick.mp3" />
+      <audio ref={startSoundRef} src="/sounds/start.mp3" /> {/* ✅ YENİ! */}
 
       <div
         style={{
@@ -1350,6 +1499,66 @@ export default function FreeQuizPage() {
                     Accuracy
                   </div>
                 </div>
+              </div>
+
+              {/* ✅ YENİ: PREMIUM CTA */}
+              <div
+                style={{
+                  marginTop: 24,
+                  marginBottom: 16,
+                  padding: "20px 18px",
+                  borderRadius: 20,
+                  background: "linear-gradient(135deg, rgba(124,58,237,0.15), rgba(6,182,212,0.15))",
+                  border: "1px solid rgba(124,58,237,0.4)",
+                  boxShadow: "0 0 30px rgba(124,58,237,0.2)",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color: "#e5e7eb",
+                    marginBottom: 14,
+                    textAlign: "center",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Ready for the real challenge?<br />Join the Live Arena 🏆
+                </p>
+                
+                <button
+                  onClick={() => router.push("/lobby")}
+                  className="animate-shine"
+                  style={{
+                    width: "100%",
+                    padding: "14px 24px",
+                    borderRadius: 9999,
+                    border: "none",
+                    background: "linear-gradient(135deg, #7c3aed, #06b6d4)",
+                    color: "white",
+                    fontSize: 15,
+                    fontWeight: 800,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    cursor: "pointer",
+                    boxShadow: "0 0 30px rgba(124,58,237,0.6), inset 0 1px 0 rgba(255,255,255,0.3)",
+                    transition: "all 0.3s",
+                    position: "relative",
+                    overflow: "hidden",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = "translateY(-2px) scale(1.02)";
+                    e.currentTarget.style.boxShadow = "0 0 40px rgba(124,58,237,0.8), inset 0 1px 0 rgba(255,255,255,0.3)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "translateY(0) scale(1)";
+                    e.currentTarget.style.boxShadow = "0 0 30px rgba(124,58,237,0.6), inset 0 1px 0 rgba(255,255,255,0.3)";
+                  }}
+                >
+                  <span style={{ position: "relative", zIndex: 1 }}>
+                    Enter Live Arena
+                  </span>
+                </button>
               </div>
 
               <div
