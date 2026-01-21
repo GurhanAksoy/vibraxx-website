@@ -1,5 +1,4 @@
-# src/middleware.ts oluştur
-@"
+$middlewareContent = @'
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
@@ -25,4 +24,6 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: ['/lobby', '/quiz', '/profile']
 };
-"@ | Out-File -FilePath "src\middleware.ts" -Encoding UTF8
+'@
+
+$middlewareContent | Out-File -FilePath "src\middleware.ts" -Encoding UTF8 -NoNewline
