@@ -6,17 +6,17 @@ export const metadata: Metadata = {
   title: "VIBRAXX - 24/7 Quiz Arena",
   description: "Global skill-based quiz arena.",
   manifest: "/manifest.json",
-  themeColor: "#020817",
+  applicationName: "VibraXX",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
     title: "VibraXX"
   }
 };
 
 export const viewport: Viewport = {
   width: "device-width",
-  initialScale: 1
+  initialScale: 1,
+  themeColor: "#020817" // ✅ doğru yer
 };
 
 const inter = Inter({
@@ -27,12 +27,10 @@ const inter = Inter({
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <head>
-        <link rel="apple-touch-icon" href="/icons/apple-icon-180.png" />
-        <meta name="mobile-web-app-capable" content="yes" />
-      </head>
       <body className={inter.className + " bg-[#020817] text-white antialiased"}>
         {children}
+
+        {/* Service Worker */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
