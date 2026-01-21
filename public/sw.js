@@ -9,19 +9,20 @@ const APP_SHELL = [
   "/icons/manifest-icon-512.maskable.png"
 ];
 
-// INSTALL
+// ================= INSTALL =================
 self.addEventListener("install", (event) => {
+  console.log("[SW] Install");
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log("[SW] Installing & caching shell");
       return cache.addAll(APP_SHELL);
     })
   );
-  self.skipWaiting();
+  // ❌ skipWaiting YOK → update flow için şart
 });
 
-// ACTIVATE
+// ================= ACTIVATE =================
 self.addEventListener("activate", (event) => {
+  console.log("[SW] Activate");
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
@@ -37,14 +38,23 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// FETCH
+// ================= UPDATE FLOW =================
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    console.log("[SW] Skip waiting triggered");
+    self.skipWaiting();
+  }
+});
+
+// ================= FETCH =================
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   const url = new URL(req.url);
 
+  // Sadece GET
   if (req.method !== "GET") return;
 
-  // API / Supabase → direkt network
+  // API / Supabase → asla cache
   if (
     url.pathname.startsWith("/api") ||
     url.hostname.includes("supabase")
@@ -53,17 +63,17 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Sayfa geçişleri
+  // NAVIGATION (sayfa değişimi)
   if (req.mode === "navigate") {
     event.respondWith(
       fetch(req).catch(() => {
-        return caches.match("/offline.html") || caches.match("/");
+        return caches.match("/offline.html");
       })
     );
     return;
   }
 
-  // Static assets
+  // STATIC ASSETS → cache first
   event.respondWith(
     caches.match(req).then((cached) => {
       if (cached) return cached;
