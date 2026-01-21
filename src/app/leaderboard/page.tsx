@@ -484,17 +484,16 @@ export default function LeaderboardPage() {
                     justifyContent: 'center',
                     color: '#a78bfa',
                     transition: 'all 0.3s',
-                    boxShadow: '0 0 15px rgba(139, 92, 246, 0.3)'
+                    boxShadow: '0 2px 8px rgba(139, 92, 246, 0.2)'
                   }}
-                  className="neon-border"
                   aria-label={isMuted ? 'Unmute audio' : 'Mute audio'}
                   onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.1)';
-                    (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 25px rgba(139, 92, 246, 0.5)';
+                    (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.05)';
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
                   }}
                   onMouseLeave={(e) => {
                     (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
-                    (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 15px rgba(139, 92, 246, 0.3)';
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 8px rgba(139, 92, 246, 0.2)';
                   }}
                 >
                   {isMuted ? 
@@ -519,20 +518,19 @@ export default function LeaderboardPage() {
                     cursor: 'pointer',
                     transition: 'all 0.3s',
                     backdropFilter: 'blur(10px)',
-                    boxShadow: '0 0 20px rgba(139, 92, 246, 0.3)',
+                    boxShadow: '0 2px 8px rgba(139, 92, 246, 0.2)',
                     whiteSpace: 'nowrap'
                   }}
-                  className="neon-border"
                   aria-label="Return to homepage"
                   onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(217, 70, 239, 0.2))';
+                    (e.currentTarget as HTMLButtonElement).style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(217, 70, 239, 0.15))';
                     (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)';
-                    (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 5px 30px rgba(139, 92, 246, 0.5)';
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
                   }}
                   onMouseLeave={(e) => {
                     (e.currentTarget as HTMLButtonElement).style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(217, 70, 239, 0.1))';
                     (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)';
-                    (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 20px rgba(139, 92, 246, 0.3)';
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 8px rgba(139, 92, 246, 0.2)';
                   }}
                 >
                   <Zap style={{ width: 'clamp(14px, 2.8vw, 18px)', height: 'clamp(14px, 2.8vw, 18px)', color: '#a78bfa' }} aria-hidden="true" />
