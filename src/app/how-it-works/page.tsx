@@ -657,7 +657,7 @@ export default function HowItWorksPage() {
                 <div className="step-number">2</div>
                 <div className="step-title">Try Free Practice Quiz</div>
                 <p className="step-description">
-                  Get one free daily quiz (50 questions) to practice. No prizes, just pure learning.
+                  Get one free daily quiz (20 questions) to practice. No prizes, just pure learning.
                 </p>
               </div>
 
@@ -681,7 +681,7 @@ export default function HowItWorksPage() {
                 <div className="step-number">5</div>
                 <div className="step-title">Compete & Score</div>
                 <p className="step-description">
-                  Answer 50 questions in 6 seconds each. Every correct answer earns 2 points.
+                  Answer 20 questions in 6 seconds each. Every correct answer earns 5 points.
                 </p>
               </div>
 
@@ -707,7 +707,7 @@ export default function HowItWorksPage() {
                 <div className="stat-label">Between Rounds</div>
               </div>
               <div className="stat-card">
-                <div className="stat-value">50</div>
+                <div className="stat-value">20</div>
                 <div className="stat-label">Questions Per Round</div>
               </div>
               <div className="stat-card">
@@ -715,11 +715,11 @@ export default function HowItWorksPage() {
                 <div className="stat-label">Per Question</div>
               </div>
               <div className="stat-card">
-                <div className="stat-value">5sec</div>
+                <div className="stat-value">6sec</div>
                 <div className="stat-label">Answer Explanation</div>
               </div>
               <div className="stat-card">
-                <div className="stat-value">2pts</div>
+                <div className="stat-value">5pts</div>
                 <div className="stat-label">Per Correct Answer</div>
               </div>
               <div className="stat-card">
@@ -731,11 +731,11 @@ export default function HowItWorksPage() {
             <h3 className="subsection-title">How Each Round Works</h3>
             <ol>
               <li><strong>Lobby Countdown:</strong> Wait in the lobby for the next round to start</li>
-              <li><strong>Competition Begins:</strong> Once started, no one else can join</li>
+              <li><strong>Competition Begins:</strong> Late arrivals must wait for the next round.</li>
               <li><strong>Question Appears:</strong> Read and select your answer within 6 seconds</li>
-              <li><strong>Answer Revealed:</strong> See if you were correct with a 5-second explanation</li>
+              <li><strong>Answer Revealed:</strong> See if you were correct with a 6-second explanation</li>
               <li><strong>Next Question:</strong> Automatically moves to the next question</li>
-              <li><strong>Scorecard:</strong> After 50 questions, view your performance</li>
+              <li><strong>Scorecard:</strong> After 20 questions, view your performance</li>
               <li><strong>Back to Lobby:</strong> Return to lobby if you have rounds remaining</li>
             </ol>
           </div>
@@ -763,9 +763,9 @@ export default function HowItWorksPage() {
 
             <h3 className="subsection-title">Important Threshold</h3>
             <div className="info-box">
-              <strong>3000+ Unique Paid Participants Required</strong>
+              <strong>3000+ Paid Round Purchases Required</strong>
               <p>
-                The £1000 prize pool activates only when 3000 or more unique participants who have purchased at least one paid round compete during the calendar month. This threshold covers platform operational costs including payment processing fees, infrastructure, security, and support services.
+               The £1000 prize pool activates only when a minimum of 3000 paid round purchases are completed during the calendar month. The number of individual participants is not relevant, as long as the total number of paid round purchases reaches this threshold. This threshold covers platform operational costs including payment processing fees, infrastructure, security, and support services.
                 <br /><br />
                 <strong style={{ color: "#a78bfa" }}>If the threshold is not met:</strong> No prize is awarded and funds do not carry over to the next month. Entry fees are not refunded as the platform service (quiz participation, scoring, leaderboards) has been provided.
               </p>
@@ -860,7 +860,7 @@ export default function HowItWorksPage() {
             <div className="info-box">
               <strong>Free Quiz = Practice Only</strong>
               <p>
-                The free daily quiz does not contribute to leaderboard scores and does not qualify for prizes. It's purely for practice and learning.
+                Free quizzes are for practice only and have no impact on rankings, rewards, or prize eligibility.
               </p>
             </div>
           </div>

@@ -757,7 +757,7 @@ export default function RefundPolicyPage() {
             <div className="warning-box">
               <strong>Payment Processing Fees</strong>
               <p>
-                Stripe payment processing fees (approximately 1.5% + 20p per transaction) are non-refundable in all cases. Approved refunds will be for the purchase amount minus the original processing fee.
+                Payment processing fees may be deducted from refunds only where permitted by law. Where a refund is required due to a fault on our side, the full purchase amount will be refunded in accordance with UK consumer law.
               </p>
             </div>
           </div>
@@ -794,7 +794,7 @@ export default function RefundPolicyPage() {
             <div className="info-box">
               <strong>Our Discretion</strong>
               <p>
-                The form of remedy (refund, replacement, credit, or support) is at our sole discretion based on the specific circumstances of each case.
+                The appropriate remedy (refund, replacement, credit, or support) will be determined based on the circumstances of each case and in accordance with applicable consumer protection laws.
               </p>
             </div>
           </div>

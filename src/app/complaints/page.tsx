@@ -733,11 +733,11 @@ export default function ComplaintsPage() {
             <p>Depending on the nature of your complaint, we may offer:</p>
             <ul>
               <li><strong>Apology</strong> and explanation</li>
-              <li><strong>Refund</strong> of entry fees or rounds (only in cases of verified platform error or wrongful charge, in accordance with our Refund Policy)</li>
+              <li><strong>Refund</strong> of entry fees or rounds (only in cases of verified platform error or wrongful charge, in strict accordance with our Refund Policy)</li>
               <li><strong>Replacement rounds</strong> at no cost</li>
               <li><strong>Account reinstatement</strong> (if wrongly suspended)</li>
               <li><strong>Quiz replay opportunity</strong> (in case of technical fault)</li>
-              <li><strong>Compensation</strong> (in exceptional circumstances)</li>
+              <li><strong>Goodwill gestures</strong> (in exceptional circumstances)</li>
               <li><strong>Policy clarification</strong> or correction</li>
             </ul>
           </div>

@@ -597,7 +597,7 @@ export default function QuizRulesPage() {
                   <Target style={{ width: 18, height: 18 }} />
                   Questions
                 </h4>
-                <p>50 multiple-choice questions per round</p>
+                <p>20 multiple-choice questions per round</p>
               </div>
               <div className="rule-card">
                 <h4>
@@ -611,7 +611,7 @@ export default function QuizRulesPage() {
                   <BookOpen style={{ width: 18, height: 18 }} />
                   Explanation
                 </h4>
-                <p>5-second explanation after each answer</p>
+                <p>6-second explanation after each answer</p>
               </div>
             </div>
 
@@ -640,13 +640,13 @@ export default function QuizRulesPage() {
             <div className="highlight-box">
               <strong>Points Per Question</strong>
               <p>
-                Each correct answer earns exactly 2 points. Wrong answers or no answer earn 0 points. There are no negative points.
+                Each correct answer earns exactly 5 points. Wrong answers or no answer earn 0 points. There are no negative points.
               </p>
             </div>
 
             <h3 className="subsection-title">Maximum Score</h3>
             <p>
-              With 50 questions per round and 2 points per correct answer, the maximum possible score per round is <strong>100 points</strong>.
+              With 20 questions per round and 5 points per correct answer, the maximum possible score per round is <strong>100 points</strong>.
             </p>
 
             <h3 className="subsection-title">Monthly Accumulation</h3>
@@ -654,12 +654,12 @@ export default function QuizRulesPage() {
               <li>Your monthly score is the sum of all your round scores</li>
               <li>Play as many rounds as you want to increase your total</li>
               <li>No limit on number of rounds you can play per month</li>
-              <li>Scores reset at the start of each calendar month (00:00 GMT on the 1st)</li>
+              <li>Scores reset at the start of each calendar month (00:00 UTC on the 1st day of each month)</li>
             </ul>
 
             <h3 className="subsection-title">No Bonus Points</h3>
             <p>
-              There are no bonus points for speed, consecutive correct answers, or difficulty. Every correct answer is worth exactly 2 points.
+              There are no bonus points for speed, consecutive correct answers, or difficulty. Every correct answer is worth exactly 5 points.
             </p>
           </div>
 
@@ -885,9 +885,9 @@ export default function QuizRulesPage() {
 
             <h3 className="subsection-title">Threshold Requirement</h3>
             <div className="info-box">
-              <strong>3000+ Unique Paid Participants Required</strong>
+              <strong>3000+ Paid Round Purchases Required</strong>
               <p>
-                The £1000 prize pool activates only when 3000 or more unique participants who have purchased at least one paid round compete during the calendar month. This threshold covers platform operational costs including payment processing fees, infrastructure, security, and support services.
+                The £1000 prize pool activates only when a minimum of 3000 paid round purchases are completed during the calendar month. This threshold covers platform operational costs including payment processing fees, infrastructure, security, and support services.
                 <br /><br />
                 <strong style={{ color: "#60a5fa" }}>If the threshold is not met:</strong> No prize is awarded and funds do not carry over to the next month. Entry fees are not refunded as the platform service (quiz participation, scoring, leaderboards) has been provided.
               </p>

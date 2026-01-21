@@ -671,7 +671,7 @@ export default function PrivacyPage() {
             <ul>
               <li><strong>Quiz Performance:</strong> Scores, correct/incorrect answers, response times, leaderboard rankings</li>
               <li><strong>Game Logs:</strong> Session data, questions answered, timestamps, IP addresses</li>
-              <li><strong>Anti-Cheat Data:</strong> Behavioral patterns, device fingerprints, anomaly detection metrics</li>
+              <li><strong>Anti-Cheat Data:</strong> Behavioral patterns, device identifiers, anomaly detection metrics</li>
             </ul>
 
             <h3 className="subsection-title">1.4 Technical Data</h3>
@@ -750,7 +750,7 @@ export default function PrivacyPage() {
             <ul>
               <li><strong>Quiz Scoring:</strong> Answers are automatically evaluated against correct responses to calculate scores in real-time.</li>
               <li><strong>Leaderboard Ranking:</strong> Players are ranked algorithmically based on total score, accuracy, and response times.</li>
-              <li><strong>Anti-Cheat Detection:</strong> Machine learning models flag suspicious patterns (e.g., impossibly fast answers, coordinated behavior) for manual review.</li>
+              <li><strong>Anti-Cheat Detection:</strong> Automated systems flag suspicious patterns (e.g., impossibly fast answers, coordinated behavior) for manual review.</li>
               <li><strong>Age Verification:</strong> Date of birth is automatically checked to ensure compliance with our 18+ policy.</li>
             </ul>
 
@@ -828,7 +828,7 @@ export default function PrivacyPage() {
             <h3 className="subsection-title">7.1 Active Accounts</h3>
             <ul>
               <li><strong>Profile Data:</strong> Retained while your account is active</li>
-              <li><strong>Quiz Performance:</strong> Stored indefinitely for leaderboard history and analytics</li>
+              <li><strong>Quiz Performance:</strong> Stored for long-term statistical and historical purposes, including leaderboard history and analytics.</li>
               <li><strong>Session Logs:</strong> Kept for 90 days for technical support and fraud prevention</li>
             </ul>
 

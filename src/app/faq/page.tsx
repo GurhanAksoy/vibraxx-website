@@ -27,7 +27,7 @@ export default function FAQPage() {
         },
         {
           q: "Is VibraXX free to play?",
-          a: "Every registered user gets one free daily practice quiz (50 questions). This practice quiz doesn't count toward prizes or leaderboards—it's purely for learning. To compete for the monthly £1000 prize, you need to purchase quiz rounds: £2.00 per round or £49.00 for 30 rounds (18% savings)."
+          a: "Every registered user gets one free daily practice quiz (20 questions). This practice quiz does not affect rankings, rewards, or prize eligibility or leaderboards and is purely for learning. To compete for the monthly £1000 prize, you need to purchase quiz rounds: £2.00 per round or £49.00 for 30 rounds (18% savings)."
         },
         {
           q: "Do I need to download an app?",
@@ -44,7 +44,7 @@ export default function FAQPage() {
         },
         {
           q: "How many questions are in each round?",
-          a: "Each round contains exactly 50 questions. You have 6 seconds to answer each question, followed by a 5-second explanation. The entire round takes approximately 10 minutes."
+          a: "Each round contains exactly 20 questions. You have 6 seconds to answer each question, followed by a 6-second explanation. The entire round takes approximately 10 minutes."
         },
         {
           q: "What happens if I don't answer in time?",
@@ -65,7 +65,7 @@ export default function FAQPage() {
       questions: [
         {
           q: "How is scoring calculated?",
-          a: "Every correct answer earns you 2 points. Maximum score per round is 100 points (50 questions × 2 points). Your monthly total score is the sum of all rounds you've played that month."
+          a: "Every correct answer earns you 5 points. Maximum score per round is 100 points (20 questions × 5 points). Your monthly total score is the sum of all rounds you've played that month."
         },
         {
           q: "How do I win the £1000 prize?",
@@ -73,7 +73,7 @@ export default function FAQPage() {
         },
         {
           q: "What is the 3000 participant threshold?",
-          a: "The prize pool activates only if 3000+ unique paid participants compete during the month. This threshold covers platform operational costs. If not met, no prize is awarded and entry fees are not refunded as platform service has been provided (quiz participation, scoring, leaderboards)."
+          a: "The prize pool activates only if at least 3000 paid round purchases are completed during the month. This threshold covers platform operational costs. If this threshold is not met, no prize is awarded, as the competition service, including quiz participation, scoring, and leaderboards, has still been provided."
         },
         {
           q: "What happens if there's a tie for first place?",
@@ -94,7 +94,7 @@ export default function FAQPage() {
       questions: [
         {
           q: "How much does it cost to play?",
-          a: "Individual rounds cost £2.00 each. We also offer a value pack: 35 rounds for £49.00, saving you 18%."
+          a: "Individual rounds cost £2.00 each. We also offer a value pack: 30 rounds for £49.00, saving you 18%."
         },
         {
           q: "What payment methods do you accept?",
@@ -102,7 +102,7 @@ export default function FAQPage() {
         },
         {
           q: "Can I get a refund?",
-          a: "All quiz round purchases are final. Digital content is delivered immediately upon payment. Refunds are available only in exceptional circumstances where VibraXX is at fault (platform technical errors, wrongful charges, etc.). If the monthly prize threshold is not met, no refunds are issued. See our Refund Policy for full details."
+          a: "All quiz round purchases are final. Digital content is delivered immediately upon payment. Refunds are available only in exceptional circumstances where VibraXX is demonstrably at fault (such as verified platform technical errors or duplicate/incorrect charges). If the monthly prize threshold is not met, no refunds are issued, as the competition service has been fully delivered. See our Refund Policy for full details."
         },
         {
           q: "Do round credits expire?",

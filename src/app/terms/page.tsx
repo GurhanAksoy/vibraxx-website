@@ -749,12 +749,12 @@ export default function TermsPage() {
             </h2>
             <ul>
               <li><strong>Registration:</strong> Sign in with Google only</li>
-              <li><strong>Free Practice:</strong> One free daily quiz (50 questions) - no prizes</li>
+              <li><strong>Free Practice:</strong> One free daily quiz (20 questions) - no prizes</li>
               <li><strong>Live Competitions:</strong> Purchase rounds to compete for the monthly £1000 prize</li>
               <li><strong>Frequency:</strong> Live quiz every 15 minutes (96 rounds daily)</li>
-              <li><strong>Format:</strong> 50 multiple-choice questions</li>
-              <li><strong>Timing:</strong> 6 seconds per question + 5 seconds for answer explanation</li>
-              <li><strong>Scoring:</strong> 2 points per correct answer (100 points maximum per round)</li>
+              <li><strong>Format:</strong> 20 multiple-choice questions</li>
+              <li><strong>Timing:</strong> 6 seconds per question + 6 seconds for answer explanation</li>
+              <li><strong>Scoring:</strong> 5 points per correct answer (100 points maximum per round)</li>
             </ul>
           </div>
 
@@ -793,11 +793,11 @@ export default function TermsPage() {
 
             <h3 className="subsection-title">7.2 Minimum Participation Threshold</h3>
             <div className="warning-box">
-              <strong>3000+ Unique Paid Participants Required</strong>
+              <strong>3000+ Paid Rounds Required</strong>
               <p>
-                The prize pool activates only if <strong>3000 or more unique participants who have purchased at least one paid round</strong> compete during the calendar month. This threshold covers platform operational costs including payment processing fees, infrastructure, security, and support services. If the threshold is not met, no prize is awarded and funds do not carry over to the next month.
+                The prize pool activates only if <strong>At least 3000 paid competition rounds must be purchased during the calendar month.</strong>This threshold covers platform operational costs including payment processing fees, infrastructure, security, and support services. If the threshold is not met, no prize is awarded and funds do not carry over to the next month.
                 <br /><br />
-                <strong style={{ color: "#fbbf24" }}>Clarification:</strong> "Unique paid participants" means individual users who have purchased and used at least one paid competition round during the month. Free practice rounds do not count toward this threshold.
+                <strong style={{ color: "#fbbf24" }}>Clarification:</strong> "Paid competition rounds" refers to the total number of successfully completed purchase transactions for competition access during the month. Free practice rounds do not count toward this threshold.
               </p>
             </div>
 
@@ -818,7 +818,7 @@ export default function TermsPage() {
               <li><strong>Maximum Total Timeline:</strong> <strong>21 calendar days</strong> from month-end to payment completion</li>
             </ul>
             <p>
-              All payments are made in GBP via Stripe to your verified bank account. If you require payment in a different currency, currency conversion fees and exchange rate differences are your responsibility.
+              Prize payments are made via bank transfer or other payment methods selected by VibraXX. Stripe is used only for processing user purchases and is not responsible for prize distribution. If you require payment in a different currency, currency conversion fees and exchange rate differences are your responsibility.
             </p>
           </div>
 
@@ -900,7 +900,7 @@ export default function TermsPage() {
             <ul>
               <li><strong>Error Validation:</strong> Errors must be reported within 24 hours of the round completion via team@vibraxx.com. Our admin team will review the question and validate the error.</li>
               <li><strong>Question Cancellation:</strong> If an error is confirmed, that specific question will be cancelled and excluded from all participants' scores for that round.</li>
-              <li><strong>Score Recalculation:</strong> The round score will be recalculated based on the remaining 49 questions (maximum score becomes 98 points).</li>
+              <li><strong>Score Recalculation:</strong> The round score will be recalculated based on the remaining 19 questions (maximum score becomes 95 points).</li>
               <li><strong>No Refunds:</strong> Cancelled questions do not entitle participants to refunds. The competition continues normally with adjusted scoring.</li>
             </ul>
 
