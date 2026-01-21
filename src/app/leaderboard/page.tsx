@@ -986,12 +986,31 @@ export default function LeaderboardPage() {
               style={{
                 background: 'rgba(15, 23, 42, 0.7)',
                 borderRadius: '20px',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
+                border: '2px solid transparent',
+                backgroundImage: 'linear-gradient(rgba(15, 23, 42, 0.7), rgba(15, 23, 42, 0.7)), linear-gradient(135deg, #7c3aed, #d946ef, #f0abfc, #d946ef, #7c3aed)',
+                backgroundOrigin: 'border-box',
+                backgroundClip: 'padding-box, border-box',
                 padding: 'clamp(16px, 3vw, 32px)',
                 backdropFilter: 'blur(20px)',
-                boxShadow: '0 10px 40px -10px rgba(0, 0, 0, 0.3)'
+                boxShadow: '0 0 40px rgba(139, 92, 246, 0.4), 0 0 80px rgba(217, 70, 239, 0.3), 0 10px 40px -10px rgba(0, 0, 0, 0.3)',
+                position: 'relative',
+                overflow: 'hidden'
               }}
+              className="neon-border"
               aria-label="Remaining players">
+              
+              {/* Animated glow overlay */}
+              <div style={{
+                position: 'absolute',
+                inset: -2,
+                borderRadius: '20px',
+                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(217, 70, 239, 0.2))',
+                opacity: 0.5,
+                pointerEvents: 'none',
+                zIndex: -1
+              }} 
+              className="animate-glow"
+              aria-hidden="true" />
               
               <h2 style={{ 
                 fontSize: 'clamp(16px, 3.2vw, 24px)', 
@@ -999,12 +1018,17 @@ export default function LeaderboardPage() {
                 marginBottom: 'clamp(16px, 3vw, 24px)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px'
+                gap: '10px',
+                background: 'linear-gradient(to right, #a78bfa, #f0abfc)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text'
               }}>
                 <Zap style={{ 
                   width: 'clamp(18px, 3.6vw, 26px)', 
                   height: 'clamp(18px, 3.6vw, 26px)', 
-                  color: '#a78bfa' 
+                  color: '#a78bfa',
+                  filter: 'drop-shadow(0 0 10px rgba(167, 139, 250, 0.6))'
                 }} 
                 aria-hidden="true" />
                 Top 100 Players
