@@ -2,17 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>VibraXX - Offline</title>
+  <title>VibraXX – Offline</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- PWA / iOS -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#020817">
+  <!-- PWA / Theme -->
+  <meta name="theme-color" content="#020817" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -29,35 +27,35 @@
 
     .glow {
       position: absolute;
-      width: 300px;
-      height: 300px;
+      width: 320px;
+      height: 320px;
       border-radius: 50%;
       background: radial-gradient(circle, rgba(124,58,237,0.35), transparent 70%);
-      filter: blur(60px);
-      top: -80px;
-      left: -80px;
+      filter: blur(70px);
+      top: -100px;
+      left: -100px;
     }
 
     .card {
       position: relative;
       z-index: 2;
-      max-width: 340px;
-      padding: 32px 28px;
+      max-width: 360px;
+      padding: 36px 30px;
       border-radius: 28px;
-      background: rgba(6,8,20,0.92);
+      background: rgba(6,8,20,0.94);
       border: 1px solid rgba(168,85,247,0.35);
-      box-shadow: 0 0 40px rgba(124,58,237,0.35);
-      backdrop-filter: blur(12px);
+      box-shadow: 0 0 50px rgba(124,58,237,0.4);
+      backdrop-filter: blur(14px);
     }
 
     .logo {
-      width: 84px;
-      height: 84px;
+      width: 90px;
+      height: 90px;
       border-radius: 50%;
-      margin: 0 auto 20px;
+      margin: 0 auto 22px;
       background: #020817;
-      border: 2px solid rgba(168,85,247,0.8);
-      box-shadow: 0 0 24px rgba(168,85,247,0.7);
+      border: 2px solid rgba(168,85,247,0.9);
+      box-shadow: 0 0 26px rgba(168,85,247,0.8);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -72,38 +70,46 @@
     h1 {
       font-size: 22px;
       font-weight: 900;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
       background: linear-gradient(to right, #a78bfa, #06b6d4);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.08em;
     }
 
     p {
       color: #9ca3af;
       font-size: 14px;
       line-height: 1.6;
-      margin-bottom: 18px;
+      margin-bottom: 20px;
     }
 
     .badge {
       display: inline-block;
-      padding: 6px 14px;
+      padding: 7px 16px;
       border-radius: 999px;
       font-size: 11px;
       font-weight: 700;
-      letter-spacing: 0.12em;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
       background: rgba(124,58,237,0.15);
       border: 1px solid rgba(124,58,237,0.5);
       color: #c4b5fd;
-      box-shadow: 0 0 12px rgba(124,58,237,0.5);
+      box-shadow: 0 0 14px rgba(124,58,237,0.6);
     }
 
     .hint {
-      margin-top: 16px;
+      margin-top: 18px;
       font-size: 11px;
       color: #64748b;
+    }
+
+    .reconnect {
+      margin-top: 22px;
+      font-size: 12px;
+      color: #22d3ee;
+      cursor: pointer;
+      text-decoration: underline;
     }
   </style>
 </head>
@@ -119,14 +125,18 @@
     <h1>YOU'RE OFFLINE</h1>
 
     <p>
-      VibraXX Arena requires an internet connection.<br />
-      Reconnect to continue competing live.
+      VibraXX Arena is currently unreachable.<br />
+      Reconnect to jump back into the live competition.
     </p>
 
     <div class="badge">Offline Mode</div>
 
     <div class="hint">
       Tip: Add VibraXX to your home screen for the full app experience.
+    </div>
+
+    <div class="reconnect" onclick="location.reload()">
+      Try reconnecting
     </div>
   </div>
 </body>

@@ -3,6 +3,7 @@
   "short_name": "VibraXX",
   "description": "Global skill-based live quiz arena.",
   "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#020817",
   "theme_color": "#020817",
