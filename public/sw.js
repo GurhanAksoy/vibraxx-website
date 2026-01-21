@@ -1,51 +1,74 @@
-const CACHE_NAME = "vibraxx-shell-v1";
+const CACHE_NAME = "vibraxx-shell-v2";
 
-const OFFLINE_URLS = [
+const APP_SHELL = [
   "/",
+  "/offline.html",
   "/manifest.json",
   "/icons/manifest-icon-192.maskable.png",
   "/icons/manifest-icon-512.maskable.png"
 ];
 
-// Install → shell cache
+// Install
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(OFFLINE_URLS))
+    caches.open(CACHE_NAME).then((cache) => {
+      console.log("[SW] Caching app shell");
+      return cache.addAll(APP_SHELL);
+    })
   );
   self.skipWaiting();
 });
 
-// Activate → clean old caches
+// Activate
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
-        keys.map((key) => key !== CACHE_NAME && caches.delete(key))
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            console.log("[SW] Deleting old cache:", key);
+            return caches.delete(key);
+          }
+        })
       )
     )
   );
   self.clients.claim();
 });
 
-// Fetch strategy
+// Fetch
 self.addEventListener("fetch", (event) => {
-  const { request } = event;
+  const req = event.request;
+  const url = new URL(req.url);
 
-  // Only GET
-  if (request.method !== "GET") return;
+  // Supabase / API → always network
+  if (
+    url.pathname.startsWith("/api") ||
+    url.hostname.includes("supabase")
+  ) {
+    return;
+  }
 
-  // Navigation (pages)
-  if (request.mode === "navigate") {
+  // Navigation pages
+  if (req.mode === "navigate") {
     event.respondWith(
-      fetch(request).catch(() => caches.match("/"))
+      fetch(req).catch(() => caches.match("/offline.html"))
     );
     return;
   }
 
-  // Static assets
+  // Static assets → cache first
   event.respondWith(
-    caches.match(request).then((cached) => {
-      return cached || fetch(request);
+    caches.match(req).then((cached) => {
+      return (
+        cached ||
+        fetch(req).then((res) => {
+          return caches.open(CACHE_NAME).then((cache) => {
+            cache.put(req, res.clone());
+            return res;
+          });
+        })
+      );
     })
   );
 });
