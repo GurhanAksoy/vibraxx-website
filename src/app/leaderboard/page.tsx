@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Crown, Trophy, Medal, Flame, Zap, ChevronRight, Volume2, VolumeX } from "lucide-react";
+import { Crown, Trophy, Medal, Flame, Zap, ChevronRight, Volume2, VolumeX, Star } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function LeaderboardPage() {
