@@ -993,24 +993,10 @@ export default function LeaderboardPage() {
                 padding: 'clamp(16px, 3vw, 32px)',
                 backdropFilter: 'blur(20px)',
                 boxShadow: '0 0 40px rgba(139, 92, 246, 0.4), 0 0 80px rgba(217, 70, 239, 0.3), 0 10px 40px -10px rgba(0, 0, 0, 0.3)',
-                position: 'relative',
-                overflow: 'hidden'
+                position: 'relative'
               }}
               className="neon-border"
               aria-label="Remaining players">
-              
-              {/* Animated glow overlay */}
-              <div style={{
-                position: 'absolute',
-                inset: -2,
-                borderRadius: '20px',
-                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(217, 70, 239, 0.2))',
-                opacity: 0.5,
-                pointerEvents: 'none',
-                zIndex: -1
-              }} 
-              className="animate-glow"
-              aria-hidden="true" />
               
               <h2 style={{ 
                 fontSize: 'clamp(16px, 3.2vw, 24px)', 
