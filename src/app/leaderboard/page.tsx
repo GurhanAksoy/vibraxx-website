@@ -1,30 +1,32 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Crown, Trophy, Medal, Flame, Zap, TrendingUp, Star, Award, ChevronRight, Volume2, VolumeX } from "lucide-react";
+import { Crown, Trophy, Medal, Flame, Zap, ChevronRight, Volume2, VolumeX } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function LeaderboardPage() {
-  const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly' | 'allTime'>('daily');
+  // ✅ ONLY weekly/monthly (NO daily/allTime!)
+  const [activeTab, setActiveTab] = useState<'weekly' | 'monthly'>('weekly');
   const [particles, setParticles] = useState<any[]>([]);
 
-useEffect(() => {
-  const arr = [...Array(8)].map((_, i) => ({
-    top: Math.random() * 100,
-    left: Math.random() * 100,
-    duration: 2 + Math.random() * 2,
-    delay: i * 0.3,
-  }));
-  setParticles(arr);
-}, []);
+  useEffect(() => {
+    const arr = [...Array(8)].map((_, i) => ({
+      top: Math.random() * 100,
+      left: Math.random() * 100,
+      duration: 2 + Math.random() * 2,
+      delay: i * 0.3,
+    }));
+    setParticles(arr);
+  }, []);
 
   const [topPlayers, setTopPlayers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDesktop, setIsDesktop] = useState(false);
   
-  // Audio controls - Simple mute/unmute
+  // ✅ Audio with click-to-play
   const [isMuted, setIsMuted] = useState(true);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const hasInteractedRef = useRef(false);
 
   // Simple audio toggle
   const toggleAudio = () => {
@@ -49,6 +51,24 @@ useEffect(() => {
     }
   }, []);
 
+  // ✅ CLICK ANYWHERE TO PLAY MUSIC
+  useEffect(() => {
+    const handleFirstClick = () => {
+      if (!hasInteractedRef.current && audioRef.current) {
+        hasInteractedRef.current = true;
+        audioRef.current.muted = false;
+        audioRef.current.play().catch(() => {});
+        setIsMuted(false);
+      }
+    };
+
+    document.addEventListener("click", handleFirstClick, { once: true });
+
+    return () => {
+      document.removeEventListener("click", handleFirstClick);
+    };
+  }, []);
+
   // SSR-safe viewport check
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 769px)');
@@ -60,52 +80,50 @@ useEffect(() => {
     };
   }, []);
 
-
-  // Fetch leaderboard using RPC function
+  // ✅ FETCH LEADERBOARD - DIRECT QUERY (NO RPC!)
   useEffect(() => {
     const fetchLeaderboard = async () => {
       setLoading(true);
       
       try {
-        // Map activeTab to RPC parameter format
-        const leaderboardType = activeTab === 'allTime' ? 'alltime' : activeTab;
+        const tableName = activeTab === 'weekly' ? 'leaderboard_weekly' : 'leaderboard_monthly';
         
-        // ✅ Use get_leaderboard RPC function
-        const { data, error } = await supabase.rpc('get_leaderboard', {
-          p_type: leaderboardType,
-          p_limit: 100
-        });
+        // ✅ Direct table query (briefing compliant!)
+        const { data, error } = await supabase
+          .from(tableName)
+          .select('user_id, full_name, total_score, correct_answers, wrong_answers, rounds_played, rank')
+          .order('total_score', { ascending: false })
+          .limit(100);
 
         if (error) {
-          console.error("Error fetching leaderboard:", error);
+          console.error(`[Leaderboard] ${activeTab} fetch error:`, error);
           setTopPlayers([]);
           return;
         }
 
-        // Map RPC response to UI format
+        // ✅ Map to UI format with total_score (NOT points!)
         const leaderboard = (data || []).map((player: any) => ({
           id: player.user_id,
           rank: player.rank,
           name: player.full_name || "Anonymous",
-          avatar: player.avatar_url || null,
-          country: player.country || "🏳️",
-          score: player.points || 0,
+          avatar: null,
+          country: "🌍",
+          score: player.total_score || 0, // ✅ total_score!
           correct: player.correct_answers || 0,
           wrong: player.wrong_answers || 0,
           rounds: player.rounds_played || 0,
-          accuracy: player.accuracy || 0,
-          streak: 0,  // Can be added later if needed
-          isOnline: false  // Can be added later if needed
+          accuracy: player.correct_answers > 0 
+            ? Math.round((player.correct_answers / (player.correct_answers + player.wrong_answers)) * 100) 
+            : 0,
+          streak: 0,
+          isOnline: false
         }));
 
         setTopPlayers(leaderboard);
         
-        // 🔍 DEBUG
-        console.log('🎯 Leaderboard Data:', leaderboard);
-        console.log('👑 Top 3:', leaderboard.slice(0, 3));
-        console.log('📊 Total Players:', leaderboard.length);
+        console.log(`[Leaderboard] ${activeTab} loaded:`, leaderboard.length, 'players');
       } catch (error) {
-        console.error("Error fetching leaderboard:", error);
+        console.error(`[Leaderboard] ${activeTab} error:`, error);
         setTopPlayers([]);
       } finally {
         setLoading(false);
@@ -124,8 +142,7 @@ useEffect(() => {
   };
 
   const top3 = topPlayers.slice(0, 3);
-const restPlayers = topPlayers.slice(3, 100);
-
+  const restPlayers = topPlayers.slice(3, 100);
 
   return (
     <>
@@ -360,7 +377,6 @@ const restPlayers = topPlayers.slice(3, 100);
   />
 ))}
 
-
         {/* Header */}
         <header 
           style={{
@@ -374,7 +390,7 @@ const restPlayers = topPlayers.slice(3, 100);
           <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 clamp(16px, 3vw, 24px)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px', gap: 'clamp(12px, 2vw, 16px)' }}>
               
-              {/* Logo */}
+              {/* Logo - NO TEXT! */}
               <div
                 onClick={() => (window.location.href = '/')}
                 style={{
@@ -430,23 +446,6 @@ const restPlayers = topPlayers.slice(3, 100);
                     }}
                   />
                 </div>
-
-                <div className="mobile-hide">
-                  <div style={{
-                    fontSize: 'clamp(14px, 2.5vw, 18px)',
-                    fontWeight: 700,
-                    letterSpacing: '0.02em',
-                  }}>
-                    VIBRAXX
-                  </div>
-                  <div style={{
-                    fontSize: 'clamp(9px, 1.8vw, 11px)',
-                    color: '#94a3b8',
-                    letterSpacing: '0.05em',
-                  }}>
-                    LIVE QUIZ ARENA
-                  </div>
-                </div>
               </div>
 
               {/* Title */}
@@ -471,7 +470,6 @@ const restPlayers = topPlayers.slice(3, 100);
 
               {/* Audio & Home Buttons */}
               <div style={{ display: 'flex', gap: 'clamp(8px, 2vw, 12px)', alignItems: 'center', flexShrink: 0 }}>
-                {/* Simple Audio Toggle */}
                 <button
                   onClick={toggleAudio}
                   style={{
@@ -505,7 +503,6 @@ const restPlayers = topPlayers.slice(3, 100);
                   }
                 </button>
 
-                {/* Home Button */}
                 <button
                   onClick={() => window.location.href = '/'}
                   style={{
@@ -552,7 +549,7 @@ const restPlayers = topPlayers.slice(3, 100);
           id="main-content">
           <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
             
-            {/* Tab Navigation */}
+            {/* Tab Navigation - ONLY WEEKLY & MONTHLY! */}
             <nav 
               style={{ 
                 display: 'flex', 
@@ -560,11 +557,12 @@ const restPlayers = topPlayers.slice(3, 100);
                 marginBottom: 'clamp(20px, 4vw, 50px)',
                 overflowX: 'auto',
                 padding: '4px',
-                WebkitOverflowScrolling: 'touch'
+                WebkitOverflowScrolling: 'touch',
+                justifyContent: 'center'
               }}
               role="tablist"
               aria-label="Leaderboard time periods">
-              {['daily', 'weekly', 'monthly', 'allTime'].map((tab) => (
+              {['weekly', 'monthly'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab as any)}
@@ -604,7 +602,7 @@ const restPlayers = topPlayers.slice(3, 100);
                     }
                   }}
                 >
-                  {tab === 'allTime' ? 'All Time' : tab}
+                  {tab}
                 </button>
               ))}
             </nav>
@@ -698,24 +696,38 @@ const restPlayers = topPlayers.slice(3, 100);
                       gap: '8px',
                       marginBottom: '6px'
                     }}>
-                      <span style={{ fontSize: 'clamp(22px, 4.5vw, 32px)' }}>
-                        {top3[1].country}
-                      </span>
-                      <h3 style={{ fontSize: 'clamp(14px, 2.8vw, 20px)', fontWeight: 700, margin: 0 }}>
+                      <Trophy style={{ 
+                        width: 'clamp(14px, 2.8vw, 18px)', 
+                        height: 'clamp(14px, 2.8vw, 18px)', 
+                        color: '#d1d5db' 
+                      }} 
+                      aria-hidden="true" />
+                      <h2 style={{ 
+                        fontSize: 'clamp(13px, 2.6vw, 18px)', 
+                        fontWeight: 800,
+                        margin: 0,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: '100%'
+                      }}>
                         {top3[1].name}
-                      </h3>
+                      </h2>
                     </div>
-                    
-                    <div 
-                      style={{ fontSize: 'clamp(20px, 4vw, 32px)', fontWeight: 900, color: '#d1d5db', marginBottom: '10px' }}
-                      aria-label={`Score: ${top3[1].score.toLocaleString()} points`}>
+
+                    <div style={{ 
+                      fontSize: 'clamp(20px, 4vw, 32px)', 
+                      fontWeight: 900,
+                      background: 'linear-gradient(to right, #d1d5db, #9ca3af)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      backgroundClip: 'text',
+                      marginBottom: '6px'
+                    }}>
                       {top3[1].score.toLocaleString()}
                     </div>
-                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', fontSize: 'clamp(10px, 2vw, 14px)', color: '#94a3b8' }}>
-                      <span aria-label={`Accuracy: ${top3[1].accuracy} percent`}>{top3[1].accuracy}% acc</span>
-                      <span aria-hidden="true">•</span>
-                      <span className="mobile-hide" aria-label={`Streak: ${top3[1].streak} days`}>{top3[1].streak} 🔥</span>
-                    </div>
+
+                    <div style={{ fontSize: 'clamp(9px, 1.8vw, 12px)', color: '#94a3b8' }}>points</div>
                   </div>
                 </article>
               )}
@@ -723,77 +735,81 @@ const restPlayers = topPlayers.slice(3, 100);
               {/* 1st Place */}
               {top3[0] && (
                 <article 
-                  className="animate-slide-in gold-glow" 
+                  className="animate-slide-in" 
                   style={{ 
-                    order: isDesktop ? 2 : 1,
-                    animationDelay: '0s',
-                    transform: isDesktop ? 'scale(1.08)' : 'scale(1)'
+                    order: 2,
+                    animationDelay: '0.2s'
                   }}
                   aria-label={`First place: ${top3[0].name}`}>
                   <div style={{
-                    padding: 'clamp(20px, 4vw, 48px)',
+                    padding: 'clamp(20px, 4vw, 40px)',
                     borderRadius: '24px',
                     border: '4px solid rgba(234, 179, 8, 0.6)',
-                    background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.2), rgba(202, 138, 4, 0.15))',
-                    backdropFilter: 'blur(20px)',
+                    background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.2), rgba(217, 119, 6, 0.15))',
+                    backdropFilter: 'blur(25px)',
                     textAlign: 'center',
                     position: 'relative',
                     overflow: 'hidden'
-                  }}>
+                  }}
+                  className="gold-glow">
                     <div style={{
                       position: 'absolute',
                       top: '-50%',
                       left: '-50%',
                       width: '200%',
                       height: '200%',
-                      background: 'radial-gradient(circle, rgba(234, 179, 8, 0.2) 0%, transparent 70%)',
+                      background: 'radial-gradient(circle, rgba(234, 179, 8, 0.15) 0%, transparent 70%)',
                       animation: 'float 3s ease-in-out infinite'
                     }}></div>
 
-                    <div className="animate-float" style={{
-                      position: 'absolute',
-                      top: 'clamp(-15px, -2.5vw, -30px)',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      fontSize: 'clamp(30px, 6vw, 60px)'
-                    }}
-                    aria-hidden="true">
-                      👑
-                    </div>
+                    <Crown 
+                      className="animate-float" 
+                      style={{ 
+                        width: 'clamp(32px, 6vw, 48px)', 
+                        height: 'clamp(32px, 6vw, 48px)', 
+                        color: '#fbbf24',
+                        margin: '0 auto clamp(8px, 1.5vw, 12px)',
+                        filter: 'drop-shadow(0 0 20px rgba(251, 191, 36, 0.8))'
+                      }}
+                      aria-hidden="true"
+                    />
                     
                     <div style={{
                       position: 'relative',
-                      width: 'clamp(75px, 15vw, 120px)',
-                      height: 'clamp(75px, 15vw, 120px)',
+                      width: 'clamp(80px, 16vw, 120px)',
+                      height: 'clamp(80px, 16vw, 120px)',
                       margin: '0 auto clamp(16px, 3vw, 24px)',
                       borderRadius: '50%',
-                      padding: '5px',
-                      background: 'linear-gradient(135deg, #eab308, #f59e0b)',
-                      boxShadow: '0 0 50px rgba(234, 179, 8, 0.8)'
+                      padding: '4px',
+                      background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
+                      boxShadow: '0 0 50px rgba(251, 191, 36, 0.7)'
                     }}>
                       <img 
                         src={top3[0].avatar || "/images/default-avatar.png"} 
-                        alt={`${top3[0].name}'s avatar - Champion`}
+                        alt={`${top3[0].name}'s avatar`}
                         style={{ width: '100%', height: '100%', borderRadius: '50%' }} 
                       />
                       <div 
                         style={{
                           position: 'absolute',
-                          bottom: '-8px',
+                          bottom: '-10px',
                           left: '50%',
                           transform: 'translateX(-50%)',
-                          width: 'clamp(35px, 7vw, 50px)',
-                          height: 'clamp(35px, 7vw, 50px)',
+                          width: 'clamp(36px, 7vw, 50px)',
+                          height: 'clamp(36px, 7vw, 50px)',
                           borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #eab308, #f59e0b)',
+                          background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           border: '3px solid rgba(15, 23, 42, 0.8)',
-                          boxShadow: '0 0 20px rgba(234, 179, 8, 0.8)'
+                          color: '#0f172a',
+                          fontWeight: 900,
+                          fontSize: 'clamp(16px, 3.2vw, 24px)',
+                          boxShadow: '0 0 20px rgba(251, 191, 36, 0.8)'
                         }}
-                        aria-label="Rank 1 - Champion">
-                        <Crown style={{ width: 'clamp(18px, 3.5vw, 28px)', height: 'clamp(18px, 3.5vw, 28px)', color: '#0f172a' }} aria-hidden="true" />
+                        aria-label="Rank 1">
+                        1
                       </div>
                     </div>
 
@@ -801,25 +817,53 @@ const restPlayers = topPlayers.slice(3, 100);
                       display: 'flex', 
                       alignItems: 'center', 
                       justifyContent: 'center',
-                      gap: '12px',
+                      gap: '10px',
                       marginBottom: '8px'
                     }}>
-                      <span style={{ fontSize: 'clamp(28px, 5.5vw, 40px)' }}>
-                        {top3[0].country}
-                      </span>
-                      <h3 style={{ fontSize: 'clamp(16px, 3.2vw, 24px)', fontWeight: 900, margin: 0 }}>
+                      <Star style={{ 
+                        width: 'clamp(16px, 3.2vw, 22px)', 
+                        height: 'clamp(16px, 3.2vw, 22px)', 
+                        color: '#fbbf24',
+                        fill: '#fbbf24'
+                      }} 
+                      aria-hidden="true" />
+                      <h2 style={{ 
+                        fontSize: 'clamp(16px, 3.2vw, 24px)', 
+                        fontWeight: 900,
+                        margin: 0,
+                        color: '#fbbf24',
+                        textShadow: '0 0 20px rgba(251, 191, 36, 0.5)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: '100%'
+                      }}>
                         {top3[0].name}
-                      </h3>
+                      </h2>
+                      <Star style={{ 
+                        width: 'clamp(16px, 3.2vw, 22px)', 
+                        height: 'clamp(16px, 3.2vw, 22px)', 
+                        color: '#fbbf24',
+                        fill: '#fbbf24'
+                      }} 
+                      aria-hidden="true" />
                     </div>
-                    
-                    <div 
-                      style={{ fontSize: 'clamp(26px, 5vw, 42px)', fontWeight: 900, color: '#facc15', marginBottom: '12px' }}
-                      aria-label={`Score: ${top3[0].score.toLocaleString()} points`}>
+
+                    <div style={{ 
+                      fontSize: 'clamp(28px, 5.5vw, 48px)', 
+                      fontWeight: 900,
+                      background: 'linear-gradient(to right, #fbbf24, #f59e0b)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      backgroundClip: 'text',
+                      marginBottom: '8px',
+                      textShadow: '0 0 30px rgba(251, 191, 36, 0.5)'
+                    }}>
                       {top3[0].score.toLocaleString()}
                     </div>
-                    <div style={{ display: 'flex', gap: '14px', justifyContent: 'center', fontSize: 'clamp(11px, 2.2vw, 15px)', color: '#fef08a' }}>
-                      <span aria-label={`Accuracy: ${top3[0].accuracy} percent`}>🎯 {top3[0].accuracy}%</span>
-                      <span className="mobile-hide" aria-label={`Streak: ${top3[0].streak} days`}>🔥 {top3[0].streak}</span>
+
+                    <div style={{ fontSize: 'clamp(10px, 2vw, 14px)', color: '#fbbf24', fontWeight: 700 }}>
+                      CHAMPION
                     </div>
                   </div>
                 </article>
@@ -830,8 +874,8 @@ const restPlayers = topPlayers.slice(3, 100);
                 <article 
                   className="animate-slide-in" 
                   style={{ 
-                    order: 3,
-                    animationDelay: '0.2s'
+                    order: isDesktop ? 3 : 2,
+                    animationDelay: '0.3s'
                   }}
                   aria-label={`Third place: ${top3[2].name}`}>
                   <div style={{
@@ -852,8 +896,7 @@ const restPlayers = topPlayers.slice(3, 100);
                       width: '200%',
                       height: '200%',
                       background: 'radial-gradient(circle, rgba(180, 83, 9, 0.1) 0%, transparent 70%)',
-                      animation: 'float 4s ease-in-out infinite',
-                      animationDelay: '1s'
+                      animation: 'float 4s ease-in-out infinite'
                     }}></div>
                     
                     <div style={{
@@ -863,8 +906,8 @@ const restPlayers = topPlayers.slice(3, 100);
                       margin: '0 auto clamp(12px, 2.5vw, 20px)',
                       borderRadius: '50%',
                       padding: '4px',
-                      background: 'linear-gradient(135deg, #b45309, #92400e)',
-                      boxShadow: '0 0 30px rgba(180, 83, 9, 0.5)'
+                      background: 'linear-gradient(135deg, #d97706, #b45309)',
+                      boxShadow: '0 0 30px rgba(217, 119, 6, 0.5)'
                     }}>
                       <img 
                         src={top3[2].avatar || "/images/default-avatar.png"} 
@@ -880,7 +923,7 @@ const restPlayers = topPlayers.slice(3, 100);
                           width: 'clamp(28px, 6vw, 40px)',
                           height: 'clamp(28px, 6vw, 40px)',
                           borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #b45309, #92400e)',
+                          background: 'linear-gradient(135deg, #d97706, #b45309)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -901,24 +944,38 @@ const restPlayers = topPlayers.slice(3, 100);
                       gap: '8px',
                       marginBottom: '6px'
                     }}>
-                      <span style={{ fontSize: 'clamp(22px, 4.5vw, 32px)' }}>
-                        {top3[2].country}
-                      </span>
-                      <h3 style={{ fontSize: 'clamp(14px, 2.8vw, 20px)', fontWeight: 700, margin: 0 }}>
+                      <Medal style={{ 
+                        width: 'clamp(14px, 2.8vw, 18px)', 
+                        height: 'clamp(14px, 2.8vw, 18px)', 
+                        color: '#d97706' 
+                      }} 
+                      aria-hidden="true" />
+                      <h2 style={{ 
+                        fontSize: 'clamp(13px, 2.6vw, 18px)', 
+                        fontWeight: 800,
+                        margin: 0,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: '100%'
+                      }}>
                         {top3[2].name}
-                      </h3>
+                      </h2>
                     </div>
-                    
-                    <div 
-                      style={{ fontSize: 'clamp(20px, 4vw, 32px)', fontWeight: 900, color: '#d97706', marginBottom: '10px' }}
-                      aria-label={`Score: ${top3[2].score.toLocaleString()} points`}>
+
+                    <div style={{ 
+                      fontSize: 'clamp(20px, 4vw, 32px)', 
+                      fontWeight: 900,
+                      background: 'linear-gradient(to right, #d97706, #b45309)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      backgroundClip: 'text',
+                      marginBottom: '6px'
+                    }}>
                       {top3[2].score.toLocaleString()}
                     </div>
-                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', fontSize: 'clamp(10px, 2vw, 14px)', color: '#94a3b8' }}>
-                      <span aria-label={`Accuracy: ${top3[2].accuracy} percent`}>{top3[2].accuracy}% acc</span>
-                      <span aria-hidden="true">•</span>
-                      <span className="mobile-hide" aria-label={`Streak: ${top3[2].streak} days`}>{top3[2].streak} 🔥</span>
-                    </div>
+
+                    <div style={{ fontSize: 'clamp(9px, 1.8vw, 12px)', color: '#94a3b8' }}>points</div>
                   </div>
                 </article>
               )}
@@ -927,183 +984,142 @@ const restPlayers = topPlayers.slice(3, 100);
             {/* Rest of Players */}
             <section 
               style={{
+                background: 'rgba(15, 23, 42, 0.7)',
                 borderRadius: '20px',
-                border: '2px solid rgba(139, 92, 246, 0.2)',
-                background: 'rgba(15, 23, 42, 0.6)',
-                backdropFilter: 'blur(20px)',
-                overflow: 'hidden',
-                boxShadow: '0 0 40px rgba(139, 92, 246, 0.2)'
-              }}
-              aria-label="Players ranked 4 to 100">
-              <div style={{ 
+                border: '1px solid rgba(255, 255, 255, 0.08)',
                 padding: 'clamp(16px, 3vw, 32px)',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(217, 70, 239, 0.05))'
+                backdropFilter: 'blur(20px)',
+                boxShadow: '0 10px 40px -10px rgba(0, 0, 0, 0.3)'
+              }}
+              aria-label="Remaining players">
+              
+              <h2 style={{ 
+                fontSize: 'clamp(16px, 3.2vw, 24px)', 
+                fontWeight: 800,
+                marginBottom: 'clamp(16px, 3vw, 24px)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
               }}>
-                <h2 style={{ fontSize: 'clamp(16px, 3vw, 24px)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
-                  <Star style={{ width: 'clamp(18px, 3.5vw, 24px)', height: 'clamp(18px, 3.5vw, 24px)', color: '#a78bfa' }} aria-hidden="true" />
-                  Top 100 Players
-                </h2>
-              </div>
+                <Zap style={{ 
+                  width: 'clamp(18px, 3.6vw, 26px)', 
+                  height: 'clamp(18px, 3.6vw, 26px)', 
+                  color: '#a78bfa' 
+                }} 
+                aria-hidden="true" />
+                Top 100 Players
+              </h2>
 
-              <div 
-                style={{ maxHeight: '800px', overflowY: 'auto', padding: 'clamp(10px, 2vw, 20px)' }}
-                role="list"
-                aria-label="Remaining top 100 players">
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: 'clamp(8px, 1.5vw, 12px)' 
+              }}>
                 {loading ? (
-                  <div style={{ textAlign: 'center', padding: 'clamp(40px, 8vw, 60px) 20px' }} role="status" aria-live="polite">
-                    <div className="animate-glow" style={{
-                      width: 'clamp(50px, 10vw, 60px)',
-                      height: 'clamp(50px, 10vw, 60px)',
-                      margin: '0 auto 20px',
-                      borderRadius: '50%',
-                      border: '4px solid rgba(139, 92, 246, 0.3)',
-                      borderTopColor: '#a78bfa',
-                      animation: 'spin 1s linear infinite'
-                    }}
-                    aria-hidden="true"></div>
-                    <p style={{ color: '#94a3b8', fontSize: 'clamp(13px, 2.5vw, 16px)' }}>Loading leaderboard...</p>
+                  <div style={{ 
+                    textAlign: 'center', 
+                    padding: 'clamp(30px, 5vw, 50px)', 
+                    color: '#94a3b8' 
+                  }}>
+                    Loading leaderboard...
                   </div>
                 ) : restPlayers.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: 'clamp(40px, 8vw, 60px) 20px' }} role="status">
-                    <Trophy style={{ width: 'clamp(50px, 10vw, 60px)', height: 'clamp(50px, 10vw, 60px)', color: '#64748b', margin: '0 auto 20px' }} aria-hidden="true" />
-                    <p style={{ color: '#94a3b8', fontSize: 'clamp(13px, 2.5vw, 16px)' }}>No players yet. Be the first!</p>
+                  <div style={{ 
+                    textAlign: 'center', 
+                    padding: 'clamp(30px, 5vw, 50px)', 
+                    color: '#94a3b8' 
+                  }}>
+                    No players yet. Be the first!
                   </div>
                 ) : (
                   restPlayers.map((player, idx) => (
                     <article
-                      key={player.rank}
+                      key={player.id}
                       className="animate-slide-in"
-                      role="listitem"
-                      aria-label={`Rank ${player.rank}: ${player.name}, ${player.score.toLocaleString()} points`}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 'clamp(8px, 2vw, 20px)',
-                        padding: 'clamp(10px, 2vw, 18px)',
-                        marginBottom: 'clamp(8px, 1.5vw, 12px)',
+                        gap: 'clamp(10px, 2vw, 16px)',
+                        padding: 'clamp(10px, 2vw, 16px)',
                         borderRadius: '14px',
-                        border: '1px solid rgba(255, 255, 255, 0.05)',
-                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.05), rgba(217, 70, 239, 0.03))',
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.06)',
                         transition: 'all 0.3s',
-                        animationDelay: `${idx * 0.02}s`,
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        animationDelay: `${Math.min(idx * 0.05, 1)}s`
                       }}
-                      tabIndex={0}
+                      aria-label={`${player.name} ranked ${player.rank}`}
                       onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(217, 70, 239, 0.1))';
+                        (e.currentTarget as HTMLElement).style.background = 'rgba(139, 92, 246, 0.1)';
                         (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139, 92, 246, 0.3)';
-                        (e.currentTarget as HTMLElement).style.transform = 'translateX(6px)';
+                        (e.currentTarget as HTMLElement).style.transform = 'translateX(8px)';
                       }}
                       onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.05), rgba(217, 70, 239, 0.03))';
-                        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255, 255, 255, 0.05)';
+                        (e.currentTarget as HTMLElement).style.background = 'rgba(255, 255, 255, 0.03)';
+                        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255, 255, 255, 0.06)';
                         (e.currentTarget as HTMLElement).style.transform = 'translateX(0)';
                       }}
                     >
                       <div 
                         style={{
-                          width: 'clamp(35px, 7vw, 50px)',
-                          height: 'clamp(35px, 7vw, 50px)',
-                          borderRadius: '10px',
-                          background: `linear-gradient(135deg, ${getRankColor(player.rank)})`,
+                          width: 'clamp(32px, 6vw, 44px)',
+                          height: 'clamp(32px, 6vw, 44px)',
+                          borderRadius: '8px',
+                          background: `linear-gradient(135deg, ${getRankColor(player.rank).replace('from-', 'var(--tw-gradient-from, ').replace(' to-', '), var(--tw-gradient-to, ')}))`,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontSize: 'clamp(12px, 2.5vw, 18px)',
+                          fontSize: 'clamp(11px, 2.2vw, 16px)',
                           fontWeight: 900,
+                          color: 'white',
                           flexShrink: 0,
-                          border: '2px solid rgba(255, 255, 255, 0.1)',
-                          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+                          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
                         }}
                         aria-label={`Rank ${player.rank}`}>
-                        {player.rank}
+                        #{player.rank}
                       </div>
 
-                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <div 
+                        style={{
+                          width: 'clamp(36px, 7vw, 50px)',
+                          height: 'clamp(36px, 7vw, 50px)',
+                          borderRadius: '50%',
+                          overflow: 'hidden',
+                          border: '2px solid rgba(139, 92, 246, 0.3)',
+                          flexShrink: 0
+                        }}>
                         <img 
                           src={player.avatar || "/images/default-avatar.png"} 
                           alt={`${player.name}'s avatar`}
-                          style={{
-                            width: 'clamp(40px, 8vw, 56px)',
-                            height: 'clamp(40px, 8vw, 56px)',
-                            borderRadius: '50%',
-                            border: '3px solid rgba(139, 92, 246, 0.5)',
-                            boxShadow: '0 0 15px rgba(139, 92, 246, 0.3)'
-                          }}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                         />
-                        {player.isOnline && (
-                          <div 
-                            style={{
-                              position: 'absolute',
-                              bottom: '1px',
-                              right: '1px',
-                              width: 'clamp(8px, 1.8vw, 12px)',
-                              height: 'clamp(8px, 1.8vw, 12px)',
-                              borderRadius: '50%',
-                              background: '#22c55e',
-                              border: '2px solid rgba(15, 23, 42, 0.9)',
-                              boxShadow: '0 0 8px #22c55e'
-                            }}
-                            aria-label="Online"
-                            title="Online"></div>
-                        )}
                       </div>
 
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px', flexWrap: 'wrap' }}>
-                          <h4 style={{ 
-                            fontSize: 'clamp(12px, 2.5vw, 17px)', 
-                            fontWeight: 700,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            margin: 0
-                          }}>
-                            {player.name}
-                          </h4>
-                          <span 
-                            style={{ 
-                              fontSize: 'clamp(20px, 4vw, 28px)',
-                              lineHeight: 1,
-                              display: 'inline-block'
-                            }}
-                            aria-label="Country flag"
-                            role="img">
-                            {player.country}
-                          </span>
-                          {player.streak >= 10 && (
-                            <div style={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              gap: '3px',
-                              padding: '2px 6px',
-                              borderRadius: '6px',
-                              background: 'rgba(239, 68, 68, 0.2)',
-                              border: '1px solid rgba(239, 68, 68, 0.3)'
-                            }}
-                            aria-label={`Hot streak: ${player.streak} days`}>
-                              <Flame style={{ width: 'clamp(10px, 2vw, 12px)', height: 'clamp(10px, 2vw, 12px)', color: '#f87171' }} aria-hidden="true" />
-                              <span style={{ fontSize: 'clamp(9px, 1.8vw, 11px)', fontWeight: 700, color: '#f87171' }}>
-                                {player.streak}
-                              </span>
-                            </div>
-                          )}
+                        <div style={{ 
+                          fontSize: 'clamp(12px, 2.4vw, 16px)', 
+                          fontWeight: 700,
+                          marginBottom: '2px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {player.name}
                         </div>
                         <div style={{ 
-                          display: 'flex', 
-                          gap: 'clamp(6px, 1.5vw, 16px)', 
-                          fontSize: 'clamp(10px, 2vw, 13px)', 
-                          color: '#94a3b8',
+                          fontSize: 'clamp(9px, 1.8vw, 12px)', 
+                          color: '#64748b',
+                          display: 'flex',
+                          gap: '10px',
                           flexWrap: 'wrap'
                         }}>
-                          <span className="mobile-hide" aria-label={`Accuracy ${player.accuracy} percent`}>🎯 {player.accuracy}%</span>
-                          <span className="mobile-hide" aria-hidden="true">•</span>
-                          <span aria-label={`Score ${player.score.toLocaleString()} points`}>⚡ {player.score.toLocaleString()}</span>
+                          <span>{player.accuracy}% accuracy</span>
+                          <span className="mobile-hide">•</span>
+                          <span className="mobile-hide">{player.rounds} rounds</span>
                         </div>
                       </div>
 
-                      <div className="mobile-hide" style={{
+                      <div style={{
                         textAlign: 'right',
                         padding: 'clamp(6px, 1.5vw, 12px) clamp(10px, 2vw, 20px)',
                         borderRadius: '10px',
@@ -1139,101 +1155,14 @@ const restPlayers = topPlayers.slice(3, 100);
               </div>
             </section>
 
-            {/* Stats Footer */}
-            <section 
-              className="mobile-stack" 
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(clamp(150px, 30vw, 200px), 1fr))',
-                gap: 'clamp(12px, 2.5vw, 24px)',
-                marginTop: 'clamp(20px, 4vw, 50px)'
-              }}
-              aria-label="Leaderboard statistics">
-              <div 
-                style={{
-                  padding: 'clamp(16px, 3vw, 28px)',
-                  borderRadius: '16px',
-                  border: '2px solid rgba(34, 197, 94, 0.3)',
-                  background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.05))',
-                  backdropFilter: 'blur(20px)',
-                  textAlign: 'center'
-                }}
-                role="article"
-                aria-label={`Total active players: ${topPlayers.length}`}>
-                <TrendingUp style={{ 
-                  width: 'clamp(28px, 5vw, 40px)', 
-                  height: 'clamp(28px, 5vw, 40px)', 
-                  color: '#22c55e',
-                  margin: '0 auto 10px'
-                }} 
-                aria-hidden="true" />
-                <div style={{ fontSize: 'clamp(20px, 4vw, 32px)', fontWeight: 900, color: '#22c55e', marginBottom: '6px' }}>
-                  {topPlayers.length}
-                </div>
-                <div style={{ fontSize: 'clamp(10px, 2vw, 14px)', color: '#94a3b8' }}>
-                  Active Players
-                </div>
-              </div>
+            {/* NO STATS CARDS! (Active Players, Top Score, Longest Streak REMOVED!) */}
 
-              <div 
-                style={{
-                  padding: 'clamp(16px, 3vw, 28px)',
-                  borderRadius: '16px',
-                  border: '2px solid rgba(139, 92, 246, 0.3)',
-                  background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(139, 92, 246, 0.05))',
-                  backdropFilter: 'blur(20px)',
-                  textAlign: 'center'
-                }}
-                role="article"
-                aria-label={`Top score: ${topPlayers[0]?.score?.toLocaleString?.() ?? 'Not available'} points`}>
-                <Award style={{ 
-                  width: 'clamp(28px, 5vw, 40px)', 
-                  height: 'clamp(28px, 5vw, 40px)', 
-                  color: '#a78bfa',
-                  margin: '0 auto 10px'
-                }} 
-                aria-hidden="true" />
-                <div style={{ fontSize: 'clamp(20px, 4vw, 32px)', fontWeight: 900, color: '#a78bfa', marginBottom: '6px' }}>
-                  {topPlayers[0]?.score?.toLocaleString?.() ?? '-'}
-                </div>
-                <div style={{ fontSize: 'clamp(10px, 2vw, 14px)', color: '#94a3b8' }}>
-                  Top Score
-                </div>
-              </div>
-
-              <div 
-                style={{
-                  padding: 'clamp(16px, 3vw, 28px)',
-                  borderRadius: '16px',
-                  border: '2px solid rgba(236, 72, 153, 0.3)',
-                  background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.1), rgba(236, 72, 153, 0.05))',
-                  backdropFilter: 'blur(20px)',
-                  textAlign: 'center'
-                }}
-                role="article"
-                aria-label={`Longest streak: ${topPlayers.length ? Math.max(...topPlayers.map((p: any) => p.streak)) : 0} days`}>
-                <Flame style={{ 
-                  width: 'clamp(28px, 5vw, 40px)', 
-                  height: 'clamp(28px, 5vw, 40px)', 
-                  color: '#ec4899',
-                  margin: '0 auto 10px'
-                }} 
-                aria-hidden="true" />
-                <div style={{ fontSize: 'clamp(20px, 4vw, 32px)', fontWeight: 900, color: '#ec4899', marginBottom: '6px' }}>
-                  {topPlayers.length ? Math.max(...topPlayers.map((p: any) => p.streak)) : 0}
-                </div>
-                <div style={{ fontSize: 'clamp(10px, 2vw, 14px)', color: '#94a3b8' }}>
-                  Longest Streak
-                </div>
-              </div>
-            </section>
           </div>
         </main>
 
         {/* Footer */}
         <footer className="vx-footer">
           <div className="vx-container">
-            {/* Legal Disclaimer */}
             <div className="vx-footer-legal">
               <strong style={{ color: "#94a3b8" }}>Educational Quiz Competition.</strong> 18+ only. 
               This is a 100% skill-based knowledge competition with no element of chance. 
@@ -1244,7 +1173,6 @@ const restPlayers = topPlayers.slice(3, 100);
               for full details.
             </div>
 
-            {/* Main Links */}
             <nav className="vx-footer-links" aria-label="Footer navigation">
               <a href="/privacy">Privacy Policy</a>
               <span className="vx-footer-divider">•</span>
@@ -1267,7 +1195,6 @@ const restPlayers = topPlayers.slice(3, 100);
               <a href="/faq">FAQ</a>
             </nav>
 
-            {/* Company Info */}
             <div className="vx-footer-company">
               <div style={{ marginBottom: 8, textAlign: "center" }}>
                 © 2025 VibraXX. Operated by Sermin Limited (UK)
