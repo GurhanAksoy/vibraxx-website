@@ -1,13 +1,12 @@
 const CACHE_NAME = "vibraxx-shell-v3";
 
-// Sadece gerçekten offline çalışabilecek şeyler
 const APP_SHELL = [
   "/",
   "/offline.html",
   "/manifest.json",
+  "/images/logo.png",
   "/icons/manifest-icon-192.maskable.png",
-  "/icons/manifest-icon-512.maskable.png",
-  "/images/logo.png"
+  "/icons/manifest-icon-512.maskable.png"
 ];
 
 // INSTALL
@@ -43,33 +42,34 @@ self.addEventListener("fetch", (event) => {
   const req = event.request;
   const url = new URL(req.url);
 
-  // Sadece GET
   if (req.method !== "GET") return;
 
-  // Supabase / API → ASLA cache'leme
+  // API / Supabase → direkt network
   if (
     url.pathname.startsWith("/api") ||
     url.hostname.includes("supabase")
   ) {
+    event.respondWith(fetch(req));
     return;
   }
 
-  // NAVIGATION (sayfa değişimi)
+  // Sayfa geçişleri
   if (req.mode === "navigate") {
     event.respondWith(
-      fetch(req).catch(() => caches.match("/offline.html"))
+      fetch(req).catch(() => {
+        return caches.match("/offline.html") || caches.match("/");
+      })
     );
     return;
   }
 
-  // STATIC ASSETS → cache first
+  // Static assets
   event.respondWith(
     caches.match(req).then((cached) => {
       if (cached) return cached;
 
       return fetch(req)
         .then((res) => {
-          // sadece başarılı response cache'le
           if (!res || res.status !== 200) return res;
 
           const clone = res.clone();

@@ -135,9 +135,26 @@
       Tip: Add VibraXX to your home screen for the full app experience.
     </div>
 
-    <div class="reconnect" onclick="location.reload()">
+    <div class="reconnect" onclick="tryReconnect()">
       Try reconnecting
     </div>
   </div>
+
+  <script>
+    function tryReconnect() {
+      if (navigator.onLine) {
+        window.location.href = "/";
+      }
+    }
+
+    // Sayfa açılır açılmaz dene
+    tryReconnect();
+
+    // İnternet gelince otomatik dön
+    window.addEventListener("online", tryReconnect);
+
+    // 3 saniyede bir de check
+    setInterval(tryReconnect, 3000);
+  </script>
 </body>
 </html>
