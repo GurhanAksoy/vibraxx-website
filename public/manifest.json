@@ -2,10 +2,11 @@
   "name": "VibraXX - Live Quiz Arena",
   "short_name": "VibraXX",
   "description": "Global skill-based live quiz arena.",
-  "start_url": "/",
+  "start_url": "/?source=pwa",
   "display": "standalone",
   "background_color": "#020817",
   "theme_color": "#020817",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "/icons/manifest-icon-192.maskable.png",
