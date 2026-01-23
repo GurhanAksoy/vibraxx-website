@@ -1169,7 +1169,8 @@ export default function ProfilePage() {
                     Purchase more rounds to continue competing for the £1000 prize
                   </p>
                   <button
-                    onClick={() => router.push("/#pricing")}
+                    onClick={() => router.push("/buy")}
+
                     style={{
                       width: "100%",
                       padding: "14px 24px",
