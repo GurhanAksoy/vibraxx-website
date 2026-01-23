@@ -1159,14 +1159,14 @@ export default function ProfilePage() {
                     gap: "8px",
                   }}>
                     <AlertCircle style={{ width: "20px", height: "20px", color: "#fbbf24" }} />
-                    <span>Out of Rounds!</span>
+                    <span>No Rounds Available!</span>
                   </div>
                   <p style={{
                     fontSize: "14px",
                     color: "#cbd5e1",
                     marginBottom: "16px",
                   }}>
-                    Purchase more rounds to continue competing for the £1000 prize
+                    Continue your journey towards the £1000 monthly prize.
                   </p>
                   <button
                     onClick={() => router.push("/buy")}
@@ -1197,14 +1197,14 @@ export default function ProfilePage() {
                       e.currentTarget.style.boxShadow = "0 0 30px rgba(124,58,237,0.6)";
                     }}>
                     <ShoppingCart style={{ width: "20px", height: "20px" }} />
-                    <span>Buy More Rounds</span>
+                    <span>Purchase Rounds</span>
                   </button>
                   <p style={{
                     fontSize: "12px",
                     color: "#94a3b8",
                     marginTop: "8px",
                   }}>
-                    Starting from £2.99 • UK Regulated
+                    Skill-based • UK regulated
                   </p>
                 </div>
               )}
