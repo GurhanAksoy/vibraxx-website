@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import Head from "next/head";
 import {
   Trophy,
   Clock,
@@ -85,6 +86,34 @@ export default function FreeQuizPage() {
 
   const currentQ = questions[currentIndex];
 
+  // ✅ SEO: Dynamic title & meta tags
+  useEffect(() => {
+    document.title = "Free Quiz Practice - VibraXX | Skill-Based Competition";
+    
+    // Meta description
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute("content", "Practice your knowledge with our free daily quiz. 20 questions, instant feedback, and detailed explanations. Perfect preparation for live competitions!");
+    }
+
+    // Open Graph
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle) ogTitle.setAttribute("content", "Free Quiz Practice - VibraXX");
+
+    const ogDesc = document.querySelector('meta[property="og:description"]');
+    if (ogDesc) ogDesc.setAttribute("content", "Practice with 20 free quiz questions daily. Instant feedback, explanations, and competition preparation!");
+
+    const ogImage = document.querySelector('meta[property="og:image"]');
+    if (ogImage) ogImage.setAttribute("content", "https://vibraxx.com/og-free-quiz.png");
+
+    // Twitter Card
+    const twitterCard = document.querySelector('meta[name="twitter:card"]');
+    if (twitterCard) twitterCard.setAttribute("content", "summary_large_image");
+
+    const twitterTitle = document.querySelector('meta[name="twitter:title"]');
+    if (twitterTitle) twitterTitle.setAttribute("content", "Free Quiz Practice - VibraXX");
+  }, []);
+
   // 🔐 === SECURITY CHECK & FETCH FREE QUIZ ===
   useEffect(() => {
     const verifyAndFetchFreeQuiz = async () => {
@@ -144,8 +173,6 @@ export default function FreeQuizPage() {
           .select("id")
           .eq("user_id", user.id)
           .eq("round_id", freeRound.id)
-          .gte("created_at", todayStart.toISOString())
-          .lte("created_at", todayEnd.toISOString())
           .maybeSingle();
 
         if (scoreError && scoreError.code !== "PGRST116") {
@@ -195,8 +222,13 @@ export default function FreeQuizPage() {
 
         console.log(`✅ Loaded ${questionsData.length} questions for free quiz`);
 
+        // ✅ SIRALAMA FIX: .in() query random döner, questionIds sırasına göre sort
+        const sortedQuestionsData = questionsData.sort((a, b) => 
+          questionIds.indexOf(a.id) - questionIds.indexOf(b.id)
+        );
+
         // Format questions
-        const formattedQuestions: Question[] = questionsData.map((q: any) => ({
+        const formattedQuestions: Question[] = sortedQuestionsData.map((q: any) => ({
           id: q.id,
           question: q.question_text,
           options: [
@@ -515,15 +547,44 @@ export default function FreeQuizPage() {
   // === LOADING / VERIFYING SCREEN ===
   if (isVerifying || isLoading) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
+      <>
+        {/* ✅ SEO: Structured Data (JSON-LD) */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Quiz",
+              "name": "VibraXX Free Daily Quiz",
+              "description": "Practice your knowledge with 20 free quiz questions. Instant feedback and detailed explanations.",
+              "educationalLevel": "All levels",
+              "assesses": "General knowledge",
+              "educationalUse": "Practice and skill assessment",
+              "interactivityType": "active",
+              "learningResourceType": "Quiz",
+              "isAccessibleForFree": true,
+              "hasPart": {
+                "@type": "Question",
+                "eduQuestionType": "Multiple choice"
+              },
+              "provider": {
+                "@type": "Organization",
+                "name": "VibraXX",
+                "url": "https://vibraxx.com"
+              }
+            })
+          }}
+        />
+
+        <div
+          style={{
+            minHeight: "100vh",
+            background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
         <div className="animate-pulse" style={{ textAlign: "center" }}>
           <div
             className="animate-spin"
@@ -549,6 +610,7 @@ export default function FreeQuizPage() {
           </p>
         </div>
       </div>
+      </>
     );
   }
 
