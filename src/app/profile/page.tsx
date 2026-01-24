@@ -817,7 +817,7 @@ export default function ProfilePage() {
           100% { background-position: 200% center; }
         }
         @keyframes slideUp {
-  from { transform: translateY(8px); opacity: 0.5; }
+  from { transform: translateY(0); opacity: 1; }
   to { transform: translateY(0); opacity: 1; }
 }
         @keyframes pulse {
@@ -832,7 +832,7 @@ export default function ProfilePage() {
           0%, 100% { transform: translateY(0px); }
           50% { transform: translateY(-10px); }
         }
-        .animate-slide-up { animation: slideUp 0.25s ease-out; }
+        .animate-slide-up { animation: none; }
         .animate-pulse { animation: pulse 2s ease-in-out infinite; }
         .animate-glow { animation: glow 2s ease-in-out infinite; }
         .animate-float { animation: float 3s ease-in-out infinite; }
