@@ -848,7 +848,14 @@ export default function ProfilePage() {
         }
       `}</style>
 
-         
+      <div style={{
+  minHeight: "100vh",
+  background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 25%, #312e81 50%, #1e1b4b 75%, #0f172a 100%)",
+  backgroundSize: "400% 400%",
+  color: "white",
+  paddingBottom: "0",
+}}>
+        
         <div style={{ padding: "clamp(20px, 5vw, 40px) clamp(16px, 4vw, 24px)" }}>
           
           {/* HEADER */}
