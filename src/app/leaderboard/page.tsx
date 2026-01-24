@@ -287,6 +287,14 @@ export default function LeaderboardPage() {
           .prize-pool-countdown { justify-content: center !important; }
           button { min-height: 44px !important; }
         }
+        
+        @media (max-width: 375px) {
+          nav button {
+            padding: 8px 16px !important;
+            font-size: 12px !important;
+            letter-spacing: 0.3px !important;
+          }
+        }
       `}</style>
 
       <div style={{
