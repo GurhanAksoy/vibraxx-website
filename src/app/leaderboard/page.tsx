@@ -1,1243 +1,1236 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Crown, Trophy, Medal, Flame, Zap, ChevronRight, Volume2, VolumeX, Star } from "lucide-react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { 
+  Crown, Trophy, Star, Target, Clock, Users, Gift, 
+  Sparkles, Volume2, VolumeX, ChevronRight, Home
+} from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import Footer from "@/components/Footer";
+
+// ✅ TIER CONFIGURATION (Profile page ile aynı)
+const TIERS = {
+  BRONZE: { min: 0, max: 500, name: "Bronze", icon: "🥉", color: "#cd7f32", gradient: "linear-gradient(135deg, #cd7f32, #b8651f)" },
+  SILVER: { min: 500, max: 2000, name: "Silver", icon: "🥈", color: "#c0c0c0", gradient: "linear-gradient(135deg, #c0c0c0, #a8a8a8)" },
+  GOLD: { min: 2000, max: 5000, name: "Gold", icon: "🥇", color: "#ffd700", gradient: "linear-gradient(135deg, #ffd700, #ffed4e)" },
+  DIAMOND: { min: 5000, max: Infinity, name: "Diamond", icon: "💎", color: "#b9f2ff", gradient: "linear-gradient(135deg, #b9f2ff, #7dd3fc)" },
+};
+
+interface Player {
+  id: string;
+  rank: number;
+  name: string;
+  score: number;
+  correct: number;
+  wrong: number;
+  rounds: number;
+  accuracy: number;
+  tier: string;
+  tierIcon: string;
+  tierColor: string;
+}
 
 export default function LeaderboardPage() {
-  // ✅ ONLY weekly/monthly (NO daily/allTime!)
-  const [activeTab, setActiveTab] = useState<'weekly' | 'monthly'>('weekly');
-  const [particles, setParticles] = useState<any[]>([]);
-
-  useEffect(() => {
-    const arr = [...Array(8)].map((_, i) => ({
-      top: Math.random() * 100,
-      left: Math.random() * 100,
-      duration: 2 + Math.random() * 2,
-      delay: i * 0.3,
-    }));
-    setParticles(arr);
-  }, []);
-
-  const [topPlayers, setTopPlayers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isDesktop, setIsDesktop] = useState(false);
+  const router = useRouter();
   
-  // ✅ Audio with click-to-play
-  const [isMuted, setIsMuted] = useState(true);
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const hasInteractedRef = useRef(false);
+  // Core State
+  const [activeTab, setActiveTab] = useState<'weekly' | 'monthly'>('weekly');
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Stats State
+  const [totalPlayers, setTotalPlayers] = useState(0);
+  const [topScore, setTopScore] = useState(0);
+  const [avgAccuracy, setAvgAccuracy] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState({ days: 0, hours: 0, minutes: 0 });
+  
+  // Background Music State
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Simple audio toggle
-  const toggleAudio = () => {
-    if (audioRef.current) {
-      if (isMuted) {
-        audioRef.current.muted = false;
-        audioRef.current.play();
-      } else {
-        audioRef.current.muted = true;
+  // ✅ GET TIER INFO
+  const getTierInfo = useCallback((totalScore: number) => {
+    if (totalScore >= TIERS.DIAMOND.min) return TIERS.DIAMOND;
+    if (totalScore >= TIERS.GOLD.min) return TIERS.GOLD;
+    if (totalScore >= TIERS.SILVER.min) return TIERS.SILVER;
+    return TIERS.BRONZE;
+  }, []);
+
+  // ✅ SEO
+  useEffect(() => {
+    document.title = `${activeTab === 'weekly' ? 'Weekly' : 'Monthly'} Leaderboard - VibraXX`;
+    
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute("content", `Compete for £1,000 monthly prize. View ${activeTab} VibraXX leaderboard rankings in UK's premier skill-based quiz competition.`);
+    }
+  }, [activeTab]);
+
+  // ✅ BACKGROUND MUSIC
+  useEffect(() => {
+    const audio = new Audio("/sounds/vibraxx.mp3");
+    audio.loop = true;
+    audio.volume = 0.3;
+    audioRef.current = audio;
+
+    const musicEnabled = localStorage.getItem("vibraxx_music_enabled");
+    if (musicEnabled === "true") {
+      setIsMusicPlaying(true);
+    }
+
+    return () => {
+      if (audioRef.current) {
         audioRef.current.pause();
+        audioRef.current = null;
       }
-      setIsMuted(!isMuted);
-    }
-  };
-
-  // Initialize audio
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = 0.5;
-      audioRef.current.loop = true;
-      audioRef.current.muted = true;
-    }
+    };
   }, []);
 
-  // ✅ CLICK ANYWHERE TO PLAY MUSIC
   useEffect(() => {
-    const handleFirstClick = () => {
-      if (!hasInteractedRef.current && audioRef.current) {
-        hasInteractedRef.current = true;
-        audioRef.current.muted = false;
-        audioRef.current.play().catch(() => {});
-        setIsMuted(false);
+    const handleFirstInteraction = () => {
+      if (!hasInteracted) {
+        setHasInteracted(true);
+        const musicEnabled = localStorage.getItem("vibraxx_music_enabled");
+        if (musicEnabled === "true" && audioRef.current) {
+          audioRef.current.play().catch(err => console.log("Audio blocked:", err));
+        }
       }
     };
 
-    document.addEventListener("click", handleFirstClick, { once: true });
+    document.addEventListener("click", handleFirstInteraction, { once: true });
+    return () => document.removeEventListener("click", handleFirstInteraction);
+  }, [hasInteracted]);
 
-    return () => {
-      document.removeEventListener("click", handleFirstClick);
-    };
-  }, []);
-
-  // SSR-safe viewport check
   useEffect(() => {
-    const mq = window.matchMedia('(min-width: 769px)');
-    const onChange = (e: MediaQueryListEvent | MediaQueryList) => setIsDesktop((e as MediaQueryList).matches ?? (e as MediaQueryListEvent).matches);
-    onChange(mq as unknown as MediaQueryList);
-    mq.addEventListener ? mq.addEventListener('change', onChange as any) : mq.addListener(onChange as any);
-    return () => {
-      mq.removeEventListener ? mq.removeEventListener('change', onChange as any) : mq.removeListener(onChange as any);
-    };
+    if (!audioRef.current || !hasInteracted) return;
+
+    if (isMusicPlaying) {
+      audioRef.current.play().catch(err => console.log("Play error:", err));
+      localStorage.setItem("vibraxx_music_enabled", "true");
+    } else {
+      audioRef.current.pause();
+      localStorage.setItem("vibraxx_music_enabled", "false");
+    }
+  }, [isMusicPlaying, hasInteracted]);
+
+  const toggleMusic = useCallback(() => {
+    setIsMusicPlaying(prev => !prev);
   }, []);
 
-  // ✅ FETCH LEADERBOARD - DIRECT QUERY (NO RPC!)
+  // ✅ CALCULATE TIME REMAINING
+  useEffect(() => {
+    const calculateTimeRemaining = () => {
+      const now = new Date();
+      let targetDate: Date;
+
+      if (activeTab === 'weekly') {
+        // Next Sunday 23:59:59 UTC
+        targetDate = new Date(now);
+        const daysUntilSunday = (7 - now.getUTCDay()) % 7 || 7;
+        targetDate.setUTCDate(now.getUTCDate() + daysUntilSunday);
+        targetDate.setUTCHours(23, 59, 59, 999);
+      } else {
+        // End of current month 23:59:59 UTC
+        targetDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+      }
+
+      const diff = targetDate.getTime() - now.getTime();
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+      setTimeRemaining({ days, hours, minutes });
+    };
+
+    calculateTimeRemaining();
+    const interval = setInterval(calculateTimeRemaining, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, [activeTab]);
+
+  // ✅ FETCH LEADERBOARD DATA (YENİ SUPABASE ŞEMASI)
   useEffect(() => {
     const fetchLeaderboard = async () => {
       setLoading(true);
-      
+
       try {
         const tableName = activeTab === 'weekly' ? 'leaderboard_weekly' : 'leaderboard_monthly';
-        
-        // ✅ Direct table query (briefing compliant!)
+
         const { data, error } = await supabase
           .from(tableName)
           .select('user_id, full_name, total_score, correct_answers, wrong_answers, rounds_played, rank')
-          .order('total_score', { ascending: false })
+          .order('rank', { ascending: true })
           .limit(100);
 
         if (error) {
-          console.error(`[Leaderboard] ${activeTab} fetch error:`, error);
-          setTopPlayers([]);
+          console.error(`Leaderboard ${activeTab} error:`, error);
+          setPlayers([]);
           return;
         }
 
-        // ✅ Map to UI format with total_score (NOT points!)
-        const leaderboard = (data || []).map((player: any) => ({
-          id: player.user_id,
-          rank: player.rank,
-          name: player.full_name || "Anonymous",
-          avatar: null,
-          country: "🌍",
-          score: player.total_score || 0, // ✅ total_score!
-          correct: player.correct_answers || 0,
-          wrong: player.wrong_answers || 0,
-          rounds: player.rounds_played || 0,
-          accuracy: player.correct_answers > 0 
-            ? Math.round((player.correct_answers / (player.correct_answers + player.wrong_answers)) * 100) 
-            : 0,
-          streak: 0,
-          isOnline: false
-        }));
+        if (!data || data.length === 0) {
+          setPlayers([]);
+          setTotalPlayers(0);
+          setTopScore(0);
+          setAvgAccuracy(0);
+          return;
+        }
 
-        setTopPlayers(leaderboard);
-        
-        console.log(`[Leaderboard] ${activeTab} loaded:`, leaderboard.length, 'players');
+        // Map to Player format with tier info
+        const leaderboard: Player[] = data.map((player: any) => {
+          const tier = getTierInfo(player.total_score || 0);
+          const totalQuestions = (player.correct_answers || 0) + (player.wrong_answers || 0);
+          const accuracy = totalQuestions > 0 
+            ? Math.round(((player.correct_answers || 0) / totalQuestions) * 100)
+            : 0;
+
+          return {
+            id: player.user_id,
+            rank: player.rank,
+            name: player.full_name || "Anonymous",
+            score: player.total_score || 0,
+            correct: player.correct_answers || 0,
+            wrong: player.wrong_answers || 0,
+            rounds: player.rounds_played || 0,
+            accuracy,
+            tier: tier.name,
+            tierIcon: tier.icon,
+            tierColor: tier.color,
+          };
+        });
+
+        setPlayers(leaderboard);
+
+        // Calculate stats
+        setTotalPlayers(leaderboard.length);
+        setTopScore(leaderboard[0]?.score || 0);
+        const avgAcc = leaderboard.length > 0
+          ? leaderboard.reduce((sum, p) => sum + p.accuracy, 0) / leaderboard.length
+          : 0;
+        setAvgAccuracy(Math.round(avgAcc));
+
       } catch (error) {
-        console.error(`[Leaderboard] ${activeTab} error:`, error);
-        setTopPlayers([]);
+        console.error(`Leaderboard ${activeTab} error:`, error);
+        setPlayers([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchLeaderboard();
-  }, [activeTab]);
+  }, [activeTab, getTierInfo]);
 
-  // Helper function for rank colors
-  const getRankColor = (rank: number) => {
-    if (rank === 1) return "from-yellow-400 to-yellow-500";
-    if (rank === 2) return "from-gray-300 to-gray-400";
-    if (rank === 3) return "from-amber-600 to-amber-700";
-    return "from-violet-500 to-violet-600";
-  };
-
-  const top3 = topPlayers.slice(0, 3);
-  const restPlayers = topPlayers.slice(3, 100);
+  const top3 = useMemo(() => players.slice(0, 3), [players]);
+  const restPlayers = useMemo(() => players.slice(3), [players]);
 
   return (
     <>
-      <audio 
-        ref={audioRef} 
-        src="sounds/vibraxx.mp3"
-        aria-label="Background music"
-      />
-
       <style jsx global>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-15px); }
-        }
-        @keyframes shimmer {
-          0% { background-position: -200% center; }
-          100% { background-position: 200% center; }
-        }
-        @keyframes glow {
-          0%, 100% { opacity: 0.5; }
-          50% { opacity: 1; }
-        }
-        @keyframes slideIn {
-          from { transform: translateX(-20px); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes neonPulse {
-          0%, 100% { 
-            box-shadow: 0 0 10px rgba(139, 92, 246, 0.5),
-                        0 0 20px rgba(139, 92, 246, 0.3),
-                        0 0 30px rgba(139, 92, 246, 0.2);
-          }
-          50% { 
-            box-shadow: 0 0 20px rgba(217, 70, 239, 0.8),
-                        0 0 40px rgba(217, 70, 239, 0.5),
-                        0 0 60px rgba(217, 70, 239, 0.3);
-          }
-        }
-        @keyframes goldGlow {
-          0%, 100% { 
-            box-shadow: 0 0 20px rgba(234, 179, 8, 0.6),
-                        0 0 40px rgba(234, 179, 8, 0.4);
-          }
-          50% { 
-            box-shadow: 0 0 30px rgba(234, 179, 8, 1),
-                        0 0 60px rgba(234, 179, 8, 0.7);
-          }
-        }
+        * { box-sizing: border-box; }
+        body { overflow-x: hidden; }
+        
         @keyframes spin {
-          from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
-        @keyframes particle {
-          0% { transform: translateY(0) scale(1); opacity: 1; }
-          100% { transform: translateY(-100px) scale(0); opacity: 0; }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.8; }
         }
-        .animate-float { animation: float 3s ease-in-out infinite; }
-        .animate-shimmer {
-          background-size: 200% 100%;
-          animation: shimmer 3s linear infinite;
+        @keyframes glow {
+          0%, 100% { box-shadow: 0 0 20px rgba(251,191,36,0.4); }
+          50% { box-shadow: 0 0 40px rgba(251,191,36,0.8); }
         }
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+        }
+        @keyframes slideUp {
+          from { transform: translateY(20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes crownBounce {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          50% { transform: translateY(-15px) rotate(5deg); }
+        }
+        
+        .animate-pulse { animation: pulse 2s ease-in-out infinite; }
         .animate-glow { animation: glow 2s ease-in-out infinite; }
-        .animate-slide-in { animation: slideIn 0.5s ease-out; }
-        .neon-border { animation: neonPulse 2s ease-in-out infinite; }
-        .gold-glow { animation: goldGlow 2s ease-in-out infinite; }
-        .animate-particle { animation: particle 2s ease-out infinite; }
-
-        *:focus-visible {
-          outline: 3px solid #a78bfa;
-          outline-offset: 2px;
-        }
-
-        html {
-          scroll-behavior: smooth;
-        }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+        .animate-slide-up { animation: slideUp 0.5s ease-out; }
+        .animate-crown { animation: crownBounce 2s ease-in-out infinite; }
 
         @media (max-width: 768px) {
           .mobile-hide { display: none !important; }
-          .mobile-stack { grid-template-columns: 1fr !important; }
-        }
-
-        /* Footer Styles */
-        .vx-footer {
-          position: relative;
-          z-index: 10;
-          border-top: 1px solid rgba(255, 255, 255, 0.1);
-          background: rgba(15, 23, 42, 0.9);
-          backdrop-filter: blur(20px);
-          margin-top: clamp(40px, 6vw, 60px);
-          padding: clamp(30px, 5vw, 50px) 0;
-        }
-
-        .vx-container {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 0 clamp(16px, 4vw, 24px);
-        }
-
-        .vx-footer-legal {
-          background: rgba(139, 92, 246, 0.1);
-          border: 1px solid rgba(139, 92, 246, 0.2);
-          border-radius: 12px;
-          padding: clamp(16px, 3vw, 20px);
-          margin-bottom: clamp(24px, 4vw, 32px);
-          font-size: clamp(11px, 2vw, 13px);
-          line-height: 1.6;
-          color: #cbd5e1;
-          text-align: center;
-        }
-
-        .vx-footer-legal a {
-          color: #a78bfa;
-          text-decoration: underline;
-          transition: color 0.3s;
-        }
-
-        .vx-footer-legal a:hover {
-          color: #c4b5fd;
-        }
-
-        .vx-footer-links {
-          display: flex;
-          flex-wrap: wrap;
-          justify-content: center;
-          align-items: center;
-          gap: clamp(8px, 2vw, 12px);
-          margin-bottom: clamp(24px, 4vw, 32px);
-        }
-
-        .vx-footer-links a {
-          color: #94a3b8;
-          text-decoration: none;
-          font-size: clamp(11px, 2vw, 13px);
-          font-weight: 500;
-          transition: color 0.3s;
-          white-space: nowrap;
-        }
-
-        .vx-footer-links a:hover {
-          color: #a78bfa;
-        }
-
-        .vx-footer-divider {
-          color: rgba(148, 163, 184, 0.3);
-          font-size: clamp(10px, 2vw, 12px);
-        }
-
-        .vx-footer-company {
-          color: #64748b;
-          font-size: clamp(11px, 2vw, 13px);
-          line-height: 1.6;
-        }
-
-        .vx-footer-company a {
-          color: #a78bfa;
-          text-decoration: none;
-          transition: color 0.3s;
-        }
-
-        .vx-footer-company a:hover {
-          color: #c4b5fd;
-        }
-
-        @media (max-width: 640px) {
-          .vx-footer-divider {
-            display: none;
+          .mobile-grid { 
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
           }
-          
-          .vx-footer-links {
-            flex-direction: column;
-            gap: 12px;
-          }
+          .mobile-stack { flex-direction: column !important; }
+          .podium-2nd { order: 2 !important; }
+          .podium-1st { order: 1 !important; }
+          .podium-3rd { order: 3 !important; }
+          button { min-height: 44px !important; }
         }
       `}</style>
 
       <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(to bottom right, #0f172a, #1e1b4b, #0f172a)',
-        color: 'white',
-        position: 'relative',
-        overflow: 'hidden'
-      }}
-      role="main"
-      aria-label="Leaderboard page">
-        {/* Animated Background */}
-        <div className="animate-float" style={{
-          position: 'fixed',
-          top: '5%',
-          left: '5%',
-          width: '500px',
-          height: '500px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, #7c3aed 0%, transparent 70%)',
-          opacity: 0.3,
-          filter: 'blur(100px)',
-          zIndex: 0
-        }}
-        aria-hidden="true"></div>
-        <div className="animate-float" style={{
-          position: 'fixed',
-          bottom: '5%',
-          right: '5%',
-          width: '600px',
-          height: '600px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, #d946ef 0%, transparent 70%)',
-          opacity: 0.25,
-          filter: 'blur(100px)',
-          zIndex: 0,
-          animationDelay: '1.5s'
-        }}
-        aria-hidden="true"></div>
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 25%, #312e81 50%, #1e1b4b 75%, #0f172a 100%)",
+        backgroundSize: "400% 400%",
+        color: "white",
+        paddingBottom: "0",
+      }}>
+        
+        <div style={{ padding: "clamp(20px, 5vw, 40px) clamp(16px, 4vw, 24px)" }}>
+          
+          {/* HEADER */}
+          <header style={{
+            maxWidth: "1400px",
+            margin: "0 auto clamp(24px, 5vw, 40px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "16px",
+            flexWrap: "wrap",
+          }}>
+            <button
+              onClick={() => router.push("/")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "10px 16px",
+                borderRadius: "12px",
+                border: "2px solid rgba(139,92,246,0.5)",
+                background: "rgba(15,23,42,0.8)",
+                color: "white",
+                fontSize: "14px",
+                fontWeight: 700,
+                cursor: "pointer",
+                transition: "all 0.3s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "#a78bfa";
+                e.currentTarget.style.background = "rgba(139,92,246,0.2)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "rgba(139,92,246,0.5)";
+                e.currentTarget.style.background = "rgba(15,23,42,0.8)";
+              }}>
+              <Home style={{ width: "18px", height: "18px" }} />
+              <span>Home</span>
+            </button>
 
-      {/* Floating Particles */}
-{particles.map((p, i) => (
-  <div
-    key={i}
-    className="animate-particle"
-    style={{
-      position: "fixed",
-      width: "4px",
-      height: "4px",
-      borderRadius: "50%",
-      background: "rgba(167, 139, 250, 0.6)",
-      top: `${p.top}%`,
-      left: `${p.left}%`,
-      animationDelay: `${p.delay}s`,
-      animationDuration: `${p.duration}s`,
-      zIndex: 0,
-    }}
-    aria-hidden="true"
-  />
-))}
+            <div style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "8px 16px",
+              borderRadius: "999px",
+              background: "rgba(34,197,94,0.15)",
+              border: "1px solid rgba(34,197,94,0.5)",
+            }}>
+              <div className="animate-pulse" style={{
+                width: "8px",
+                height: "8px",
+                borderRadius: "50%",
+                background: "#22c55e",
+              }} />
+              <span style={{ fontSize: "12px", color: "#22c55e", fontWeight: 600 }}>
+                Live Leaderboard
+              </span>
+            </div>
+          </header>
 
-        {/* Header */}
-        <header 
-          style={{
-            position: 'relative',
-            zIndex: 50,
-            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-            backdropFilter: 'blur(20px)',
-            background: 'rgba(15, 23, 42, 0.8)'
-          }}
-          role="banner">
-          <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 clamp(16px, 3vw, 24px)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px', gap: 'clamp(12px, 2vw, 16px)' }}>
+          <main style={{ maxWidth: "1400px", margin: "0 auto" }}>
+            
+            {/* === HERO SECTION === */}
+            <div className="animate-slide-up" style={{
+              padding: "clamp(32px, 6vw, 48px) clamp(24px, 5vw, 40px)",
+              borderRadius: "clamp(20px, 4vw, 28px)",
+              border: "2px solid rgba(251,191,36,0.5)",
+              background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(251,191,36,0.3)",
+              backdropFilter: "blur(20px)",
+              marginBottom: "clamp(24px, 5vw, 40px)",
+              textAlign: "center",
+            }}>
               
-              {/* Logo - NO TEXT! */}
-              <div
-                onClick={() => (window.location.href = '/')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  cursor: 'pointer',
-                  transition: 'transform 0.25s ease',
-                  flexShrink: 0
-                }}
-                onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.transform = 'scale(1.05)')}
-                onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.transform = 'scale(1)')}
-                role="link"
-                aria-label="Go to homepage"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    window.location.href = '/';
-                  }
-                }}
-              >
-                <div style={{
-                  width: 'clamp(45px, 9vw, 60px)',
-                  height: 'clamp(45px, 9vw, 60px)',
-                  borderRadius: '50%',
-                  background: 'linear-gradient(to bottom right, #7c3aed, #d946ef)',
-                  padding: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 0 25px rgba(139, 92, 246, 0.55)',
-                  border: '2px solid rgba(255, 255, 255, 0.08)',
-                  position: 'relative',
-                  overflow: 'hidden',
+              {/* Title */}
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "16px",
+                marginBottom: "clamp(20px, 4vw, 32px)",
+                flexWrap: "wrap",
+              }}>
+                <Trophy className="animate-float" style={{
+                  width: "clamp(32px, 7vw, 48px)",
+                  height: "clamp(32px, 7vw, 48px)",
+                  color: "#fbbf24",
+                }} />
+                <h1 style={{
+                  fontSize: "clamp(24px, 5vw, 48px)",
+                  fontWeight: 900,
+                  background: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)",
+                  backgroundClip: "text",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  textTransform: "uppercase",
+                  letterSpacing: "2px",
                 }}>
-                  <div style={{
-                    position: 'absolute',
-                    inset: '4px',
-                    borderRadius: '50%',
-                    backgroundColor: '#0f172a',
-                    zIndex: 1,
-                  }} />
-                  <img
-                    src="images/logo.png"
-                    alt="VibraXX Logo"
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'contain',
-                      position: 'relative',
-                      zIndex: 2,
-                      filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.35))',
-                    }}
-                  />
+                  {activeTab === 'weekly' ? 'Weekly' : 'Monthly'} Leaderboard
+                </h1>
+                <Trophy className="animate-float" style={{
+                  width: "clamp(32px, 7vw, 48px)",
+                  height: "clamp(32px, 7vw, 48px)",
+                  color: "#fbbf24",
+                }} />
+              </div>
+
+              {/* Prize Pool */}
+              <div className="animate-glow" style={{
+                padding: "clamp(20px, 4vw, 32px)",
+                borderRadius: "clamp(16px, 3vw, 20px)",
+                background: "linear-gradient(135deg, rgba(251,191,36,0.25), rgba(245,158,11,0.2))",
+                border: "2px solid rgba(251,191,36,0.6)",
+                marginBottom: "clamp(24px, 5vw, 32px)",
+              }}>
+                <div style={{
+                  fontSize: "clamp(12px, 2.5vw, 16px)",
+                  color: "#fcd34d",
+                  fontWeight: 700,
+                  marginBottom: "12px",
+                  textTransform: "uppercase",
+                  letterSpacing: "1px",
+                }}>
+                  💰 {activeTab === 'weekly' ? 'Weekly' : 'Monthly'} Prize Pool
+                </div>
+                <div style={{
+                  fontSize: "clamp(40px, 8vw, 72px)",
+                  fontWeight: 900,
+                  background: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)",
+                  backgroundClip: "text",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  lineHeight: 1,
+                  marginBottom: "12px",
+                }}>
+                  £1,000
+                </div>
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  fontSize: "clamp(11px, 2.2vw, 14px)",
+                  color: "#cbd5e1",
+                }}>
+                  <Clock style={{ width: "16px", height: "16px" }} />
+                  <span>
+                    Resets in {timeRemaining.days}d {timeRemaining.hours}h {timeRemaining.minutes}m
+                  </span>
                 </div>
               </div>
 
-              {/* Title */}
-              <h1 
-                className="animate-shimmer" 
-                style={{ 
-                  fontSize: 'clamp(14px, 3vw, 28px)',
-                  fontWeight: 900,
-                  background: 'linear-gradient(90deg, #7c3aed, #d946ef, #f0abfc, #d946ef, #7c3aed)',
-                  backgroundSize: '200% 100%',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  textAlign: 'center',
-                  margin: 0,
-                  flex: 1
+              {/* Stats Cards */}
+              <div className="mobile-grid" style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                gap: "clamp(12px, 3vw, 16px)",
+              }}>
+                
+                {/* Total Players */}
+                <div style={{
+                  padding: "clamp(16px, 3vw, 20px)",
+                  borderRadius: "14px",
+                  background: "linear-gradient(135deg, rgba(139,92,246,0.2), rgba(124,58,237,0.15))",
+                  border: "2px solid rgba(139,92,246,0.5)",
                 }}>
-                Leaderboard
-              </h1>
+                  <Users style={{
+                    width: "clamp(20px, 4vw, 28px)",
+                    height: "clamp(20px, 4vw, 28px)",
+                    color: "#a78bfa",
+                    margin: "0 auto 8px",
+                  }} />
+                  <div style={{
+                    fontSize: "clamp(20px, 4vw, 32px)",
+                    fontWeight: 900,
+                    color: "#a78bfa",
+                    lineHeight: 1,
+                    marginBottom: "4px",
+                  }}>
+                    {totalPlayers.toLocaleString()}
+                  </div>
+                  <div style={{
+                    fontSize: "clamp(10px, 2vw, 12px)",
+                    color: "#c4b5fd",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                  }}>
+                    Players
+                  </div>
+                </div>
 
-              {/* Audio & Home Buttons */}
-              <div style={{ display: 'flex', gap: 'clamp(8px, 2vw, 12px)', alignItems: 'center', flexShrink: 0 }}>
-                <button
-                  onClick={toggleAudio}
-                  style={{
-                    width: 'clamp(36px, 7vw, 44px)',
-                    height: 'clamp(36px, 7vw, 44px)',
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(217, 70, 239, 0.1))',
-                    border: '2px solid rgba(139, 92, 246, 0.3)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#a78bfa',
-                    transition: 'all 0.3s',
-                    boxShadow: '0 2px 8px rgba(139, 92, 246, 0.2)'
-                  }}
-                  aria-label={isMuted ? 'Unmute audio' : 'Mute audio'}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.05)';
-                    (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
-                    (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 8px rgba(139, 92, 246, 0.2)';
-                  }}
-                >
-                  {isMuted ? 
-                    <VolumeX style={{ width: 'clamp(16px, 3vw, 20px)', height: 'clamp(16px, 3vw, 20px)' }} /> : 
-                    <Volume2 style={{ width: 'clamp(16px, 3vw, 20px)', height: 'clamp(16px, 3vw, 20px)' }} />
-                  }
-                </button>
+                {/* Top Score */}
+                <div style={{
+                  padding: "clamp(16px, 3vw, 20px)",
+                  borderRadius: "14px",
+                  background: "linear-gradient(135deg, rgba(34,197,94,0.2), rgba(21,128,61,0.15))",
+                  border: "2px solid rgba(34,197,94,0.5)",
+                }}>
+                  <Star style={{
+                    width: "clamp(20px, 4vw, 28px)",
+                    height: "clamp(20px, 4vw, 28px)",
+                    color: "#22c55e",
+                    margin: "0 auto 8px",
+                  }} />
+                  <div style={{
+                    fontSize: "clamp(20px, 4vw, 32px)",
+                    fontWeight: 900,
+                    color: "#22c55e",
+                    lineHeight: 1,
+                    marginBottom: "4px",
+                  }}>
+                    {topScore.toLocaleString()}
+                  </div>
+                  <div style={{
+                    fontSize: "clamp(10px, 2vw, 12px)",
+                    color: "#86efac",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                  }}>
+                    Top Score
+                  </div>
+                </div>
 
-                <button
-                  onClick={() => window.location.href = '/'}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: 'clamp(8px, 2vw, 10px) clamp(12px, 2.5vw, 20px)',
-                    borderRadius: '12px',
-                    border: '2px solid rgba(139, 92, 246, 0.3)',
-                    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(217, 70, 239, 0.1))',
-                    color: 'white',
-                    fontSize: 'clamp(12px, 2.2vw, 14px)',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.3s',
-                    backdropFilter: 'blur(10px)',
-                    boxShadow: '0 2px 8px rgba(139, 92, 246, 0.2)',
-                    whiteSpace: 'nowrap'
-                  }}
-                  aria-label="Return to homepage"
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(217, 70, 239, 0.15))';
-                    (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)';
-                    (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(217, 70, 239, 0.1))';
-                    (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)';
-                    (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 8px rgba(139, 92, 246, 0.2)';
-                  }}
-                >
-                  <Zap style={{ width: 'clamp(14px, 2.8vw, 18px)', height: 'clamp(14px, 2.8vw, 18px)', color: '#a78bfa' }} aria-hidden="true" />
-                  <span className="mobile-hide">Home</span>
-                </button>
+                {/* Avg Accuracy */}
+                <div style={{
+                  padding: "clamp(16px, 3vw, 20px)",
+                  borderRadius: "14px",
+                  background: "linear-gradient(135deg, rgba(56,189,248,0.2), rgba(14,165,233,0.15))",
+                  border: "2px solid rgba(56,189,248,0.5)",
+                }}>
+                  <Target style={{
+                    width: "clamp(20px, 4vw, 28px)",
+                    height: "clamp(20px, 4vw, 28px)",
+                    color: "#38bdf8",
+                    margin: "0 auto 8px",
+                  }} />
+                  <div style={{
+                    fontSize: "clamp(20px, 4vw, 32px)",
+                    fontWeight: 900,
+                    color: "#38bdf8",
+                    lineHeight: 1,
+                    marginBottom: "4px",
+                  }}>
+                    {avgAccuracy}%
+                  </div>
+                  <div style={{
+                    fontSize: "clamp(10px, 2vw, 12px)",
+                    color: "#7dd3fc",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                  }}>
+                    Avg Accuracy
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </header>
 
-        {/* Main Content */}
-        <main 
-          style={{ position: 'relative', zIndex: 10, padding: 'clamp(20px, 4vw, 50px) clamp(12px, 3vw, 24px)' }}
-          id="main-content">
-          <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-            
-            {/* Tab Navigation - ONLY WEEKLY & MONTHLY! */}
-            <nav 
-              style={{ 
-                display: 'flex', 
-                gap: 'clamp(6px, 1.5vw, 16px)', 
-                marginBottom: 'clamp(20px, 4vw, 50px)',
-                overflowX: 'auto',
-                padding: '4px',
-                WebkitOverflowScrolling: 'touch',
-                justifyContent: 'center'
-              }}
-              role="tablist"
-              aria-label="Leaderboard time periods">
-              {['weekly', 'monthly'].map((tab) => (
+            {/* === TAB NAVIGATION === */}
+            <nav style={{
+              display: "flex",
+              gap: "12px",
+              marginBottom: "clamp(24px, 5vw, 32px)",
+              justifyContent: "center",
+              flexWrap: "wrap",
+            }}>
+              {(['weekly', 'monthly'] as const).map((tab) => (
                 <button
                   key={tab}
-                  onClick={() => setActiveTab(tab as any)}
-                  role="tab"
-                  aria-selected={activeTab === tab}
-                  aria-controls={`${tab}-leaderboard`}
-                  tabIndex={activeTab === tab ? 0 : -1}
+                  onClick={() => setActiveTab(tab)}
                   style={{
-                    padding: 'clamp(10px, 2vw, 16px) clamp(16px, 3vw, 32px)',
-                    borderRadius: '12px',
-                    border: `2px solid ${activeTab === tab ? '#a78bfa' : 'rgba(255, 255, 255, 0.1)'}`,
+                    padding: "12px 24px",
+                    borderRadius: "12px",
+                    border: `2px solid ${activeTab === tab ? 'rgba(139,92,246,0.8)' : 'rgba(139,92,246,0.3)'}`,
                     background: activeTab === tab 
-                      ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(217, 70, 239, 0.2))' 
-                      : 'rgba(255, 255, 255, 0.05)',
-                    color: 'white',
-                    fontSize: 'clamp(11px, 2.2vw, 15px)',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.3s',
-                    textTransform: 'capitalize',
-                    whiteSpace: 'nowrap',
-                    backdropFilter: 'blur(10px)',
-                    boxShadow: activeTab === tab ? '0 0 20px rgba(139, 92, 246, 0.4)' : 'none',
-                    flexShrink: 0
+                      ? "linear-gradient(135deg, rgba(139,92,246,0.3), rgba(124,58,237,0.2))"
+                      : "rgba(15,23,42,0.6)",
+                    color: "white",
+                    fontSize: "14px",
+                    fontWeight: 800,
+                    textTransform: "uppercase",
+                    cursor: "pointer",
+                    transition: "all 0.3s",
+                    boxShadow: activeTab === tab ? "0 0 20px rgba(139,92,246,0.4)" : "none",
                   }}
-                  className={activeTab === tab ? 'neon-border' : ''}
                   onMouseEnter={(e) => {
                     if (activeTab !== tab) {
-                      (e.currentTarget as HTMLButtonElement).style.background = 'rgba(139, 92, 246, 0.15)';
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(139, 92, 246, 0.5)';
+                      e.currentTarget.style.borderColor = "rgba(139,92,246,0.6)";
+                      e.currentTarget.style.background = "rgba(139,92,246,0.15)";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (activeTab !== tab) {
-                      (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255, 255, 255, 0.05)';
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                      e.currentTarget.style.borderColor = "rgba(139,92,246,0.3)";
+                      e.currentTarget.style.background = "rgba(15,23,42,0.6)";
                     }
-                  }}
-                >
-                  {tab}
+                  }}>
+                  {tab === 'weekly' ? '📅 Weekly' : '📆 Monthly'}
                 </button>
               ))}
             </nav>
 
-            {/* Top 3 Podium */}
-            <section 
-              className="mobile-stack" 
-              style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(3, 1fr)', 
-                gap: 'clamp(12px, 2.5vw, 32px)',
-                marginBottom: 'clamp(30px, 5vw, 60px)',
-                alignItems: 'end'
-              }}
-              aria-label="Top 3 players"
-              id={`${activeTab}-leaderboard`}
-              role="tabpanel">
-              
-              {/* 2nd Place */}
-              {top3[1] && (
-                <article 
-                  className="animate-slide-in" 
-                  style={{ 
-                    order: isDesktop ? 1 : 2,
-                    animationDelay: '0.1s'
-                  }}
-                  aria-label={`Second place: ${top3[1].name}`}>
-                  <div style={{
-                    padding: 'clamp(16px, 3vw, 32px)',
-                    borderRadius: '20px',
-                    border: '3px solid rgba(192, 192, 192, 0.5)',
-                    background: 'linear-gradient(135deg, rgba(192, 192, 192, 0.15), rgba(156, 163, 175, 0.1))',
-                    backdropFilter: 'blur(20px)',
-                    textAlign: 'center',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    boxShadow: '0 0 30px rgba(192, 192, 192, 0.3)'
-                  }}>
-                    <div style={{
-                      position: 'absolute',
-                      top: '-50%',
-                      left: '-50%',
-                      width: '200%',
-                      height: '200%',
-                      background: 'radial-gradient(circle, rgba(192, 192, 192, 0.1) 0%, transparent 70%)',
-                      animation: 'float 4s ease-in-out infinite'
-                    }}></div>
-                    
-                    <div style={{
-                      position: 'relative',
-                      width: 'clamp(60px, 13vw, 90px)',
-                      height: 'clamp(60px, 13vw, 90px)',
-                      margin: '0 auto clamp(12px, 2.5vw, 20px)',
-                      borderRadius: '50%',
-                      padding: '4px',
-                      background: 'linear-gradient(135deg, #d1d5db, #9ca3af)',
-                      boxShadow: '0 0 30px rgba(192, 192, 192, 0.5)'
-                    }}>
-                      <img 
-                        src={top3[1].avatar || "/images/default-avatar.png"} 
-                        alt={`${top3[1].name}'s avatar`}
-                        style={{ width: '100%', height: '100%', borderRadius: '50%' }} 
-                      />
-                      <div 
-                        style={{
-                          position: 'absolute',
-                          bottom: '-8px',
-                          left: '50%',
-                          transform: 'translateX(-50%)',
-                          width: 'clamp(28px, 6vw, 40px)',
-                          height: 'clamp(28px, 6vw, 40px)',
-                          borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #d1d5db, #9ca3af)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          border: '2px solid rgba(15, 23, 42, 0.8)',
-                          color: '#0f172a',
-                          fontWeight: 900,
-                          fontSize: 'clamp(12px, 2.5vw, 18px)'
-                        }}
-                        aria-label="Rank 2">
-                        2
-                      </div>
-                    </div>
-
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      gap: '8px',
-                      marginBottom: '6px'
-                    }}>
-                      <Trophy style={{ 
-                        width: 'clamp(14px, 2.8vw, 18px)', 
-                        height: 'clamp(14px, 2.8vw, 18px)', 
-                        color: '#d1d5db' 
-                      }} 
-                      aria-hidden="true" />
-                      <h2 style={{ 
-                        fontSize: 'clamp(13px, 2.6vw, 18px)', 
-                        fontWeight: 800,
-                        margin: 0,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        maxWidth: '100%'
-                      }}>
-                        {top3[1].name}
-                      </h2>
-                    </div>
-
-                    <div style={{ 
-                      fontSize: 'clamp(20px, 4vw, 32px)', 
-                      fontWeight: 900,
-                      background: 'linear-gradient(to right, #d1d5db, #9ca3af)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text',
-                      marginBottom: '6px'
-                    }}>
-                      {top3[1].score.toLocaleString()}
-                    </div>
-
-                    <div style={{ fontSize: 'clamp(9px, 1.8vw, 12px)', color: '#94a3b8' }}>points</div>
-                  </div>
-                </article>
-              )}
-
-              {/* 1st Place */}
-              {top3[0] && (
-                <article 
-                  className="animate-slide-in" 
-                  style={{ 
-                    order: 2,
-                    animationDelay: '0.2s'
-                  }}
-                  aria-label={`First place: ${top3[0].name}`}>
-                  <div style={{
-                    padding: 'clamp(20px, 4vw, 40px)',
-                    borderRadius: '24px',
-                    border: '4px solid rgba(234, 179, 8, 0.6)',
-                    background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.2), rgba(217, 119, 6, 0.15))',
-                    backdropFilter: 'blur(25px)',
-                    textAlign: 'center',
-                    position: 'relative',
-                    overflow: 'hidden'
-                  }}
-                  className="gold-glow">
-                    <div style={{
-                      position: 'absolute',
-                      top: '-50%',
-                      left: '-50%',
-                      width: '200%',
-                      height: '200%',
-                      background: 'radial-gradient(circle, rgba(234, 179, 8, 0.15) 0%, transparent 70%)',
-                      animation: 'float 3s ease-in-out infinite'
-                    }}></div>
-
-                    <Crown 
-                      className="animate-float" 
-                      style={{ 
-                        width: 'clamp(32px, 6vw, 48px)', 
-                        height: 'clamp(32px, 6vw, 48px)', 
-                        color: '#fbbf24',
-                        margin: '0 auto clamp(8px, 1.5vw, 12px)',
-                        filter: 'drop-shadow(0 0 20px rgba(251, 191, 36, 0.8))'
-                      }}
-                      aria-hidden="true"
-                    />
-                    
-                    <div style={{
-                      position: 'relative',
-                      width: 'clamp(80px, 16vw, 120px)',
-                      height: 'clamp(80px, 16vw, 120px)',
-                      margin: '0 auto clamp(16px, 3vw, 24px)',
-                      borderRadius: '50%',
-                      padding: '4px',
-                      background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
-                      boxShadow: '0 0 50px rgba(251, 191, 36, 0.7)'
-                    }}>
-                      <img 
-                        src={top3[0].avatar || "/images/default-avatar.png"} 
-                        alt={`${top3[0].name}'s avatar`}
-                        style={{ width: '100%', height: '100%', borderRadius: '50%' }} 
-                      />
-                      <div 
-                        style={{
-                          position: 'absolute',
-                          bottom: '-10px',
-                          left: '50%',
-                          transform: 'translateX(-50%)',
-                          width: 'clamp(36px, 7vw, 50px)',
-                          height: 'clamp(36px, 7vw, 50px)',
-                          borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          border: '3px solid rgba(15, 23, 42, 0.8)',
-                          color: '#0f172a',
-                          fontWeight: 900,
-                          fontSize: 'clamp(16px, 3.2vw, 24px)',
-                          boxShadow: '0 0 20px rgba(251, 191, 36, 0.8)'
-                        }}
-                        aria-label="Rank 1">
-                        1
-                      </div>
-                    </div>
-
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      gap: '10px',
-                      marginBottom: '8px'
-                    }}>
-                      <Star style={{ 
-                        width: 'clamp(16px, 3.2vw, 22px)', 
-                        height: 'clamp(16px, 3.2vw, 22px)', 
-                        color: '#fbbf24',
-                        fill: '#fbbf24'
-                      }} 
-                      aria-hidden="true" />
-                      <h2 style={{ 
-                        fontSize: 'clamp(16px, 3.2vw, 24px)', 
-                        fontWeight: 900,
-                        margin: 0,
-                        color: '#fbbf24',
-                        textShadow: '0 0 20px rgba(251, 191, 36, 0.5)',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        maxWidth: '100%'
-                      }}>
-                        {top3[0].name}
-                      </h2>
-                      <Star style={{ 
-                        width: 'clamp(16px, 3.2vw, 22px)', 
-                        height: 'clamp(16px, 3.2vw, 22px)', 
-                        color: '#fbbf24',
-                        fill: '#fbbf24'
-                      }} 
-                      aria-hidden="true" />
-                    </div>
-
-                    <div style={{ 
-                      fontSize: 'clamp(28px, 5.5vw, 48px)', 
-                      fontWeight: 900,
-                      background: 'linear-gradient(to right, #fbbf24, #f59e0b)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text',
-                      marginBottom: '8px',
-                      textShadow: '0 0 30px rgba(251, 191, 36, 0.5)'
-                    }}>
-                      {top3[0].score.toLocaleString()}
-                    </div>
-
-                    <div style={{ fontSize: 'clamp(10px, 2vw, 14px)', color: '#fbbf24', fontWeight: 700 }}>
-                      CHAMPION
-                    </div>
-                  </div>
-                </article>
-              )}
-
-              {/* 3rd Place */}
-              {top3[2] && (
-                <article 
-                  className="animate-slide-in" 
-                  style={{ 
-                    order: isDesktop ? 3 : 2,
-                    animationDelay: '0.3s'
-                  }}
-                  aria-label={`Third place: ${top3[2].name}`}>
-                  <div style={{
-                    padding: 'clamp(16px, 3vw, 32px)',
-                    borderRadius: '20px',
-                    border: '3px solid rgba(180, 83, 9, 0.5)',
-                    background: 'linear-gradient(135deg, rgba(180, 83, 9, 0.15), rgba(146, 64, 14, 0.1))',
-                    backdropFilter: 'blur(20px)',
-                    textAlign: 'center',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    boxShadow: '0 0 30px rgba(180, 83, 9, 0.3)'
-                  }}>
-                    <div style={{
-                      position: 'absolute',
-                      top: '-50%',
-                      left: '-50%',
-                      width: '200%',
-                      height: '200%',
-                      background: 'radial-gradient(circle, rgba(180, 83, 9, 0.1) 0%, transparent 70%)',
-                      animation: 'float 4s ease-in-out infinite'
-                    }}></div>
-                    
-                    <div style={{
-                      position: 'relative',
-                      width: 'clamp(60px, 13vw, 90px)',
-                      height: 'clamp(60px, 13vw, 90px)',
-                      margin: '0 auto clamp(12px, 2.5vw, 20px)',
-                      borderRadius: '50%',
-                      padding: '4px',
-                      background: 'linear-gradient(135deg, #d97706, #b45309)',
-                      boxShadow: '0 0 30px rgba(217, 119, 6, 0.5)'
-                    }}>
-                      <img 
-                        src={top3[2].avatar || "/images/default-avatar.png"} 
-                        alt={`${top3[2].name}'s avatar`}
-                        style={{ width: '100%', height: '100%', borderRadius: '50%' }} 
-                      />
-                      <div 
-                        style={{
-                          position: 'absolute',
-                          bottom: '-8px',
-                          left: '50%',
-                          transform: 'translateX(-50%)',
-                          width: 'clamp(28px, 6vw, 40px)',
-                          height: 'clamp(28px, 6vw, 40px)',
-                          borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #d97706, #b45309)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          border: '2px solid rgba(15, 23, 42, 0.8)',
-                          color: '#0f172a',
-                          fontWeight: 900,
-                          fontSize: 'clamp(12px, 2.5vw, 18px)'
-                        }}
-                        aria-label="Rank 3">
-                        3
-                      </div>
-                    </div>
-
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      gap: '8px',
-                      marginBottom: '6px'
-                    }}>
-                      <Medal style={{ 
-                        width: 'clamp(14px, 2.8vw, 18px)', 
-                        height: 'clamp(14px, 2.8vw, 18px)', 
-                        color: '#d97706' 
-                      }} 
-                      aria-hidden="true" />
-                      <h2 style={{ 
-                        fontSize: 'clamp(13px, 2.6vw, 18px)', 
-                        fontWeight: 800,
-                        margin: 0,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        maxWidth: '100%'
-                      }}>
-                        {top3[2].name}
-                      </h2>
-                    </div>
-
-                    <div style={{ 
-                      fontSize: 'clamp(20px, 4vw, 32px)', 
-                      fontWeight: 900,
-                      background: 'linear-gradient(to right, #d97706, #b45309)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text',
-                      marginBottom: '6px'
-                    }}>
-                      {top3[2].score.toLocaleString()}
-                    </div>
-
-                    <div style={{ fontSize: 'clamp(9px, 1.8vw, 12px)', color: '#94a3b8' }}>points</div>
-                  </div>
-                </article>
-              )}
-            </section>
-
-            {/* Rest of Players */}
-            <section 
-              style={{
-                background: 'rgba(15, 23, 42, 0.7)',
-                borderRadius: '20px',
-                border: '2px solid transparent',
-                backgroundImage: 'linear-gradient(rgba(15, 23, 42, 0.7), rgba(15, 23, 42, 0.7)), linear-gradient(135deg, #7c3aed, #d946ef, #f0abfc, #d946ef, #7c3aed)',
-                backgroundOrigin: 'border-box',
-                backgroundClip: 'padding-box, border-box',
-                padding: 'clamp(16px, 3vw, 32px)',
-                backdropFilter: 'blur(20px)',
-                boxShadow: '0 0 40px rgba(139, 92, 246, 0.4), 0 0 80px rgba(217, 70, 239, 0.3), 0 10px 40px -10px rgba(0, 0, 0, 0.3)',
-                position: 'relative'
-              }}
-              className="neon-border"
-              aria-label="Remaining players">
-              
-              <h2 style={{ 
-                fontSize: 'clamp(16px, 3.2vw, 24px)', 
-                fontWeight: 800,
-                marginBottom: 'clamp(16px, 3vw, 24px)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                background: 'linear-gradient(to right, #a78bfa, #f0abfc)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text'
+            {/* === LOADING === */}
+            {loading ? (
+              <div style={{
+                padding: "clamp(60px, 12vw, 100px)",
+                textAlign: "center",
               }}>
-                <Zap style={{ 
-                  width: 'clamp(18px, 3.6vw, 26px)', 
-                  height: 'clamp(18px, 3.6vw, 26px)', 
-                  color: '#a78bfa',
-                  filter: 'drop-shadow(0 0 10px rgba(167, 139, 250, 0.6))'
-                }} 
-                aria-hidden="true" />
-                Top 100 Players
-              </h2>
-
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: 'clamp(8px, 1.5vw, 12px)' 
+                <div style={{
+                  width: "60px",
+                  height: "60px",
+                  borderRadius: "50%",
+                  border: "4px solid rgba(139,92,246,0.3)",
+                  borderTopColor: "#a78bfa",
+                  animation: "spin 1s linear infinite",
+                  margin: "0 auto 20px",
+                }} />
+                <p style={{ color: "#94a3b8", fontSize: "16px" }}>Loading leaderboard...</p>
+              </div>
+            ) : players.length === 0 ? (
+              <div style={{
+                padding: "clamp(60px, 12vw, 100px)",
+                textAlign: "center",
+                borderRadius: "20px",
+                border: "2px solid rgba(139,92,246,0.3)",
+                background: "rgba(15,23,42,0.6)",
               }}>
-                {loading ? (
-                  <div style={{ 
-                    textAlign: 'center', 
-                    padding: 'clamp(30px, 5vw, 50px)', 
-                    color: '#94a3b8' 
-                  }}>
-                    Loading leaderboard...
-                  </div>
-                ) : restPlayers.length === 0 ? (
-                  <div style={{ 
-                    textAlign: 'center', 
-                    padding: 'clamp(30px, 5vw, 50px)', 
-                    color: '#94a3b8' 
-                  }}>
-                    No players yet. Be the first!
-                  </div>
-                ) : (
-                  restPlayers.map((player, idx) => (
-                    <article
-                      key={player.id}
-                      className="animate-slide-in"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 'clamp(10px, 2vw, 16px)',
-                        padding: 'clamp(10px, 2vw, 16px)',
-                        borderRadius: '14px',
-                        background: 'rgba(255, 255, 255, 0.03)',
-                        border: '1px solid rgba(255, 255, 255, 0.06)',
-                        transition: 'all 0.3s',
-                        cursor: 'pointer',
-                        animationDelay: `${Math.min(idx * 0.05, 1)}s`
-                      }}
-                      aria-label={`${player.name} ranked ${player.rank}`}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLElement).style.background = 'rgba(139, 92, 246, 0.1)';
-                        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139, 92, 246, 0.3)';
-                        (e.currentTarget as HTMLElement).style.transform = 'translateX(8px)';
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLElement).style.background = 'rgba(255, 255, 255, 0.03)';
-                        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255, 255, 255, 0.06)';
-                        (e.currentTarget as HTMLElement).style.transform = 'translateX(0)';
-                      }}
-                    >
-                      <div 
-                        style={{
-                          width: 'clamp(32px, 6vw, 44px)',
-                          height: 'clamp(32px, 6vw, 44px)',
-                          borderRadius: '8px',
-                          background: `linear-gradient(135deg, ${getRankColor(player.rank).replace('from-', 'var(--tw-gradient-from, ').replace(' to-', '), var(--tw-gradient-to, ')}))`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 'clamp(11px, 2.2vw, 16px)',
-                          fontWeight: 900,
-                          color: 'white',
-                          flexShrink: 0,
-                          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
-                        }}
-                        aria-label={`Rank ${player.rank}`}>
-                        #{player.rank}
-                      </div>
-
-                      <div 
-                        style={{
-                          width: 'clamp(36px, 7vw, 50px)',
-                          height: 'clamp(36px, 7vw, 50px)',
-                          borderRadius: '50%',
-                          overflow: 'hidden',
-                          border: '2px solid rgba(139, 92, 246, 0.3)',
-                          flexShrink: 0
-                        }}>
-                        <img 
-                          src={player.avatar || "/images/default-avatar.png"} 
-                          alt={`${player.name}'s avatar`}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                        />
-                      </div>
-
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ 
-                          fontSize: 'clamp(12px, 2.4vw, 16px)', 
-                          fontWeight: 700,
-                          marginBottom: '2px',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
-                        }}>
-                          {player.name}
-                        </div>
-                        <div style={{ 
-                          fontSize: 'clamp(9px, 1.8vw, 12px)', 
-                          color: '#64748b',
-                          display: 'flex',
-                          gap: '10px',
-                          flexWrap: 'wrap'
-                        }}>
-                          <span>{player.accuracy}% accuracy</span>
-                          <span className="mobile-hide">•</span>
-                          <span className="mobile-hide">{player.rounds} rounds</span>
-                        </div>
-                      </div>
-
+                <Trophy style={{
+                  width: "48px",
+                  height: "48px",
+                  color: "#64748b",
+                  margin: "0 auto 16px",
+                }} />
+                <p style={{ color: "#94a3b8", fontSize: "16px" }}>No players yet. Be the first!</p>
+              </div>
+            ) : (
+              <>
+                {/* === TOP 3 PODIUM === */}
+                <div className="mobile-stack" style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: "clamp(16px, 3vw, 24px)",
+                  marginBottom: "clamp(32px, 6vw, 48px)",
+                  alignItems: "end",
+                }}>
+                  
+                  {/* 2nd Place */}
+                  {top3[1] && (
+                    <div className="animate-slide-up podium-2nd" style={{
+                      order: 1,
+                      animationDelay: "0.1s",
+                    }}>
                       <div style={{
-                        textAlign: 'right',
-                        padding: 'clamp(6px, 1.5vw, 12px) clamp(10px, 2vw, 20px)',
-                        borderRadius: '10px',
-                        background: 'rgba(139, 92, 246, 0.1)',
-                        border: '1px solid rgba(139, 92, 246, 0.2)'
-                      }}>
-                        <div style={{ 
-                          fontSize: 'clamp(14px, 2.8vw, 20px)', 
-                          fontWeight: 900,
-                          background: 'linear-gradient(to right, #a78bfa, #f0abfc)',
-                          WebkitBackgroundClip: 'text',
-                          WebkitTextFillColor: 'transparent',
-                          backgroundClip: 'text'
+                        padding: "clamp(20px, 4vw, 28px)",
+                        borderRadius: "clamp(16px, 3vw, 24px)",
+                        border: "3px solid rgba(192,192,192,0.6)",
+                        background: "linear-gradient(135deg, rgba(192,192,192,0.2), rgba(156,163,175,0.15))",
+                        backdropFilter: "blur(20px)",
+                        textAlign: "center",
+                        boxShadow: "0 0 40px rgba(192,192,192,0.4)",
+                        transition: "transform 0.3s",
+                        cursor: "default",
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-8px)"}
+                      onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
+                        
+                        {/* Medal Badge */}
+                        <div style={{
+                          position: "relative",
+                          width: "clamp(70px, 14vw, 100px)",
+                          height: "clamp(70px, 14vw, 100px)",
+                          margin: "0 auto clamp(16px, 3vw, 20px)",
+                          borderRadius: "50%",
+                          padding: "4px",
+                          background: "linear-gradient(135deg, #d1d5db, #9ca3af)",
+                          boxShadow: "0 0 30px rgba(192,192,192,0.6)",
                         }}>
-                          {player.score.toLocaleString()}
+                          <div style={{
+                            width: "100%",
+                            height: "100%",
+                            borderRadius: "50%",
+                            background: "#1e293b",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "clamp(32px, 6vw, 48px)",
+                          }}>
+                            🥈
+                          </div>
+                          <div style={{
+                            position: "absolute",
+                            bottom: "-8px",
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                            width: "clamp(32px, 6vw, 40px)",
+                            height: "clamp(32px, 6vw, 40px)",
+                            borderRadius: "50%",
+                            background: "linear-gradient(135deg, #d1d5db, #9ca3af)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            border: "2px solid #0f172a",
+                            color: "#0f172a",
+                            fontWeight: 900,
+                            fontSize: "clamp(14px, 3vw, 20px)",
+                          }}>
+                            2
+                          </div>
                         </div>
-                        <div style={{ fontSize: 'clamp(9px, 1.8vw, 12px)', color: '#64748b' }}>points</div>
+
+                        {/* Name */}
+                        <h2 style={{
+                          fontSize: "clamp(14px, 3vw, 18px)",
+                          fontWeight: 800,
+                          marginBottom: "4px",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}>
+                          {top3[1].name}
+                        </h2>
+
+                        {/* Tier Badge */}
+                        <div style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          padding: "4px 10px",
+                          borderRadius: "999px",
+                          background: `${top3[1].tierColor}20`,
+                          border: `1px solid ${top3[1].tierColor}60`,
+                          marginBottom: "12px",
+                          fontSize: "clamp(10px, 2vw, 12px)",
+                        }}>
+                          <span>{top3[1].tierIcon}</span>
+                          <span style={{ color: top3[1].tierColor, fontWeight: 700 }}>
+                            {top3[1].tier}
+                          </span>
+                        </div>
+
+                        {/* Score */}
+                        <div style={{
+                          fontSize: "clamp(24px, 5vw, 36px)",
+                          fontWeight: 900,
+                          background: "linear-gradient(90deg, #d1d5db, #9ca3af)",
+                          backgroundClip: "text",
+                          WebkitBackgroundClip: "text",
+                          WebkitTextFillColor: "transparent",
+                          marginBottom: "8px",
+                        }}>
+                          {top3[1].score.toLocaleString()}
+                        </div>
+
+                        {/* Stats */}
+                        <div style={{
+                          fontSize: "clamp(10px, 2vw, 12px)",
+                          color: "#94a3b8",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "4px",
+                        }}>
+                          <span>{top3[1].accuracy}% accuracy</span>
+                          <span>{top3[1].rounds} rounds</span>
+                        </div>
                       </div>
+                    </div>
+                  )}
 
-                      <ChevronRight 
-                        className="mobile-hide"
-                        style={{ 
-                          width: 'clamp(16px, 3vw, 24px)', 
-                          height: 'clamp(16px, 3vw, 24px)', 
-                          color: '#64748b',
-                          flexShrink: 0
-                        }} 
-                        aria-hidden="true"
-                      />
-                    </article>
-                  ))
+                  {/* 1st Place */}
+                  {top3[0] && (
+                    <div className="animate-slide-up podium-1st" style={{
+                      order: 2,
+                      animationDelay: "0.2s",
+                    }}>
+                      <div className="animate-glow" style={{
+                        padding: "clamp(24px, 5vw, 36px)",
+                        borderRadius: "clamp(20px, 4vw, 28px)",
+                        border: "4px solid rgba(251,191,36,0.8)",
+                        background: "linear-gradient(135deg, rgba(251,191,36,0.25), rgba(245,158,11,0.2))",
+                        backdropFilter: "blur(25px)",
+                        textAlign: "center",
+                        boxShadow: "0 0 60px rgba(251,191,36,0.6)",
+                        transition: "transform 0.3s",
+                        cursor: "default",
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-12px)"}
+                      onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
+                        
+                        {/* Crown Animation */}
+                        <Crown className="animate-crown" style={{
+                          width: "clamp(32px, 6vw, 48px)",
+                          height: "clamp(32px, 6vw, 48px)",
+                          color: "#fbbf24",
+                          margin: "0 auto clamp(12px, 2.5vw, 16px)",
+                        }} />
+
+                        {/* Medal Badge */}
+                        <div style={{
+                          position: "relative",
+                          width: "clamp(90px, 18vw, 120px)",
+                          height: "clamp(90px, 18vw, 120px)",
+                          margin: "0 auto clamp(20px, 4vw, 24px)",
+                          borderRadius: "50%",
+                          padding: "5px",
+                          background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
+                          boxShadow: "0 0 50px rgba(251,191,36,0.8)",
+                        }}>
+                          <div style={{
+                            width: "100%",
+                            height: "100%",
+                            borderRadius: "50%",
+                            background: "#1e293b",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "clamp(40px, 8vw, 60px)",
+                          }}>
+                            🥇
+                          </div>
+                          <div style={{
+                            position: "absolute",
+                            bottom: "-10px",
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                            width: "clamp(36px, 7vw, 48px)",
+                            height: "clamp(36px, 7vw, 48px)",
+                            borderRadius: "50%",
+                            background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            border: "3px solid #0f172a",
+                            color: "#0f172a",
+                            fontWeight: 900,
+                            fontSize: "clamp(16px, 3.5vw, 24px)",
+                          }}>
+                            1
+                          </div>
+                        </div>
+
+                        {/* Name */}
+                        <h2 style={{
+                          fontSize: "clamp(18px, 4vw, 24px)",
+                          fontWeight: 900,
+                          marginBottom: "6px",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}>
+                          {top3[0].name}
+                        </h2>
+
+                        {/* Tier Badge */}
+                        <div style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          padding: "6px 14px",
+                          borderRadius: "999px",
+                          background: `${top3[0].tierColor}25`,
+                          border: `2px solid ${top3[0].tierColor}`,
+                          marginBottom: "16px",
+                          fontSize: "clamp(11px, 2.2vw, 14px)",
+                        }}>
+                          <span style={{ fontSize: "clamp(14px, 3vw, 18px)" }}>{top3[0].tierIcon}</span>
+                          <span style={{ color: top3[0].tierColor, fontWeight: 800 }}>
+                            {top3[0].tier}
+                          </span>
+                        </div>
+
+                        {/* Score */}
+                        <div style={{
+                          fontSize: "clamp(32px, 7vw, 48px)",
+                          fontWeight: 900,
+                          background: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)",
+                          backgroundClip: "text",
+                          WebkitBackgroundClip: "text",
+                          WebkitTextFillColor: "transparent",
+                          marginBottom: "12px",
+                        }}>
+                          {top3[0].score.toLocaleString()}
+                        </div>
+
+                        {/* Stats */}
+                        <div style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr 1fr",
+                          gap: "8px",
+                          fontSize: "clamp(11px, 2.2vw, 14px)",
+                        }}>
+                          <div>
+                            <div style={{ color: "#22c55e", fontWeight: 700 }}>
+                              {top3[0].accuracy}%
+                            </div>
+                            <div style={{ color: "#94a3b8", fontSize: "clamp(9px, 1.8vw, 11px)" }}>
+                              accuracy
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ color: "#38bdf8", fontWeight: 700 }}>
+                              {top3[0].rounds}
+                            </div>
+                            <div style={{ color: "#94a3b8", fontSize: "clamp(9px, 1.8vw, 11px)" }}>
+                              rounds
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3rd Place */}
+                  {top3[2] && (
+                    <div className="animate-slide-up podium-3rd" style={{
+                      order: 3,
+                      animationDelay: "0.15s",
+                    }}>
+                      <div style={{
+                        padding: "clamp(20px, 4vw, 28px)",
+                        borderRadius: "clamp(16px, 3vw, 24px)",
+                        border: "3px solid rgba(217,119,6,0.6)",
+                        background: "linear-gradient(135deg, rgba(217,119,6,0.2), rgba(194,65,12,0.15))",
+                        backdropFilter: "blur(20px)",
+                        textAlign: "center",
+                        boxShadow: "0 0 40px rgba(217,119,6,0.4)",
+                        transition: "transform 0.3s",
+                        cursor: "default",
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-8px)"}
+                      onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
+                        
+                        {/* Medal Badge */}
+                        <div style={{
+                          position: "relative",
+                          width: "clamp(70px, 14vw, 100px)",
+                          height: "clamp(70px, 14vw, 100px)",
+                          margin: "0 auto clamp(16px, 3vw, 20px)",
+                          borderRadius: "50%",
+                          padding: "4px",
+                          background: "linear-gradient(135deg, #d97706, #c2410c)",
+                          boxShadow: "0 0 30px rgba(217,119,6,0.6)",
+                        }}>
+                          <div style={{
+                            width: "100%",
+                            height: "100%",
+                            borderRadius: "50%",
+                            background: "#1e293b",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "clamp(32px, 6vw, 48px)",
+                          }}>
+                            🥉
+                          </div>
+                          <div style={{
+                            position: "absolute",
+                            bottom: "-8px",
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                            width: "clamp(32px, 6vw, 40px)",
+                            height: "clamp(32px, 6vw, 40px)",
+                            borderRadius: "50%",
+                            background: "linear-gradient(135deg, #d97706, #c2410c)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            border: "2px solid #0f172a",
+                            color: "#0f172a",
+                            fontWeight: 900,
+                            fontSize: "clamp(14px, 3vw, 20px)",
+                          }}>
+                            3
+                          </div>
+                        </div>
+
+                        {/* Name */}
+                        <h2 style={{
+                          fontSize: "clamp(14px, 3vw, 18px)",
+                          fontWeight: 800,
+                          marginBottom: "4px",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}>
+                          {top3[2].name}
+                        </h2>
+
+                        {/* Tier Badge */}
+                        <div style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          padding: "4px 10px",
+                          borderRadius: "999px",
+                          background: `${top3[2].tierColor}20`,
+                          border: `1px solid ${top3[2].tierColor}60`,
+                          marginBottom: "12px",
+                          fontSize: "clamp(10px, 2vw, 12px)",
+                        }}>
+                          <span>{top3[2].tierIcon}</span>
+                          <span style={{ color: top3[2].tierColor, fontWeight: 700 }}>
+                            {top3[2].tier}
+                          </span>
+                        </div>
+
+                        {/* Score */}
+                        <div style={{
+                          fontSize: "clamp(24px, 5vw, 36px)",
+                          fontWeight: 900,
+                          background: "linear-gradient(90deg, #d97706, #c2410c)",
+                          backgroundClip: "text",
+                          WebkitBackgroundClip: "text",
+                          WebkitTextFillColor: "transparent",
+                          marginBottom: "8px",
+                        }}>
+                          {top3[2].score.toLocaleString()}
+                        </div>
+
+                        {/* Stats */}
+                        <div style={{
+                          fontSize: "clamp(10px, 2vw, 12px)",
+                          color: "#94a3b8",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "4px",
+                        }}>
+                          <span>{top3[2].accuracy}% accuracy</span>
+                          <span>{top3[2].rounds} rounds</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* === REST OF LEADERBOARD === */}
+                {restPlayers.length > 0 && (
+                  <div className="animate-slide-up" style={{
+                    padding: "clamp(24px, 5vw, 32px)",
+                    borderRadius: "clamp(16px, 3vw, 24px)",
+                    border: "2px solid rgba(139,92,246,0.5)",
+                    background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)",
+                    boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+                    backdropFilter: "blur(20px)",
+                    animationDelay: "0.3s",
+                  }}>
+                    
+                    <h2 style={{
+                      fontSize: "clamp(18px, 4vw, 24px)",
+                      fontWeight: 900,
+                      marginBottom: "clamp(20px, 4vw, 24px)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                    }}>
+                      <Sparkles style={{ width: "24px", height: "24px", color: "#a78bfa" }} />
+                      Ranked Players
+                    </h2>
+
+                    <div style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "12px",
+                    }}>
+                      {restPlayers.map((player, idx) => (
+                        <div
+                          key={player.id}
+                          className="animate-slide-up"
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "clamp(12px, 2.5vw, 16px)",
+                            padding: "clamp(12px, 2.5vw, 16px)",
+                            borderRadius: "14px",
+                            background: "rgba(139,92,246,0.05)",
+                            border: "1px solid rgba(139,92,246,0.2)",
+                            transition: "all 0.3s",
+                            cursor: "pointer",
+                            animationDelay: `${Math.min(idx * 0.03, 0.5)}s`,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "rgba(139,92,246,0.15)";
+                            e.currentTarget.style.borderColor = "rgba(139,92,246,0.5)";
+                            e.currentTarget.style.transform = "translateX(8px)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "rgba(139,92,246,0.05)";
+                            e.currentTarget.style.borderColor = "rgba(139,92,246,0.2)";
+                            e.currentTarget.style.transform = "translateX(0)";
+                          }}>
+                          
+                          {/* Rank Badge */}
+                          <div style={{
+                            width: "clamp(36px, 7vw, 48px)",
+                            height: "clamp(36px, 7vw, 48px)",
+                            borderRadius: "10px",
+                            background: player.rank <= 10 
+                              ? "linear-gradient(135deg, #8b5cf6, #7c3aed)"
+                              : "rgba(139,92,246,0.2)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "clamp(12px, 2.5vw, 16px)",
+                            fontWeight: 900,
+                            color: "white",
+                            flexShrink: 0,
+                            boxShadow: player.rank <= 10 ? "0 4px 12px rgba(139,92,246,0.5)" : "none",
+                          }}>
+                            #{player.rank}
+                          </div>
+
+                          {/* Player Info */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                              marginBottom: "4px",
+                            }}>
+                              <span style={{
+                                fontSize: "clamp(14px, 3vw, 16px)",
+                                fontWeight: 800,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}>
+                                {player.name}
+                              </span>
+                              <span style={{ fontSize: "clamp(14px, 3vw, 16px)" }}>
+                                {player.tierIcon}
+                              </span>
+                            </div>
+                            <div style={{
+                              fontSize: "clamp(10px, 2vw, 12px)",
+                              color: "#64748b",
+                              display: "flex",
+                              gap: "10px",
+                              flexWrap: "wrap",
+                            }}>
+                              <span style={{ color: "#22c55e" }}>
+                                {player.accuracy}% acc
+                              </span>
+                              <span className="mobile-hide">•</span>
+                              <span className="mobile-hide">
+                                {player.rounds} rounds
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Score */}
+                          <div style={{
+                            padding: "clamp(8px, 2vw, 12px) clamp(12px, 2.5vw, 20px)",
+                            borderRadius: "10px",
+                            background: "rgba(139,92,246,0.15)",
+                            border: "1px solid rgba(139,92,246,0.3)",
+                            textAlign: "right",
+                          }}>
+                            <div style={{
+                              fontSize: "clamp(16px, 3.5vw, 22px)",
+                              fontWeight: 900,
+                              background: "linear-gradient(90deg, #a78bfa, #f0abfc)",
+                              backgroundClip: "text",
+                              WebkitBackgroundClip: "text",
+                              WebkitTextFillColor: "transparent",
+                            }}>
+                              {player.score.toLocaleString()}
+                            </div>
+                            <div style={{
+                              fontSize: "clamp(9px, 1.8vw, 11px)",
+                              color: "#64748b",
+                            }}>
+                              points
+                            </div>
+                          </div>
+
+                          <ChevronRight 
+                            className="mobile-hide"
+                            style={{
+                              width: "20px",
+                              height: "20px",
+                              color: "#64748b",
+                              flexShrink: 0,
+                            }} 
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
-              </div>
-            </section>
+              </>
+            )}
 
-            {/* NO STATS CARDS! (Active Players, Top Score, Longest Streak REMOVED!) */}
+          </main>
+        </div>
 
-          </div>
-        </main>
+        {/* === BACKGROUND MUSIC TOGGLE === */}
+        <button
+          onClick={toggleMusic}
+          style={{
+            position: "fixed",
+            top: "clamp(20px, 4vw, 24px)",
+            right: "clamp(20px, 4vw, 24px)",
+            width: "clamp(48px, 10vw, 56px)",
+            height: "clamp(48px, 10vw, 56px)",
+            borderRadius: "50%",
+            border: "2px solid rgba(139,92,246,0.5)",
+            background: isMusicPlaying 
+              ? "linear-gradient(135deg, rgba(139,92,246,0.95), rgba(124,58,237,0.95))"
+              : "rgba(15,23,42,0.95)",
+            backdropFilter: "blur(10px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            zIndex: 50,
+            transition: "all 0.3s ease",
+            boxShadow: isMusicPlaying 
+              ? "0 0 20px rgba(139,92,246,0.6), 0 8px 16px rgba(0,0,0,0.4)"
+              : "0 4px 12px rgba(0,0,0,0.3)",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "scale(1.1) rotate(5deg)";
+            e.currentTarget.style.boxShadow = isMusicPlaying
+              ? "0 0 30px rgba(139,92,246,0.8), 0 12px 20px rgba(0,0,0,0.5)"
+              : "0 8px 16px rgba(0,0,0,0.4)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "scale(1) rotate(0deg)";
+            e.currentTarget.style.boxShadow = isMusicPlaying
+              ? "0 0 20px rgba(139,92,246,0.6), 0 8px 16px rgba(0,0,0,0.4)"
+              : "0 4px 12px rgba(0,0,0,0.3)";
+          }}
+          title={isMusicPlaying ? "Mute Music" : "Play Music"}>
+          {isMusicPlaying ? (
+            <Volume2 className="animate-pulse" style={{
+              width: "clamp(20px, 5vw, 24px)",
+              height: "clamp(20px, 5vw, 24px)",
+              color: "white",
+            }} />
+          ) : (
+            <VolumeX style={{
+              width: "clamp(20px, 5vw, 24px)",
+              height: "clamp(20px, 5vw, 24px)",
+              color: "#94a3b8",
+            }} />
+          )}
+        </button>
 
-        {/* Footer */}
-        <footer className="vx-footer">
-          <div className="vx-container">
-            <div className="vx-footer-legal">
-              <strong style={{ color: "#94a3b8" }}>Educational Quiz Competition.</strong> 18+ only. 
-              This is a 100% skill-based knowledge competition with no element of chance. 
-              Entry fees apply. Prize pool activates with 3000+ monthly participants. See{" "}
-              <a href="/terms" style={{ color: "#a78bfa", textDecoration: "underline" }}>
-                Terms & Conditions
-              </a>{" "}
-              for full details.
-            </div>
-
-            <nav className="vx-footer-links" aria-label="Footer navigation">
-              <a href="/privacy">Privacy Policy</a>
-              <span className="vx-footer-divider">•</span>
-              <a href="/terms">Terms & Conditions</a>
-              <span className="vx-footer-divider">•</span>
-              <a href="/cookies">Cookie Policy</a>
-              <span className="vx-footer-divider">•</span>
-              <a href="/how-it-works">How It Works</a>
-              <span className="vx-footer-divider">•</span>
-              <a href="/rules">Quiz Rules</a>
-              <span className="vx-footer-divider">•</span>
-              <a href="/complaints">Complaints</a>
-              <span className="vx-footer-divider">•</span>
-              <a href="/refunds">Refund Policy</a>
-              <span className="vx-footer-divider">•</span>
-              <a href="/about">About Us</a>
-              <span className="vx-footer-divider">•</span>
-              <a href="/contact">Contact</a>
-              <span className="vx-footer-divider">•</span>
-              <a href="/faq">FAQ</a>
-            </nav>
-
-            <div className="vx-footer-company">
-              <div style={{ marginBottom: 8, textAlign: "center" }}>
-                © 2025 VibraXX. Operated by Sermin Limited (UK)
-              </div>
-              <div style={{ fontSize: 'clamp(10px, 2vw, 11px)', color: "#64748b", marginBottom: 8, textAlign: "center" }}>
-                Registered in England & Wales | All rights reserved
-              </div>
-              <div style={{ marginBottom: 10, textAlign: "center" }}>
-                <a 
-                  href="mailto:team@vibraxx.com"
-                  style={{ 
-                    color: "#a78bfa", 
-                    textDecoration: "none",
-                    fontSize: 'clamp(11px, 2.2vw, 12px)',
-                    fontWeight: 600,
-                  }}
-                >
-                  team@vibraxx.com
-                </a>
-              </div>
-              <div style={{ fontSize: 'clamp(10px, 2vw, 11px)', textAlign: "center" }}>
-                Payment processing by{" "}
-                <a 
-                  href="https://stripe.com" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  style={{ color: "#a78bfa", textDecoration: "none" }}
-                >
-                  Stripe
-                </a>
-                {" "}| Secure SSL encryption | Skill-based competition - Not gambling
-              </div>
-            </div>
-          </div>
-        </footer>
+        <Footer />
       </div>
     </>
   );
