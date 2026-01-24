@@ -264,6 +264,7 @@ export default function ProfilePage() {
         });
         setEditName(profileData?.full_name || "User");
         setEditCountry(profileData?.country || "🌍");
+        setIsLoading(false);
 
         // 2️⃣ LIVE CREDITS
         const { data: creditsData } = await supabase
@@ -396,76 +397,79 @@ export default function ProfilePage() {
           target: 10,
         });
 
-        // 7️⃣ RANKINGS
-        const { data: weeklyLeaderboard } = await supabase
-          .from("leaderboard_weekly")
-          .select("rank")
-          .eq("user_id", authUser.id)
-          .maybeSingle();
+        // 7️⃣ RANKINGS & 8️⃣ RECENT HISTORY - PARALLEL
+const [weeklyLeaderboard, monthlyLeaderboard, recentRounds] = await Promise.all([
+  supabase
+    .from("leaderboard_weekly")
+    .select("rank")
+    .eq("user_id", authUser.id)
+    .maybeSingle(),
+  supabase
+    .from("leaderboard_monthly")
+    .select("rank")
+    .eq("user_id", authUser.id)
+    .maybeSingle(),
+  supabase
+    .from("score_ledger")
+    .select("id, round_id, score, correct_answers, wrong_answers, created_at, source")
+    .eq("user_id", authUser.id)
+    .order("created_at", { ascending: false })
+    .limit(10),
+]);
 
-        setWeeklyRank(weeklyLeaderboard?.rank || null);
+setWeeklyRank(weeklyLeaderboard.data?.rank || null);
+setMonthlyRank(monthlyLeaderboard.data?.rank || null);
+setHistory(recentRounds.data || []);
 
-        const { data: monthlyLeaderboard } = await supabase
-          .from("leaderboard_monthly")
-          .select("rank")
-          .eq("user_id", authUser.id)
-          .maybeSingle();
+        // 9️⃣ PERFORMANCE CHART - OPTIMIZED (1 query instead of 7)
+const sevenDaysAgo = new Date();
+sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 6);
+sevenDaysAgo.setUTCHours(0, 0, 0, 0);
 
-        setMonthlyRank(monthlyLeaderboard?.rank || null);
+const { data: last7DaysScores } = await supabase
+  .from("score_ledger")
+  .select("score, created_at")
+  .eq("user_id", authUser.id)
+  .gte("created_at", sevenDaysAgo.toISOString())
+  .order("created_at", { ascending: true });
 
-        // 8️⃣ RECENT HISTORY
-        const { data: recentRounds } = await supabase
-          .from("score_ledger")
-          .select("id, round_id, score, correct_answers, wrong_answers, created_at, source")
-          .eq("user_id", authUser.id)
-          .order("created_at", { ascending: false })
-          .limit(10);
+const last7Days: { date: string; score: number }[] = [];
+for (let i = 6; i >= 0; i--) {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() - i);
+  date.setUTCHours(0, 0, 0, 0);
+  
+  const nextDay = new Date(date);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  
+  const dayScores = last7DaysScores?.filter(s => {
+    const scoreDate = new Date(s.created_at);
+    return scoreDate >= date && scoreDate < nextDay;
+  }) || [];
+  
+  const totalScore = dayScores.reduce((sum, r) => sum + r.score, 0);
+  
+  last7Days.push({
+    date: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    score: totalScore,
+  });
+}
 
-        setHistory(recentRounds || []);
+setChartData(last7Days);
 
-        // 9️⃣ PERFORMANCE CHART
-        const last7Days: { date: string; score: number }[] = [];
-        
-        for (let i = 6; i >= 0; i--) {
-          const date = new Date();
-          date.setUTCDate(date.getUTCDate() - i);
-          date.setUTCHours(0, 0, 0, 0);
-          
-          const nextDay = new Date(date);
-          nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+      // 🔟 ACHIEVEMENTS
+calculateAchievements(allScores || [], weekScores?.length || 0, weeklyLeaderboard.data?.rank, personalBests);
 
-          const { data: dayScores } = await supabase
-            .from("score_ledger")
-            .select("score")
-            .eq("user_id", authUser.id)
-            .gte("created_at", date.toISOString())
-            .lt("created_at", nextDay.toISOString());
+// 1️⃣1️⃣ ACTIVITY FEED
+generateActivityFeed(recentRounds.data || [], allScores || [], weeklyLeaderboard.data?.rank, monthlyLeaderboard.data?.rank);
 
-          const totalScore = dayScores?.reduce((sum, r) => sum + r.score, 0) || 0;
+    } catch (err) {
+      console.error("Error fetching user data:", err);
+    }
+  };
 
-          last7Days.push({
-            date: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-            score: totalScore,
-          });
-        }
-
-        setChartData(last7Days);
-
-        // 🔟 ACHIEVEMENTS
-        calculateAchievements(allScores || [], weekScores?.length || 0, weeklyLeaderboard?.rank, personalBests);
-
-        // 1️⃣1️⃣ ACTIVITY FEED
-        generateActivityFeed(recentRounds || [], allScores || [], weeklyLeaderboard?.rank, monthlyLeaderboard?.rank);
-
-      } catch (err) {
-        console.error("Error fetching user data:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchUserData();
-  }, [securityPassed]);
+  fetchUserData();
+}, [securityPassed]);
 
   // ✅ CALCULATE ACHIEVEMENTS
   const calculateAchievements = useCallback((
@@ -868,34 +872,86 @@ export default function ProfilePage() {
             gap: "16px",
             flexWrap: "wrap",
           }}>
-            <button
-              onClick={() => router.push("/")}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "10px 16px",
-                borderRadius: "12px",
-                border: "2px solid rgba(139,92,246,0.5)",
-                background: "rgba(15,23,42,0.8)",
-                color: "white",
-                fontSize: "14px",
-                fontWeight: 700,
-                cursor: "pointer",
-                transition: "all 0.3s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "#a78bfa";
-                e.currentTarget.style.background = "rgba(139,92,246,0.2)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "rgba(139,92,246,0.5)";
-                e.currentTarget.style.background = "rgba(15,23,42,0.8)";
-              }}>
-              <ChevronRight style={{ width: "18px", height: "18px", transform: "rotate(180deg)" }} />
-              <span>Back to Home</span>
-            </button>
+            {/* Left Group: Back + Music */}
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+            }}>
+              <button
+                onClick={() => router.push("/")}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "10px 16px",
+                  borderRadius: "12px",
+                  border: "2px solid rgba(139,92,246,0.5)",
+                  background: "rgba(15,23,42,0.8)",
+                  color: "white",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  transition: "all 0.3s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#a78bfa";
+                  e.currentTarget.style.background = "rgba(139,92,246,0.2)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(139,92,246,0.5)";
+                  e.currentTarget.style.background = "rgba(15,23,42,0.8)";
+                }}>
+                <ChevronRight style={{ width: "18px", height: "18px", transform: "rotate(180deg)" }} />
+                <span>Back to Home</span>
+              </button>
 
+              {/* Music Button */}
+              <button
+                onClick={toggleMusic}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "10px",
+                  border: "2px solid rgba(139,92,246,0.5)",
+                  background: isMusicPlaying 
+                    ? "linear-gradient(135deg, rgba(139,92,246,0.95), rgba(124,58,237,0.95))"
+                    : "rgba(15,23,42,0.8)",
+                  cursor: "pointer",
+                  transition: "all 0.3s ease",
+                  boxShadow: isMusicPlaying 
+                    ? "0 0 15px rgba(139,92,246,0.5)"
+                    : "none",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#a78bfa";
+                  e.currentTarget.style.transform = "scale(1.05)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(139,92,246,0.5)";
+                  e.currentTarget.style.transform = "scale(1)";
+                }}
+                title={isMusicPlaying ? "Mute Music" : "Play Music"}>
+                {isMusicPlaying ? (
+                  <Volume2 style={{
+                    width: "18px",
+                    height: "18px",
+                    color: "white",
+                  }} />
+                ) : (
+                  <VolumeX style={{
+                    width: "18px",
+                    height: "18px",
+                    color: "#94a3b8",
+                  }} />
+                )}
+              </button>
+            </div>
+
+            {/* Right: Logout */}
             <button
               onClick={handleLogout}
               style={{
@@ -2243,62 +2299,7 @@ export default function ProfilePage() {
 
           </main>
         </div>
-
-        {/* === BACKGROUND MUSIC TOGGLE === */}
-        <button
-          onClick={toggleMusic}
-          style={{
-            position: "fixed",
-            top: "clamp(20px, 4vw, 24px)",
-            right: "clamp(20px, 4vw, 24px)",
-            width: "clamp(48px, 10vw, 56px)",
-            height: "clamp(48px, 10vw, 56px)",
-            borderRadius: "50%",
-            border: "2px solid rgba(139,92,246,0.5)",
-            background: isMusicPlaying 
-              ? "linear-gradient(135deg, rgba(139,92,246,0.95), rgba(124,58,237,0.95))"
-              : "rgba(15,23,42,0.95)",
-            backdropFilter: "blur(10px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            zIndex: 50,
-            transition: "all 0.3s ease",
-            boxShadow: isMusicPlaying 
-              ? "0 0 20px rgba(139,92,246,0.6), 0 8px 16px rgba(0,0,0,0.4)"
-              : "0 4px 12px rgba(0,0,0,0.3)",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "scale(1.1) rotate(5deg)";
-            e.currentTarget.style.boxShadow = isMusicPlaying
-              ? "0 0 30px rgba(139,92,246,0.8), 0 12px 20px rgba(0,0,0,0.5)"
-              : "0 8px 16px rgba(0,0,0,0.4)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "scale(1) rotate(0deg)";
-            e.currentTarget.style.boxShadow = isMusicPlaying
-              ? "0 0 20px rgba(139,92,246,0.6), 0 8px 16px rgba(0,0,0,0.4)"
-              : "0 4px 12px rgba(0,0,0,0.3)";
-          }}
-          title={isMusicPlaying ? "Mute Music" : "Play Music"}
-          aria-label={isMusicPlaying ? "Mute background music" : "Play background music"}>
-          {isMusicPlaying ? (
-            <Volume2 style={{
-              width: "clamp(20px, 5vw, 24px)",
-              height: "clamp(20px, 5vw, 24px)",
-              color: "white",
-              animation: "pulse 2s ease-in-out infinite",
-            }} />
-          ) : (
-            <VolumeX style={{
-              width: "clamp(20px, 5vw, 24px)",
-              height: "clamp(20px, 5vw, 24px)",
-              color: "#94a3b8",
-            }} />
-          )}
-        </button>
-
+       
         <Footer />
       </div>
 
