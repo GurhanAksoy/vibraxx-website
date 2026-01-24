@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import Footer from "@/components/Footer";
 import {
   Crown,
   Zap,
@@ -12,22 +13,28 @@ import {
   Trophy,
   Sparkles,
   Lock,
-  Unlock,
   ChevronRight,
   Rocket,
   ShoppingCart,
   CheckCircle2,
-  ArrowRight,
   Target,
   Volume2,
   VolumeX,
   Shield,
   Percent,
   Gift,
+  Star,
+  Clock,
   Flame,
+  Medal,
+  Award,
+  Gem,
+  BarChart3,
+  Wifi,
+  Zap as Lightning,
 } from "lucide-react";
 
-// ✅ UPDATED: 20 questions per round (not 50)
+// ✅ ULTRA RICH PACKAGES
 const packages = [
   {
     id: "single",
@@ -38,14 +45,24 @@ const packages = [
     popular: false,
     savings: 0,
     icon: Zap,
+    badge: null,
+    tagline: "Try it out",
     features: [
-      "1 Quiz Round",
-      "20 Questions",
-      "Instant Access",
-      "Leaderboard Entry",
-      "Score Tracking",
+      { icon: Lightning, text: "1 Quiz Round", highlight: false },
+      { icon: Target, text: "20 Questions", highlight: false },
+      { icon: Rocket, text: "Instant Access", highlight: true },
+      { icon: BarChart3, text: "Leaderboard Entry", highlight: false },
+      { icon: TrendingUp, text: "Score Tracking", highlight: false },
+      { icon: Wifi, text: "Real-time Stats", highlight: false },
     ],
-    description: "Perfect for trying out",
+    description: "Perfect for trying out the competition",
+    color: {
+      primary: "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 50%, #6d28d9 100%)",
+      secondary: "rgba(139,92,246,0.15)",
+      border: "rgba(139,92,246,0.5)",
+      glow: "rgba(139,92,246,0.4)",
+      iconBg: "linear-gradient(135deg, #7c3aed, #d946ef)",
+    },
   },
   {
     id: "bundle",
@@ -56,26 +73,38 @@ const packages = [
     popular: true,
     savings: 18,
     icon: Crown,
+    badge: "BEST VALUE",
+    tagline: "Most Popular",
     features: [
-      "30 Quiz Rounds",
-      "600 Questions", // ✅ 30 x 20 = 600
-      "18% Savings (Save £11)",
-      "Priority Support",
-      "Extended Statistics",
-      "Champion Badge",
+      { icon: Trophy, text: "30 Quiz Rounds", highlight: true },
+      { icon: Target, text: "600 Questions Total", highlight: false },
+      { icon: Percent, text: "18% Savings (£11 Off)", highlight: true },
+      { icon: Star, text: "Priority Support", highlight: false },
+      { icon: BarChart3, text: "Extended Statistics", highlight: false },
+      { icon: Crown, text: "Champion Badge", highlight: true },
+      { icon: Users, text: "Exclusive Discord", highlight: false },
+      { icon: Gift, text: "Monthly Prize Entry", highlight: true },
     ],
-    description: "Best value for champions",
+    description: "Ultimate package for serious competitors",
+    color: {
+      primary: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)",
+      secondary: "rgba(251,191,36,0.15)",
+      border: "rgba(251,191,36,0.6)",
+      glow: "rgba(251,191,36,0.5)",
+      iconBg: "linear-gradient(135deg, #fbbf24, #f59e0b)",
+    },
   },
 ];
 
 // ✅ Prize unlock threshold
-const PRIZE_UNLOCK_TARGET = 3000;
+const PRIZE_UNLOCK_THRESHOLD = 3000;
 
 export default function BuyPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [liveCredits, setLiveCredits] = useState(0);
   const [totalPurchases, setTotalPurchases] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState({ days: 0, hours: 0, minutes: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [processingPackageId, setProcessingPackageId] = useState<string | null>(null);
   
@@ -84,7 +113,30 @@ export default function BuyPage() {
   const [hasInteracted, setHasInteracted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // ✅ BACKGROUND MUSIC (same as leaderboard)
+  // ✅ COUNTDOWN TIMER (same as leaderboard)
+  useEffect(() => {
+    const calculateTimeRemaining = () => {
+      const now = new Date();
+      const currentDay = now.getUTCDay();
+      const daysUntilMonday = currentDay === 0 ? 1 : 8 - currentDay;
+      const nextMonday = new Date(now);
+      nextMonday.setUTCDate(now.getUTCDate() + daysUntilMonday);
+      nextMonday.setUTCHours(0, 0, 0, 0);
+
+      const diff = nextMonday.getTime() - now.getTime();
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+      setTimeRemaining({ days, hours, minutes });
+    };
+
+    calculateTimeRemaining();
+    const interval = setInterval(calculateTimeRemaining, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ✅ BACKGROUND MUSIC
   useEffect(() => {
     const audio = new Audio("/sounds/vibraxx.mp3");
     audio.loop = true;
@@ -104,7 +156,6 @@ export default function BuyPage() {
     };
   }, []);
 
-  // Handle first interaction
   useEffect(() => {
     const handleFirstInteraction = () => {
       if (!hasInteracted) {
@@ -124,7 +175,6 @@ export default function BuyPage() {
     };
   }, [hasInteracted]);
 
-  // Handle music play/pause
   useEffect(() => {
     if (!audioRef.current || !hasInteracted) return;
 
@@ -143,7 +193,7 @@ export default function BuyPage() {
     setIsMusicPlaying(prev => !prev);
   }, []);
 
-  // ✅ FETCH USER DATA (Updated Supabase Schema)
+  // ✅ FETCH USER DATA
   useEffect(() => {
     const loadUser = async () => {
       setIsLoading(true);
@@ -151,7 +201,6 @@ export default function BuyPage() {
       const { data: { user: authUser } } = await supabase.auth.getUser();
 
       if (!authUser) {
-        // ✅ Redirect to Google OAuth
         await supabase.auth.signInWithOAuth({
           provider: "google",
           options: {
@@ -163,7 +212,7 @@ export default function BuyPage() {
 
       setUser(authUser);
 
-      // ✅ FIXED: Using user_credits table (not user_rounds)
+      // Get credits
       const { data: creditsData } = await supabase
         .from("user_credits")
         .select("live_credits")
@@ -172,7 +221,7 @@ export default function BuyPage() {
 
       setLiveCredits(creditsData?.live_credits || 0);
 
-      // ✅ Get total purchases for prize unlock
+      // Get total purchases for prize unlock
       const { data: purchaseData } = await supabase
         .from("premium_purchases")
         .select("id", { count: "exact" });
@@ -219,10 +268,6 @@ export default function BuyPage() {
     }
   };
 
-  // ✅ Prize unlock progress
-  const prizeProgress = Math.min((totalPurchases / PRIZE_UNLOCK_TARGET) * 100, 100);
-  const isPrizeUnlocked = totalPurchases >= PRIZE_UNLOCK_TARGET;
-
   if (isLoading) {
     return (
       <div style={{
@@ -260,14 +305,44 @@ export default function BuyPage() {
         }
 
         @keyframes glow {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.6; }
+          0%, 100% { box-shadow: 0 0 20px rgba(251,191,36,0.4); }
+          50% { box-shadow: 0 0 40px rgba(251,191,36,0.8); }
         }
 
         @keyframes pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.05); }
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.8; }
         }
+
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+        }
+
+        @keyframes shimmer {
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
+        }
+
+        @keyframes slideUp {
+          from { transform: translateY(30px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes scaleIn {
+          from { transform: scale(0.9); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes cardShine {
+          0% { left: -100%; }
+          100% { left: 200%; }
+        }
+
+        .animate-glow { animation: glow 2s ease-in-out infinite; }
+        .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+        .animate-slide-up { animation: slideUp 0.6s ease-out; }
+        .animate-scale-in { animation: scaleIn 0.5s ease-out; }
 
         .vx-buy-container {
           min-height: 100vh;
@@ -346,7 +421,7 @@ export default function BuyPage() {
           background-color: #020817;
           display: flex;
           align-items: center;
-          justifyContent: center;
+          justify-content: center;
           overflow: hidden;
         }
 
@@ -377,7 +452,7 @@ export default function BuyPage() {
           align-items: center;
           gap: 8px;
           padding: 10px 16px;
-          borderRadius: 12px;
+          border-radius: 12px;
           border: 2px solid rgba(139, 92, 246, 0.5);
           background: rgba(15, 23, 42, 0.8);
           color: white;
@@ -385,6 +460,7 @@ export default function BuyPage() {
           font-weight: 700;
           cursor: pointer;
           transition: all 0.3s;
+          min-height: 44px;
         }
 
         .vx-buy-audio-btn {
@@ -406,309 +482,390 @@ export default function BuyPage() {
           z-index: 1;
           max-width: 1200px;
           margin: 0 auto;
-          padding: clamp(30px, 6vw, 60px) clamp(16px, 4vw, 24px);
+          padding: clamp(40px, 8vw, 80px) clamp(16px, 4vw, 24px) 0;
         }
 
         .vx-buy-hero {
           text-align: center;
-          margin-bottom: clamp(40px, 8vw, 60px);
+          margin-bottom: clamp(50px, 10vw, 80px);
         }
 
         .vx-buy-badge {
           display: inline-flex;
           align-items: center;
           gap: 8px;
-          padding: 8px 16px;
+          padding: 10px 20px;
           background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.15));
-          border: 1px solid rgba(251, 191, 36, 0.5);
+          border: 2px solid rgba(251, 191, 36, 0.6);
           border-radius: 999px;
-          font-size: clamp(10px, 2vw, 12px);
-          font-weight: 700;
+          font-size: clamp(11px, 2.2vw, 13px);
+          font-weight: 800;
           color: #fbbf24;
           text-transform: uppercase;
-          letter-spacing: 0.1em;
-          margin-bottom: clamp(16px, 3vw, 20px);
+          letter-spacing: 0.12em;
+          margin-bottom: clamp(20px, 4vw, 28px);
+          animation: pulse 2s ease-in-out infinite;
+          box-shadow: 0 0 20px rgba(251,191,36,0.3);
         }
 
         .vx-buy-title {
-          font-size: clamp(32px, 7vw, 48px);
+          font-size: clamp(36px, 8vw, 64px);
           font-weight: 900;
-          margin-bottom: clamp(16px, 3vw, 20px);
-          line-height: 1.2;
+          margin-bottom: clamp(20px, 4vw, 28px);
+          line-height: 1.1;
         }
 
         .vx-buy-title-gradient {
-          background: linear-gradient(90deg, #a78bfa, #f0abfc);
+          background: linear-gradient(90deg, #a78bfa, #f0abfc, #fbbf24, #f0abfc, #a78bfa);
+          background-size: 200% auto;
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
+          animation: shimmer 4s linear infinite;
         }
 
         .vx-buy-subtitle {
-          font-size: clamp(14px, 3vw, 16px);
+          font-size: clamp(15px, 3.5vw, 19px);
           color: #cbd5e1;
-          line-height: 1.6;
-          max-width: 600px;
-          margin: 0 auto clamp(20px, 4vw, 24px);
+          line-height: 1.7;
+          max-width: 720px;
+          margin: 0 auto clamp(28px, 5vw, 36px);
         }
 
         .vx-buy-trust {
           display: flex;
           flex-wrap: wrap;
           justify-content: center;
-          gap: clamp(12px, 3vw, 16px);
+          gap: clamp(14px, 3vw, 18px);
         }
 
         .vx-buy-trust-badge {
           display: flex;
           align-items: center;
-          gap: 6px;
-          padding: 8px 14px;
-          background: rgba(34, 197, 94, 0.1);
-          border: 1px solid rgba(34, 197, 94, 0.3);
-          border-radius: 8px;
-          font-size: clamp(11px, 2.2vw, 13px);
-          font-weight: 600;
-          color: #86efac;
-        }
-
-        /* ✅ PRIZE UNLOCK SECTION */
-        .vx-prize-unlock {
-          max-width: 800px;
-          margin: 0 auto clamp(40px, 8vw, 60px);
-          padding: clamp(24px, 5vw, 32px);
-          background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
-          border: 2px solid rgba(251, 191, 36, 0.5);
-          border-radius: clamp(16px, 3vw, 20px);
-          box-shadow: 0 0 40px rgba(251, 191, 36, 0.3);
-        }
-
-        .vx-prize-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: clamp(16px, 3vw, 20px);
-          flex-wrap: wrap;
-          gap: 12px;
-        }
-
-        .vx-prize-title {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          font-size: clamp(18px, 4vw, 22px);
-          font-weight: 900;
-          color: #fbbf24;
-        }
-
-        .vx-prize-amount {
-          font-size: clamp(24px, 5vw, 32px);
-          font-weight: 900;
-          color: #fbbf24;
-          text-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
-        }
-
-        .vx-prize-progress-bar {
-          position: relative;
-          width: 100%;
-          height: clamp(40px, 8vw, 50px);
-          background: rgba(15, 23, 42, 0.8);
-          border-radius: 999px;
-          overflow: hidden;
-          margin-bottom: clamp(12px, 3vw, 16px);
-          border: 2px solid rgba(251, 191, 36, 0.3);
-        }
-
-        .vx-prize-progress-fill {
-          position: absolute;
-          left: 0;
-          top: 0;
-          height: 100%;
-          background: linear-gradient(90deg, #f59e0b, #fbbf24, #fcd34d);
-          transition: width 1s ease;
-          box-shadow: 0 0 20px rgba(251, 191, 36, 0.6);
-        }
-
-        .vx-prize-progress-text {
-          position: relative;
-          z-index: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 100%;
-          font-size: clamp(14px, 3vw, 16px);
-          font-weight: 800;
-          color: white;
-          text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-        }
-
-        .vx-prize-status {
-          display: flex;
-          align-items: center;
-          justify-content: center;
           gap: 8px;
-          padding: clamp(12px, 3vw, 14px);
-          background: rgba(251, 191, 36, 0.1);
-          border: 1px solid rgba(251, 191, 36, 0.3);
-          border-radius: 12px;
+          padding: 10px 18px;
+          background: rgba(34, 197, 94, 0.12);
+          border: 2px solid rgba(34, 197, 94, 0.4);
+          border-radius: 10px;
           font-size: clamp(12px, 2.5vw, 14px);
           font-weight: 700;
-          color: #fbbf24;
-          text-align: center;
+          color: #86efac;
+          box-shadow: 0 0 15px rgba(34,197,94,0.2);
         }
 
-        .vx-prize-unlocked {
-          background: rgba(34, 197, 94, 0.2);
-          border-color: rgba(34, 197, 94, 0.5);
-          color: #22c55e;
+        .prize-pool-content {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .prize-pool-info {
+          text-align: left;
+        }
+
+        .prize-pool-countdown {
+          justify-content: flex-start;
         }
 
         .vx-buy-cards {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
-          gap: clamp(20px, 4vw, 30px);
-          margin-bottom: clamp(40px, 8vw, 60px);
+          grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+          gap: clamp(32px, 6vw, 48px);
+          margin-bottom: clamp(80px, 12vw, 100px);
         }
 
         .vx-buy-card {
           position: relative;
-          background: linear-gradient(135deg, rgba(30, 27, 75, 0.98), rgba(15, 23, 42, 0.98));
-          border: 2px solid rgba(139, 92, 246, 0.3);
-          border-radius: clamp(16px, 3vw, 20px);
-          padding: clamp(24px, 5vw, 32px);
-          transition: all 0.3s;
+          background: linear-gradient(135deg, rgba(30, 27, 75, 0.95), rgba(15, 23, 42, 0.95));
+          border: 3px solid transparent;
+          border-radius: clamp(24px, 5vw, 32px);
+          padding: clamp(36px, 6vw, 48px) clamp(28px, 5vw, 40px);
+          transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
           display: flex;
           flex-direction: column;
+          overflow: hidden;
+        }
+
+        .vx-buy-card::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: radial-gradient(circle at 50% 0%, rgba(139,92,246,0.15), transparent 70%);
+          opacity: 0;
+          transition: opacity 0.5s;
+          pointer-events: none;
+        }
+
+        .vx-buy-card::after {
+          content: '';
+          position: absolute;
+          top: -50%;
+          left: -50%;
+          width: 200%;
+          height: 200%;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+          transform: rotate(45deg);
+          pointer-events: none;
+        }
+
+        .vx-buy-card:hover::before {
+          opacity: 1;
+        }
+
+        .vx-buy-card:hover::after {
+          animation: cardShine 1.5s ease-in-out;
         }
 
         .vx-buy-card:hover {
-          border-color: #a78bfa;
-          transform: translateY(-8px);
-          box-shadow: 0 20px 60px rgba(139, 92, 246, 0.4);
+          transform: translateY(-16px) scale(1.02);
+          box-shadow: 0 40px 100px rgba(139, 92, 246, 0.6);
         }
 
         .vx-buy-card.popular {
           border-color: #fbbf24;
-          box-shadow: 0 0 40px rgba(251, 191, 36, 0.3);
+          box-shadow: 0 0 80px rgba(251, 191, 36, 0.4);
+          background: linear-gradient(135deg, rgba(45, 35, 75, 0.95), rgba(30, 20, 52, 0.95));
+        }
+
+        .vx-buy-card.popular:hover {
+          box-shadow: 0 40px 100px rgba(251, 191, 36, 0.7);
         }
 
         .vx-buy-ribbon {
           position: absolute;
-          top: -12px;
-          left: 50%;
-          transform: translateX(-50%);
+          top: clamp(20px, 4vw, 28px);
+          right: clamp(-36px, -7vw, -48px);
           background: linear-gradient(135deg, #fbbf24, #f59e0b);
           color: #0f172a;
-          padding: 6px 16px;
-          border-radius: 999px;
-          font-size: clamp(10px, 2vw, 11px);
-          font-weight: 800;
-          letter-spacing: 0.1em;
-          box-shadow: 0 4px 12px rgba(251, 191, 36, 0.5);
+          padding: 8px 48px;
+          font-size: clamp(10px, 2vw, 12px);
+          font-weight: 900;
+          letter-spacing: 0.12em;
+          box-shadow: 0 4px 20px rgba(251, 191, 36, 0.6);
+          transform: rotate(45deg);
+          z-index: 2;
         }
 
         .vx-buy-card-header {
           text-align: center;
-          margin-bottom: clamp(20px, 4vw, 24px);
+          margin-bottom: clamp(28px, 5vw, 36px);
+          position: relative;
+          z-index: 1;
         }
 
-        .vx-buy-icon {
-          width: clamp(48px, 10vw, 64px);
-          height: clamp(48px, 10vw, 64px);
+        .vx-buy-icon-wrapper {
+          width: clamp(100px, 18vw, 120px);
+          height: clamp(100px, 18vw, 120px);
           border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
-          margin: 0 auto clamp(16px, 3vw, 20px);
-          background: linear-gradient(135deg, #7c3aed, #d946ef);
-          box-shadow: 0 0 30px rgba(124, 58, 237, 0.5);
+          margin: 0 auto clamp(24px, 5vw, 32px);
+          position: relative;
+          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .vx-buy-icon-wrapper::before {
+          content: '';
+          position: absolute;
+          inset: -8px;
+          border-radius: 50%;
+          opacity: 0.5;
+          filter: blur(20px);
+          transition: all 0.4s;
+          z-index: -1;
+        }
+
+        .vx-buy-card:hover .vx-buy-icon-wrapper {
+          transform: scale(1.15) rotate(360deg);
+        }
+
+        .vx-buy-card:hover .vx-buy-icon-wrapper::before {
+          opacity: 1;
+          filter: blur(30px);
+        }
+
+        .vx-buy-icon {
+          width: clamp(48px, 10vw, 60px);
+          height: clamp(48px, 10vw, 60px);
+          color: white;
+          filter: drop-shadow(0 0 10px rgba(255,255,255,0.5));
+        }
+
+        .vx-buy-card-tagline {
+          font-size: clamp(11px, 2.2vw, 13px);
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          margin-bottom: 8px;
+          opacity: 0.8;
         }
 
         .vx-buy-card-name {
-          font-size: clamp(20px, 4vw, 24px);
-          font-weight: 800;
-          margin-bottom: 8px;
-          color: #e5e7eb;
+          font-size: clamp(26px, 5vw, 32px);
+          font-weight: 900;
+          margin-bottom: 12px;
+          background: linear-gradient(90deg, #ffffff, #e5e7eb, #ffffff);
+          background-size: 200% auto;
+          background-clip: text;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          animation: shimmer 3s linear infinite;
         }
 
         .vx-buy-card-desc {
-          font-size: clamp(12px, 2.5vw, 13px);
+          font-size: clamp(13px, 2.8vw, 15px);
           color: #94a3b8;
+          line-height: 1.5;
         }
 
         .vx-buy-pricing {
           text-align: center;
-          margin-bottom: clamp(20px, 4vw, 24px);
+          margin-bottom: clamp(28px, 5vw, 36px);
+          padding: clamp(20px, 4vw, 28px);
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+          border-radius: 20px;
+          border: 2px solid rgba(255, 255, 255, 0.08);
+          backdrop-filter: blur(10px);
         }
 
         .vx-buy-original-price {
-          font-size: clamp(14px, 3vw, 16px);
+          font-size: clamp(15px, 3vw, 18px);
           color: #64748b;
           text-decoration: line-through;
-          margin-bottom: 4px;
+          margin-bottom: 6px;
+          opacity: 0.7;
+        }
+
+        .vx-buy-price-wrapper {
+          position: relative;
+          margin-bottom: 12px;
         }
 
         .vx-buy-price {
-          font-size: clamp(40px, 8vw, 56px);
+          font-size: clamp(56px, 12vw, 72px);
           font-weight: 900;
-          color: #fbbf24;
+          background: linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24);
+          background-size: 200% auto;
+          background-clip: text;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
           line-height: 1;
+          filter: drop-shadow(0 0 20px rgba(251,191,36,0.5));
+          animation: shimmer 3s linear infinite;
+        }
+
+        .vx-buy-price-currency {
+          font-size: clamp(32px, 7vw, 40px);
+          vertical-align: super;
         }
 
         .vx-buy-savings {
-          margin-top: 8px;
-          padding: 6px 12px;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 18px;
           background: rgba(34, 197, 94, 0.2);
-          border: 1px solid rgba(34, 197, 94, 0.5);
-          border-radius: 8px;
-          display: inline-block;
-          font-size: clamp(12px, 2.5vw, 13px);
-          font-weight: 700;
+          border: 2px solid rgba(34, 197, 94, 0.5);
+          border-radius: 999px;
+          font-size: clamp(13px, 2.8vw, 15px);
+          font-weight: 800;
           color: #86efac;
+          box-shadow: 0 0 20px rgba(34,197,94,0.3);
         }
 
         .vx-buy-features {
           flex: 1;
-          margin-bottom: clamp(20px, 4vw, 24px);
+          margin-bottom: clamp(28px, 5vw, 36px);
         }
 
         .vx-buy-feature {
           display: flex;
           align-items: center;
-          gap: 10px;
-          padding: 10px 0;
-          font-size: clamp(13px, 2.8vw, 14px);
+          gap: 14px;
+          padding: 14px 16px;
+          margin-bottom: 10px;
+          font-size: clamp(14px, 3vw, 16px);
           color: #cbd5e1;
+          background: rgba(255, 255, 255, 0.03);
+          border-radius: 12px;
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          transition: all 0.3s;
+        }
+
+        .vx-buy-feature:hover {
+          background: rgba(139, 92, 246, 0.1);
+          border-color: rgba(139, 92, 246, 0.3);
+          transform: translateX(6px);
+        }
+
+        .vx-buy-feature.highlight {
+          background: rgba(251, 191, 36, 0.08);
+          border-color: rgba(251, 191, 36, 0.3);
         }
 
         .vx-buy-feature-icon {
-          width: 20px;
-          height: 20px;
+          width: 22px;
+          height: 22px;
           flex-shrink: 0;
           color: #22c55e;
         }
 
+        .vx-buy-feature.highlight .vx-buy-feature-icon {
+          color: #fbbf24;
+        }
+
         .vx-buy-btn {
           width: 100%;
-          padding: clamp(14px, 3vw, 16px);
+          padding: clamp(18px, 4vw, 22px);
           background: linear-gradient(135deg, #7c3aed, #d946ef);
           border: none;
-          border-radius: 12px;
+          border-radius: 16px;
           color: white;
-          font-size: clamp(14px, 3vw, 16px);
-          font-weight: 800;
+          font-size: clamp(16px, 3.5vw, 18px);
+          font-weight: 900;
           cursor: pointer;
-          transition: all 0.3s;
+          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 8px;
-          box-shadow: 0 0 30px rgba(124, 58, 237, 0.5);
+          gap: 12px;
+          box-shadow: 0 10px 40px rgba(124, 58, 237, 0.5);
+          position: relative;
+          overflow: hidden;
+          z-index: 1;
+        }
+
+        .vx-buy-btn::before {
+          content: '';
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 0;
+          height: 0;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.2);
+          transform: translate(-50%, -50%);
+          transition: width 0.6s, height 0.6s;
+          z-index: -1;
+        }
+
+        .vx-buy-btn:hover::before {
+          width: 400px;
+          height: 400px;
         }
 
         .vx-buy-btn:hover:not(:disabled) {
+          transform: translateY(-4px);
+          box-shadow: 0 15px 50px rgba(124, 58, 237, 0.7);
+        }
+
+        .vx-buy-btn:active:not(:disabled) {
           transform: translateY(-2px);
-          box-shadow: 0 0 40px rgba(124, 58, 237, 0.7);
         }
 
         .vx-buy-btn:disabled {
@@ -718,133 +875,86 @@ export default function BuyPage() {
 
         .vx-buy-btn.popular {
           background: linear-gradient(135deg, #fbbf24, #f59e0b);
-          box-shadow: 0 0 30px rgba(251, 191, 36, 0.5);
+          box-shadow: 0 10px 40px rgba(251, 191, 36, 0.5);
         }
 
         .vx-buy-btn.popular:hover:not(:disabled) {
-          box-shadow: 0 0 40px rgba(251, 191, 36, 0.7);
+          box-shadow: 0 15px 50px rgba(251, 191, 36, 0.7);
         }
 
         .vx-buy-benefits {
-          max-width: 900px;
-          margin: 0 auto clamp(40px, 8vw, 60px);
+          max-width: 1000px;
+          margin: 0 auto clamp(80px, 12vw, 100px);
         }
 
         .vx-buy-benefits-title {
           text-align: center;
-          font-size: clamp(24px, 5vw, 32px);
+          font-size: clamp(32px, 7vw, 44px);
           font-weight: 900;
-          margin-bottom: clamp(30px, 6vw, 40px);
-          color: #e5e7eb;
+          margin-bottom: clamp(50px, 8vw, 60px);
+          background: linear-gradient(90deg, #ffffff, #e5e7eb, #ffffff);
+          background-size: 200% auto;
+          background-clip: text;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          animation: shimmer 3s linear infinite;
         }
 
         .vx-buy-benefits-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
-          gap: clamp(16px, 3vw, 20px);
+          grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+          gap: clamp(24px, 5vw, 32px);
         }
 
         .vx-buy-benefit {
-          padding: clamp(20px, 4vw, 24px);
-          border-radius: clamp(14px, 3vw, 16px);
+          padding: clamp(28px, 5vw, 36px);
+          border-radius: clamp(18px, 4vw, 24px);
           background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          transition: all 0.3s;
+          border: 2px solid rgba(255, 255, 255, 0.1);
+          transition: all 0.4s;
           text-align: center;
         }
 
         .vx-buy-benefit:hover {
-          background: rgba(139, 92, 246, 0.1);
-          border-color: rgba(139, 92, 246, 0.4);
-          transform: translateY(-4px);
+          background: rgba(139, 92, 246, 0.12);
+          border-color: rgba(139, 92, 246, 0.5);
+          transform: translateY(-12px) scale(1.02);
+          box-shadow: 0 20px 60px rgba(139, 92, 246, 0.4);
         }
 
         .vx-buy-benefit-icon {
-          width: clamp(44px, 9vw, 48px);
-          height: clamp(44px, 9vw, 48px);
-          border-radius: 12px;
+          width: clamp(64px, 12vw, 72px);
+          height: clamp(64px, 12vw, 72px);
+          border-radius: 18px;
           display: flex;
           align-items: center;
           justify-content: center;
-          margin: 0 auto clamp(10px, 2vw, 12px);
+          margin: 0 auto clamp(20px, 4vw, 24px);
+          transition: transform 0.4s;
+        }
+
+        .vx-buy-benefit:hover .vx-buy-benefit-icon {
+          transform: scale(1.1) rotate(5deg);
         }
 
         .vx-buy-benefit-title {
-          font-size: clamp(14px, 3vw, 16px);
-          font-weight: 700;
-          margin-bottom: 6px;
+          font-size: clamp(17px, 3.8vw, 20px);
+          font-weight: 800;
+          margin-bottom: 10px;
           color: #e5e7eb;
         }
 
         .vx-buy-benefit-text {
-          font-size: clamp(12px, 2.5vw, 13px);
+          font-size: clamp(14px, 3vw, 15px);
           color: #94a3b8;
-          line-height: 1.5;
-        }
-
-        .vx-buy-footer {
-          position: relative;
-          z-index: 10;
-          border-top: 1px solid rgba(255, 255, 255, 0.1);
-          background: rgba(15, 23, 42, 0.9);
-          backdrop-filter: blur(20px);
-          padding: clamp(30px, 5vw, 50px) 0;
-        }
-
-        .vx-buy-footer-inner {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 0 clamp(16px, 4vw, 24px);
-        }
-
-        .vx-buy-footer-disclaimer {
-          background: rgba(139, 92, 246, 0.1);
-          border: 1px solid rgba(139, 92, 246, 0.2);
-          border-radius: 12px;
-          padding: clamp(16px, 3vw, 20px);
-          margin-bottom: clamp(24px, 4vw, 32px);
-          font-size: clamp(11px, 2.2vw, 13px);
-          line-height: 1.6;
-          color: #cbd5e1;
-          text-align: center;
-        }
-
-        .vx-buy-footer-links {
-          display: flex;
-          flex-wrap: wrap;
-          justify-content: center;
-          align-items: center;
-          gap: clamp(8px, 2vw, 12px);
-          margin-bottom: clamp(24px, 4vw, 32px);
-        }
-
-        .vx-buy-footer-link {
-          color: #94a3b8;
-          text-decoration: none;
-          font-size: clamp(11px, 2.2vw, 13px);
-          font-weight: 500;
-          transition: color 0.3s;
-          white-space: nowrap;
-        }
-
-        .vx-buy-footer-link:hover {
-          color: #a78bfa;
-        }
-
-        .vx-buy-footer-sep {
-          color: rgba(148, 163, 184, 0.3);
-          font-size: clamp(10px, 2vw, 12px);
-        }
-
-        .vx-buy-footer-company {
-          color: #64748b;
-          font-size: clamp(11px, 2.2vw, 13px);
-          line-height: 1.6;
-          text-align: center;
+          line-height: 1.7;
         }
 
         @media (max-width: 768px) {
           .mobile-hide { display: none !important; }
+          .prize-pool-content { flex-direction: column !important; }
+          .prize-pool-info { text-align: center !important; }
+          .prize-pool-countdown { justify-content: center !important; }
         }
       `}</style>
 
@@ -882,101 +992,320 @@ export default function BuyPage() {
         {/* Main */}
         <main className="vx-buy-main">
           {/* Hero */}
-          <div className="vx-buy-hero">
+          <div className="vx-buy-hero animate-slide-up">
             <div className="vx-buy-badge">
-              <Sparkles size={16} />
+              <Sparkles size={18} />
               LIMITED TIME OFFER
             </div>
 
             <h1 className="vx-buy-title">
-              <span className="vx-buy-title-gradient">Choose Your Plan</span>
+              <span className="vx-buy-title-gradient">Choose Your Champion Plan</span>
             </h1>
 
             <p className="vx-buy-subtitle">
-              Join the competition for the <strong style={{ color: "#fbbf24" }}>£1,000 monthly prize</strong>
+              Join the elite competition for the <strong style={{ color: "#fbbf24", fontWeight: 900 }}>£1,000 monthly prize</strong>. 
+              Skill-based, UK-regulated, and completely transparent. Your journey to victory starts here.
             </p>
 
             <div className="vx-buy-trust">
               <div className="vx-buy-trust-badge">
-                <Shield size={14} />
-                Secure Payment
+                <Shield size={16} />
+                <span>Secure Payment</span>
               </div>
               <div className="vx-buy-trust-badge">
-                <Lock size={14} />
-                SSL Encrypted
+                <Lock size={16} />
+                <span>SSL Encrypted</span>
               </div>
               <div className="vx-buy-trust-badge">
-                <CheckCircle2 size={14} />
-                Instant Access
+                <CheckCircle2 size={16} />
+                <span>Instant Access</span>
               </div>
             </div>
           </div>
 
-          {/* ✅ PRIZE UNLOCK SECTION */}
-          <div className="vx-prize-unlock">
-            <div className="vx-prize-header">
-              <div className="vx-prize-title">
-                {isPrizeUnlocked ? (
-                  <>
-                    <Unlock size={24} />
-                    Monthly Prize Pool
-                  </>
+          {/* ✅ EXACT LEADERBOARD PRIZE SECTION */}
+          <div className="animate-glow animate-scale-in" style={{
+            padding: "clamp(32px, 6vw, 48px) clamp(24px, 5vw, 40px)",
+            borderRadius: "clamp(20px, 4vw, 28px)",
+            background: "linear-gradient(135deg, rgba(251,191,36,0.25), rgba(245,158,11,0.2))",
+            border: "3px solid rgba(251,191,36,0.6)",
+            marginBottom: "clamp(60px, 10vw, 80px)",
+            position: "relative",
+            overflow: "hidden",
+          }}>
+            {/* Background particles */}
+            <div style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "radial-gradient(circle at 50% 50%, rgba(251,191,36,0.15) 0%, transparent 70%)",
+              pointerEvents: "none",
+            }} />
+
+            {/* Title */}
+            <div style={{
+              fontSize: "clamp(14px, 3vw, 18px)",
+              color: "#fcd34d",
+              fontWeight: 800,
+              marginBottom: "clamp(24px, 5vw, 32px)",
+              textTransform: "uppercase",
+              letterSpacing: "1.5px",
+              textAlign: "center",
+              position: "relative",
+              zIndex: 1,
+            }}>
+              💰 Monthly Prize Pool
+            </div>
+
+            {/* Main Content - Circular Progress */}
+            <div className="prize-pool-content" style={{
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "clamp(32px, 6vw, 48px)",
+              position: "relative",
+              zIndex: 1,
+            }}>
+              
+              {/* Circular Progress Ring */}
+              <div style={{
+                position: "relative",
+                width: "clamp(160px, 30vw, 200px)",
+                height: "clamp(160px, 30vw, 200px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}>
+                {/* SVG Progress Ring */}
+                <svg
+                  width="100%"
+                  height="100%"
+                  viewBox="0 0 200 200"
+                  style={{
+                    transform: "rotate(-90deg)",
+                    filter: totalPurchases >= PRIZE_UNLOCK_THRESHOLD 
+                      ? "drop-shadow(0 0 20px rgba(251,191,36,0.8))"
+                      : "drop-shadow(0 0 10px rgba(139,92,246,0.5))",
+                  }}>
+                  {/* Background Circle */}
+                  <circle
+                    cx="100"
+                    cy="100"
+                    r="85"
+                    fill="none"
+                    stroke="rgba(15,23,42,0.6)"
+                    strokeWidth="12"
+                  />
+                  {/* Progress Circle */}
+                  <circle
+                    cx="100"
+                    cy="100"
+                    r="85"
+                    fill="none"
+                    stroke={totalPurchases >= PRIZE_UNLOCK_THRESHOLD 
+                      ? "url(#goldGradient)" 
+                      : "url(#purpleGradient)"}
+                    strokeWidth="12"
+                    strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 85}`}
+                    strokeDashoffset={`${2 * Math.PI * 85 * (1 - Math.min(totalPurchases / PRIZE_UNLOCK_THRESHOLD, 1))}`}
+                    style={{
+                      transition: "stroke-dashoffset 1s ease-out, stroke 0.5s ease",
+                    }}
+                  />
+                  {/* Gradients */}
+                  <defs>
+                    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#fbbf24" />
+                      <stop offset="50%" stopColor="#f59e0b" />
+                      <stop offset="100%" stopColor="#fbbf24" />
+                    </linearGradient>
+                    <linearGradient id="purpleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#8b5cf6" />
+                      <stop offset="50%" stopColor="#d946ef" />
+                      <stop offset="100%" stopColor="#8b5cf6" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+
+                {/* Center Content */}
+                <div style={{
+                  position: "absolute",
+                  top: "50%",
+                  left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  textAlign: "center",
+                }}>
+                  {/* Icon */}
+                  <div style={{
+                    fontSize: "clamp(32px, 6vw, 48px)",
+                    marginBottom: "8px",
+                    animation: totalPurchases >= PRIZE_UNLOCK_THRESHOLD 
+                      ? "float 2s ease-in-out infinite"
+                      : totalPurchases >= PRIZE_UNLOCK_THRESHOLD * 0.95
+                      ? "pulse 1s ease-in-out infinite"
+                      : "none",
+                  }}>
+                    {totalPurchases >= PRIZE_UNLOCK_THRESHOLD ? "🎉" : "🔒"}
+                  </div>
+                  {/* Percentage */}
+                  <div style={{
+                    fontSize: "clamp(24px, 5vw, 36px)",
+                    fontWeight: 900,
+                    background: totalPurchases >= PRIZE_UNLOCK_THRESHOLD
+                      ? "linear-gradient(90deg, #fbbf24, #f59e0b)"
+                      : "linear-gradient(90deg, #8b5cf6, #d946ef)",
+                    backgroundClip: "text",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    lineHeight: 1,
+                  }}>
+                    {Math.round((totalPurchases / PRIZE_UNLOCK_THRESHOLD) * 100)}%
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Side - Info */}
+              <div className="prize-pool-info" style={{
+                flex: 1,
+                textAlign: "left",
+              }}>
+                {/* Prize Amount */}
+                <div style={{
+                  fontSize: "clamp(48px, 10vw, 80px)",
+                  fontWeight: 900,
+                  background: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)",
+                  backgroundClip: "text",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  lineHeight: 1,
+                  marginBottom: "16px",
+                  filter: totalPurchases >= PRIZE_UNLOCK_THRESHOLD
+                    ? "drop-shadow(0 0 20px rgba(251,191,36,0.6))"
+                    : "none",
+                }}>
+                  £1,000
+                </div>
+
+                {/* Status */}
+                {totalPurchases >= PRIZE_UNLOCK_THRESHOLD ? (
+                  <div style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "10px 20px",
+                    borderRadius: "999px",
+                    background: "linear-gradient(135deg, rgba(34,197,94,0.25), rgba(21,128,61,0.2))",
+                    border: "2px solid rgba(34,197,94,0.6)",
+                    marginBottom: "16px",
+                  }}>
+                    <Sparkles style={{ width: "20px", height: "20px", color: "#22c55e" }} />
+                    <span style={{
+                      fontSize: "clamp(12px, 2.5vw, 16px)",
+                      fontWeight: 800,
+                      color: "#22c55e",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                    }}>
+                      PRIZE ACTIVE!
+                    </span>
+                  </div>
                 ) : (
-                  <>
-                    <Lock size={24} />
-                    Prize Unlocking Soon
-                  </>
+                  <div style={{
+                    marginBottom: "16px",
+                  }}>
+                    <div style={{
+                      fontSize: "clamp(14px, 3vw, 18px)",
+                      fontWeight: 700,
+                      color: "#fcd34d",
+                      marginBottom: "8px",
+                    }}>
+                      {totalPurchases.toLocaleString()} / {PRIZE_UNLOCK_THRESHOLD.toLocaleString()} Purchases
+                    </div>
+                    <div style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      padding: "8px 16px",
+                      borderRadius: "999px",
+                      background: "rgba(139,92,246,0.2)",
+                      border: "1px solid rgba(139,92,246,0.5)",
+                    }}>
+                      <Target style={{ width: "16px", height: "16px", color: "#a78bfa" }} />
+                      <span style={{
+                        fontSize: "clamp(11px, 2.2vw, 14px)",
+                        fontWeight: 700,
+                        color: "#a78bfa",
+                      }}>
+                        {(PRIZE_UNLOCK_THRESHOLD - totalPurchases).toLocaleString()} more to unlock!
+                      </span>
+                    </div>
+                  </div>
                 )}
-              </div>
-              <div className="vx-prize-amount">£1,000</div>
-            </div>
 
-            <div className="vx-prize-progress-bar">
-              <div className="vx-prize-progress-fill" style={{ width: `${prizeProgress}%` }} />
-              <div className="vx-prize-progress-text">
-                {totalPurchases.toLocaleString()} / {PRIZE_UNLOCK_TARGET.toLocaleString()} Purchases
+                {/* Countdown */}
+                <div className="prize-pool-countdown" style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "flex-start",
+                  gap: "8px",
+                  fontSize: "clamp(11px, 2.2vw, 14px)",
+                  color: "#cbd5e1",
+                }}>
+                  <Clock style={{ width: "16px", height: "16px" }} />
+                  <span>
+                    Resets in {timeRemaining.days}d {timeRemaining.hours}h {timeRemaining.minutes}m
+                  </span>
+                </div>
               </div>
-            </div>
-
-            <div className={`vx-prize-status ${isPrizeUnlocked ? "vx-prize-unlocked" : ""}`}>
-              {isPrizeUnlocked ? (
-                <>
-                  <Trophy size={18} />
-                  Prize Pool Active! Compete now for £1,000 monthly!
-                </>
-              ) : (
-                <>
-                  <Target size={18} />
-                  {(PRIZE_UNLOCK_TARGET - totalPurchases).toLocaleString()} more purchases to unlock the prize pool!
-                </>
-              )}
             </div>
           </div>
 
           {/* Package Cards */}
           <div className="vx-buy-cards">
-            {packages.map((pkg) => {
+            {packages.map((pkg, index) => {
               const Icon = pkg.icon;
               const isProcessing = processingPackageId === pkg.id;
 
               return (
-                <div key={pkg.id} className={`vx-buy-card ${pkg.popular ? "popular" : ""}`}>
-                  {pkg.popular && (
+                <div 
+                  key={pkg.id} 
+                  className={`vx-buy-card ${pkg.popular ? "popular" : ""} animate-slide-up`}
+                  style={{
+                    borderColor: pkg.color.border,
+                    animationDelay: `${index * 0.15}s`,
+                  }}>
+                  {pkg.badge && (
                     <div className="vx-buy-ribbon">
-                      BEST VALUE
+                      {pkg.badge}
                     </div>
                   )}
 
                   <div className="vx-buy-card-header">
                     <div
-                      className="vx-buy-icon"
+                      className="vx-buy-icon-wrapper"
                       style={{
-                        background: pkg.popular
-                          ? "linear-gradient(135deg, #fbbf24, #f59e0b)"
-                          : "linear-gradient(135deg, #7c3aed, #d946ef)"
+                        background: pkg.color.iconBg,
+                        boxShadow: `0 0 50px ${pkg.color.glow}`,
                       }}>
-                      <Icon size={32} color="white" />
+                      <div style={{
+                        position: "absolute",
+                        inset: -8,
+                        background: pkg.color.iconBg,
+                        borderRadius: "50%",
+                        opacity: 0.5,
+                        filter: "blur(20px)",
+                      }} />
+                      <Icon className="vx-buy-icon" />
                     </div>
+                    {pkg.tagline && (
+                      <div className="vx-buy-card-tagline" style={{ color: pkg.popular ? "#fbbf24" : "#a78bfa" }}>
+                        {pkg.tagline}
+                      </div>
+                    )}
                     <h3 className="vx-buy-card-name">{pkg.name}</h3>
                     <p className="vx-buy-card-desc">{pkg.description}</p>
                   </div>
@@ -985,22 +1314,29 @@ export default function BuyPage() {
                     {pkg.originalPrice && (
                       <div className="vx-buy-original-price">£{pkg.originalPrice}</div>
                     )}
-                    <div className="vx-buy-price">£{pkg.price}</div>
+                    <div className="vx-buy-price-wrapper">
+                      <div className="vx-buy-price">
+                        <span className="vx-buy-price-currency">£</span>{pkg.price}
+                      </div>
+                    </div>
                     {pkg.savings > 0 && (
                       <div className="vx-buy-savings">
-                        <Percent size={14} />
-                        Save {pkg.savings}% (£{pkg.originalPrice! - pkg.price})
+                        <Percent size={16} />
+                        <span>Save {pkg.savings}% - £{pkg.originalPrice! - pkg.price} Off</span>
                       </div>
                     )}
                   </div>
 
                   <div className="vx-buy-features">
-                    {pkg.features.map((feature, idx) => (
-                      <div key={idx} className="vx-buy-feature">
-                        <Check size={20} className="vx-buy-feature-icon" />
-                        <span>{feature}</span>
-                      </div>
-                    ))}
+                    {pkg.features.map((feature, idx) => {
+                      const FeatureIcon = feature.icon;
+                      return (
+                        <div key={idx} className={`vx-buy-feature ${feature.highlight ? "highlight" : ""}`}>
+                          <FeatureIcon className="vx-buy-feature-icon" />
+                          <span>{feature.text}</span>
+                        </div>
+                      );
+                    })}
                   </div>
 
                   <button
@@ -1010,19 +1346,19 @@ export default function BuyPage() {
                     {isProcessing ? (
                       <>
                         <div style={{
-                          width: "18px",
-                          height: "18px",
-                          border: "2px solid rgba(255,255,255,0.3)",
+                          width: "20px",
+                          height: "20px",
+                          border: "3px solid rgba(255,255,255,0.3)",
                           borderTopColor: "white",
                           borderRadius: "50%",
-                          animation: "spin 0.8s linear infinite"
+                          animation: "spin 0.8s linear infinite",
                         }} />
-                        Processing...
+                        <span>Processing...</span>
                       </>
                     ) : (
                       <>
-                        <ShoppingCart size={18} />
-                        Buy Now
+                        <ShoppingCart size={22} />
+                        <span>Purchase Now - Instant Access</span>
                       </>
                     )}
                   </button>
@@ -1033,78 +1369,53 @@ export default function BuyPage() {
 
           {/* Benefits */}
           <div className="vx-buy-benefits">
-            <h2 className="vx-buy-benefits-title">Why VibraXX?</h2>
+            <h2 className="vx-buy-benefits-title">Why Choose VibraXX?</h2>
             <div className="vx-buy-benefits-grid">
-              <div className="vx-buy-benefit">
+              <div className="vx-buy-benefit animate-scale-in" style={{ animationDelay: "0.1s" }}>
                 <div className="vx-buy-benefit-icon" style={{ background: "linear-gradient(135deg, #3b82f6, #2563eb)" }}>
-                  <Trophy size={24} color="white" />
+                  <Trophy size={32} color="white" />
                 </div>
                 <div className="vx-buy-benefit-title">Skill-Based Competition</div>
                 <div className="vx-buy-benefit-text">
-                  Test your knowledge and compete based on pure skill
+                  Test your knowledge and compete based on pure skill, not chance. Every question counts!
                 </div>
               </div>
 
-              <div className="vx-buy-benefit">
+              <div className="vx-buy-benefit animate-scale-in" style={{ animationDelay: "0.2s" }}>
                 <div className="vx-buy-benefit-icon" style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}>
-                  <Users size={24} color="white" />
+                  <Shield size={32} color="white" />
                 </div>
-                <div className="vx-buy-benefit-title">Fair Play Guaranteed</div>
+                <div className="vx-buy-benefit-title">UK Regulated</div>
                 <div className="vx-buy-benefit-text">
-                  UK-regulated platform with transparent rules
+                  Fully compliant with UK gaming laws and consumer protection standards
                 </div>
               </div>
 
-              <div className="vx-buy-benefit">
+              <div className="vx-buy-benefit animate-scale-in" style={{ animationDelay: "0.3s" }}>
                 <div className="vx-buy-benefit-icon" style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}>
-                  <TrendingUp size={24} color="white" />
+                  <TrendingUp size={32} color="white" />
                 </div>
-                <div className="vx-buy-benefit-title">Track Your Progress</div>
+                <div className="vx-buy-benefit-title">Track Progress</div>
                 <div className="vx-buy-benefit-text">
-                  Real-time statistics and performance analytics
+                  Real-time statistics, detailed performance analytics, and tier rankings
                 </div>
               </div>
 
-              <div className="vx-buy-benefit">
+              <div className="vx-buy-benefit animate-scale-in" style={{ animationDelay: "0.4s" }}>
                 <div className="vx-buy-benefit-icon" style={{ background: "linear-gradient(135deg, #8b5cf6, #7c3aed)" }}>
-                  <Rocket size={24} color="white" />
+                  <Rocket size={32} color="white" />
                 </div>
                 <div className="vx-buy-benefit-title">Instant Access</div>
                 <div className="vx-buy-benefit-text">
-                  Start playing immediately after purchase
+                  Start playing immediately after purchase - no waiting, no delays
                 </div>
               </div>
             </div>
           </div>
         </main>
 
-        {/* Footer */}
-        <footer className="vx-buy-footer">
-          <div className="vx-buy-footer-inner">
-            <div className="vx-buy-footer-disclaimer">
-              <strong>Important:</strong> VibraXX is a skill-based quiz competition regulated under UK law. 
-              Participation requires knowledge and strategy. Players must be 18+ and located in the UK. 
-              The £1,000 monthly prize is awarded when 3,000+ active purchases are reached. 
-              See Terms & Conditions for full details.
-            </div>
-
-            <div className="vx-buy-footer-links">
-              <a href="/terms" className="vx-buy-footer-link">Terms & Conditions</a>
-              <span className="vx-buy-footer-sep">•</span>
-              <a href="/privacy" className="vx-buy-footer-link">Privacy Policy</a>
-              <span className="vx-buy-footer-sep">•</span>
-              <a href="/rules" className="vx-buy-footer-link">Competition Rules</a>
-              <span className="vx-buy-footer-sep">•</span>
-              <a href="/contact" className="vx-buy-footer-link">Contact Support</a>
-            </div>
-
-            <div className="vx-buy-footer-company">
-              © 2025 VibraXX • Operated by Sermin Limited (UK Company No. 16088119)<br />
-              Registered Office: 167-169 Great Portland Street, London, W1W 5PF<br />
-              Contact: <a href="mailto:team@vibraxx.com" className="vx-buy-footer-link">team@vibraxx.com</a>
-            </div>
-          </div>
-        </footer>
+        {/* ✅ Footer Component */}
+        <Footer />
       </div>
     </>
   );
