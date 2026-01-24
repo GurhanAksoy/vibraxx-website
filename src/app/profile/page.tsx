@@ -146,7 +146,7 @@ export default function ProfilePage() {
   // ✅ BACKGROUND MUSIC
   useEffect(() => {
     // Create audio element
-    const audio = new Audio("/sounds/vibraxx-theme.mp3");
+    const audio = new Audio("/sounds/vibraxx.mp3");
     audio.loop = true;
     audio.volume = 0.3; // 30% volume
     audioRef.current = audio;
