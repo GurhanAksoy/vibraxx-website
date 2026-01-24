@@ -97,7 +97,10 @@ export default function LeaderboardPage() {
       if (!hasInteracted) {
         setHasInteracted(true);
         const musicEnabled = localStorage.getItem("vibraxx_music_enabled");
-        if (musicEnabled === "true" && audioRef.current) {
+        
+        // Autoplay on first interaction (unless user explicitly disabled it)
+        if (musicEnabled !== "false" && audioRef.current) {
+          setIsMusicPlaying(true);
           audioRef.current.play().catch(err => console.log("Audio blocked:", err));
         }
       }
