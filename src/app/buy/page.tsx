@@ -908,12 +908,12 @@ export default function BuyPage() {
 
         .vx-buy-benefits-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
-          gap: clamp(24px, 5vw, 32px);
+          grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+          gap: clamp(20px, 4vw, 28px);
         }
 
         .vx-buy-benefit {
-          padding: clamp(28px, 5vw, 36px);
+          padding: clamp(24px, 4.5vw, 32px);
           border-radius: clamp(18px, 4vw, 24px);
           background: rgba(255, 255, 255, 0.03);
           border: 2px solid rgba(255, 255, 255, 0.1);
@@ -929,13 +929,13 @@ export default function BuyPage() {
         }
 
         .vx-buy-benefit-icon {
-          width: clamp(64px, 12vw, 72px);
-          height: clamp(64px, 12vw, 72px);
-          border-radius: 18px;
+          width: clamp(56px, 11vw, 64px);
+          height: clamp(56px, 11vw, 64px);
+          border-radius: 16px;
           display: flex;
           align-items: center;
           justify-content: center;
-          margin: 0 auto clamp(20px, 4vw, 24px);
+          margin: 0 auto clamp(16px, 3.5vw, 20px);
           transition: transform 0.4s;
         }
 
@@ -944,9 +944,9 @@ export default function BuyPage() {
         }
 
         .vx-buy-benefit-title {
-          font-size: clamp(17px, 3.8vw, 20px);
+          font-size: clamp(16px, 3.5vw, 18px);
           font-weight: 800;
-          margin-bottom: 10px;
+          margin-bottom: 8px;
           color: #e5e7eb;
         }
 
@@ -1381,7 +1381,7 @@ export default function BuyPage() {
             <div className="vx-buy-benefits-grid">
               <div className="vx-buy-benefit animate-scale-in" style={{ animationDelay: "0.1s" }}>
                 <div className="vx-buy-benefit-icon" style={{ background: "linear-gradient(135deg, #3b82f6, #2563eb)" }}>
-                  <Trophy size={32} color="white" />
+                  <Trophy size={28} color="white" />
                 </div>
                 <div className="vx-buy-benefit-title">Skill-Based Competition</div>
                 <div className="vx-buy-benefit-text">
@@ -1391,7 +1391,7 @@ export default function BuyPage() {
 
               <div className="vx-buy-benefit animate-scale-in" style={{ animationDelay: "0.2s" }}>
                 <div className="vx-buy-benefit-icon" style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}>
-                  <Shield size={32} color="white" />
+                  <Shield size={28} color="white" />
                 </div>
                 <div className="vx-buy-benefit-title">UK Regulated</div>
                 <div className="vx-buy-benefit-text">
@@ -1401,7 +1401,7 @@ export default function BuyPage() {
 
               <div className="vx-buy-benefit animate-scale-in" style={{ animationDelay: "0.3s" }}>
                 <div className="vx-buy-benefit-icon" style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}>
-                  <TrendingUp size={32} color="white" />
+                  <TrendingUp size={28} color="white" />
                 </div>
                 <div className="vx-buy-benefit-title">Track Progress</div>
                 <div className="vx-buy-benefit-text">
@@ -1411,7 +1411,7 @@ export default function BuyPage() {
 
               <div className="vx-buy-benefit animate-scale-in" style={{ animationDelay: "0.4s" }}>
                 <div className="vx-buy-benefit-icon" style={{ background: "linear-gradient(135deg, #8b5cf6, #7c3aed)" }}>
-                  <Rocket size={32} color="white" />
+                  <Rocket size={28} color="white" />
                 </div>
                 <div className="vx-buy-benefit-title">Instant Access</div>
                 <div className="vx-buy-benefit-text">
