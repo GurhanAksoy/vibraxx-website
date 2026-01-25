@@ -32,21 +32,23 @@ import {
   BarChart3,
   Wifi,
   Zap as Lightning,
+  TrendingDown,
+  DollarSign,
 } from "lucide-react";
 
-// ✅ ULTRA RICH PACKAGES
+// ✅ NO PRICES - Stripe handles pricing by region (£3 / €4 / $5)
+// ✅ Bundle = 40% SAVINGS!
 const packages = [
   {
     id: "single",
     name: "Single Round",
-    price: 2,
-    originalPrice: null,
     rounds: 1,
     popular: false,
     savings: 0,
     icon: Zap,
     badge: null,
     tagline: "Try it out",
+    savingsAmount: null,
     features: [
       { icon: Lightning, text: "1 Quiz Round", highlight: false },
       { icon: Target, text: "20 Questions", highlight: false },
@@ -67,22 +69,21 @@ const packages = [
   {
     id: "bundle",
     name: "Champion Bundle",
-    price: 49,
-    originalPrice: 60,
     rounds: 30,
     popular: true,
-    savings: 18,
+    savings: 40, // ✅ 40% SAVINGS!
     icon: Crown,
-    badge: "BEST VALUE",
-    tagline: "Most Popular",
+    badge: "🔥 SAVE 40% 🔥",
+    tagline: "Best Value",
+    savingsAmount: "40% OFF",
     features: [
       { icon: Trophy, text: "30 Quiz Rounds", highlight: true },
+      { icon: Percent, text: "40% MEGA SAVINGS", highlight: true },
       { icon: Target, text: "600 Questions Total", highlight: false },
-      { icon: Percent, text: "18% Savings (£11 Off)", highlight: true },
       { icon: Star, text: "Priority Support", highlight: false },
       { icon: BarChart3, text: "Extended Statistics", highlight: false },
       { icon: Crown, text: "Champion Badge", highlight: true },
-      { icon: Users, text: "Exclusive Discord", highlight: false },
+      { icon: Users, text: "Exclusive Discord Access", highlight: false },
       { icon: Gift, text: "Monthly Prize Entry", highlight: true },
     ],
     description: "Ultimate package for serious competitors",
@@ -113,7 +114,7 @@ export default function BuyPage() {
   const [hasInteracted, setHasInteracted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // ✅ COUNTDOWN TIMER (same as leaderboard)
+  // ✅ COUNTDOWN TIMER
   useEffect(() => {
     const calculateTimeRemaining = () => {
       const now = new Date();
@@ -243,6 +244,7 @@ export default function BuyPage() {
     setProcessingPackageId(pkg.id);
 
     try {
+      // ✅ Stripe will handle pricing based on user's region
       const response = await fetch("/api/create-checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -310,8 +312,8 @@ export default function BuyPage() {
         }
 
         @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.8; }
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.9; transform: scale(1.05); }
         }
 
         @keyframes float {
@@ -339,10 +341,18 @@ export default function BuyPage() {
           100% { left: 200%; }
         }
 
+        @keyframes megaBounce {
+          0%, 100% { transform: translateY(0) scale(1); }
+          25% { transform: translateY(-8px) scale(1.1); }
+          50% { transform: translateY(-4px) scale(1.05); }
+          75% { transform: translateY(-6px) scale(1.08); }
+        }
+
         .animate-glow { animation: glow 2s ease-in-out infinite; }
         .animate-pulse { animation: pulse 2s ease-in-out infinite; }
         .animate-slide-up { animation: slideUp 0.6s ease-out; }
         .animate-scale-in { animation: scaleIn 0.5s ease-out; }
+        .animate-mega-bounce { animation: megaBounce 1.5s ease-in-out infinite; }
 
         .vx-buy-container {
           min-height: 100vh;
@@ -641,13 +651,14 @@ export default function BuyPage() {
           right: clamp(-36px, -7vw, -48px);
           background: linear-gradient(135deg, #fbbf24, #f59e0b);
           color: #0f172a;
-          padding: 8px 48px;
-          font-size: clamp(10px, 2vw, 12px);
+          padding: 10px 52px;
+          font-size: clamp(11px, 2.4vw, 14px);
           font-weight: 900;
-          letter-spacing: 0.12em;
+          letter-spacing: 0.1em;
           box-shadow: 0 4px 20px rgba(251, 191, 36, 0.6);
           transform: rotate(45deg);
           z-index: 2;
+          animation: megaBounce 1.5s ease-in-out infinite;
         }
 
         .vx-buy-card-header {
@@ -723,59 +734,66 @@ export default function BuyPage() {
           line-height: 1.5;
         }
 
-        .vx-buy-pricing {
+        /* ✅ MEGA SAVINGS DISPLAY - NO PRICE */
+        .vx-buy-mega-savings {
           text-align: center;
           margin-bottom: clamp(28px, 5vw, 36px);
-          padding: clamp(20px, 4vw, 28px);
-          background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+          padding: clamp(24px, 5vw, 32px);
+          background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.15));
+          border: 3px solid rgba(251, 191, 36, 0.6);
           border-radius: 20px;
-          border: 2px solid rgba(255, 255, 255, 0.08);
           backdrop-filter: blur(10px);
+          box-shadow: 0 0 40px rgba(251,191,36,0.3);
+          animation: glow 2s ease-in-out infinite;
         }
 
-        .vx-buy-original-price {
-          font-size: clamp(15px, 3vw, 18px);
-          color: #64748b;
-          text-decoration: line-through;
-          margin-bottom: 6px;
-          opacity: 0.7;
-        }
-
-        .vx-buy-price-wrapper {
-          position: relative;
+        .vx-buy-savings-icon {
+          font-size: clamp(48px, 10vw, 64px);
           margin-bottom: 12px;
+          animation: float 2s ease-in-out infinite;
         }
 
-        .vx-buy-price {
-          font-size: clamp(56px, 12vw, 72px);
+        .vx-buy-savings-text {
+          font-size: clamp(32px, 7vw, 48px);
           font-weight: 900;
           background: linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24);
           background-size: 200% auto;
           background-clip: text;
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
-          line-height: 1;
-          filter: drop-shadow(0 0 20px rgba(251,191,36,0.5));
           animation: shimmer 3s linear infinite;
+          line-height: 1.2;
+          margin-bottom: 8px;
         }
 
-        .vx-buy-price-currency {
-          font-size: clamp(32px, 7vw, 40px);
-          vertical-align: super;
+        .vx-buy-savings-subtext {
+          font-size: clamp(14px, 3vw, 18px);
+          color: #fcd34d;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
         }
 
-        .vx-buy-savings {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 18px;
-          background: rgba(34, 197, 94, 0.2);
-          border: 2px solid rgba(34, 197, 94, 0.5);
-          border-radius: 999px;
-          font-size: clamp(13px, 2.8vw, 15px);
+        /* Single Round - Simple Display */
+        .vx-buy-single-display {
+          text-align: center;
+          margin-bottom: clamp(28px, 5vw, 36px);
+          padding: clamp(20px, 4vw, 28px);
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 16px;
+          border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .vx-buy-single-text {
+          font-size: clamp(20px, 4.5vw, 28px);
           font-weight: 800;
-          color: #86efac;
-          box-shadow: 0 0 20px rgba(34,197,94,0.3);
+          color: #e5e7eb;
+          margin-bottom: 8px;
+        }
+
+        .vx-buy-single-subtext {
+          font-size: clamp(13px, 2.8vw, 15px);
+          color: #94a3b8;
         }
 
         .vx-buy-features {
@@ -1310,22 +1328,27 @@ export default function BuyPage() {
                     <p className="vx-buy-card-desc">{pkg.description}</p>
                   </div>
 
-                  <div className="vx-buy-pricing">
-                    {pkg.originalPrice && (
-                      <div className="vx-buy-original-price">£{pkg.originalPrice}</div>
-                    )}
-                    <div className="vx-buy-price-wrapper">
-                      <div className="vx-buy-price">
-                        <span className="vx-buy-price-currency">£</span>{pkg.price}
+                  {/* ✅ NO PRICE - Show savings for bundle, simple for single */}
+                  {pkg.popular ? (
+                    <div className="vx-buy-mega-savings">
+                      <div className="vx-buy-savings-icon">💰</div>
+                      <div className="vx-buy-savings-text">
+                        SAVE 40%
+                      </div>
+                      <div className="vx-buy-savings-subtext">
+                        Massive Discount on 30 Rounds!
                       </div>
                     </div>
-                    {pkg.savings > 0 && (
-                      <div className="vx-buy-savings">
-                        <Percent size={16} />
-                        <span>Save {pkg.savings}% - £{pkg.originalPrice! - pkg.price} Off</span>
+                  ) : (
+                    <div className="vx-buy-single-display">
+                      <div className="vx-buy-single-text">
+                        Single Round
                       </div>
-                    )}
-                  </div>
+                      <div className="vx-buy-single-subtext">
+                        Perfect for trying out
+                      </div>
+                    </div>
+                  )}
 
                   <div className="vx-buy-features">
                     {pkg.features.map((feature, idx) => {
