@@ -614,22 +614,24 @@ export default function HomePage() {
   );
 
   // ============================================
-  // 🎯 FETCH CHAMPIONS (GÜNCELLENDİ - KANONİK)
+  // 🎯 FETCH CHAMPIONS (GÜNCELLENDİ - RPC KULLANıYOR)
   // ============================================
   const fetchChampions = useCallback(async () => {
     try {
-      const periods = ["weekly", "monthly"];
+      // Call get_champions RPC
+      const { data, error } = await supabase.rpc('get_champions');
 
-      const results = await Promise.all(
-        periods.map((period) =>
-          supabase
-            .from(`leaderboard_${period}`)
-            .select("user_id, full_name, total_score")
-            .eq("rank", 1)
-            .limit(1)
-            .single()
-        )
-      );
+      if (error) {
+        console.error("[Champions] RPC error:", error);
+        setChampions(getDefaultChampions());
+        return;
+      }
+
+      // If no data or empty, show defaults
+      if (!data || data.length === 0) {
+        setChampions(getDefaultChampions());
+        return;
+      }
 
       const icons = [Trophy, Crown];
       const colors = ["#c084fc", "#22d3ee"];
@@ -638,18 +640,20 @@ export default function HomePage() {
         "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
       ];
 
-      const mapped = results
-        .map((res, i) => {
-          const row = res.data;
+      // Map RPC results to champion cards
+      const mapped = data
+        .map((row: any) => {
           if (!row || !row.full_name || row.total_score === 0) return null;
 
+          const periodIndex = row.period === 'weekly' ? 0 : 1;
+          
           return {
-            period: periods[i][0].toUpperCase() + periods[i].slice(1),
+            period: row.period === 'weekly' ? 'Weekly' : 'Monthly',
             name: row.full_name,
             score: row.total_score || 0,
-            gradient: gradients[i],
-            color: colors[i],
-            icon: icons[i],
+            gradient: gradients[periodIndex],
+            color: colors[periodIndex],
+            icon: icons[periodIndex],
           };
         })
         .filter(Boolean);
