@@ -16,6 +16,44 @@ import { supabase } from "@/lib/supabaseClient";
 import Image from "next/image";
 import { useNextRound } from "@/hooks/useNextRound";
 
+// ============================================
+// 🎯 PRESENCE TRACKING HOOK (YENİ - KANONİK)
+// ============================================
+function usePresence(pageType: string, roundId: number | null = null) {
+  const sessionIdRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (!sessionIdRef.current) {
+      const stored = sessionStorage.getItem('presence_session_id');
+      if (stored) {
+        sessionIdRef.current = stored;
+      } else {
+        sessionIdRef.current = crypto.randomUUID();
+        sessionStorage.setItem('presence_session_id', sessionIdRef.current);
+      }
+    }
+
+    const sendHeartbeat = async () => {
+      try {
+        await supabase.rpc('update_presence', {
+          p_session_id: sessionIdRef.current,
+          p_page_type: pageType,
+          p_round_id: roundId
+        });
+      } catch (err) {
+        console.error('[Presence] Heartbeat failed:', err);
+      }
+    };
+
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 30000); // 30s
+
+    return () => clearInterval(interval);
+  }, [pageType, roundId]);
+}
+
 interface LobbyPlayer {
   user_id: string;
   full_name: string;
@@ -31,6 +69,9 @@ export default function LobbyPage() {
   // ✅ Use shared hook (Homepage ile AYNI round!)
   const { nextRound, timeUntilStart, formattedCountdown, lobbyStatus } = useNextRound();
 
+  // 🎯 PRESENCE TRACKING (YENİ - KANONİK)
+  usePresence('lobby', nextRound?.id || null);
+
   // Core State
   const [isPlaying, setIsPlaying] = useState(false);
   const [showWarning, setShowWarning] = useState(false);
@@ -43,6 +84,7 @@ export default function LobbyPage() {
   // Lobby Data
   const [players, setPlayers] = useState<LobbyPlayer[]>([]);
   const [totalPlayers, setTotalPlayers] = useState(0);
+  const [lobbyPresenceCount, setLobbyPresenceCount] = useState(0); // 🎯 YENİ
 
   // Audio refs
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -163,6 +205,7 @@ export default function LobbyPage() {
       setIsRedirecting(false);
       setPlayers([]);
       setTotalPlayers(0);
+      setLobbyPresenceCount(0); // 🎯 YENİ
     }
     lastRoundIdRef.current = nextRound?.id || null;
   }, [nextRound?.id]);
@@ -198,6 +241,24 @@ export default function LobbyPage() {
     }
   }, [nextRound?.id]);
 
+  // 🎯 === FETCH LOBBY PRESENCE COUNT (YENİ - KANONİK) ===
+  const fetchLobbyPresence = useCallback(async () => {
+    if (!nextRound?.id) return;
+
+    try {
+      const { data, error } = await supabase.rpc('get_presence_count', {
+        p_page_type: 'lobby',
+        p_round_id: nextRound.id
+      });
+
+      if (!error && typeof data === 'number') {
+        setLobbyPresenceCount(data);
+      }
+    } catch (err) {
+      console.error('[Lobby] Fetch presence error:', err);
+    }
+  }, [nextRound?.id]);
+
   // === FETCH TOTAL PARTICIPANTS ===
   const fetchTotalParticipants = useCallback(async () => {
     if (!nextRound?.id) return;
@@ -225,19 +286,25 @@ export default function LobbyPage() {
     if (!hasJoined || !nextRound?.id) return;
 
     const loadParticipants = async () => {
-      await Promise.all([fetchLobbyPlayers(), fetchTotalParticipants()]);
+      await Promise.all([
+        fetchLobbyPlayers(), 
+        fetchTotalParticipants(),
+        fetchLobbyPresence() // 🎯 YENİ
+      ]);
     };
 
     loadParticipants();
 
     const playersInterval = setInterval(fetchLobbyPlayers, 5000);
     const countInterval = setInterval(fetchTotalParticipants, 5000);
+    const presenceInterval = setInterval(fetchLobbyPresence, 15000); // 🎯 YENİ
 
     return () => {
       clearInterval(playersInterval);
       clearInterval(countInterval);
+      clearInterval(presenceInterval); // 🎯 YENİ
     };
-  }, [hasJoined, nextRound?.id, fetchLobbyPlayers, fetchTotalParticipants]);
+  }, [hasJoined, nextRound?.id, fetchLobbyPlayers, fetchTotalParticipants, fetchLobbyPresence]);
 
   // === AUTO START WHEN COUNTDOWN ENDS ===
   useEffect(() => {
@@ -644,34 +711,60 @@ export default function LobbyPage() {
                 <span className="hide-on-small">Back</span>
               </button>
 
-              {/* Right: Sound Toggle */}
-              <button
-                onClick={() => setIsPlaying(!isPlaying)}
-                style={{
-                  padding: "11px",
-                  borderRadius: "12px",
-                  border: "1px solid rgba(148, 163, 253, 0.3)",
-                  background: "rgba(15, 23, 42, 0.8)",
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  transition: "all 0.3s",
-                  zIndex: 21,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(15, 23, 42, 0.8)";
-                }}
-              >
-                {isPlaying ? (
-                  <Volume2 style={{ width: 20, height: 20, color: "#a78bfa" }} />
-                ) : (
-                  <VolumeX style={{ width: 20, height: 20, color: "#6b7280" }} />
-                )}
-              </button>
+              {/* Right: Credits + Sound Toggle */}
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", zIndex: 21 }}>
+                {/* Credits Display */}
+                <div
+                  style={{
+                    padding: "10px 16px",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(251, 191, 36, 0.4)",
+                    background: "rgba(251, 191, 36, 0.1)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <Shield style={{ width: 18, height: 18, color: "#fbbf24" }} />
+                  <span
+                    style={{
+                      fontSize: "clamp(13px, 2.5vw, 15px)",
+                      fontWeight: 700,
+                      color: "#fbbf24",
+                    }}
+                  >
+                    {userCredits} Rounds
+                  </span>
+                </div>
+
+                {/* Sound Toggle */}
+                <button
+                  onClick={() => setIsPlaying(!isPlaying)}
+                  style={{
+                    padding: "11px",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(148, 163, 253, 0.3)",
+                    background: "rgba(15, 23, 42, 0.8)",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "all 0.3s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "rgba(15, 23, 42, 0.8)";
+                  }}
+                >
+                  {isPlaying ? (
+                    <Volume2 style={{ width: 20, height: 20, color: "#a78bfa" }} />
+                  ) : (
+                    <VolumeX style={{ width: 20, height: 20, color: "#6b7280" }} />
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Center: Logo + GLOBAL ARENA Text */}
@@ -759,6 +852,19 @@ export default function LobbyPage() {
                 >
                   GLOBAL ARENA
                 </div>
+                {/* 🎯 YENİ: Presence Count Subtitle */}
+                {lobbyPresenceCount > 0 && (
+                  <div
+                    style={{
+                      fontSize: "clamp(10px, 2vw, 12px)",
+                      color: "#94a3b8",
+                      fontWeight: 600,
+                      marginTop: "2px",
+                    }}
+                  >
+                    {lobbyPresenceCount} online
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1193,7 +1299,7 @@ export default function LobbyPage() {
                   : "You're in. Get ready!"}
               </p>
 
-              {/* Quiz Info Grid - 3 Cards Centered */}
+              {/* Quiz Info Grid - 3 Cards */}
               <div
                 style={{
                   display: "grid",
@@ -1292,6 +1398,7 @@ export default function LobbyPage() {
                 </div>
               </div>
 
+              {/* Pro Tip */}
               <div
                 style={{
                   marginTop: "clamp(20px, 4.5vw, 28px)",
@@ -1313,7 +1420,7 @@ export default function LobbyPage() {
               </div>
             </div>
 
-            {/* Players Section - 25% Smaller */}
+            {/* Players Section */}
             <div
               style={{
                 padding: "clamp(21px, 4.5vw, 30px)",
