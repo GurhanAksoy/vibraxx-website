@@ -26,7 +26,7 @@ import { playMenuMusic, stopMenuMusic } from "@/lib/audioManager";
 // 🎯 PRESENCE TRACKING HOOK (YENİ - KANONİK)
 // ============================================
 function usePresence(pageType: string) {
-  const sessionIdRef = useRef<string>();
+  const sessionIdRef = useRef<string | undefined>();
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
