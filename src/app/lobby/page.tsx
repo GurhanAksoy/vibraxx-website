@@ -269,13 +269,22 @@ export default function LobbyPage() {
   // ============================================
   useEffect(() => {
     const checkAuth = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) {
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        
+        if (error || !data.user) {
+          console.log('[Lobby] No user found, redirecting to home');
+          router.push("/");
+          return;
+        }
+        
+        console.log('[Lobby] User authenticated:', data.user.id);
+        setUser(data.user);
+        setIsLoading(false);
+      } catch (err) {
+        console.error('[Lobby] Auth check error:', err);
         router.push("/");
-        return;
       }
-      setUser(data.user);
-      setIsLoading(false);
     };
 
     checkAuth();
