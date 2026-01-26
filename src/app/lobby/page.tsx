@@ -10,14 +10,17 @@ import {
   VolumeX,
   ArrowLeft,
   Shield,
+  Zap,
+  Trophy,
+  Globe,
+  TrendingUp,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Image from "next/image";
-import { useNextRound } from "@/hooks/useNextRound";
 
 // ============================================
-// 🎯 PRESENCE TRACKING HOOK (YENİ - KANONİK)
+// 🎯 PRESENCE TRACKING HOOK (KANONİK)
 // ============================================
 function usePresence(pageType: string, roundId: number | null = null) {
   const sessionIdRef = useRef<string | undefined>(undefined);
@@ -48,29 +51,139 @@ function usePresence(pageType: string, roundId: number | null = null) {
     };
 
     sendHeartbeat();
-    const interval = setInterval(sendHeartbeat, 30000); // 30s
+    const interval = setInterval(sendHeartbeat, 30000);
 
     return () => clearInterval(interval);
   }, [pageType, roundId]);
 }
 
-interface LobbyPlayer {
+// ============================================
+// 🎯 ORGANIC PLAYER COUNT (KANONİK)
+// ============================================
+interface PlayerCountData {
+  participants: number;
+  spectators: number;
+  displayRange: string;
+}
+
+function useOrganicPlayerCount(roundId: number | null) {
+  const [counts, setCounts] = useState<PlayerCountData>({
+    participants: 0,
+    spectators: 0,
+    displayRange: '0-50'
+  });
+
+  useEffect(() => {
+    if (!roundId) return;
+
+    async function loadCounts() {
+      try {
+        // Participants
+        const { count: participants } = await supabase
+          .from('round_participants')
+          .select('*', { count: 'exact', head: true })
+          .eq('round_id', roundId)
+          .eq('source', 'live');
+
+        // Spectators
+        const { data: spectators } = await supabase
+          .rpc('get_presence_count', {
+            p_page_type: 'lobby',
+            p_round_id: roundId
+          });
+
+        const p = participants || 0;
+        const s = spectators || 0;
+        const total = p + s;
+
+        const rangeMin = Math.floor(total / 50) * 50;
+        const rangeMax = rangeMin + 50;
+
+        setCounts({
+          participants: p,
+          spectators: s,
+          displayRange: `${rangeMin}-${rangeMax}`
+        });
+      } catch (err) {
+        console.error('[PlayerCount] Error:', err);
+      }
+    }
+
+    loadCounts();
+    const interval = setInterval(loadCounts, 5000);
+
+    const channel = supabase
+      .channel(`players:${roundId}:live`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'round_participants',
+        filter: `round_id=eq.${roundId}`
+      }, loadCounts)
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      channel.unsubscribe();
+    };
+  }, [roundId]);
+
+  return counts;
+}
+
+// ============================================
+// 🎯 PUBLIC PROFILES FOR PLAYER LIST (KANONİK)
+// ============================================
+interface PublicPlayer {
   user_id: string;
   full_name: string;
-  avatar_url: string;
-  total_score: number;
-  streak: number;
   joined_at: string;
+}
+
+function useRecentPlayers(roundId: number | null, limit: number = 12) {
+  const [players, setPlayers] = useState<PublicPlayer[]>([]);
+
+  useEffect(() => {
+    if (!roundId) return;
+
+    async function loadPlayers() {
+      try {
+        const { data } = await supabase
+          .from('round_participants')
+          .select(`
+            user_id,
+            joined_at,
+            profiles!inner(full_name)
+          `)
+          .eq('round_id', roundId)
+          .eq('source', 'live')
+          .order('joined_at', { ascending: false })
+          .limit(limit);
+
+        if (data) {
+          const mapped = data.map((p: any) => ({
+            user_id: p.user_id,
+            full_name: p.profiles?.full_name || 'Player',
+            joined_at: p.joined_at
+          }));
+          setPlayers(mapped);
+        }
+      } catch (err) {
+        console.error('[RecentPlayers] Error:', err);
+      }
+    }
+
+    loadPlayers();
+    const interval = setInterval(loadPlayers, 5000);
+
+    return () => clearInterval(interval);
+  }, [roundId, limit]);
+
+  return players;
 }
 
 export default function LobbyPage() {
   const router = useRouter();
-
-  // ✅ Use shared hook (Homepage ile AYNI round!)
-  const { nextRound, timeUntilStart, formattedCountdown, lobbyStatus } = useNextRound();
-
-  // 🎯 PRESENCE TRACKING (YENİ - KANONİK)
-  usePresence('lobby', nextRound?.id || null);
 
   // Core State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -81,10 +194,9 @@ export default function LobbyPage() {
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
 
-  // Lobby Data
-  const [players, setPlayers] = useState<LobbyPlayer[]>([]);
-  const [totalPlayers, setTotalPlayers] = useState(0);
-  const [lobbyPresenceCount, setLobbyPresenceCount] = useState(0); // 🎯 YENİ
+  // Round State
+  const [nextRound, setNextRound] = useState<any>(null);
+  const [timeUntilStart, setTimeUntilStart] = useState<number>(0);
 
   // Audio refs
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -92,240 +204,185 @@ export default function LobbyPage() {
   const countdownBeepRef = useRef<HTMLAudioElement | null>(null);
   const hasInteractedRef = useRef(false);
 
-  // Round change detection
-  const lastRoundIdRef = useRef<number | null>(null);
+  // 🎯 PRESENCE TRACKING
+  usePresence('lobby', nextRound?.id || null);
 
-  // === AUDIO INITIALIZATION ===
+  // 🎯 ORGANIC DATA
+  const { participants, spectators, displayRange } = useOrganicPlayerCount(nextRound?.id);
+  const recentPlayers = useRecentPlayers(nextRound?.id);
+
+  // ============================================
+  // AUDIO INITIALIZATION
+  // ============================================
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const audio = new Audio("/sounds/vibraxx.mp3");
-    audio.loop = true;
-    audioRef.current = audio;
-
-    alarmRef.current = new Audio("/sounds/alarm.mp3");
-    countdownBeepRef.current = new Audio("/sounds/countdown.mp3");
-
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-      if (alarmRef.current) {
-        alarmRef.current.pause();
-        alarmRef.current = null;
-      }
-      if (countdownBeepRef.current) {
-        countdownBeepRef.current.pause();
-        countdownBeepRef.current = null;
-      }
-    };
-  }, []);
-
-  // === CLICK ANYWHERE TO PLAY MUSIC ===
-  useEffect(() => {
-    const handleFirstClick = () => {
+    const handleFirstInteraction = () => {
       if (!hasInteractedRef.current) {
         hasInteractedRef.current = true;
-        setIsPlaying(true);
-        if (audioRef.current) {
-          audioRef.current.play().catch(() => {});
+
+        if (!audioRef.current) {
+          audioRef.current = new Audio("/audio/lobby-music.mp3");
+          audioRef.current.loop = true;
+          audioRef.current.volume = 0.3;
+        }
+
+        if (!alarmRef.current) {
+          alarmRef.current = new Audio("/audio/alarm.mp3");
+          alarmRef.current.volume = 0.6;
+        }
+
+        if (!countdownBeepRef.current) {
+          countdownBeepRef.current = new Audio("/audio/beep.mp3");
+          countdownBeepRef.current.volume = 0.4;
+        }
+
+        const musicPref = localStorage.getItem("vibraxx_lobby_music");
+        if (musicPref !== "false") {
+          setIsPlaying(true);
+          audioRef.current?.play().catch(() => {});
         }
       }
     };
 
-    document.addEventListener("click", handleFirstClick, { once: true });
+    document.addEventListener("click", handleFirstInteraction, { once: true });
+    document.addEventListener("touchstart", handleFirstInteraction, { once: true });
 
     return () => {
-      document.removeEventListener("click", handleFirstClick);
+      document.removeEventListener("click", handleFirstInteraction);
+      document.removeEventListener("touchstart", handleFirstInteraction);
     };
   }, []);
 
-  // === PLAY / PAUSE CONTROL ===
   useEffect(() => {
-    if (!audioRef.current) return;
-    if (isPlaying) {
+    if (isPlaying && audioRef.current) {
       audioRef.current.play().catch(() => {});
-    } else {
+      localStorage.setItem("vibraxx_lobby_music", "true");
+    } else if (audioRef.current) {
       audioRef.current.pause();
+      localStorage.setItem("vibraxx_lobby_music", "false");
     }
   }, [isPlaying]);
 
-  // 🔐 === AUTH CHECK & CREDITS ===
-useEffect(() => {
-  const checkAuth = async () => {
-    setIsLoading(true);
-
-    // 1️⃣ Auth check
-    const {
-      data: { user: authUser },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !authUser) {
-      console.log("[Lobby] Not authenticated");
-      router.push("/");
-      return;
-    }
-
-    setUser(authUser);
-
-    // 2️⃣ Credits check (✅ FIXED: .limit(1) kullanıyor, .single() değil)
-    const { data: creditsData, error: creditsError } = await supabase
-      .from("user_credits")
-      .select("live_credits")
-      .eq("user_id", authUser.id)
-      .limit(1);
-
-    if (creditsError) {
-      console.error("[Lobby] Credits check error:", creditsError);
-      router.push("/buy");
-      return;
-    }
-
-    // 3️⃣ Güvenli credits parse
-    const credits = creditsData?.[0]?.live_credits ?? 0;
-
-    // 4️⃣ Credits validation
-    if (credits <= 0) {
-      console.log("[Lobby] No remaining credits");
-      router.push("/buy");
-      return;
-    }
-
-    // 5️⃣ Success
-    setUserCredits(credits);
-    console.log("[Lobby] User credits:", credits);
-    setIsLoading(false);
-  };
-
-  checkAuth();
-}, [router]);
-
-  // ✅ === ROUND CHANGE DETECTION ===
+  // ============================================
+  // AUTH CHECK
+  // ============================================
   useEffect(() => {
-    if (nextRound?.id && lastRoundIdRef.current && lastRoundIdRef.current !== nextRound.id) {
-      console.log("[Lobby] Round changed, resetting state");
-      setHasJoined(false);
-      setShowWarning(false);
-      setIsRedirecting(false);
-      setPlayers([]);
-      setTotalPlayers(0);
-      setLobbyPresenceCount(0); // 🎯 YENİ
-    }
-    lastRoundIdRef.current = nextRound?.id || null;
-  }, [nextRound?.id]);
-
-  // ✅ === LOBBY SESSION TRACKING (ROUND DÜŞMEZ) ===
-  useEffect(() => {
-    if (nextRound?.id && user && !hasJoined) {
-      console.log("[Lobby] User in lobby, waiting for quiz start");
-      supabase.rpc("upsert_user_session", { p_user_id: user.id });
-      setHasJoined(true);
-    }
-  }, [nextRound?.id, user?.id, hasJoined]);
-
-  // === FETCH LOBBY PLAYERS ===
-  const fetchLobbyPlayers = useCallback(async () => {
-    if (!nextRound?.id) return;
-
-    try {
-      const { data, error } = await supabase.rpc("get_lobby_participants", {
-        p_round_id: nextRound.id,
-      });
-
-      if (error) {
-        console.error("[Lobby] Fetch players error:", error);
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) {
+        router.push("/");
         return;
       }
+      setUser(data.user);
+      setIsLoading(false);
+    };
+
+    checkAuth();
+  }, [router]);
+
+  // ============================================
+  // FETCH USER CREDITS
+  // ============================================
+  const fetchUserCredits = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const { data } = await supabase
+        .from("user_credits")
+        .select("live_credits")
+        .eq("user_id", user.id)
+        .single();
+
+      setUserCredits(data?.live_credits || 0);
+    } catch (err) {
+      console.error("[Credits] Error:", err);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) fetchUserCredits();
+  }, [user, fetchUserCredits]);
+
+  // ============================================
+  // FETCH NEXT ROUND
+  // ============================================
+  const loadNextRound = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from("rounds")
+        .select("id, scheduled_start, status")
+        .eq("status", "scheduled")
+        .order("scheduled_start", { ascending: true })
+        .limit(1)
+        .single();
 
       if (data) {
-        setPlayers(data);
+        setNextRound(data);
+
+        const scheduledStart = new Date(data.scheduled_start).getTime();
+        const now = Date.now();
+        const seconds = Math.floor((scheduledStart - now) / 1000);
+
+        if (Number.isFinite(seconds)) {
+          setTimeUntilStart(Math.max(0, seconds));
+        }
       }
     } catch (err) {
-      console.error("[Lobby] Fetch players error:", err);
+      console.error("[NextRound] Error:", err);
     }
-  }, [nextRound?.id]);
+  }, []);
 
-  // 🎯 === FETCH LOBBY PRESENCE COUNT (YENİ - KANONİK) ===
-  const fetchLobbyPresence = useCallback(async () => {
-    if (!nextRound?.id) return;
-
-    try {
-      const { data, error } = await supabase.rpc('get_presence_count', {
-        p_page_type: 'lobby',
-        p_round_id: nextRound.id
-      });
-
-      if (!error && typeof data === 'number') {
-        setLobbyPresenceCount(data);
-      }
-    } catch (err) {
-      console.error('[Lobby] Fetch presence error:', err);
-    }
-  }, [nextRound?.id]);
-
-  // === FETCH TOTAL PARTICIPANTS ===
-  const fetchTotalParticipants = useCallback(async () => {
-    if (!nextRound?.id) return;
-
-    try {
-      const { data, error } = await supabase.rpc("get_round_participant_count", {
-        p_round_id: nextRound.id,
-      });
-
-      if (error) {
-        console.error("[Lobby] Fetch count error:", error);
-        return;
-      }
-
-      if (typeof data === "number") {
-        setTotalPlayers(data);
-      }
-    } catch (err) {
-      console.error("[Lobby] Fetch total error:", err);
-    }
-  }, [nextRound?.id]);
-
-  // === FETCH PLAYERS WHEN IN LOBBY ===
   useEffect(() => {
-    if (!hasJoined || !nextRound?.id) return;
+    loadNextRound();
+    const interval = setInterval(loadNextRound, 5000);
+    return () => clearInterval(interval);
+  }, [loadNextRound]);
 
-    const loadParticipants = async () => {
-      await Promise.all([
-        fetchLobbyPlayers(), 
-        fetchTotalParticipants(),
-        fetchLobbyPresence() // 🎯 YENİ
-      ]);
+  // ============================================
+  // COUNTDOWN TIMER
+  // ============================================
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeUntilStart((prev) => {
+        if (prev <= 0) return 0;
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // ============================================
+  // CHECK IF ALREADY JOINED
+  // ============================================
+  useEffect(() => {
+    if (!user || !nextRound) return;
+
+    const checkJoinedStatus = async () => {
+      try {
+        const { data } = await supabase
+          .from("round_participants")
+          .select("round_id")
+          .eq("round_id", nextRound.id)
+          .eq("user_id", user.id)
+          .eq("source", "live")
+          .maybeSingle();
+
+        if (data) {
+          setHasJoined(true);
+        }
+      } catch (err) {
+        console.error("[CheckJoined] Error:", err);
+      }
     };
 
-    loadParticipants();
+    checkJoinedStatus();
+  }, [user, nextRound]);
 
-    const playersInterval = setInterval(fetchLobbyPlayers, 5000);
-    const countInterval = setInterval(fetchTotalParticipants, 5000);
-    const presenceInterval = setInterval(fetchLobbyPresence, 15000); // 🎯 YENİ
-
-    return () => {
-      clearInterval(playersInterval);
-      clearInterval(countInterval);
-      clearInterval(presenceInterval); // 🎯 YENİ
-    };
-  }, [hasJoined, nextRound?.id, fetchLobbyPlayers, fetchTotalParticipants, fetchLobbyPresence]);
-
-  // === AUTO START WHEN COUNTDOWN ENDS ===
-  useEffect(() => {
-    if (
-      timeUntilStart <= 0 &&
-      nextRound?.status === "scheduled" &&
-      !isRedirecting &&
-      hasJoined
-    ) {
-      handleStartGame();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeUntilStart, nextRound?.status, isRedirecting, hasJoined]);
-
-  // === WARNING & SOUND EFFECTS ===
+  // ============================================
+  // WARNING & SOUND EFFECTS
+  // ============================================
   useEffect(() => {
     if (timeUntilStart === 10) {
       setShowWarning(true);
@@ -347,67 +404,102 @@ useEffect(() => {
     }
   }, [timeUntilStart, isPlaying]);
 
-  // ✅ === START GAME & JOIN ROUND (BURADA ROUND DÜŞER) ===
+  // ============================================
+  // AUTO START WHEN COUNTDOWN ENDS
+  // ============================================
+  useEffect(() => {
+    if (
+      timeUntilStart <= 0 &&
+      nextRound?.status === "scheduled" &&
+      !isRedirecting &&
+      hasJoined
+    ) {
+      handleStartGame();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeUntilStart, nextRound?.status, isRedirecting, hasJoined]);
+
+  // ============================================
+  // 🎯 JOIN ROUND (KANONİK)
+  // ============================================
+  const handleJoinRound = async () => {
+    if (!nextRound || !user || hasJoined) return;
+
+    try {
+      const { data, error } = await supabase.rpc('join_live_round', {
+        p_round_id: nextRound.id
+      });
+
+      if (error) {
+        console.error('[JoinRound] RPC error:', error);
+        return;
+      }
+
+      const response = data as { success: boolean; error?: string };
+
+      if (!response.success) {
+        if (response.error === 'No credits available') {
+          alert('You have no rounds left. Redirecting to purchase page...');
+          setTimeout(() => router.push('/buy'), 1500);
+        } else if (response.error === 'Already joined') {
+          setHasJoined(true);
+        }
+        return;
+      }
+
+      setHasJoined(true);
+      await fetchUserCredits();
+    } catch (err: any) {
+      console.error('[JoinRound] Error:', err);
+    }
+  };
+
+  // ============================================
+  // START GAME
+  // ============================================
   const handleStartGame = async () => {
     if (isRedirecting) return;
     setIsRedirecting(true);
 
-    console.log("[Lobby] Quiz starting, joining round now...");
-
-    if (nextRound?.id && user) {
-      try {
-        const { data, error } = await supabase.rpc("join_round", {
-          p_round_id: nextRound.id,
-          p_user_id: user.id,
-          p_round_type: "live",
-        });
-
-        if (error) {
-          console.error("[Lobby] Join round error:", error);
-          if ((error as any).message?.includes("no_credits")) {
-            router.push("/buy");
-            return;
-          }
-        }
-
-        const result = data as { success: boolean; error?: string };
-
-        if (!result?.success) {
-          console.error("[Lobby] Join failed:", result?.error);
-          if (result?.error === "no_credits") {
-            router.push("/buy");
-            return;
-          }
-        }
-
-        console.log("[Lobby] Round joined successfully, credits deducted");
-      } catch (err) {
-        console.error("[Lobby] Join round error:", err);
-      }
-    }
-
-    router.push("/quiz");
+    console.log("[Lobby] Quiz starting, redirecting...");
+    router.push(`/quiz/${nextRound.id}`);
   };
 
-  // === HANDLE BACK BUTTON ===
+  // ============================================
+  // HANDLE BACK
+  // ============================================
   const handleBack = async () => {
-    console.log("[Lobby] User left lobby, round NOT deducted");
+    console.log("[Lobby] User left lobby");
     router.push("/");
   };
 
-  // === PROGRESS CALCULATION ===
-  const progress = ((900 - Math.max(Math.min(timeUntilStart, 900), 0)) / 900) * 100;
-
-  // === WARNING HELPERS ===
-  const getWarningMessage = () => {
-    if (timeUntilStart <= 3) return "🚀 QUIZ STARTING NOW!";
-    if (timeUntilStart <= 5) return "⚡ GET READY!";
-    if (timeUntilStart <= 10) return "⏰ FINAL COUNTDOWN!";
-    return "Quiz Starting Soon";
+  // ============================================
+  // FORMAT TIME
+  // ============================================
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  // === LOADING STATE ===
-  if (isLoading) {
+  // ============================================
+  // PROGRESS CALCULATION
+  // ============================================
+  const progress = ((300 - Math.max(Math.min(timeUntilStart, 300), 0)) / 300) * 100;
+
+  // ============================================
+  // STATUS COLOR
+  // ============================================
+  const getStatusColor = () => {
+    if (timeUntilStart <= 10) return "#ef4444";
+    if (timeUntilStart <= 30) return "#f59e0b";
+    return "#22c55e";
+  };
+
+  // ============================================
+  // LOADING STATE
+  // ============================================
+  if (isLoading || !user) {
     return (
       <div
         style={{
@@ -416,67 +508,22 @@ useEffect(() => {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "white",
         }}
       >
-        <div style={{ textAlign: "center" }}>
+        <div style={{ textAlign: "center", color: "white" }}>
           <div
             style={{
-              width: 120,
-              height: 120,
-              margin: "0 auto 24px",
-              position: "relative",
-              borderRadius: "50%",
-              padding: 4,
-              background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-              boxShadow: "0 0 40px rgba(124, 58, 237, 0.7)",
-            }}
-          >
-            <div
-              style={{
-                position: "relative",
-                width: "100%",
-                height: "100%",
-                borderRadius: "50%",
-                backgroundColor: "#020817",
-                overflow: "hidden",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Image
-                src="/images/logo.png"
-                alt="VibraXX"
-                fill
-                sizes="120px"
-                style={{ objectFit: "contain", padding: "8px" }}
-                priority
-              />
-            </div>
-          </div>
-          <div
-            style={{
-              width: 64,
-              height: 64,
-              margin: "0 auto 20px",
-              border: "4px solid rgba(139, 92, 246, 0.3)",
-              borderTop: "4px solid #a78bfa",
+              width: 48,
+              height: 48,
+              margin: "0 auto 16px",
+              border: "3px solid rgba(139, 92, 246, 0.3)",
+              borderTopColor: "#8b5cf6",
               borderRadius: "50%",
               animation: "spin 1s linear infinite",
             }}
           />
-          <p style={{ fontSize: 18, color: "#94a3b8", fontWeight: 600 }}>
-            Loading Premium Lobby...
-          </p>
+          <p style={{ fontSize: 14, color: "#94a3b8" }}>Loading lobby...</p>
         </div>
-        <style jsx>{`
-          @keyframes spin {
-            to {
-              transform: rotate(360deg);
-            }
-          }
-        `}</style>
       </div>
     );
   }
@@ -484,6 +531,10 @@ useEffect(() => {
   return (
     <>
       <style jsx global>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+
         @keyframes pulse-ring {
           0% {
             transform: scale(0.95);
@@ -498,15 +549,16 @@ useEffect(() => {
             opacity: 1;
           }
         }
+
         @keyframes float {
-          0%,
-          100% {
+          0%, 100% {
             transform: translateY(0px);
           }
           50% {
             transform: translateY(-20px);
           }
         }
+
         @keyframes shimmer {
           0% {
             transform: translateX(-100%);
@@ -515,6 +567,7 @@ useEffect(() => {
             transform: translateX(100%);
           }
         }
+
         @keyframes slideIn {
           from {
             transform: translateY(20px);
@@ -525,9 +578,9 @@ useEffect(() => {
             opacity: 1;
           }
         }
+
         @keyframes neonPulse {
-          0%,
-          100% {
+          0%, 100% {
             box-shadow: 0 0 20px rgba(139, 92, 246, 0.6),
               0 0 40px rgba(139, 92, 246, 0.4),
               inset 0 0 20px rgba(139, 92, 246, 0.2);
@@ -538,63 +591,45 @@ useEffect(() => {
               inset 0 0 30px rgba(217, 70, 239, 0.3);
           }
         }
-        @keyframes redAlarm {
-          0%,
-          100% {
-            box-shadow: 0 0 40px rgba(239, 68, 68, 0.8),
-              0 0 80px rgba(239, 68, 68, 0.6),
-              inset 0 0 40px rgba(239, 68, 68, 0.3);
-            border-color: rgba(239, 68, 68, 0.8);
-          }
-          50% {
-            box-shadow: 0 0 60px rgba(220, 38, 38, 1),
-              0 0 120px rgba(220, 38, 38, 0.8),
-              inset 0 0 60px rgba(220, 38, 38, 0.5);
-            border-color: rgba(220, 38, 38, 1);
-          }
-        }
-        @keyframes shake {
-          0%,
-          100% {
-            transform: translateX(0) rotate(0deg);
-          }
-          25% {
-            transform: translateX(-10px) rotate(-2deg);
-          }
-          75% {
-            transform: translateX(10px) rotate(2deg);
-          }
-        }
+
         @keyframes warningPulse {
-          0%,
-          100% {
-            transform: scale(1);
-            opacity: 1;
+          0%, 100% {
+            opacity: 0.25;
           }
           50% {
-            transform: scale(1.08);
-            opacity: 0.9;
-          }
-        }
-        @keyframes glowPulse {
-          0%,
-          100% {
-            filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.6));
-          }
-          50% {
-            filter: drop-shadow(0 0 20px rgba(251, 191, 36, 1));
+            opacity: 0.45;
           }
         }
 
-        .animate-slide-in {
-          animation: slideIn 0.5s ease-out forwards;
-          opacity: 0;
+        @keyframes glow {
+          0%, 100% {
+            opacity: 0.4;
+          }
+          50% {
+            opacity: 0.7;
+          }
+        }
+
+        .animate-float {
+          animation: float 6s ease-in-out infinite;
+        }
+
+        .animate-glow {
+          animation: glow 3s ease-in-out infinite;
+        }
+
+        .hide-on-small {
+          display: inline;
+        }
+
+        @media (max-width: 480px) {
+          .hide-on-small {
+            display: none;
+          }
         }
 
         * {
           box-sizing: border-box;
-          margin: 0;
-          padding: 0;
         }
 
         body {
@@ -858,8 +893,7 @@ useEffect(() => {
                 >
                   GLOBAL ARENA
                 </div>
-                {/* 🎯 YENİ: Presence Count Subtitle */}
-                {lobbyPresenceCount > 0 && (
+                {spectators > 0 && (
                   <div
                     style={{
                       fontSize: "clamp(10px, 2vw, 12px)",
@@ -868,7 +902,7 @@ useEffect(() => {
                       marginTop: "2px",
                     }}
                   >
-                    {lobbyPresenceCount} online
+                    {spectators} online
                   </div>
                 )}
               </div>
@@ -886,7 +920,299 @@ useEffect(() => {
             padding: "clamp(24px, 5vw, 40px) clamp(16px, 4vw, 32px)",
           }}
         >
-          {/* Sponsor Banner */}
+          {/* ULTRA PREMIUM Sponsor Banner */}
+          <div
+            style={{
+              marginBottom: "clamp(24px, 5vw, 36px)",
+              padding: "clamp(20px, 4vw, 32px)",
+              borderRadius: "24px",
+              background:
+                "linear-gradient(135deg, rgba(251, 191, 36, 0.25) 0%, rgba(245, 158, 11, 0.18) 50%, rgba(234, 88, 12, 0.15) 100%)",
+              border: "3px solid transparent",
+              backgroundImage: `
+                linear-gradient(135deg, rgba(251, 191, 36, 0.25) 0%, rgba(245, 158, 11, 0.18) 50%, rgba(234, 88, 12, 0.15) 100%),
+                linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #ea580c 100%)
+              `,
+              backgroundOrigin: "border-box",
+              backgroundClip: "padding-box, border-box",
+              backdropFilter: "blur(24px)",
+              position: "relative",
+              overflow: "hidden",
+              boxShadow:
+                "0 0 40px rgba(251, 191, 36, 0.4), 0 10px 60px rgba(251, 191, 36, 0.25), inset 0 0 50px rgba(251, 191, 36, 0.08)",
+              minHeight: "clamp(120px, 20vw, 180px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              animation: "neonPulse 4s ease-in-out infinite",
+            }}
+          >
+            {/* Animated gradient overlay */}
+            <div
+              style={{
+                position: "absolute",
+                top: "-50%",
+                left: "-50%",
+                width: "200%",
+                height: "200%",
+                background:
+                  "conic-gradient(from 0deg, transparent, rgba(251, 191, 36, 0.3), transparent 30%)",
+                animation: "spin 8s linear infinite",
+                pointerEvents: "none",
+              }}
+            />
+
+            {/* Shimmer effect 1 */}
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: "-100%",
+                width: "50%",
+                height: "100%",
+                background:
+                  "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent)",
+                animation: "shimmer 3s infinite",
+                pointerEvents: "none",
+              }}
+            />
+
+            {/* Shimmer effect 2 (delayed) */}
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: "-100%",
+                width: "30%",
+                height: "100%",
+                background:
+                  "linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.4), transparent)",
+                animation: "shimmer 4s infinite 1.5s",
+                pointerEvents: "none",
+              }}
+            />
+
+            {/* Glow particles */}
+            <div
+              style={{
+                position: "absolute",
+                top: "20%",
+                left: "10%",
+                width: "8px",
+                height: "8px",
+                borderRadius: "50%",
+                background: "#fbbf24",
+                boxShadow: "0 0 20px #fbbf24",
+                animation: "float 5s ease-in-out infinite",
+                pointerEvents: "none",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                top: "70%",
+                right: "15%",
+                width: "6px",
+                height: "6px",
+                borderRadius: "50%",
+                background: "#f59e0b",
+                boxShadow: "0 0 15px #f59e0b",
+                animation: "float 6s ease-in-out infinite 1s",
+                pointerEvents: "none",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                top: "40%",
+                right: "25%",
+                width: "5px",
+                height: "5px",
+                borderRadius: "50%",
+                background: "#fbbf24",
+                boxShadow: "0 0 12px #fbbf24",
+                animation: "float 7s ease-in-out infinite 2s",
+                pointerEvents: "none",
+              }}
+            />
+
+            {/* Content container */}
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                height: "100%",
+                minHeight: "clamp(120px, 20vw, 180px)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "clamp(12px, 2.5vw, 16px)",
+                zIndex: 10,
+              }}
+            >
+              {/* Premium badge */}
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "6px 16px",
+                  borderRadius: "999px",
+                  background: "rgba(15, 23, 42, 0.8)",
+                  border: "1px solid rgba(251, 191, 36, 0.6)",
+                  backdropFilter: "blur(10px)",
+                  boxShadow: "0 4px 20px rgba(251, 191, 36, 0.3)",
+                }}
+              >
+                <Sparkles style={{ width: 14, height: 14, color: "#fbbf24" }} />
+                <span
+                  style={{
+                    fontSize: "clamp(10px, 2vw, 12px)",
+                    fontWeight: 700,
+                    color: "#fbbf24",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.1em",
+                    textShadow: "0 0 10px rgba(251, 191, 36, 0.5)",
+                  }}
+                >
+                  Official Sponsor
+                </span>
+                <Sparkles style={{ width: 14, height: 14, color: "#fbbf24" }} />
+              </div>
+
+              {/* Sponsor image with fallback */}
+              <div
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  maxWidth: "clamp(300px, 60vw, 600px)",
+                  height: "clamp(80px, 15vw, 120px)",
+                }}
+              >
+                <Image
+                  src="/images/sponsor.png"
+                  alt="Official Sponsor"
+                  fill
+                  sizes="(max-width: 768px) 300px, 600px"
+                  style={{
+                    objectFit: "contain",
+                    filter: "drop-shadow(0 0 20px rgba(251, 191, 36, 0.3))",
+                  }}
+                  priority
+                  onError={(e) => {
+                    const img = e.currentTarget;
+                    const container = img.parentElement as HTMLDivElement;
+                    if (container) {
+                      container.innerHTML = `
+                        <div style="
+                          width: 100%;
+                          height: 100%;
+                          display: flex;
+                          flex-direction: column;
+                          align-items: center;
+                          justify-content: center;
+                          gap: 12px;
+                        ">
+                          <div style="
+                            font-size: clamp(24px, 5vw, 36px);
+                            font-weight: 900;
+                            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+                            -webkit-background-clip: text;
+                            -webkit-text-fill-color: transparent;
+                            background-clip: text;
+                            text-transform: uppercase;
+                            letter-spacing: 0.05em;
+                            text-shadow: 0 0 30px rgba(251, 191, 36, 0.5);
+                          ">
+                            PREMIUM SPONSOR
+                          </div>
+                          <div style="
+                            font-size: clamp(12px, 2.5vw, 15px);
+                            color: #cbd5e1;
+                            font-weight: 600;
+                          ">
+                            Powering Global Competition
+                          </div>
+                        </div>
+                      `;
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Subtitle */}
+              <div
+                style={{
+                  fontSize: "clamp(11px, 2.2vw, 13px)",
+                  color: "#e0e7ff",
+                  fontWeight: 600,
+                  textAlign: "center",
+                  maxWidth: "500px",
+                  lineHeight: 1.4,
+                  textShadow: "0 2px 10px rgba(0, 0, 0, 0.3)",
+                }}
+              >
+                Supporting skill-based competition worldwide
+              </div>
+            </div>
+
+            {/* Corner accents */}
+            <div
+              style={{
+                position: "absolute",
+                top: "10px",
+                left: "10px",
+                width: "40px",
+                height: "40px",
+                borderTop: "3px solid rgba(251, 191, 36, 0.6)",
+                borderLeft: "3px solid rgba(251, 191, 36, 0.6)",
+                borderRadius: "8px 0 0 0",
+                pointerEvents: "none",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                top: "10px",
+                right: "10px",
+                width: "40px",
+                height: "40px",
+                borderTop: "3px solid rgba(251, 191, 36, 0.6)",
+                borderRight: "3px solid rgba(251, 191, 36, 0.6)",
+                borderRadius: "0 8px 0 0",
+                pointerEvents: "none",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                bottom: "10px",
+                left: "10px",
+                width: "40px",
+                height: "40px",
+                borderBottom: "3px solid rgba(251, 191, 36, 0.6)",
+                borderLeft: "3px solid rgba(251, 191, 36, 0.6)",
+                borderRadius: "0 0 0 8px",
+                pointerEvents: "none",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                bottom: "10px",
+                right: "10px",
+                width: "40px",
+                height: "40px",
+                borderBottom: "3px solid rgba(251, 191, 36, 0.6)",
+                borderRight: "3px solid rgba(251, 191, 36, 0.6)",
+                borderRadius: "0 0 8px 0",
+                pointerEvents: "none",
+              }}
+            />
+          </div>
+
+          {/* Prize Banner */}
           <div
             style={{
               marginBottom: "clamp(24px, 5vw, 36px)",
@@ -898,12 +1224,7 @@ useEffect(() => {
               backdropFilter: "blur(20px)",
               position: "relative",
               overflow: "hidden",
-              boxShadow:
-                "0 0 30px rgba(251, 191, 36, 0.3), inset 0 0 40px rgba(251, 191, 36, 0.06)",
-              minHeight: "clamp(100px, 18vw, 160px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              animation: "slideIn 0.5s ease-out",
             }}
           >
             <div
@@ -911,791 +1232,493 @@ useEffect(() => {
                 position: "absolute",
                 top: 0,
                 left: 0,
-                width: "50%",
+                right: 0,
                 height: "100%",
                 background:
-                  "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent)",
-                animation: "shimmer 3s infinite",
-                pointerEvents: "none",
+                  "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent)",
+                animation: "shimmer 3s linear infinite",
               }}
             />
-
             <div
-              style={{
-                position: "relative",
-                width: "100%",
-                height: "100%",
-                minHeight: "clamp(100px, 18vw, 160px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Image
-                src="/images/sponsor.png"
-                alt="Official Sponsor"
-                fill
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
-                style={{
-                  objectFit: "contain",
-                  padding: "clamp(12px, 3vw, 20px)",
-                }}
-                priority
-                onError={(e) => {
-                  const img = e.currentTarget;
-                  const container = img.parentElement as HTMLDivElement;
-                  if (container) {
-                    container.style.display = "none";
-                    const placeholder = container.nextElementSibling as HTMLDivElement;
-                    if (placeholder) placeholder.style.display = "block";
-                  }
-                }}
-              />
-            </div>
-
-            <div
-              id="sponsor-placeholder"
               style={{
                 position: "relative",
                 zIndex: 10,
-                textAlign: "center",
-                display: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "clamp(12px, 3vw, 18px)",
+                flexWrap: "wrap",
               }}
             >
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  padding: "4px 12px",
-                  borderRadius: "999px",
-                  background: "rgba(251, 191, 36, 0.25)",
-                  border: "1px solid rgba(251, 191, 36, 0.6)",
-                  marginBottom: "10px",
-                }}
-              >
-                <Sparkles style={{ width: 12, height: 12, color: "#fbbf24" }} />
-                <span
+              <Trophy style={{ width: "clamp(28px, 6vw, 38px)", height: "clamp(28px, 6vw, 38px)", color: "#fbbf24" }} />
+              <div style={{ textAlign: "center" }}>
+                <div
                   style={{
-                    fontSize: "clamp(9px, 1.8vw, 11px)",
-                    fontWeight: 700,
+                    fontSize: "clamp(18px, 4.5vw, 28px)",
+                    fontWeight: 900,
                     color: "#fbbf24",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
+                    textShadow: "0 0 20px rgba(251, 191, 36, 0.6)",
+                    lineHeight: 1.2,
                   }}
                 >
-                  Sponsor Space Available
-                </span>
-              </div>
-
-              <h2
-                style={{
-                  fontSize: "clamp(18px, 4.5vw, 32px)",
-                  fontWeight: 900,
-                  backgroundImage: "linear-gradient(135deg, #fbbf24, #f59e0b)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                  marginBottom: "8px",
-                  textShadow: "0 0 30px rgba(251, 191, 36, 0.4)",
-                }}
-              >
-                Your Brand Here
-              </h2>
-
-              <p
-                style={{
-                  fontSize: "clamp(11px, 2.8vw, 14px)",
-                  color: "#fcd34d",
-                  fontWeight: 600,
-                  marginBottom: "12px",
-                  lineHeight: 1.4,
-                }}
-              >
-                Reach 12,000+ active quiz players daily!
-              </p>
-
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  flexWrap: "wrap",
-                  justifyContent: "center",
-                }}
-              >
-                <div
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "8px",
-                    background: "rgba(15, 23, 42, 0.6)",
-                    border: "1px solid rgba(251, 191, 36, 0.3)",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: "clamp(9px, 2vw, 11px)",
-                      color: "#cbd5e1",
-                    }}
-                  >
-                    📊 <strong style={{ color: "#fbbf24" }}>12K+</strong> Players
-                  </span>
+                  £1,000 MONTHLY PRIZE
                 </div>
                 <div
                   style={{
-                    padding: "6px 12px",
-                    borderRadius: "8px",
-                    background: "rgba(15, 23, 42, 0.6)",
-                    border: "1px solid rgba(251, 191, 36, 0.3)",
+                    fontSize: "clamp(12px, 2.5vw, 15px)",
+                    color: "#cbd5e1",
+                    marginTop: "4px",
+                    fontWeight: 600,
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: "clamp(9px, 2vw, 11px)",
-                      color: "#cbd5e1",
-                    }}
-                  >
-                    🎯 <strong style={{ color: "#fbbf24" }}>Premium</strong> Spot
-                  </span>
-                </div>
-                <div
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "8px",
-                    background: "rgba(15, 23, 42, 0.6)",
-                    border: "1px solid rgba(251, 191, 36, 0.3)",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: "clamp(9px, 2vw, 11px)",
-                      color: "#cbd5e1",
-                    }}
-                  >
-                    💰 <strong style={{ color: "#fbbf24" }}>High</strong> ROI
-                  </span>
+                  Top scorer wins when 3000+ rounds sold
                 </div>
               </div>
+              <Sparkles style={{ width: "clamp(28px, 6vw, 38px)", height: "clamp(28px, 6vw, 38px)", color: "#fbbf24" }} />
             </div>
           </div>
 
+          {/* Main Grid */}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr",
-              gap: "clamp(24px, 5vw, 40px)",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 400px), 1fr))",
+              gap: "clamp(20px, 4vw, 32px)",
             }}
           >
-            {/* Countdown Section */}
+            {/* Left: Countdown Card */}
             <div
               style={{
-                padding: "clamp(32px, 6vw, 56px)",
-                borderRadius: "28px",
-                border:
-                  timeUntilStart <= 10
-                    ? "3px solid #ef4444"
-                    : "3px solid rgba(139, 92, 246, 0.6)",
-                background:
-                  timeUntilStart <= 10
-                    ? "linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.1))"
-                    : "rgba(15, 23, 42, 0.85)",
-                backdropFilter: "blur(25px)",
-                textAlign: "center",
-                animation:
-                  showWarning && timeUntilStart <= 10
-                    ? "redAlarm 0.8s ease-in-out infinite, shake 0.5s ease-in-out infinite"
-                    : "none",
-                boxShadow:
-                  timeUntilStart <= 10
-                    ? "0 0 60px rgba(239, 68, 68, 0.6)"
-                    : "0 0 40px rgba(139, 92, 246, 0.4)",
+                background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+                borderRadius: "24px",
+                padding: "clamp(24px, 5vw, 36px)",
+                border: timeUntilStart <= 10 ? "2px solid #ef4444" : "2px solid rgba(139, 92, 246, 0.4)",
+                boxShadow: timeUntilStart <= 10 
+                  ? "0 0 40px rgba(239, 68, 68, 0.6), inset 0 0 40px rgba(239, 68, 68, 0.1)"
+                  : "0 0 40px rgba(139, 92, 246, 0.3), inset 0 0 30px rgba(139, 92, 246, 0.1)",
+                position: "relative",
+                overflow: "hidden",
+                animation: "slideIn 0.6s ease-out 0.1s backwards",
               }}
             >
+              {/* Shimmer Effect */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: "2px",
+                  background:
+                    "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent)",
+                  animation: "shimmer 2s linear infinite",
+                }}
+              />
+
               {/* Status Badge */}
               <div
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: "10px",
-                  padding: "10px 24px",
+                  gap: "8px",
+                  padding: "8px 16px",
                   borderRadius: "999px",
-                  background:
-                    timeUntilStart <= 10
-                      ? "rgba(239, 68, 68, 0.25)"
-                      : "rgba(34, 197, 94, 0.25)",
-                  border:
-                    timeUntilStart <= 10
-                      ? "2px solid rgba(239, 68, 68, 0.6)"
-                      : "2px solid rgba(34, 197, 94, 0.5)",
-                  marginBottom: "clamp(20px, 4vw, 32px)",
-                  boxShadow:
-                    timeUntilStart <= 10
-                      ? "0 0 25px rgba(239, 68, 68, 0.5)"
-                      : "0 0 20px rgba(34, 197, 94, 0.4)",
+                  background: `${getStatusColor()}20`,
+                  border: `1px solid ${getStatusColor()}`,
+                  marginBottom: "24px",
                 }}
               >
-                <Shield
+                <div
                   style={{
-                    width: 20,
-                    height: 20,
-                    color:
-                      timeUntilStart <= 10
-                        ? "#ef4444"
-                        : "#4ade80",
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: getStatusColor(),
+                    animation: "pulse-ring 2s ease-in-out infinite",
                   }}
                 />
                 <span
                   style={{
-                    fontSize: "clamp(12px, 2.8vw, 14px)",
-                    fontWeight: 800,
-                    color:
-                      timeUntilStart <= 10
-                        ? "#fca5a5"
-                        : "#4ade80",
+                    fontSize: "clamp(12px, 2.5vw, 14px)",
+                    fontWeight: 700,
+                    color: getStatusColor(),
                     textTransform: "uppercase",
-                    letterSpacing: "0.06em",
+                    letterSpacing: "0.05em",
                   }}
                 >
-                  {timeUntilStart <= 10
-                    ? "🚨 STARTING NOW!"
-                    : "✓ You're in the Lobby"}
+                  {hasJoined ? "JOINED" : timeUntilStart <= 10 ? "STARTING SOON" : "WAITING"}
                 </span>
               </div>
 
-              {/* Warning Message */}
-              {showWarning && timeUntilStart <= 10 && (
+              {/* Countdown Display */}
+              <div style={{ textAlign: "center", marginBottom: "32px" }}>
                 <div
                   style={{
-                    padding: "20px 28px",
-                    borderRadius: "20px",
-                    background:
-                      "linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(220, 38, 38, 0.2))",
-                    border: "3px solid #ef4444",
-                    marginBottom: "clamp(20px, 4vw, 32px)",
-                    animation: "neonPulse 0.6s ease-in-out infinite",
-                    boxShadow: "0 0 40px rgba(239, 68, 68, 0.8)",
+                    fontSize: "clamp(11px, 2.2vw, 13px)",
+                    color: "#94a3b8",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.1em",
+                    marginBottom: "16px",
                   }}
                 >
-                  <p
-                    style={{
-                      fontSize: "clamp(20px, 5vw, 32px)",
-                      fontWeight: 900,
-                      color: "#fca5a5",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.12em",
-                      textShadow: "0 0 30px #ef4444",
-                      margin: 0,
-                    }}
-                  >
-                    {getWarningMessage()}
-                  </p>
+                  Round Starts In
                 </div>
-              )}
-
-              {/* Countdown Title */}
-              <h1
-                style={{
-                  fontSize: "clamp(22px, 5.5vw, 36px)",
-                  fontWeight: 800,
-                  marginBottom: "clamp(16px, 3vw, 24px)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "14px",
-                  flexWrap: "wrap",
-                  color:
-                    timeUntilStart <= 10
-                      ? "#fca5a5"
-                      : "white",
-                }}
-              >
-                <Clock
-                  style={{
-                    width: "clamp(28px, 7vw, 36px)",
-                    height: "clamp(28px, 7vw, 36px)",
-                    color:
-                      timeUntilStart <= 10
-                        ? "#ef4444"
-                        : "#a78bfa",
-                  }}
-                />
-                Quiz Starting In
-              </h1>
-
-              {/* Countdown Timer */}
-              <div
-                style={{
-                  fontSize: "clamp(56px, 18vw, 120px)",
-                  fontWeight: 900,
-                  backgroundImage:
-                    timeUntilStart <= 10
-                      ? "linear-gradient(135deg, #ef4444, #dc2626)"
-                      : "linear-gradient(135deg, #a78bfa, #f0abfc)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                  marginBottom: "clamp(24px, 5vw, 40px)",
-                  fontFamily: "monospace",
-                  textShadow:
-                    timeUntilStart <= 10
-                      ? "0 0 50px rgba(239, 68, 68, 0.8)"
-                      : "0 0 50px rgba(167, 139, 250, 0.6)",
-                  animation:
-                    timeUntilStart <= 10
-                      ? "warningPulse 0.4s ease-in-out infinite"
-                      : "none",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                {formattedCountdown}
-              </div>
-
-              {/* Progress Bar */}
-              <div
-                style={{
-                  width: "100%",
-                  height: "14px",
-                  borderRadius: "999px",
-                  background: "rgba(30, 41, 59, 0.9)",
-                  overflow: "hidden",
-                  marginBottom: "clamp(24px, 5vw, 40px)",
-                  border:
-                    timeUntilStart <= 10
-                      ? "2px solid rgba(239, 68, 68, 0.5)"
-                      : "2px solid rgba(139, 92, 246, 0.4)",
-                  boxShadow:
-                    timeUntilStart <= 10
-                      ? "0 0 20px rgba(239, 68, 68, 0.5), inset 0 0 10px rgba(239, 68, 68, 0.3)"
-                      : "0 0 15px rgba(139, 92, 246, 0.4)",
-                }}
-              >
                 <div
                   style={{
-                    width: `${progress}%`,
-                    height: "100%",
-                    background:
-                      timeUntilStart <= 10
-                        ? "linear-gradient(90deg, #ef4444, #dc2626)"
-                        : "linear-gradient(90deg, #7c3aed, #d946ef)",
-                    borderRadius: "999px",
-                    transition: "width 1s linear",
-                    boxShadow:
-                      timeUntilStart <= 10
-                        ? "0 0 25px rgba(239, 68, 68, 1)"
-                        : "0 0 25px rgba(139, 92, 246, 0.9)",
+                    fontSize: "clamp(64px, 15vw, 96px)",
+                    fontWeight: 900,
+                    fontFamily: "ui-monospace, monospace",
+                    color: getStatusColor(),
+                    lineHeight: 1,
+                    textShadow: `0 0 40px ${getStatusColor()}80`,
+                    marginBottom: "24px",
                   }}
-                />
+                >
+                  {formatTime(timeUntilStart)}
+                </div>
+
+                {/* Progress Bar */}
+                <div
+                  style={{
+                    width: "100%",
+                    height: "8px",
+                    background: "rgba(255, 255, 255, 0.1)",
+                    borderRadius: "999px",
+                    overflow: "hidden",
+                    position: "relative",
+                  }}
+                >
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: 0,
+                      top: 0,
+                      height: "100%",
+                      width: `${progress}%`,
+                      background: `linear-gradient(90deg, ${getStatusColor()}, ${getStatusColor()}dd)`,
+                      borderRadius: "999px",
+                      transition: "width 1s linear",
+                      boxShadow: `0 0 20px ${getStatusColor()}`,
+                    }}
+                  />
+                </div>
               </div>
 
-              {/* Info Message */}
-              <p
+              {/* Join Button */}
+              {!hasJoined && (
+                <button
+                  onClick={handleJoinRound}
+                  disabled={userCredits === 0}
+                  style={{
+                    width: "100%",
+                    padding: "clamp(16px, 3.5vw, 20px)",
+                    borderRadius: "16px",
+                    border: "none",
+                    background: userCredits === 0
+                      ? "rgba(148, 163, 184, 0.3)"
+                      : "linear-gradient(135deg, #7c3aed, #d946ef)",
+                    color: "white",
+                    fontSize: "clamp(16px, 3.5vw, 20px)",
+                    fontWeight: 800,
+                    cursor: userCredits === 0 ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "12px",
+                    transition: "all 0.3s",
+                    opacity: userCredits === 0 ? 0.5 : 1,
+                    boxShadow: userCredits === 0 
+                      ? "none"
+                      : "0 10px 40px rgba(139, 92, 246, 0.5)",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (userCredits > 0) {
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.boxShadow = "0 15px 50px rgba(139, 92, 246, 0.6)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (userCredits > 0) {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "0 10px 40px rgba(139, 92, 246, 0.5)";
+                    }
+                  }}
+                >
+                  {userCredits === 0 ? (
+                    <>
+                      <Shield style={{ width: 20, height: 20 }} />
+                      No Rounds Left
+                    </>
+                  ) : (
+                    <>
+                      <Zap style={{ width: 20, height: 20 }} />
+                      JOIN ROUND (1 Credit)
+                      <Flame style={{ width: 20, height: 20 }} />
+                    </>
+                  )}
+                </button>
+              )}
+
+              {hasJoined && (
+                <div
+                  style={{
+                    width: "100%",
+                    padding: "20px",
+                    borderRadius: "16px",
+                    background: "rgba(34, 197, 94, 0.15)",
+                    border: "2px solid rgba(34, 197, 94, 0.4)",
+                    textAlign: "center",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      fontSize: "clamp(16px, 3.5vw, 18px)",
+                      fontWeight: 700,
+                      color: "#22c55e",
+                    }}
+                  >
+                    <Trophy style={{ width: 22, height: 22 }} />
+                    YOU'RE IN! GET READY...
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right: Players Card */}
+            <div
+              style={{
+                background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+                borderRadius: "24px",
+                padding: "clamp(24px, 5vw, 36px)",
+                border: "2px solid rgba(139, 92, 246, 0.3)",
+                animation: "slideIn 0.6s ease-out 0.2s backwards",
+              }}
+            >
+              {/* Header */}
+              <div
                 style={{
-                  fontSize: "clamp(14px, 3.2vw, 17px)",
-                  color:
-                    timeUntilStart <= 10
-                      ? "#fca5a5"
-                      : "#cbd5e1",
-                  marginBottom: "clamp(28px, 6vw, 40px)",
-                  lineHeight: 1.7,
-                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  marginBottom: "24px",
                 }}
               >
-                {timeUntilStart <= 10
-                  ? "🔥 Get ready! You'll be automatically entered when the countdown ends!"
-                  : "You're in. Get ready!"}
-              </p>
+                <Users style={{ width: 24, height: 24, color: "#8b5cf6" }} />
+                <h3
+                  style={{
+                    fontSize: "clamp(18px, 4vw, 24px)",
+                    fontWeight: 800,
+                    margin: 0,
+                    color: "white",
+                  }}
+                >
+                  Live Arena
+                </h3>
+              </div>
 
-              {/* Quiz Info Grid - 3 Cards */}
+              {/* Stats Grid */}
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                  gap: "clamp(14px, 3.5vw, 20px)",
-                  maxWidth: "900px",
-                  margin: "0 auto",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: "12px",
+                  marginBottom: "24px",
                 }}
               >
                 <div
                   style={{
-                    padding: "clamp(14px, 3.5vw, 20px)",
-                    borderRadius: "16px",
-                    background: "rgba(139, 92, 246, 0.15)",
-                    border: "2px solid rgba(139, 92, 246, 0.3)",
-                    boxShadow: "0 0 15px rgba(139, 92, 246, 0.2)",
+                    padding: "16px",
+                    borderRadius: "12px",
+                    background: "rgba(139, 92, 246, 0.1)",
+                    border: "1px solid rgba(139, 92, 246, 0.3)",
+                    textAlign: "center",
                   }}
                 >
-                  <div
-                    style={{
-                      fontSize: "clamp(11px, 2.3vw, 13px)",
-                      color: "#94a3b8",
-                      marginBottom: "6px",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Format
+                  <div style={{ fontSize: "clamp(20px, 5vw, 28px)", fontWeight: 800, color: "white", marginBottom: "4px" }}>
+                    {participants}
                   </div>
-                  <div
-                    style={{
-                      fontSize: "clamp(16px, 3.5vw, 20px)",
-                      fontWeight: 800,
-                      color: "#c4b5fd",
-                    }}
-                  >
-                    Multiple Choice
+                  <div style={{ fontSize: "clamp(10px, 2vw, 12px)", color: "#94a3b8", fontWeight: 600 }}>
+                    JOINED
                   </div>
                 </div>
+
                 <div
                   style={{
-                    padding: "clamp(14px, 3.5vw, 20px)",
-                    borderRadius: "16px",
-                    background: "rgba(236, 72, 153, 0.15)",
-                    border: "2px solid rgba(236, 72, 153, 0.3)",
-                    boxShadow: "0 0 15px rgba(236, 72, 153, 0.2)",
+                    padding: "16px",
+                    borderRadius: "12px",
+                    background: "rgba(34, 211, 238, 0.1)",
+                    border: "1px solid rgba(34, 211, 238, 0.3)",
+                    textAlign: "center",
                   }}
                 >
-                  <div
-                    style={{
-                      fontSize: "clamp(11px, 2.3vw, 13px)",
-                      color: "#94a3b8",
-                      marginBottom: "6px",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Time Limit
+                  <div style={{ fontSize: "clamp(20px, 5vw, 28px)", fontWeight: 800, color: "white", marginBottom: "4px" }}>
+                    {spectators}
                   </div>
-                  <div
-                    style={{
-                      fontSize: "clamp(16px, 3.5vw, 20px)",
-                      fontWeight: 800,
-                      color: "#f9a8d4",
-                    }}
-                  >
-                    6 seconds
+                  <div style={{ fontSize: "clamp(10px, 2vw, 12px)", color: "#94a3b8", fontWeight: 600 }}>
+                    WATCHING
                   </div>
                 </div>
+
                 <div
                   style={{
-                    padding: "clamp(14px, 3.5vw, 20px)",
-                    borderRadius: "16px",
-                    background: "rgba(34, 197, 94, 0.15)",
-                    border: "2px solid rgba(34, 197, 94, 0.3)",
-                    boxShadow: "0 0 15px rgba(34, 197, 94, 0.2)",
+                    padding: "16px",
+                    borderRadius: "12px",
+                    background: "rgba(16, 185, 129, 0.1)",
+                    border: "1px solid rgba(16, 185, 129, 0.3)",
+                    textAlign: "center",
                   }}
                 >
-                  <div
-                    style={{
-                      fontSize: "clamp(11px, 2.3vw, 13px)",
-                      color: "#94a3b8",
-                      marginBottom: "6px",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Points
+                  <div style={{ fontSize: "clamp(18px, 4.5vw, 24px)", fontWeight: 800, color: "white", marginBottom: "4px" }}>
+                    {displayRange}
                   </div>
-                  <div
-                    style={{
-                      fontSize: "clamp(16px, 3.5vw, 20px)",
-                      fontWeight: 800,
-                      color: "#86efac",
-                    }}
-                  >
-                    2 per correct
+                  <div style={{ fontSize: "clamp(10px, 2vw, 12px)", color: "#94a3b8", fontWeight: 600 }}>
+                    ACTIVE
                   </div>
                 </div>
               </div>
 
-              {/* Pro Tip */}
-              <div
-                style={{
-                  marginTop: "clamp(20px, 4.5vw, 28px)",
-                  padding: "clamp(14px, 3.5vw, 20px)",
-                  borderRadius: "14px",
-                  background: "rgba(59, 130, 246, 0.12)",
-                  border: "2px solid rgba(59, 130, 246, 0.25)",
-                }}
-              >
+              {/* Recent Players List */}
+              <div>
                 <div
                   style={{
-                    fontSize: "clamp(13px, 3vw, 15px)",
-                    color: "#bfdbfe",
+                    fontSize: "clamp(13px, 2.8vw, 15px)",
+                    color: "#94a3b8",
                     fontWeight: 600,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    marginBottom: "16px",
                   }}
                 >
-                  💡 <strong style={{ color: "white" }}>Pro Tip:</strong> Speed matters. Answer fast and accurately to dominate the leaderboard.
+                  Recent Joins
                 </div>
-              </div>
-            </div>
 
-            {/* Players Section */}
-            <div
-              style={{
-                padding: "clamp(21px, 4.5vw, 30px)",
-                borderRadius: "28px",
-                border: "2px solid rgba(255, 255, 255, 0.12)",
-                background: "rgba(15, 23, 42, 0.7)",
-                backdropFilter: "blur(25px)",
-                boxShadow: "0 0 30px rgba(139, 92, 246, 0.2)",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  marginBottom: "clamp(18px, 3.75vw, 24px)",
-                  flexWrap: "wrap",
-                  gap: "14px",
-                }}
-              >
-                <h3
-                  style={{
-                    fontSize: "clamp(17px, 3.4vw, 20px)",
-                    fontWeight: 800,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                  }}
-                >
-                  <Users
-                    style={{
-                      width: "clamp(19px, 4.1vw, 24px)",
-                      height: "clamp(19px, 4.1vw, 24px)",
-                      color: "#c4b5fd",
-                    }}
-                  />
-                  Players in Lobby
-                </h3>
                 <div
                   style={{
-                    padding: "8px 16px",
-                    borderRadius: "10px",
-                    background: "rgba(139, 92, 246, 0.25)",
-                    border: "2px solid rgba(139, 92, 246, 0.4)",
-                    fontSize: "clamp(12px, 2.25vw, 14px)",
-                    fontWeight: 800,
-                    color: "#c4b5fd",
-                    boxShadow: "0 0 15px rgba(139, 92, 246, 0.3)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                    maxHeight: "300px",
+                    overflowY: "auto",
                   }}
                 >
-                  {Math.max(66, players.length)}
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "clamp(9px, 1.9vw, 12px)",
-                  maxHeight: "412px",
-                  overflowY: "auto",
-                  paddingRight: "8px",
-                }}
-              >
-                {players.length > 0 ? (
-                  players.map((player, idx) => (
+                  {recentPlayers.length === 0 ? (
                     <div
-                      key={player.user_id}
-                      className="animate-slide-in"
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "clamp(10px, 2.6vw, 13px)",
-                        padding: "clamp(10px, 2.6vw, 15px)",
-                        borderRadius: "18px",
-                        border: "1px solid rgba(255, 255, 255, 0.12)",
-                        background: "rgba(255, 255, 255, 0.04)",
-                        transition: "all 0.3s",
-                        animationDelay: `${idx * 0.1}s`,
-                        boxShadow: "0 0 15px rgba(0, 0, 0, 0.2)",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "rgba(139, 92, 246, 0.1)";
-                        e.currentTarget.style.transform = "translateX(8px)";
-                        e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.4)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)";
-                        e.currentTarget.style.transform = "translateX(0)";
-                        e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)";
+                        padding: "24px",
+                        textAlign: "center",
+                        color: "#6b7280",
+                        fontSize: "14px",
                       }}
                     >
+                      Waiting for players to join...
+                    </div>
+                  ) : (
+                    recentPlayers.map((player, idx) => (
                       <div
+                        key={player.user_id}
                         style={{
-                          width: "clamp(33px, 8.25vw, 40px)",
-                          height: "clamp(33px, 8.25vw, 40px)",
-                          borderRadius: "50%",
-                          border: "3px solid rgba(139, 92, 246, 0.6)",
-                          overflow: "hidden",
-                          flexShrink: 0,
-                          position: "relative",
-                          boxShadow: "0 0 15px rgba(139, 92, 246, 0.4)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "12px",
+                          padding: "12px",
+                          borderRadius: "12px",
+                          background: "rgba(255, 255, 255, 0.03)",
+                          border: "1px solid rgba(255, 255, 255, 0.06)",
+                          animation: `slideIn 0.4s ease-out ${idx * 0.05}s backwards`,
                         }}
                       >
-                        <Image
-                          src={player.avatar_url || "/images/logo.png"}
-                          alt={player.full_name}
-                          fill
-                          sizes="40px"
-                          style={{ objectFit: "cover" }}
-                        />
-                      </div>
-
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                        {/* Avatar */}
                         <div
                           style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: "50%",
+                            background: "linear-gradient(135deg, #7c3aed, #d946ef)",
                             display: "flex",
                             alignItems: "center",
-                            gap: "8px",
-                            marginBottom: "5px",
-                            flexWrap: "wrap",
+                            justifyContent: "center",
+                            fontWeight: 700,
+                            fontSize: "16px",
+                            color: "white",
+                            flexShrink: 0,
                           }}
                         >
-                          <span
+                          {player.full_name.charAt(0).toUpperCase()}
+                        </div>
+
+                        {/* Name */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
                             style={{
-                              fontSize: "clamp(13px, 2.6vw, 15px)",
-                              fontWeight: 700,
+                              fontSize: "clamp(13px, 2.8vw, 15px)",
+                              fontWeight: 600,
+                              color: "white",
                               overflow: "hidden",
                               textOverflow: "ellipsis",
                               whiteSpace: "nowrap",
                             }}
                           >
-                            {player.full_name || "Anonymous"}
-                          </span>
-                          {player.streak >= 10 && (
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "5px",
-                                padding: "3px 10px",
-                                borderRadius: "8px",
-                                background: "rgba(239, 68, 68, 0.25)",
-                                border: "1px solid rgba(239, 68, 68, 0.4)",
-                                boxShadow: "0 0 10px rgba(239, 68, 68, 0.3)",
-                              }}
-                            >
-                              <Flame style={{ width: 13, height: 13, color: "#fca5a5" }} />
-                              <span
-                                style={{
-                                  fontSize: "11px",
-                                  fontWeight: 800,
-                                  color: "#fca5a5",
-                                }}
-                              >
-                                {player.streak}
-                              </span>
-                            </div>
-                          )}
+                            {player.full_name}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "clamp(10px, 2vw, 12px)",
+                              color: "#6b7280",
+                            }}
+                          >
+                            Just joined
+                          </div>
                         </div>
+
+                        {/* Badge */}
                         <div
                           style={{
-                            fontSize: "clamp(10px, 2.1vw, 12px)",
-                            color: "#94a3b8",
-                            fontWeight: 600,
+                            padding: "4px 8px",
+                            borderRadius: "6px",
+                            background: "rgba(34, 197, 94, 0.15)",
+                            border: "1px solid rgba(34, 197, 94, 0.3)",
                           }}
                         >
-                          🏆 {player.total_score.toLocaleString()} points
+                          <Clock style={{ width: 14, height: 14, color: "#22c55e" }} />
                         </div>
                       </div>
-                    </div>
-                  ))
-                ) : (
-                  <div
-                    style={{
-                      padding: "clamp(21px, 4.5vw, 30px)",
-                      textAlign: "center",
-                      color: "#64748b",
-                      fontSize: "clamp(12px, 2.4vw, 14px)",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Waiting for players to join...
-                  </div>
-                )}
-              </div>
-
-              {/* Total Players Info */}
-              <div
-                style={{
-                  marginTop: "clamp(15px, 3.4vw, 21px)",
-                  padding: "clamp(12px, 3vw, 16px)",
-                  borderRadius: "16px",
-                  background:
-                    "linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(217, 70, 239, 0.1))",
-                  border: "2px solid rgba(139, 92, 246, 0.3)",
-                  textAlign: "center",
-                  boxShadow: "0 0 20px rgba(139, 92, 246, 0.25)",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "clamp(12px, 2.4vw, 14px)",
-                    color: "#cbd5e1",
-                    fontWeight: 600,
-                  }}
-                >
-                  🌍{" "}
-                  <strong style={{ color: "#c4b5fd", fontWeight: 800 }}>
-                    {Math.max(66, totalPlayers).toLocaleString()}
-                  </strong>{" "}
-                  players in this round
+                    ))
+                  )}
                 </div>
               </div>
             </div>
           </div>
+
+          {/* Bottom Info */}
+          <div
+            style={{
+              marginTop: "32px",
+              padding: "20px",
+              borderRadius: "16px",
+              background: "rgba(139, 92, 246, 0.08)",
+              border: "1px solid rgba(139, 92, 246, 0.2)",
+              textAlign: "center",
+              animation: "slideIn 0.6s ease-out 0.3s backwards",
+            }}
+          >
+            <p
+              style={{
+                fontSize: "clamp(13px, 2.8vw, 15px)",
+                color: "#cbd5e1",
+                margin: 0,
+                lineHeight: 1.6,
+              }}
+            >
+              <strong style={{ color: "white" }}>You're in the lobby!</strong> The quiz will start
+              automatically when the countdown reaches 0. Get ready to compete!
+            </p>
+          </div>
         </main>
       </div>
-
-      <style jsx>{`
-        @media (min-width: 900px) {
-          main > div:last-child {
-            grid-template-columns: 1.3fr 1fr;
-          }
-        }
-
-        @media (max-width: 640px) {
-          .hide-on-small {
-            display: none !important;
-          }
-
-          header > div {
-            position: relative !important;
-          }
-        }
-
-        @media (max-width: 899px) {
-          .hide-mobile {
-            display: none !important;
-          }
-        }
-
-        ::-webkit-scrollbar {
-          width: 10px;
-        }
-
-        ::-webkit-scrollbar-track {
-          background: rgba(15, 23, 42, 0.7);
-          borderRadius: 10px;
-        }
-
-        ::-webkit-scrollbar-thumb {
-          background: linear-gradient(
-            135deg,
-            rgba(139, 92, 246, 0.7),
-            rgba(217, 70, 239, 0.5)
-          );
-          borderRadius: 10px;
-          border: 2px solid rgba(15, 23, 42, 0.7);
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-          background: linear-gradient(
-            135deg,
-            rgba(139, 92, 246, 0.9),
-            rgba(217, 70, 239, 0.7)
-          );
-        }
-      `}</style>
     </>
   );
 }
