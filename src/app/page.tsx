@@ -918,30 +918,41 @@ export default function HomePage() {
   }, []);
 
   const handleStartLiveQuiz = useCallback(async () => {
+    console.log('[HomePage] handleStartLiveQuiz called');
+    
     if (!user) {
+      console.log('[HomePage] No user, storing intent and signing in');
       sessionStorage.setItem("postLoginIntent", "live");
       await handleSignIn();
       return;
     }
 
+    console.log('[HomePage] User exists:', user.email);
+
     if (!checkAgeVerification()) {
+      console.log('[HomePage] Age verification needed');
       setPendingAction("live");
       setShowAgeModal(true);
       return;
     }
 
+    console.log('[HomePage] Age verified, checking credits...');
     const remaining = await getFreshUserRounds();
+    console.log('[HomePage] Credits remaining:', remaining);
 
     if (remaining === "error") {
+      console.error('[HomePage] Error fetching credits');
       alert("Round balance could not be verified. Please refresh and try again.");
       return;
     }
 
     if (remaining <= 0) {
+      console.log('[HomePage] No credits, showing modal');
       setShowNoRoundsModal(true);
       return;
     }
 
+    console.log('[HomePage] ✅ All checks passed, redirecting to /lobby');
     router.push("/lobby");
   }, [user, handleSignIn, checkAgeVerification, getFreshUserRounds, router]);
 
