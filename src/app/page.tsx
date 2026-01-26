@@ -23,7 +23,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { playMenuMusic, stopMenuMusic } from "@/lib/audioManager";
 
 // ============================================
-// 🎯 PRESENCE TRACKING HOOK (YENİ - KANONİK)
+// 🎯 PRESENCE TRACKING HOOK (KANONİK)
 // ============================================
 function usePresence(pageType: string) {
   const sessionIdRef = useRef<string | undefined>(undefined);
@@ -460,7 +460,7 @@ export default function HomePage() {
   const resumeIntentHandledRef = useRef<boolean>(false);
 
   // ============================================
-  // 🎯 PRESENCE TRACKING (YENİ - KANONİK)
+  // 🎯 PRESENCE TRACKING (KANONİK)
   // ============================================
   usePresence('homepage');
 
@@ -543,18 +543,22 @@ export default function HomePage() {
   }, []);
 
   // ============================================
-  // 🎯 FETCH ACTIVE PLAYERS (YENİ - KANONİK)
+  // 🎯 FETCH ACTIVE PLAYERS (DÜZELTİLDİ - KANONİK)
   // ============================================
   const fetchActivePlayers = useCallback(async () => {
     try {
-      // Get presence count on homepage
-      const { data: presenceCount } = await supabase.rpc('get_presence_count', {
+      const { data, error } = await supabase.rpc('get_presence_count', {
         p_page_type: 'homepage',
         p_round_id: null
       });
 
-      if (presenceCount !== null && presenceCount !== undefined) {
-        setActivePlayers(presenceCount);
+      if (error) {
+        console.error('[ActivePlayers] RPC error:', error);
+        return;
+      }
+
+      if (data !== null && data !== undefined) {
+        setActivePlayers(data);
       }
     } catch (err) {
       console.error('[ActivePlayers] Error:', err);
@@ -562,7 +566,7 @@ export default function HomePage() {
   }, []);
 
   // ============================================
-  // 🎯 FETCH REAL STATS (YENİ - KANONİK)
+  // 🎯 FETCH REAL STATS (DÜZELTİLDİ - KANONİK)
   // ============================================
   const fetchRealStats = useCallback(async () => {
     try {
@@ -574,15 +578,12 @@ export default function HomePage() {
       
       if (roundsCount !== null) setTotalRounds(roundsCount);
 
-      // Total participants (unique users)
-      const { data: participantsData } = await supabase
-        .from('round_participants')
-        .select('user_id', { count: 'exact', head: false });
+      // Total unique participants (from profiles table)
+      const { count: participantsCount } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
       
-      if (participantsData) {
-        const uniqueUsers = new Set(participantsData.map((p: any) => p.user_id));
-        setTotalParticipants(uniqueUsers.size);
-      }
+      if (participantsCount !== null) setTotalParticipants(participantsCount);
     } catch (err) {
       console.error('[RealStats] Error:', err);
     }
@@ -614,24 +615,28 @@ export default function HomePage() {
   );
 
   // ============================================
-  // 🎯 FETCH CHAMPIONS (GÜNCELLENDİ - RPC KULLANıYOR)
+  // 🎯 FETCH CHAMPIONS (DÜZELTİLDİ - KANONİK)
   // ============================================
   const fetchChampions = useCallback(async () => {
     try {
-      // Call get_champions RPC
-      const { data, error } = await supabase.rpc('get_champions');
+      // Weekly champion from materialized view
+      const { data: weeklyData, error: weeklyError } = await supabase
+        .from('leaderboard_weekly')
+        .select('full_name, total_score')
+        .eq('rank', 1)
+        .limit(1)
+        .maybeSingle();
 
-      if (error) {
-        console.error("[Champions] RPC error:", error);
-        setChampions(getDefaultChampions());
-        return;
-      }
+      // Monthly champion from materialized view
+      const { data: monthlyData, error: monthlyError } = await supabase
+        .from('leaderboard_monthly')
+        .select('full_name, total_score')
+        .eq('rank', 1)
+        .limit(1)
+        .maybeSingle();
 
-      // If no data or empty, show defaults
-      if (!data || data.length === 0) {
-        setChampions(getDefaultChampions());
-        return;
-      }
+      if (weeklyError) console.error('[Champions] Weekly error:', weeklyError);
+      if (monthlyError) console.error('[Champions] Monthly error:', monthlyError);
 
       const icons = [Trophy, Crown];
       const colors = ["#c084fc", "#22d3ee"];
@@ -640,27 +645,28 @@ export default function HomePage() {
         "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
       ];
 
-      // Map RPC results to champion cards
-      const mapped = data
-        .map((row: any) => {
-          if (!row || !row.full_name || row.total_score === 0) return null;
+      const champions = [
+        {
+          period: "Weekly",
+          name: weeklyData?.full_name || "TBA",
+          score: weeklyData?.total_score || 0,
+          gradient: gradients[0],
+          color: colors[0],
+          icon: icons[0],
+        },
+        {
+          period: "Monthly",
+          name: monthlyData?.full_name || "TBA",
+          score: monthlyData?.total_score || 0,
+          gradient: gradients[1],
+          color: colors[1],
+          icon: icons[1],
+        },
+      ];
 
-          const periodIndex = row.period === 'weekly' ? 0 : 1;
-          
-          return {
-            period: row.period === 'weekly' ? 'Weekly' : 'Monthly',
-            name: row.full_name,
-            score: row.total_score || 0,
-            gradient: gradients[periodIndex],
-            color: colors[periodIndex],
-            icon: icons[periodIndex],
-          };
-        })
-        .filter(Boolean);
-
-      setChampions(mapped.length ? mapped : getDefaultChampions());
+      setChampions(champions);
     } catch (err) {
-      console.error("[Champions] Fetch failed:", err);
+      console.error("[Champions] Error:", err);
       setChampions(getDefaultChampions());
     }
   }, [getDefaultChampions]);
@@ -694,7 +700,7 @@ export default function HomePage() {
   }, [user, fetchUserRounds]);
 
   // ============================================
-  // INITIAL DATA LOAD (GÜNCELLENDİ - KANONİK)
+  // INITIAL DATA LOAD (KANONİK)
   // ============================================
   useEffect(() => {
     let cancelled = false;
@@ -965,7 +971,7 @@ export default function HomePage() {
   }, []);
 
   // ============================================
-  // 🎯 STATS CARDS (GÜNCELLENDİ - KANONİK)
+  // 🎯 STATS CARDS (KANONİK)
   // ============================================
   const statsCards = useMemo(
     () => [
