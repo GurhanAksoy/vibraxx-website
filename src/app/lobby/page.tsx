@@ -152,49 +152,55 @@ export default function LobbyPage() {
   }, [isPlaying]);
 
   // 🔐 === AUTH CHECK & CREDITS ===
-  useEffect(() => {
-    const checkAuth = async () => {
-      setIsLoading(true);
+useEffect(() => {
+  const checkAuth = async () => {
+    setIsLoading(true);
 
-      const {
-        data: { user: authUser },
-        error: authError,
-      } = await supabase.auth.getUser();
+    // 1️⃣ Auth check
+    const {
+      data: { user: authUser },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-      if (authError || !authUser) {
-        console.log("[Lobby] Not authenticated");
-        router.push("/");
-        return;
-      }
+    if (authError || !authUser) {
+      console.log("[Lobby] Not authenticated");
+      router.push("/");
+      return;
+    }
 
-      setUser(authUser);
+    setUser(authUser);
 
-      // ✅ NEW: user_credits.live_credits (ESKİ: get_my_round_credits RPC)
-      const { data: creditsData, error: creditsError } = await supabase
-        .from("user_credits")
-        .select("live_credits")
-        .eq("user_id", authUser.id)
-        .single();
+    // 2️⃣ Credits check (✅ FIXED: .limit(1) kullanıyor, .single() değil)
+    const { data: creditsData, error: creditsError } = await supabase
+      .from("user_credits")
+      .select("live_credits")
+      .eq("user_id", authUser.id)
+      .limit(1);
 
-      if (creditsError) {
-        console.error("[Lobby] Credits check error:", creditsError);
-        router.push("/buy");
-        return;
-      }
+    if (creditsError) {
+      console.error("[Lobby] Credits check error:", creditsError);
+      router.push("/buy");
+      return;
+    }
 
-      if (!creditsData || creditsData.live_credits <= 0) {
-        console.log("[Lobby] No remaining credits");
-        router.push("/buy");
-        return;
-      }
+    // 3️⃣ Güvenli credits parse
+    const credits = creditsData?.[0]?.live_credits ?? 0;
 
-      setUserCredits(creditsData.live_credits);
-      console.log("[Lobby] User credits:", creditsData.live_credits);
-      setIsLoading(false);
-    };
+    // 4️⃣ Credits validation
+    if (credits <= 0) {
+      console.log("[Lobby] No remaining credits");
+      router.push("/buy");
+      return;
+    }
 
-    checkAuth();
-  }, [router]);
+    // 5️⃣ Success
+    setUserCredits(credits);
+    console.log("[Lobby] User credits:", credits);
+    setIsLoading(false);
+  };
+
+  checkAuth();
+}, [router]);
 
   // ✅ === ROUND CHANGE DETECTION ===
   useEffect(() => {
