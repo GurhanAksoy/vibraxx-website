@@ -268,27 +268,22 @@ export default function LobbyPage() {
   // AUTH CHECK
   // ============================================
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const { data, error } = await supabase.auth.getUser();
-        
-        if (error || !data.user) {
-          console.log('[Lobby] No user found, redirecting to home');
-          router.push("/");
-          return;
-        }
-        
-        console.log('[Lobby] User authenticated:', data.user.id);
-        setUser(data.user);
-        setIsLoading(false);
-      } catch (err) {
-        console.error('[Lobby] Auth check error:', err);
-        router.push("/");
-      }
-    };
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((event, session) => {
+    if (!session?.user) {
+      router.push("/");
+      return;
+    }
 
-    checkAuth();
-  }, [router]);
+    setUser(session.user);
+    setIsLoading(false);
+  });
+
+  return () => {
+    subscription.unsubscribe();
+  };
+}, [router]);
 
   // ============================================
   // FETCH USER CREDITS
