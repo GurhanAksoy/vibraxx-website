@@ -267,7 +267,27 @@ export default function LobbyPage() {
   // ============================================
   // AUTH CHECK
   // ============================================
-  useEffect(() => {
+ useEffect(() => {
+  let isMounted = true;
+
+  const initAuth = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.user) {
+      router.push("/");
+      return;
+    }
+
+    if (isMounted) {
+      setUser(session.user);
+      setIsLoading(false);
+    }
+  };
+
+  initAuth();
+
   const {
     data: { subscription },
   } = supabase.auth.onAuthStateChange((event, session) => {
@@ -277,10 +297,10 @@ export default function LobbyPage() {
     }
 
     setUser(session.user);
-    setIsLoading(false);
   });
 
   return () => {
+    isMounted = false;
     subscription.unsubscribe();
   };
 }, [router]);
