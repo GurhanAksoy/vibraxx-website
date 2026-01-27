@@ -1,19 +1,16 @@
 ﻿"use client";
 
 export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { createOrUpdateProfile } from "@/lib/createProfile";
-import { detectCountry } from "@/lib/countryService";
 
-// ✅ STANDARDIZED REDIRECT DELAYS
+// ✅ KANONIK: Standardized delays
 const REDIRECT_DELAYS = {
-  SUCCESS: 1000,      // Happy path - fast redirect
-  ERROR: 2500,        // Error cases - give user time to read
-  NO_SESSION: 1500,   // Mild error - medium delay
+  SUCCESS: 1000,
+  ERROR: 2500,
+  NO_SESSION: 1500,
 };
 
 function AuthCallbackInner() {
@@ -26,27 +23,20 @@ function AuthCallbackInner() {
     const handleOAuthCallback = async () => {
       try {
         // ============================================
-        // STEP 1: CHECK FOR OAUTH ERROR PARAMETERS
+        // STEP 1: CHECK FOR OAUTH ERROR
         // ============================================
         const error = searchParams.get("error");
         const errorDesc = searchParams.get("error_description");
 
         if (error) {
-          console.error("❌ Callback: OAuth error:", error, errorDesc);
+          console.error("❌ OAuth error:", error, errorDesc);
 
-          // ✅ SPECIFIC ERROR HANDLING
           let userMessage = "Sign-in failed";
-          let userSubMessage = errorDesc || "An error occurred while signing you in.";
+          let userSubMessage = errorDesc || "An error occurred.";
 
           if (error === "access_denied") {
             userMessage = "Sign-in cancelled";
-            userSubMessage = "You chose not to continue. Redirecting...";
-          } else if (error === "server_error") {
-            userMessage = "Service temporarily unavailable";
-            userSubMessage = "Google is experiencing issues. Please try again later.";
-          } else if (error === "temporarily_unavailable") {
-            userMessage = "Service busy";
-            userSubMessage = "Too many requests. Please try again in a moment.";
+            userSubMessage = "You chose not to continue.";
           }
 
           setMessage(userMessage);
@@ -60,102 +50,71 @@ function AuthCallbackInner() {
         // ============================================
         const { data, error: sessionError } = await supabase.auth.getSession();
 
-        if (sessionError) {
-          console.error("❌ Callback: Session error:", sessionError);
+        if (sessionError || !data.session?.user) {
+          console.error("❌ Session error:", sessionError);
           setMessage("Session error");
           setSubMessage("Please try signing in again.");
           setTimeout(() => router.replace("/"), REDIRECT_DELAYS.ERROR);
           return;
         }
 
-        const session = data.session;
+        const user = data.session.user;
+        console.log("✅ Session validated:", user.id);
 
-        if (!session?.user) {
-          console.warn("⚠️ Callback: No active session found");
-          setMessage("No active session");
-          setSubMessage("Redirecting you to home...");
-          setTimeout(() => router.replace("/"), REDIRECT_DELAYS.NO_SESSION);
+        // ============================================
+        // STEP 3: DETECT COUNTRY (OPTIONAL)
+        // ============================================
+        let countryCode = 'GB'; // Default
+        
+        try {
+          const ipResponse = await fetch('https://api.country.is/');
+          const ipData = await ipResponse.json();
+          countryCode = ipData.country || 'GB';
+          console.log("✅ Country detected:", countryCode);
+        } catch (err) {
+          console.warn("⚠️ Country detection failed, using GB");
+        }
+
+        // ============================================
+        // STEP 4: UPSERT PROFILE (KANONIK RPC)
+        // ============================================
+        console.log("📝 Creating/updating profile...");
+        
+        const { error: profileError } = await supabase.rpc('upsert_profile', {
+          p_user_id: user.id,
+          p_full_name: user.user_metadata?.full_name || 
+                       user.user_metadata?.name || 
+                       user.email?.split('@')[0] || 
+                       'User',
+          p_email: user.email!,
+          p_country_code: countryCode
+        });
+
+        if (profileError) {
+          console.error("❌ Profile creation failed:", profileError);
+          setMessage("Profile error");
+          setSubMessage("Could not create your profile. Please try again.");
+          setTimeout(() => router.replace("/"), REDIRECT_DELAYS.ERROR);
           return;
         }
 
-        console.log("✅ Callback: Session validated for user:", session.user.id);
+        console.log("✅ Profile created/updated");
 
         // ============================================
-        // STEP 2.5: AUTO-DETECT COUNTRY (NEW!)
-        // ============================================
-        console.log("🌍 Callback: Auto-detecting user country...");
-        let userCountry = '🌍'; // Default
-        
-        try {
-          const countryData = await detectCountry();
-          userCountry = countryData.flag;
-          console.log("✅ Callback: Country detected:", countryData.countryName, userCountry);
-        } catch (error) {
-          console.warn("⚠️ Callback: Country detection failed, using default", error);
-        }
-
-        // Add country to user metadata if not already present
-        if (!session.user.user_metadata?.country) {
-          console.log("📝 Callback: Adding country to user metadata...");
-          await supabase.auth.updateUser({
-            data: { country: userCountry }
-          });
-        }
-
-        // ============================================
-        // STEP 3: CREATE/UPDATE PROFILE (CENTRAL HANDLER)
-        // ============================================
-        console.log("📝 Callback: Creating/updating user profile...");
-        await createOrUpdateProfile(session.user);
-        console.log("✅ Callback: Profile created/updated");
-
-        // ============================================
-        // STEP 4: REGISTER ACTIVE SESSION (CRITICAL)
-        // ============================================
-        console.log("🔐 Callback: Registering active session...");
-        await fetch("/api/session/update", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            userId: session.user.id,
-            location: "HOME"
-          })
-        });
-        console.log("✅ Callback: Active session registered");
-
-        // ============================================
-        // STEP 5: SUCCESS - REDIRECT TO HOME
+        // STEP 5: SUCCESS - REDIRECT
         // ============================================
         setMessage("Welcome!");
-        setSubMessage("Redirecting you to VibraXX...");
+        setSubMessage("Redirecting to VibraXX...");
+        
         setTimeout(() => {
-          console.log("🚀 Callback: Redirecting to homepage");
+          console.log("🚀 Redirecting to homepage");
           router.replace("/");
         }, REDIRECT_DELAYS.SUCCESS);
 
       } catch (err: any) {
-        // ============================================
-        // STEP 6: CATCH-ALL ERROR HANDLER
-        // ============================================
-        console.error("❌ Callback: Unexpected error:", err);
-        console.error("Error details:", {
-          message: err?.message,
-          stack: err?.stack,
-          name: err?.name,
-        });
-
-        // Optional: Sentry integration
-        // if (typeof Sentry !== 'undefined') {
-        //   Sentry.captureException(err, {
-        //     tags: { context: 'oauth_callback' },
-        //     extra: { searchParams: Object.fromEntries(searchParams) },
-        //   });
-        // }
-
+        console.error("❌ Unexpected error:", err);
         setMessage("Unexpected error");
-        setSubMessage("Something went wrong. Redirecting you to home...");
+        setSubMessage("Something went wrong. Redirecting...");
         setTimeout(() => router.replace("/"), REDIRECT_DELAYS.ERROR);
       }
     };
@@ -165,7 +124,7 @@ function AuthCallbackInner() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white grid place-items-center">
-      {/* Background Decorative Elements (matching login page) */}
+      {/* Background Effects */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-20 left-10 w-72 h-72 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse" />
         <div className="absolute bottom-20 right-10 w-72 h-72 bg-pink-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse" 
@@ -174,7 +133,7 @@ function AuthCallbackInner() {
 
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center gap-4">
-        {/* Loading Spinner */}
+        {/* Spinner */}
         <svg
           className="animate-spin h-12 w-12 text-cyan-400"
           xmlns="http://www.w3.org/2000/svg"
@@ -213,14 +172,12 @@ export default function AuthCallbackPage() {
     <Suspense
       fallback={
         <main className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white grid place-items-center">
-          {/* Background Elements */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div className="absolute top-20 left-10 w-72 h-72 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse" />
             <div className="absolute bottom-20 right-10 w-72 h-72 bg-pink-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse" 
                  style={{ animationDelay: "700ms" }} />
           </div>
-
-          {/* Loading Content */}
+          
           <div className="relative z-10 flex flex-col items-center gap-4">
             <svg
               className="animate-spin h-12 w-12 text-cyan-400"
