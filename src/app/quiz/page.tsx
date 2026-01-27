@@ -1193,7 +1193,7 @@ export default function LiveQuizPage() {
                     userName: user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Player",
                     userCountry: user?.user_metadata?.country || "🌍",
                     userId: user?.id,
-                    roundId: roundId || undefined,
+                    roundId: roundId?.toString(),
                   }}
                   variant="full"
                 />
