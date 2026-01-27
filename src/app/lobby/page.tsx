@@ -22,10 +22,11 @@ import Image from "next/image";
 // ============================================
 // 🎯 PRESENCE TRACKING HOOK (KANONİK)
 // ============================================
-function usePresence(pageType: string, roundId: number | null = null) {
+function usePresence(pageType: string, roundId: number | null, userId?: string) {
   const sessionIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
+    if (!userId) return;
     if (typeof window === 'undefined') return;
 
     if (!sessionIdRef.current) {
@@ -54,7 +55,7 @@ function usePresence(pageType: string, roundId: number | null = null) {
     const interval = setInterval(sendHeartbeat, 30000);
 
     return () => clearInterval(interval);
-  }, [pageType, roundId]);
+  }, [pageType, roundId, userId]);
 }
 
 // ============================================
@@ -205,7 +206,7 @@ export default function LobbyPage() {
   const hasInteractedRef = useRef(false);
 
   // 🎯 PRESENCE TRACKING
-  usePresence('lobby', nextRound?.id || null);
+  usePresence('lobby', nextRound?.id || null, user?.id);
 
   // 🎯 ORGANIC DATA
   const { participants, spectators, displayRange } = useOrganicPlayerCount(nextRound?.id);
@@ -271,17 +272,15 @@ export default function LobbyPage() {
   let isMounted = true;
 
   const initAuth = async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const { data } = await supabase.auth.getUser();
 
-    if (!session?.user) {
-      router.push("/");
+    if (!data.user) {
+      router.replace("/");
       return;
     }
 
     if (isMounted) {
-      setUser(session.user);
+      setUser(data.user);
       setIsLoading(false);
     }
   };
@@ -291,12 +290,14 @@ export default function LobbyPage() {
   const {
     data: { subscription },
   } = supabase.auth.onAuthStateChange((event, session) => {
-    if (!session?.user) {
-      router.push("/");
+    if (event === "SIGNED_OUT") {
+      router.replace("/");
       return;
     }
 
-    setUser(session.user);
+    if (session?.user) {
+      setUser(session.user);
+    }
   });
 
   return () => {
