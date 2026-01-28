@@ -1,33 +1,110 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
 import {
   Users,
   Clock,
   Sparkles,
-  Flame,
   Volume2,
   VolumeX,
   ArrowLeft,
-  Shield,
   Zap,
   Trophy,
   Globe,
-  TrendingUp,
+  Play,
+  CheckCircle,
+  Flame,
+  Star,
+  AlertCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import Image from "next/image";
 
 // ============================================
-// 🎯 PRESENCE TRACKING HOOK (KANONİK)
+// LOBBY STATE INTERFACE (KANONİK KONTRAT)
 // ============================================
-function usePresence(pageType: string, roundId: number | null, userId?: string) {
-  const sessionIdRef = useRef<string | undefined>(undefined);
+interface LobbyState {
+  round_id: number;
+  round_status: string;
+  seconds_to_start: number;
+  
+  user_credits: number;
+  user_joined: boolean;
+  can_join: boolean;
+  join_block_reason: string | null;
+  
+  should_redirect_to_quiz: boolean;
+  is_urgent: boolean;
+  should_play_alarm: boolean;
+  should_play_beep: boolean;
+  
+  participants_count: number;
+  spectators_count: number;
+  total_range: string;
+  
+  recent_players: Array<{
+    user_id: string;
+    full_name: string;
+  }>;
+}
+
+// ============================================
+// LOBBY STATE HOOK (TEK KAYNAK)
+// ============================================
+function useLobbyState() {
+  const [state, setState] = useState<LobbyState | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  const loadState = useCallback(async (): Promise<LobbyState | null> => {
+    try {
+      const { data, error } = await supabase.rpc('get_lobby_state');
+
+      if (error) {
+        console.error('[LobbyState] RPC error:', error);
+        setHasError(true);
+        return null;
+      }
+
+      if (data) {
+        const freshState = data as LobbyState;
+        setState(freshState);
+        setHasError(false);
+        return freshState;
+      }
+      return null;
+    } catch (err) {
+      console.error('[LobbyState] Error:', err);
+      setHasError(true);
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (!userId) return;
+    loadState();
+    const interval = setInterval(loadState, 3000);
+    return () => clearInterval(interval);
+  }, [loadState]);
+
+  return { state, isLoading, hasError, refresh: loadState };
+}
+
+// ============================================
+// PRESENCE HOOK (KANONİK)
+// ============================================
+function usePresence(pageType: string, roundId: number | null) {
+  const sessionIdRef = useRef<string | undefined>(undefined);
+  const lastRoundIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!roundId) return;
+
+    if (lastRoundIdRef.current !== roundId) {
+      lastRoundIdRef.current = roundId;
+    }
 
     if (!sessionIdRef.current) {
       const stored = sessionStorage.getItem('presence_session_id');
@@ -47,7 +124,7 @@ function usePresence(pageType: string, roundId: number | null, userId?: string) 
           p_round_id: roundId
         });
       } catch (err) {
-        console.error('[Presence] Heartbeat failed:', err);
+        console.error('Presence heartbeat failed:', err);
       }
     };
 
@@ -55,408 +132,248 @@ function usePresence(pageType: string, roundId: number | null, userId?: string) 
     const interval = setInterval(sendHeartbeat, 30000);
 
     return () => clearInterval(interval);
-  }, [pageType, roundId, userId]);
+  }, [pageType, roundId]);
 }
 
 // ============================================
-// 🎯 ORGANIC PLAYER COUNT (KANONİK)
+// DETERMINISTIC AUDIO CONTROLLER
 // ============================================
-interface PlayerCountData {
-  participants: number;
-  spectators: number;
-  displayRange: string;
-}
-
-function useOrganicPlayerCount(roundId: number | null) {
-  const [counts, setCounts] = useState<PlayerCountData>({
-    participants: 0,
-    spectators: 0,
-    displayRange: '0-50'
-  });
-
-  useEffect(() => {
-    if (!roundId) return;
-
-    async function loadCounts() {
-      try {
-        // Participants
-        const { count: participants } = await supabase
-          .from('round_participants')
-          .select('*', { count: 'exact', head: true })
-          .eq('round_id', roundId)
-          .eq('source', 'live');
-
-        // Spectators
-        const { data: spectators } = await supabase
-          .rpc('get_presence_count', {
-            p_page_type: 'lobby',
-            p_round_id: roundId
-          });
-
-        const p = participants || 0;
-        const s = spectators || 0;
-        const total = p + s;
-
-        const rangeMin = Math.floor(total / 50) * 50;
-        const rangeMax = rangeMin + 50;
-
-        setCounts({
-          participants: p,
-          spectators: s,
-          displayRange: `${rangeMin}-${rangeMax}`
-        });
-      } catch (err) {
-        console.error('[PlayerCount] Error:', err);
-      }
-    }
-
-    loadCounts();
-    const interval = setInterval(loadCounts, 5000);
-
-    const channel = supabase
-      .channel(`players:${roundId}:live`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'round_participants',
-        filter: `round_id=eq.${roundId}`
-      }, loadCounts)
-      .subscribe();
-
-    return () => {
-      clearInterval(interval);
-      channel.unsubscribe();
-    };
-  }, [roundId]);
-
-  return counts;
-}
-
-// ============================================
-// 🎯 PUBLIC PROFILES FOR PLAYER LIST (KANONİK)
-// ============================================
-interface PublicPlayer {
-  user_id: string;
-  full_name: string;
-  joined_at: string;
-}
-
-function useRecentPlayers(roundId: number | null, limit: number = 12) {
-  const [players, setPlayers] = useState<PublicPlayer[]>([]);
-
-  useEffect(() => {
-    if (!roundId) return;
-
-    async function loadPlayers() {
-      try {
-        const { data } = await supabase
-          .from('round_participants')
-          .select(`
-            user_id,
-            joined_at,
-            profiles!inner(full_name)
-          `)
-          .eq('round_id', roundId)
-          .eq('source', 'live')
-          .order('joined_at', { ascending: false })
-          .limit(limit);
-
-        if (data) {
-          const mapped = data.map((p: any) => ({
-            user_id: p.user_id,
-            full_name: p.profiles?.full_name || 'Player',
-            joined_at: p.joined_at
-          }));
-          setPlayers(mapped);
-        }
-      } catch (err) {
-        console.error('[RecentPlayers] Error:', err);
-      }
-    }
-
-    loadPlayers();
-    const interval = setInterval(loadPlayers, 5000);
-
-    return () => clearInterval(interval);
-  }, [roundId, limit]);
-
-  return players;
-}
-
-export default function LobbyPage() {
-  const router = useRouter();
-
-  // Core State
+function useAudioController() {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [showWarning, setShowWarning] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const [userCredits, setUserCredits] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRedirecting, setIsRedirecting] = useState(false);
-  const [hasJoined, setHasJoined] = useState(false);
-
-  // Round State
-  const [nextRound, setNextRound] = useState<any>(null);
-  const [timeUntilStart, setTimeUntilStart] = useState<number>(0);
-
-  // Audio refs
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const alarmRef = useRef<HTMLAudioElement | null>(null);
-  const countdownBeepRef = useRef<HTMLAudioElement | null>(null);
+  const beepRef = useRef<HTMLAudioElement | null>(null);
   const hasInteractedRef = useRef(false);
+  const lastAlarmPlayedRef = useRef(false);
+  const lastBeepPlayedRef = useRef(false);
 
-  // 🎯 PRESENCE TRACKING
-  usePresence('lobby', nextRound?.id || null, user?.id);
-
-  // 🎯 ORGANIC DATA
-  const { participants, spectators, displayRange } = useOrganicPlayerCount(nextRound?.id);
-  const recentPlayers = useRecentPlayers(nextRound?.id);
-
-  // ============================================
-  // AUDIO INITIALIZATION
-  // ============================================
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === 'undefined') return;
 
     const handleFirstInteraction = () => {
-      if (!hasInteractedRef.current) {
-        hasInteractedRef.current = true;
+      if (hasInteractedRef.current) return;
+      hasInteractedRef.current = true;
 
-        if (!audioRef.current) {
-          audioRef.current = new Audio("/audio/lobby-music.mp3");
-          audioRef.current.loop = true;
-          audioRef.current.volume = 0.3;
-        }
+      if (!audioRef.current) {
+        audioRef.current = new Audio('/audio/vibraxx.mp3');
+        audioRef.current.loop = true;
+        audioRef.current.volume = 0.3;
+      }
 
-        if (!alarmRef.current) {
-          alarmRef.current = new Audio("/audio/alarm.mp3");
-          alarmRef.current.volume = 0.6;
-        }
+      if (!alarmRef.current) {
+        alarmRef.current = new Audio('/audio/alarm.mp3');
+        alarmRef.current.volume = 0.6;
+      }
 
-        if (!countdownBeepRef.current) {
-          countdownBeepRef.current = new Audio("/audio/beep.mp3");
-          countdownBeepRef.current.volume = 0.4;
-        }
+      if (!beepRef.current) {
+        beepRef.current = new Audio('/audio/beep.mp3');
+        beepRef.current.volume = 0.4;
+      }
 
-        const musicPref = localStorage.getItem("vibraxx_lobby_music");
-        if (musicPref !== "false") {
-          setIsPlaying(true);
-          audioRef.current?.play().catch(() => {});
-        }
+      const musicPref = localStorage.getItem('vibraxx_lobby_music');
+      if (musicPref !== 'false') {
+        audioRef.current.play().catch(() => {});
+        setIsPlaying(true);
+        localStorage.setItem('vibraxx_lobby_music', 'true');
       }
     };
 
-    document.addEventListener("click", handleFirstInteraction, { once: true });
-    document.addEventListener("touchstart", handleFirstInteraction, { once: true });
+    document.addEventListener('click', handleFirstInteraction, { once: true });
+    document.addEventListener('touchstart', handleFirstInteraction, { once: true });
+    document.addEventListener('keydown', handleFirstInteraction, { once: true });
 
     return () => {
-      document.removeEventListener("click", handleFirstInteraction);
-      document.removeEventListener("touchstart", handleFirstInteraction);
+      document.removeEventListener('click', handleFirstInteraction);
+      document.removeEventListener('touchstart', handleFirstInteraction);
+      document.removeEventListener('keydown', handleFirstInteraction);
     };
   }, []);
 
   useEffect(() => {
-    if (isPlaying && audioRef.current) {
+    if (!audioRef.current) return;
+
+    if (isPlaying) {
       audioRef.current.play().catch(() => {});
-      localStorage.setItem("vibraxx_lobby_music", "true");
-    } else if (audioRef.current) {
+      localStorage.setItem('vibraxx_lobby_music', 'true');
+    } else {
       audioRef.current.pause();
-      localStorage.setItem("vibraxx_lobby_music", "false");
+      localStorage.setItem('vibraxx_lobby_music', 'false');
     }
   }, [isPlaying]);
 
-  // ============================================
-  // AUTH CHECK
-  // ============================================
- useEffect(() => {
-  let isMounted = true;
+  const toggleMusic = useCallback(() => {
+    setIsPlaying(prev => !prev);
+  }, []);
 
-  const initAuth = async () => {
-    const { data } = await supabase.auth.getUser();
-
-    if (!data.user) {
-      router.replace("/");
+  const playAlarm = useCallback((shouldPlay: boolean) => {
+    if (!shouldPlay) {
+      lastAlarmPlayedRef.current = false;
       return;
     }
 
-    if (isMounted) {
-      setUser(data.user);
-      setIsLoading(false);
+    if (lastAlarmPlayedRef.current) return;
+    lastAlarmPlayedRef.current = true;
+
+    if (alarmRef.current && isPlaying) {
+      alarmRef.current.currentTime = 0;
+      alarmRef.current.play().catch(() => {});
     }
-  };
+  }, [isPlaying]);
 
-  initAuth();
-
-  const {
-    data: { subscription },
-  } = supabase.auth.onAuthStateChange((event, session) => {
-    if (event === "SIGNED_OUT") {
-      router.replace("/");
+  const playBeep = useCallback((shouldPlay: boolean) => {
+    if (!shouldPlay) {
+      lastBeepPlayedRef.current = false;
       return;
     }
 
-    if (session?.user) {
-      setUser(session.user);
+    if (lastBeepPlayedRef.current) return;
+    lastBeepPlayedRef.current = true;
+
+    if (beepRef.current && isPlaying) {
+      beepRef.current.currentTime = 0;
+      beepRef.current.play().catch(() => {});
     }
-  });
+  }, [isPlaying]);
 
-  return () => {
-    isMounted = false;
-    subscription.unsubscribe();
-  };
-}, [router]);
+  return { isPlaying, toggleMusic, playAlarm, playBeep };
+}
 
-  // ============================================
-  // FETCH USER CREDITS
-  // ============================================
-  const fetchUserCredits = useCallback(async () => {
-    if (!user) return;
+// ============================================
+// PLAYER CARD COMPONENT
+// ============================================
+const PlayerCard = memo(({ player, index }: { player: { user_id: string; full_name: string }; index: number }) => (
+  <div
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+      padding: 12,
+      borderRadius: 12,
+      background: 'rgba(255, 255, 255, 0.03)',
+      border: '1px solid rgba(255, 255, 255, 0.08)',
+      animation: `slideIn 0.4s ease-out ${index * 0.05}s backwards`,
+      transition: 'all 0.2s',
+    }}
+  >
+    <div
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: '50%',
+        background: 'linear-gradient(135deg, #7c3aed, #d946ef)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontWeight: 700,
+        fontSize: 16,
+        color: 'white',
+        flexShrink: 0,
+        boxShadow: '0 4px 12px rgba(124, 58, 237, 0.4)',
+      }}
+    >
+      {player.full_name.charAt(0).toUpperCase()}
+    </div>
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div
+        style={{
+          fontSize: 14,
+          fontWeight: 600,
+          color: 'white',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {player.full_name}
+      </div>
+      <div style={{ fontSize: 12, color: '#6b7280' }}>Just joined</div>
+    </div>
+    <div
+      style={{
+        padding: '4px 8px',
+        borderRadius: 6,
+        background: 'rgba(34, 197, 94, 0.15)',
+        border: '1px solid rgba(34, 197, 94, 0.3)',
+      }}
+    >
+      <CheckCircle style={{ width: 14, height: 14, color: '#22c55e' }} />
+    </div>
+  </div>
+));
+PlayerCard.displayName = 'PlayerCard';
 
-    try {
-      const { data } = await supabase
-        .from("user_credits")
-        .select("live_credits")
-        .eq("user_id", user.id)
-        .single();
+// ============================================
+// MAIN LOBBY PAGE
+// ============================================
+export default function LobbyPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const mountedRef = useRef(false);
 
-      setUserCredits(data?.live_credits || 0);
-    } catch (err) {
-      console.error("[Credits] Error:", err);
-    }
-  }, [user]);
+  const { state, isLoading, hasError, refresh } = useLobbyState();
+  const { isPlaying, toggleMusic, playAlarm, playBeep } = useAudioController();
+
+  usePresence('lobby', state?.round_id || null);
+
+  const countdownSeconds = state?.seconds_to_start ?? 0;
 
   useEffect(() => {
-    if (user) fetchUserCredits();
-  }, [user, fetchUserCredits]);
-
-  // ============================================
-  // FETCH NEXT ROUND
-  // ============================================
-  const loadNextRound = useCallback(async () => {
-    try {
-      const { data } = await supabase
-        .from("rounds")
-        .select("id, scheduled_start, status")
-        .eq("status", "scheduled")
-        .order("scheduled_start", { ascending: true })
-        .limit(1)
-        .single();
-
-      if (data) {
-        setNextRound(data);
-
-        const scheduledStart = new Date(data.scheduled_start).getTime();
-        const now = Date.now();
-        const seconds = Math.floor((scheduledStart - now) / 1000);
-
-        if (Number.isFinite(seconds)) {
-          setTimeUntilStart(Math.max(0, seconds));
-        }
-      }
-    } catch (err) {
-      console.error("[NextRound] Error:", err);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadNextRound();
-    const interval = setInterval(loadNextRound, 5000);
-    return () => clearInterval(interval);
-  }, [loadNextRound]);
-
-  // ============================================
-  // COUNTDOWN TIMER
-  // ============================================
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTimeUntilStart((prev) => {
-        if (prev <= 0) return 0;
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // ============================================
-  // CHECK IF ALREADY JOINED
-  // ============================================
-  useEffect(() => {
-    if (!user || !nextRound) return;
-
-    const checkJoinedStatus = async () => {
-      try {
-        const { data } = await supabase
-          .from("round_participants")
-          .select("round_id")
-          .eq("round_id", nextRound.id)
-          .eq("user_id", user.id)
-          .eq("source", "live")
-          .maybeSingle();
-
-        if (data) {
-          setHasJoined(true);
-        }
-      } catch (err) {
-        console.error("[CheckJoined] Error:", err);
-      }
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
     };
+  }, []);
 
-    checkJoinedStatus();
-  }, [user, nextRound]);
-
-  // ============================================
-  // WARNING & SOUND EFFECTS
-  // ============================================
   useEffect(() => {
-    if (timeUntilStart === 10) {
-      setShowWarning(true);
-      if (isPlaying && alarmRef.current) {
-        alarmRef.current.currentTime = 0;
-        alarmRef.current.play().catch(() => {});
+    const loadUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) {
+        router.replace('/');
+        return;
       }
-    }
+      setUser(data.user);
+    };
+    loadUser();
 
-    if (timeUntilStart <= 10 && timeUntilStart > 0) {
-      if (isPlaying && countdownBeepRef.current) {
-        countdownBeepRef.current.currentTime = 0;
-        countdownBeepRef.current.play().catch(() => {});
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        router.replace('/');
+        return;
       }
-    }
+      setUser(session?.user || null);
+    });
 
-    if (timeUntilStart > 10) {
-      setShowWarning(false);
-    }
-  }, [timeUntilStart, isPlaying]);
+    return () => sub.subscription.unsubscribe();
+  }, [router]);
 
-  // ============================================
-  // AUTO START WHEN COUNTDOWN ENDS
-  // ============================================
   useEffect(() => {
-    if (
-      timeUntilStart <= 0 &&
-      nextRound?.status === "scheduled" &&
-      !isRedirecting &&
-      hasJoined
-    ) {
-      handleStartGame();
+    if (state?.should_redirect_to_quiz && !isRedirecting) {
+      setIsRedirecting(true);
+      router.push(`/quiz/${state.round_id}`);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeUntilStart, nextRound?.status, isRedirecting, hasJoined]);
+  }, [state?.should_redirect_to_quiz, state?.round_id, isRedirecting, router]);
 
-  // ============================================
-  // 🎯 JOIN ROUND (KANONİK)
-  // ============================================
+  useEffect(() => {
+    if (!state) return;
+    playAlarm(state.should_play_alarm);
+  }, [state?.should_play_alarm, playAlarm, state]);
+
+  useEffect(() => {
+    if (!state) return;
+    playBeep(state.should_play_beep);
+  }, [state?.should_play_beep, playBeep, state]);
+
   const handleJoinRound = async () => {
-    if (!nextRound || !user || hasJoined) return;
+    if (!state || !state.can_join) return;
 
     try {
       const { data, error } = await supabase.rpc('join_live_round', {
-        p_round_id: nextRound.id
+        p_round_id: state.round_id
       });
 
       if (error) {
-        console.error('[JoinRound] RPC error:', error);
+        console.error('[JoinRound] Error:', error);
         return;
       }
 
@@ -466,88 +383,61 @@ export default function LobbyPage() {
         if (response.error === 'No credits available') {
           alert('You have no rounds left. Redirecting to purchase page...');
           setTimeout(() => router.push('/buy'), 1500);
-        } else if (response.error === 'Already joined') {
-          setHasJoined(true);
         }
         return;
       }
 
-      setHasJoined(true);
-      await fetchUserCredits();
-    } catch (err: any) {
+      await refresh();
+    } catch (err) {
       console.error('[JoinRound] Error:', err);
     }
   };
 
-  // ============================================
-  // START GAME
-  // ============================================
-  const handleStartGame = async () => {
-    if (isRedirecting) return;
-    setIsRedirecting(true);
+  const formatTime = useCallback((seconds: number) => {
+    const safe = Math.max(0, Math.floor(seconds));
+    const m = Math.floor(safe / 60);
+    const s = safe % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }, []);
 
-    console.log("[Lobby] Quiz starting, redirecting...");
-    router.push(`/quiz/${nextRound.id}`);
-  };
-
-  // ============================================
-  // HANDLE BACK
-  // ============================================
-  const handleBack = async () => {
-    console.log("[Lobby] User left lobby");
-    router.push("/");
-  };
-
-  // ============================================
-  // FORMAT TIME
-  // ============================================
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, "0")}`;
-  };
-
-  // ============================================
-  // PROGRESS CALCULATION
-  // ============================================
-  const progress = ((300 - Math.max(Math.min(timeUntilStart, 300), 0)) / 300) * 100;
-
-  // ============================================
-  // STATUS COLOR
-  // ============================================
-  const getStatusColor = () => {
-    if (timeUntilStart <= 10) return "#ef4444";
-    if (timeUntilStart <= 30) return "#f59e0b";
-    return "#22c55e";
-  };
-
-  // ============================================
-  // LOADING STATE
-  // ============================================
   if (isLoading || !user) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <div style={{ textAlign: "center", color: "white" }}>
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              margin: "0 auto 16px",
-              border: "3px solid rgba(139, 92, 246, 0.3)",
-              borderTopColor: "#8b5cf6",
-              borderRadius: "50%",
-              animation: "spin 1s linear infinite",
-            }}
-          />
-          <p style={{ fontSize: 14, color: "#94a3b8" }}>Loading lobby...</p>
+      <div style={{ minHeight: '100vh', background: '#020817', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: 48, height: 48, margin: '0 auto 16px', borderRadius: '50%', border: '3px solid rgba(139, 92, 246, 0.3)', borderTopColor: '#8b5cf6', animation: 'spin 1s linear infinite' }} />
+          <div style={{ fontSize: 16, color: '#94a3b8', fontWeight: 500 }}>Loading Arena...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#020817', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center', maxWidth: 400, padding: '0 20px' }}>
+          <AlertCircle style={{ width: 64, height: 64, color: '#ef4444', margin: '0 auto 24px' }} />
+          <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginBottom: 12 }}>Connection Issue</div>
+          <div style={{ fontSize: 16, color: '#94a3b8', marginBottom: 24, lineHeight: 1.6 }}>
+            Temporary connection problem. Retrying automatically...
+          </div>
+          <button onClick={() => window.location.reload()} style={{ padding: '12px 24px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #7c3aed, #d946ef)', color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!state) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#020817', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center', maxWidth: 400, padding: '0 20px' }}>
+          <Globe style={{ width: 64, height: 64, color: '#8b5cf6', margin: '0 auto 24px' }} />
+          <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginBottom: 12 }}>No Active Round</div>
+          <div style={{ fontSize: 16, color: '#94a3b8', marginBottom: 24 }}>Waiting for next round to be scheduled...</div>
+          <button onClick={() => router.push('/')} style={{ padding: '12px 24px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #7c3aed, #d946ef)', color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+            Back to Home
+          </button>
         </div>
       </div>
     );
@@ -556,101 +446,9 @@ export default function LobbyPage() {
   return (
     <>
       <style jsx global>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-
-        @keyframes pulse-ring {
-          0% {
-            transform: scale(0.95);
-            opacity: 1;
-          }
-          50% {
-            transform: scale(1);
-            opacity: 0.7;
-          }
-          100% {
-            transform: scale(0.95);
-            opacity: 1;
-          }
-        }
-
-        @keyframes float {
-          0%, 100% {
-            transform: translateY(0px);
-          }
-          50% {
-            transform: translateY(-20px);
-          }
-        }
-
-        @keyframes shimmer {
-          0% {
-            transform: translateX(-100%);
-          }
-          100% {
-            transform: translateX(100%);
-          }
-        }
-
-        @keyframes slideIn {
-          from {
-            transform: translateY(20px);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
-        }
-
-        @keyframes neonPulse {
-          0%, 100% {
-            box-shadow: 0 0 20px rgba(139, 92, 246, 0.6),
-              0 0 40px rgba(139, 92, 246, 0.4),
-              inset 0 0 20px rgba(139, 92, 246, 0.2);
-          }
-          50% {
-            box-shadow: 0 0 30px rgba(217, 70, 239, 0.9),
-              0 0 60px rgba(217, 70, 239, 0.6),
-              inset 0 0 30px rgba(217, 70, 239, 0.3);
-          }
-        }
-
-        @keyframes warningPulse {
-          0%, 100% {
-            opacity: 0.25;
-          }
-          50% {
-            opacity: 0.45;
-          }
-        }
-
-        @keyframes glow {
-          0%, 100% {
-            opacity: 0.4;
-          }
-          50% {
-            opacity: 0.7;
-          }
-        }
-
-        .animate-float {
-          animation: float 6s ease-in-out infinite;
-        }
-
-        .animate-glow {
-          animation: glow 3s ease-in-out infinite;
-        }
-
-        .hide-on-small {
-          display: inline;
-        }
-
-        @media (max-width: 480px) {
-          .hide-on-small {
-            display: none;
-          }
+        :root {
+          color-scheme: dark;
+          background-color: #020817;
         }
 
         * {
@@ -658,1089 +456,301 @@ export default function LobbyPage() {
         }
 
         body {
-          overflow-x: hidden;
+          background-color: #020817;
+          margin: 0;
+          padding: 0;
+        }
+
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
+        }
+
+        @keyframes pulse-glow {
+          0%, 100% { box-shadow: 0 0 0 rgba(139, 92, 246, 0); }
+          50% { box-shadow: 0 0 30px rgba(139, 92, 246, 0.6); }
+        }
+
+        @keyframes shimmer {
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
+        }
+
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes countdownPulse {
+          0%, 100% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.05);
+          }
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+
+        .vx-container {
+          max-width: 1400px;
+          margin: 0 auto;
+          padding: 0 16px;
+        }
+
+        @media (min-width: 640px) {
+          .vx-container {
+            padding: 0 24px;
+          }
         }
       `}</style>
 
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
-          color: "white",
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
+      <div style={{ minHeight: '100vh', background: '#020817', position: 'relative', overflow: 'hidden' }}>
         {/* Animated Background Orbs */}
-        <div
-          className="animate-float"
-          style={{
-            position: "fixed",
-            top: "-150px",
-            left: "-150px",
-            width: "500px",
-            height: "500px",
-            borderRadius: "50%",
-            background:
-              "radial-gradient(circle, rgba(139, 92, 246, 0.4), transparent)",
-            filter: "blur(90px)",
-            pointerEvents: "none",
-            zIndex: 0,
-          }}
-        />
-        <div
-          className="animate-float"
-          style={{
-            position: "fixed",
-            bottom: "-150px",
-            right: "-150px",
-            width: "500px",
-            height: "500px",
-            borderRadius: "50%",
-            background:
-              "radial-gradient(circle, rgba(217, 70, 239, 0.4), transparent)",
-            filter: "blur(90px)",
-            pointerEvents: "none",
-            zIndex: 0,
-            animationDelay: "2s",
-          }}
-        />
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+          <div style={{ position: 'absolute', top: '15%', left: '10%', width: 600, height: 600, background: 'radial-gradient(circle, rgba(124, 58, 237, 0.25) 0%, transparent 70%)', borderRadius: '50%', filter: 'blur(80px)', animation: 'float 6s ease-in-out infinite' }} />
+          <div style={{ position: 'absolute', top: '50%', right: '10%', width: 500, height: 500, background: 'radial-gradient(circle, rgba(217, 70, 239, 0.2) 0%, transparent 70%)', borderRadius: '50%', filter: 'blur(80px)', animation: 'float 8s ease-in-out infinite', animationDelay: '1s' }} />
+          <div style={{ position: 'absolute', bottom: '15%', left: '50%', transform: 'translateX(-50%)', width: 550, height: 550, background: 'radial-gradient(circle, rgba(34, 211, 238, 0.15) 0%, transparent 70%)', borderRadius: '50%', filter: 'blur(80px)', animation: 'float 7s ease-in-out infinite', animationDelay: '2s' }} />
+        </div>
 
-        {/* RED WARNING Overlay */}
-        {showWarning && timeUntilStart <= 10 && (
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: `radial-gradient(circle, rgba(239, 68, 68, 0.25), transparent)`,
-              pointerEvents: "none",
-              zIndex: 40,
-              animation: "warningPulse 0.6s ease-in-out infinite",
-            }}
-          />
-        )}
-
-        {/* Top Header Bar */}
-        <header
-          style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 50,
-            background: "rgba(15, 23, 42, 0.95)",
-            backdropFilter: "blur(20px)",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
-          }}
-        >
-          <div
-            style={{
-              maxWidth: "1400px",
-              margin: "0 auto",
-              padding: "clamp(14px, 3.6vw, 19px) clamp(19px, 4.8vw, 38px)",
-              position: "relative",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              {/* Left: Back Button */}
-              <button
-                onClick={handleBack}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "10px 16px",
-                  borderRadius: "12px",
-                  border: "1px solid rgba(148, 163, 253, 0.3)",
-                  background: "rgba(15, 23, 42, 0.8)",
-                  color: "white",
-                  fontSize: "clamp(13px, 2.5vw, 15px)",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  transition: "all 0.3s",
-                  zIndex: 21,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
-                  e.currentTarget.style.transform = "translateX(-4px)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(15, 23, 42, 0.8)";
-                  e.currentTarget.style.transform = "translateX(0)";
-                }}
-              >
-                <ArrowLeft style={{ width: 18, height: 18 }} />
-                <span className="hide-on-small">Back</span>
-              </button>
-
-              {/* Right: Credits + Sound Toggle */}
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", zIndex: 21 }}>
-                {/* Credits Display */}
-                <div
-                  style={{
-                    padding: "10px 16px",
-                    borderRadius: "12px",
-                    border: "1px solid rgba(251, 191, 36, 0.4)",
-                    background: "rgba(251, 191, 36, 0.1)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                  }}
-                >
-                  <Shield style={{ width: 18, height: 18, color: "#fbbf24" }} />
-                  <span
-                    style={{
-                      fontSize: "clamp(13px, 2.5vw, 15px)",
-                      fontWeight: 700,
-                      color: "#fbbf24",
-                    }}
-                  >
-                    {userCredits} Rounds
-                  </span>
+        {/* Header */}
+        <header style={{ position: 'sticky', top: 0, zIndex: 50, borderBottom: '1px solid rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(16px)', background: 'rgba(2, 8, 23, 0.9)' }}>
+          <div className="vx-container">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', gap: 16, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #7c3aed, #d946ef)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 24px rgba(124, 58, 237, 0.4)' }}>
+                  <Zap style={{ width: 24, height: 24, color: 'white' }} />
                 </div>
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: 'white', letterSpacing: '-0.02em', lineHeight: 1 }}>VibraXX</div>
+                  <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Live Arena Lobby</div>
+                </div>
+              </div>
 
-                {/* Sound Toggle */}
-                <button
-                  onClick={() => setIsPlaying(!isPlaying)}
-                  style={{
-                    padding: "11px",
-                    borderRadius: "12px",
-                    border: "1px solid rgba(148, 163, 253, 0.3)",
-                    background: "rgba(15, 23, 42, 0.8)",
-                    cursor: "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "all 0.3s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "rgba(15, 23, 42, 0.8)";
-                  }}
-                >
-                  {isPlaying ? (
-                    <Volume2 style={{ width: 20, height: 20, color: "#a78bfa" }} />
-                  ) : (
-                    <VolumeX style={{ width: 20, height: 20, color: "#6b7280" }} />
-                  )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <button onClick={toggleMusic} style={{ width: 40, height: 40, borderRadius: 10, border: '1px solid rgba(255, 255, 255, 0.1)', background: 'rgba(255, 255, 255, 0.05)', color: isPlaying ? '#22d3ee' : '#6b7280', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }} aria-label={isPlaying ? 'Mute music' : 'Play music'}>
+                  {isPlaying ? <Volume2 style={{ width: 18, height: 18 }} /> : <VolumeX style={{ width: 18, height: 18 }} />}
                 </button>
-              </div>
-            </div>
 
-            {/* Center: Logo + GLOBAL ARENA Text */}
-            <div
-              style={{
-                position: "absolute",
-                left: "50%",
-                top: "50%",
-                transform: "translate(-50%, -50%)",
-                zIndex: 20,
-                display: "flex",
-                alignItems: "center",
-                gap: "clamp(12px, 3vw, 16px)",
-              }}
-            >
-              {/* Logo */}
-              <div
-                style={{
-                  position: "relative",
-                  width: "clamp(70px, 14vw, 90px)",
-                  height: "clamp(70px, 14vw, 90px)",
-                  borderRadius: "50%",
-                  padding: 3,
-                  background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-                  boxShadow:
-                    "0 0 30px rgba(124, 58, 237, 0.7), 0 0 60px rgba(217, 70, 239, 0.4)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <div
-                  className="animate-glow"
-                  style={{
-                    position: "absolute",
-                    inset: -5,
-                    borderRadius: "50%",
-                    background: "radial-gradient(circle, #a855f7, transparent)",
-                    opacity: 0.5,
-                    filter: "blur(10px)",
-                    pointerEvents: "none",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "relative",
-                    width: "100%",
-                    height: "100%",
-                    borderRadius: "50%",
-                    backgroundColor: "#020817",
-                    overflow: "hidden",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    zIndex: 10,
-                  }}
-                >
-                  <Image
-                    src="/images/logo.png"
-                    alt="VibraXX"
-                    fill
-                    sizes="90px"
-                    style={{ objectFit: "contain", padding: "5px" }}
-                    priority
-                  />
+                <div style={{ padding: '8px 16px', borderRadius: 10, border: '1px solid rgba(251, 191, 36, 0.3)', background: 'rgba(251, 191, 36, 0.1)', color: '#fbbf24', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Sparkles style={{ width: 14, height: 14 }} />
+                  {state.user_credits} Rounds
                 </div>
-              </div>
 
-              {/* GLOBAL ARENA Text */}
-              <div>
-                <div
-                  style={{
-                    fontSize: "clamp(16px, 3.5vw, 22px)",
-                    fontWeight: 900,
-                    backgroundImage: "linear-gradient(135deg, #a78bfa, #f0abfc)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    backgroundClip: "text",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                    lineHeight: 1.2,
-                    textShadow: "0 0 20px rgba(167, 139, 250, 0.5)",
-                  }}
-                >
-                  GLOBAL ARENA
-                </div>
-                {spectators > 0 && (
-                  <div
-                    style={{
-                      fontSize: "clamp(10px, 2vw, 12px)",
-                      color: "#94a3b8",
-                      fontWeight: 600,
-                      marginTop: "2px",
-                    }}
-                  >
-                    {spectators} online
-                  </div>
-                )}
+                <button onClick={() => router.push('/')} style={{ padding: '10px 20px', borderRadius: 10, border: '1px solid rgba(255, 255, 255, 0.1)', background: 'rgba(255, 255, 255, 0.05)', color: '#94a3b8', fontSize: 14, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <ArrowLeft style={{ width: 16, height: 16 }} />
+                  Exit
+                </button>
               </div>
             </div>
           </div>
         </header>
 
-        {/* Main Content */}
-        <main
-          style={{
-            position: "relative",
-            zIndex: 10,
-            maxWidth: "1400px",
-            margin: "0 auto",
-            padding: "clamp(24px, 5vw, 40px) clamp(16px, 4vw, 32px)",
-          }}
-        >
-          {/* ULTRA PREMIUM Sponsor Banner */}
-          <div
-            style={{
-              marginBottom: "clamp(24px, 5vw, 36px)",
-              padding: "clamp(20px, 4vw, 32px)",
-              borderRadius: "24px",
-              background:
-                "linear-gradient(135deg, rgba(251, 191, 36, 0.25) 0%, rgba(245, 158, 11, 0.18) 50%, rgba(234, 88, 12, 0.15) 100%)",
-              border: "3px solid transparent",
-              backgroundImage: `
-                linear-gradient(135deg, rgba(251, 191, 36, 0.25) 0%, rgba(245, 158, 11, 0.18) 50%, rgba(234, 88, 12, 0.15) 100%),
-                linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #ea580c 100%)
-              `,
-              backgroundOrigin: "border-box",
-              backgroundClip: "padding-box, border-box",
-              backdropFilter: "blur(24px)",
-              position: "relative",
-              overflow: "hidden",
-              boxShadow:
-                "0 0 40px rgba(251, 191, 36, 0.4), 0 10px 60px rgba(251, 191, 36, 0.25), inset 0 0 50px rgba(251, 191, 36, 0.08)",
-              minHeight: "clamp(120px, 20vw, 180px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              animation: "neonPulse 4s ease-in-out infinite",
-            }}
-          >
-            {/* Animated gradient overlay */}
-            <div
-              style={{
-                position: "absolute",
-                top: "-50%",
-                left: "-50%",
-                width: "200%",
-                height: "200%",
-                background:
-                  "conic-gradient(from 0deg, transparent, rgba(251, 191, 36, 0.3), transparent 30%)",
-                animation: "spin 8s linear infinite",
-                pointerEvents: "none",
-              }}
-            />
+        {/* Ultra Premium Sponsor Banner */}
+        <div style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01))', backdropFilter: 'blur(10px)' }}>
+          <div className="vx-container">
+            <div style={{ padding: '16px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Sponsored By</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 20, opacity: 0.6 }}>
+                <div style={{ width: 100, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05))', border: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Star style={{ width: 20, height: 20, color: '#8b5cf6' }} />
+                </div>
+                <div style={{ width: 100, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05))', border: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Star style={{ width: 20, height: 20, color: '#22d3ee' }} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
-            {/* Shimmer effect 1 */}
-            <div
-              style={{
-                position: "absolute",
-                top: 0,
-                left: "-100%",
-                width: "50%",
-                height: "100%",
-                background:
-                  "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent)",
-                animation: "shimmer 3s infinite",
-                pointerEvents: "none",
-              }}
-            />
+        {/* Live Status Bar */}
+        <div style={{ zIndex: 40, borderBottom: '1px solid rgba(139, 92, 246, 0.3)', backdropFilter: 'blur(16px)', background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(217, 70, 239, 0.15))', animation: state.is_urgent ? 'pulse-glow 1s ease-in-out infinite' : 'none' }}>
+          <div className="vx-container">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', alignItems: 'center', padding: '10px 0', fontSize: 13 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#22c55e', fontWeight: 700 }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', animation: 'pulse-glow 2s ease-in-out infinite' }} />
+                LIVE ARENA
+              </div>
+              <div style={{ color: '#94a3b8', fontWeight: 500 }}>•</div>
+              <div style={{ color: '#94a3b8', fontWeight: 500 }}>{state.participants_count} Players Joined</div>
+              <div style={{ color: '#94a3b8', fontWeight: 500 }}>•</div>
+              <div style={{ color: '#fbbf24', fontWeight: 600 }}>Round #{state.round_id}</div>
+            </div>
+          </div>
+        </div>
 
-            {/* Shimmer effect 2 (delayed) */}
-            <div
-              style={{
-                position: "absolute",
-                top: 0,
-                left: "-100%",
-                width: "30%",
-                height: "100%",
-                background:
-                  "linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.4), transparent)",
-                animation: "shimmer 4s infinite 1.5s",
-                pointerEvents: "none",
-              }}
-            />
+        <main style={{ position: 'relative', zIndex: 10, padding: '40px 0 60px' }}>
+          <div className="vx-container">
+            {/* Hero Section */}
+            <div style={{ textAlign: 'center', marginBottom: 48, animation: 'slideIn 0.6s ease-out' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 20px', borderRadius: 9999, border: '2px solid rgba(251, 191, 36, 0.4)', background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1))', color: '#fbbf24', fontSize: 12, marginBottom: 20, backdropFilter: 'blur(10px)', fontWeight: 700, boxShadow: '0 0 20px rgba(251, 191, 36, 0.3), inset 0 0 20px rgba(251, 191, 36, 0.1)' }}>
+                <Globe style={{ width: 16, height: 16 }} />
+                Global Live Arena
+              </div>
 
-            {/* Glow particles */}
-            <div
-              style={{
-                position: "absolute",
-                top: "20%",
-                left: "10%",
-                width: "8px",
-                height: "8px",
-                borderRadius: "50%",
-                background: "#fbbf24",
-                boxShadow: "0 0 20px #fbbf24",
-                animation: "float 5s ease-in-out infinite",
-                pointerEvents: "none",
-              }}
-            />
-            <div
-              style={{
-                position: "absolute",
-                top: "70%",
-                right: "15%",
-                width: "6px",
-                height: "6px",
-                borderRadius: "50%",
-                background: "#f59e0b",
-                boxShadow: "0 0 15px #f59e0b",
-                animation: "float 6s ease-in-out infinite 1s",
-                pointerEvents: "none",
-              }}
-            />
-            <div
-              style={{
-                position: "absolute",
-                top: "40%",
-                right: "25%",
-                width: "5px",
-                height: "5px",
-                borderRadius: "50%",
-                background: "#fbbf24",
-                boxShadow: "0 0 12px #fbbf24",
-                animation: "float 7s ease-in-out infinite 2s",
-                pointerEvents: "none",
-              }}
-            />
-
-            {/* Content container */}
-            <div
-              style={{
-                position: "relative",
-                width: "100%",
-                height: "100%",
-                minHeight: "clamp(120px, 20vw, 180px)",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "clamp(12px, 2.5vw, 16px)",
-                zIndex: 10,
-              }}
-            >
-              {/* Premium badge */}
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "6px 16px",
-                  borderRadius: "999px",
-                  background: "rgba(15, 23, 42, 0.8)",
-                  border: "1px solid rgba(251, 191, 36, 0.6)",
-                  backdropFilter: "blur(10px)",
-                  boxShadow: "0 4px 20px rgba(251, 191, 36, 0.3)",
-                }}
-              >
-                <Sparkles style={{ width: 14, height: 14, color: "#fbbf24" }} />
-                <span
-                  style={{
-                    fontSize: "clamp(10px, 2vw, 12px)",
-                    fontWeight: 700,
-                    color: "#fbbf24",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.1em",
-                    textShadow: "0 0 10px rgba(251, 191, 36, 0.5)",
-                  }}
-                >
-                  Official Sponsor
+              <h1 style={{ fontSize: 'clamp(32px, 7vw, 52px)', fontWeight: 800, lineHeight: 1.2, marginBottom: 20, letterSpacing: '-0.03em', color: 'white' }}>
+                <span style={{ display: 'inline-block', background: 'linear-gradient(90deg, #7c3aed, #22d3ee, #f97316, #d946ef, #7c3aed)', backgroundSize: '250% 100%', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'shimmer 4s linear infinite', textShadow: '0 0 20px rgba(124, 58, 237, 0.5)' }}>
+                  Prepare for Battle
                 </span>
-                <Sparkles style={{ width: 14, height: 14, color: "#fbbf24" }} />
-              </div>
+              </h1>
 
-              {/* Sponsor image with fallback */}
-              <div
-                style={{
-                  position: "relative",
-                  width: "100%",
-                  maxWidth: "clamp(300px, 60vw, 600px)",
-                  height: "clamp(80px, 15vw, 120px)",
-                }}
-              >
-                <Image
-                  src="/images/sponsor.png"
-                  alt="Official Sponsor"
-                  fill
-                  sizes="(max-width: 768px) 300px, 600px"
-                  style={{
-                    objectFit: "contain",
-                    filter: "drop-shadow(0 0 20px rgba(251, 191, 36, 0.3))",
-                  }}
-                  priority
-                  onError={(e) => {
-                    const img = e.currentTarget;
-                    const container = img.parentElement as HTMLDivElement;
-                    if (container) {
-                      container.innerHTML = `
-                        <div style="
-                          width: 100%;
-                          height: 100%;
-                          display: flex;
-                          flex-direction: column;
-                          align-items: center;
-                          justify-content: center;
-                          gap: 12px;
-                        ">
-                          <div style="
-                            font-size: clamp(24px, 5vw, 36px);
-                            font-weight: 900;
-                            background: linear-gradient(135deg, #fbbf24, #f59e0b);
-                            -webkit-background-clip: text;
-                            -webkit-text-fill-color: transparent;
-                            background-clip: text;
-                            text-transform: uppercase;
-                            letter-spacing: 0.05em;
-                            text-shadow: 0 0 30px rgba(251, 191, 36, 0.5);
-                          ">
-                            PREMIUM SPONSOR
-                          </div>
-                          <div style="
-                            font-size: clamp(12px, 2.5vw, 15px);
-                            color: #cbd5e1;
-                            font-weight: 600;
-                          ">
-                            Powering Global Competition
-                          </div>
-                        </div>
-                      `;
-                    }
-                  }}
-                />
-              </div>
+              <p style={{ fontSize: 'clamp(15px, 3.5vw, 18px)', color: '#cbd5e1', maxWidth: 600, margin: '0 auto 16px', lineHeight: 1.7, fontWeight: 500 }}>
+                Challenge yourself. Challenge the world.
+              </p>
 
-              {/* Subtitle */}
-              <div
-                style={{
-                  fontSize: "clamp(11px, 2.2vw, 13px)",
-                  color: "#e0e7ff",
-                  fontWeight: 600,
-                  textAlign: "center",
-                  maxWidth: "500px",
-                  lineHeight: 1.4,
-                  textShadow: "0 2px 10px rgba(0, 0, 0, 0.3)",
-                }}
-              >
-                Supporting skill-based competition worldwide
+              <p style={{ fontSize: 14, color: '#94a3b8', maxWidth: 600, margin: '0 auto', lineHeight: 1.6 }}>
+                {state.user_joined 
+                  ? "You're locked in! The quiz starts when the countdown ends."
+                  : "Join now to compete for prizes and glory."}
+              </p>
+            </div>
+
+            {/* Premium Countdown Panel */}
+            <div style={{ 
+              margin: '32px auto 48px', 
+              maxWidth: 520, 
+              padding: state.is_urgent ? '24px 32px 32px' : '32px', 
+              borderRadius: 24, 
+              background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)', 
+              border: state.is_urgent ? '3px solid rgba(239, 68, 68, 0.6)' : '2px solid rgba(255, 255, 255, 0.15)', 
+              backdropFilter: 'blur(20px)', 
+              boxShadow: state.is_urgent 
+                ? '0 20px 60px rgba(239, 68, 68, 0.5), 0 0 40px rgba(239, 68, 68, 0.3)' 
+                : '0 12px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05), inset 0 2px 0 rgba(255, 255, 255, 0.08)', 
+              position: 'relative', 
+              overflow: 'hidden', 
+              animation: state.is_urgent ? 'countdownPulse 1s ease-in-out infinite' : 'slideIn 0.6s ease-out 0.2s backwards',
+            }}>
+              {state.is_urgent && (
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '10px', background: 'rgba(239, 68, 68, 0.25)', borderBottom: '1px solid rgba(239, 68, 68, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: '#ef4444', animation: 'pulse-glow 1s ease-in-out infinite' }}>
+                  <Flame style={{ width: 16, height: 16 }} />
+                  QUIZ STARTING SOON!
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#6b7280', textAlign: 'center' }}>
+                  {state.user_joined ? 'Quiz Starts In' : 'Join Before'}
+                </div>
+                
+                <div style={{ 
+                  fontSize: 'clamp(56px, 15vw, 80px)', 
+                  fontWeight: 900, 
+                  background: state.is_urgent 
+                    ? 'linear-gradient(135deg, #ef4444, #dc2626)' 
+                    : 'linear-gradient(135deg, #7c3aed, #22d3ee)', 
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                  textAlign: 'center', 
+                  letterSpacing: '-0.02em', 
+                  fontVariantNumeric: 'tabular-nums', 
+                  lineHeight: 1,
+                  filter: state.is_urgent ? 'drop-shadow(0 0 20px rgba(239, 68, 68, 0.6))' : 'drop-shadow(0 0 20px rgba(124, 58, 237, 0.5))',
+                }}>
+                  {formatTime(countdownSeconds)}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13, color: '#6b7280', fontWeight: 500 }}>
+                  <Clock style={{ width: 16, height: 16, color: state.is_urgent ? '#ef4444' : '#8b5cf6' }} />
+                  <span style={{ color: '#ffffff', fontWeight: 600 }}>{state.spectators_count}</span>
+                  <span>watching live</span>
+                </div>
               </div>
             </div>
 
-            {/* Corner accents */}
-            <div
-              style={{
-                position: "absolute",
-                top: "10px",
-                left: "10px",
-                width: "40px",
-                height: "40px",
-                borderTop: "3px solid rgba(251, 191, 36, 0.6)",
-                borderLeft: "3px solid rgba(251, 191, 36, 0.6)",
-                borderRadius: "8px 0 0 0",
-                pointerEvents: "none",
-              }}
-            />
-            <div
-              style={{
-                position: "absolute",
-                top: "10px",
-                right: "10px",
-                width: "40px",
-                height: "40px",
-                borderTop: "3px solid rgba(251, 191, 36, 0.6)",
-                borderRight: "3px solid rgba(251, 191, 36, 0.6)",
-                borderRadius: "0 8px 0 0",
-                pointerEvents: "none",
-              }}
-            />
-            <div
-              style={{
-                position: "absolute",
-                bottom: "10px",
-                left: "10px",
-                width: "40px",
-                height: "40px",
-                borderBottom: "3px solid rgba(251, 191, 36, 0.6)",
-                borderLeft: "3px solid rgba(251, 191, 36, 0.6)",
-                borderRadius: "0 0 0 8px",
-                pointerEvents: "none",
-              }}
-            />
-            <div
-              style={{
-                position: "absolute",
-                bottom: "10px",
-                right: "10px",
-                width: "40px",
-                height: "40px",
-                borderBottom: "3px solid rgba(251, 191, 36, 0.6)",
-                borderRight: "3px solid rgba(251, 191, 36, 0.6)",
-                borderRadius: "0 0 8px 0",
-                pointerEvents: "none",
-              }}
-            />
-          </div>
-
-          {/* Prize Banner */}
-          <div
-            style={{
-              marginBottom: "clamp(24px, 5vw, 36px)",
-              padding: "clamp(16px, 3.5vw, 28px)",
-              borderRadius: "20px",
-              background:
-                "linear-gradient(135deg, rgba(251, 191, 36, 0.18), rgba(245, 158, 11, 0.12))",
-              border: "2px solid rgba(251, 191, 36, 0.5)",
-              backdropFilter: "blur(20px)",
-              position: "relative",
-              overflow: "hidden",
-              animation: "slideIn 0.5s ease-out",
-            }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                height: "100%",
-                background:
-                  "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent)",
-                animation: "shimmer 3s linear infinite",
-              }}
-            />
-            <div
-              style={{
-                position: "relative",
-                zIndex: 10,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "clamp(12px, 3vw, 18px)",
-                flexWrap: "wrap",
-              }}
-            >
-              <Trophy style={{ width: "clamp(28px, 6vw, 38px)", height: "clamp(28px, 6vw, 38px)", color: "#fbbf24" }} />
-              <div style={{ textAlign: "center" }}>
-                <div
-                  style={{
-                    fontSize: "clamp(18px, 4.5vw, 28px)",
-                    fontWeight: 900,
-                    color: "#fbbf24",
-                    textShadow: "0 0 20px rgba(251, 191, 36, 0.6)",
-                    lineHeight: 1.2,
-                  }}
-                >
-                  £1,000 MONTHLY PRIZE
-                </div>
-                <div
-                  style={{
-                    fontSize: "clamp(12px, 2.5vw, 15px)",
-                    color: "#cbd5e1",
-                    marginTop: "4px",
-                    fontWeight: 600,
-                  }}
-                >
-                  Top scorer wins when 3000+ rounds sold
-                </div>
-              </div>
-              <Sparkles style={{ width: "clamp(28px, 6vw, 38px)", height: "clamp(28px, 6vw, 38px)", color: "#fbbf24" }} />
-            </div>
-          </div>
-
-          {/* Main Grid */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 400px), 1fr))",
-              gap: "clamp(20px, 4vw, 32px)",
-            }}
-          >
-            {/* Left: Countdown Card */}
-            <div
-              style={{
-                background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-                borderRadius: "24px",
-                padding: "clamp(24px, 5vw, 36px)",
-                border: timeUntilStart <= 10 ? "2px solid #ef4444" : "2px solid rgba(139, 92, 246, 0.4)",
-                boxShadow: timeUntilStart <= 10 
-                  ? "0 0 40px rgba(239, 68, 68, 0.6), inset 0 0 40px rgba(239, 68, 68, 0.1)"
-                  : "0 0 40px rgba(139, 92, 246, 0.3), inset 0 0 30px rgba(139, 92, 246, 0.1)",
-                position: "relative",
-                overflow: "hidden",
-                animation: "slideIn 0.6s ease-out 0.1s backwards",
-              }}
-            >
-              {/* Shimmer Effect */}
-              <div
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: "2px",
-                  background:
-                    "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent)",
-                  animation: "shimmer 2s linear infinite",
-                }}
-              />
-
-              {/* Status Badge */}
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "8px 16px",
-                  borderRadius: "999px",
-                  background: `${getStatusColor()}20`,
-                  border: `1px solid ${getStatusColor()}`,
-                  marginBottom: "24px",
-                }}
-              >
-                <div
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    background: getStatusColor(),
-                    animation: "pulse-ring 2s ease-in-out infinite",
-                  }}
-                />
-                <span
-                  style={{
-                    fontSize: "clamp(12px, 2.5vw, 14px)",
-                    fontWeight: 700,
-                    color: getStatusColor(),
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                  }}
-                >
-                  {hasJoined ? "JOINED" : timeUntilStart <= 10 ? "STARTING SOON" : "WAITING"}
-                </span>
-              </div>
-
-              {/* Countdown Display */}
-              <div style={{ textAlign: "center", marginBottom: "32px" }}>
-                <div
-                  style={{
-                    fontSize: "clamp(11px, 2.2vw, 13px)",
-                    color: "#94a3b8",
-                    fontWeight: 600,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.1em",
-                    marginBottom: "16px",
-                  }}
-                >
-                  Round Starts In
-                </div>
-                <div
-                  style={{
-                    fontSize: "clamp(64px, 15vw, 96px)",
-                    fontWeight: 900,
-                    fontFamily: "ui-monospace, monospace",
-                    color: getStatusColor(),
-                    lineHeight: 1,
-                    textShadow: `0 0 40px ${getStatusColor()}80`,
-                    marginBottom: "24px",
-                  }}
-                >
-                  {formatTime(timeUntilStart)}
-                </div>
-
-                {/* Progress Bar */}
-                <div
-                  style={{
-                    width: "100%",
-                    height: "8px",
-                    background: "rgba(255, 255, 255, 0.1)",
-                    borderRadius: "999px",
-                    overflow: "hidden",
-                    position: "relative",
-                  }}
-                >
-                  <div
-                    style={{
-                      position: "absolute",
-                      left: 0,
-                      top: 0,
-                      height: "100%",
-                      width: `${progress}%`,
-                      background: `linear-gradient(90deg, ${getStatusColor()}, ${getStatusColor()}dd)`,
-                      borderRadius: "999px",
-                      transition: "width 1s linear",
-                      boxShadow: `0 0 20px ${getStatusColor()}`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Join Button */}
-              {!hasJoined && (
+            {/* Join Button or Status */}
+            {!state.user_joined ? (
+              <div style={{ marginBottom: 48, textAlign: 'center', animation: 'slideIn 0.6s ease-out 0.3s backwards' }}>
                 <button
                   onClick={handleJoinRound}
-                  disabled={userCredits === 0}
+                  disabled={!state.can_join}
                   style={{
-                    width: "100%",
-                    padding: "clamp(16px, 3.5vw, 20px)",
-                    borderRadius: "16px",
-                    border: "none",
-                    background: userCredits === 0
-                      ? "rgba(148, 163, 184, 0.3)"
-                      : "linear-gradient(135deg, #7c3aed, #d946ef)",
-                    color: "white",
-                    fontSize: "clamp(16px, 3.5vw, 20px)",
-                    fontWeight: 800,
-                    cursor: userCredits === 0 ? "not-allowed" : "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "12px",
-                    transition: "all 0.3s",
-                    opacity: userCredits === 0 ? 0.5 : 1,
-                    boxShadow: userCredits === 0 
-                      ? "none"
-                      : "0 10px 40px rgba(139, 92, 246, 0.5)",
+                    position: 'relative',
+                    padding: '18px 48px',
+                    borderRadius: 14,
+                    border: 'none',
+                    cursor: state.can_join ? 'pointer' : 'not-allowed',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 12,
+                    fontWeight: 700,
+                    fontSize: 18,
+                    overflow: 'hidden',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    opacity: state.can_join ? 1 : 0.5,
+                    boxShadow: state.can_join ? '0 20px 40px -16px rgba(139, 92, 246, 0.6)' : 'none',
                   }}
-                  onMouseEnter={(e) => {
-                    if (userCredits > 0) {
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.boxShadow = "0 15px 50px rgba(139, 92, 246, 0.6)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (userCredits > 0) {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = "0 10px 40px rgba(139, 92, 246, 0.5)";
-                    }
-                  }}
+                  onMouseEnter={(e) => state.can_join && (e.currentTarget.style.transform = 'translateY(-2px)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
                 >
-                  {userCredits === 0 ? (
-                    <>
-                      <Shield style={{ width: 20, height: 20 }} />
-                      No Rounds Left
-                    </>
-                  ) : (
-                    <>
-                      <Zap style={{ width: 20, height: 20 }} />
-                      JOIN ROUND (1 Credit)
-                      <Flame style={{ width: 20, height: 20 }} />
-                    </>
-                  )}
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, #7c3aed, #d946ef)' }} />
+                  <Play style={{ position: 'relative', zIndex: 10, width: 20, height: 20, color: 'white' }} />
+                  <span style={{ position: 'relative', zIndex: 10, color: 'white' }}>
+                    {state.join_block_reason === 'no_credits' ? 'No Rounds Left' : 'Join Arena'}
+                  </span>
                 </button>
-              )}
-
-              {hasJoined && (
-                <div
-                  style={{
-                    width: "100%",
-                    padding: "20px",
-                    borderRadius: "16px",
-                    background: "rgba(34, 197, 94, 0.15)",
-                    border: "2px solid rgba(34, 197, 94, 0.4)",
-                    textAlign: "center",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "10px",
-                      fontSize: "clamp(16px, 3.5vw, 18px)",
-                      fontWeight: 700,
-                      color: "#22c55e",
-                    }}
-                  >
-                    <Trophy style={{ width: 22, height: 22 }} />
-                    YOU'RE IN! GET READY...
+                {state.join_block_reason === 'no_credits' && (
+                  <div style={{ marginTop: 16, fontSize: 14, color: '#94a3b8' }}>
+                    <button onClick={() => router.push('/buy')} style={{ color: '#fbbf24', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
+                      Buy more rounds
+                    </button>
                   </div>
-                </div>
-              )}
-            </div>
-
-            {/* Right: Players Card */}
-            <div
-              style={{
-                background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-                borderRadius: "24px",
-                padding: "clamp(24px, 5vw, 36px)",
-                border: "2px solid rgba(139, 92, 246, 0.3)",
-                animation: "slideIn 0.6s ease-out 0.2s backwards",
-              }}
-            >
-              {/* Header */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  marginBottom: "24px",
-                }}
-              >
-                <Users style={{ width: 24, height: 24, color: "#8b5cf6" }} />
-                <h3
-                  style={{
-                    fontSize: "clamp(18px, 4vw, 24px)",
-                    fontWeight: 800,
-                    margin: 0,
-                    color: "white",
-                  }}
-                >
-                  Live Arena
-                </h3>
+                )}
               </div>
-
-              {/* Stats Grid */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: "12px",
-                  marginBottom: "24px",
-                }}
-              >
-                <div
-                  style={{
-                    padding: "16px",
-                    borderRadius: "12px",
-                    background: "rgba(139, 92, 246, 0.1)",
-                    border: "1px solid rgba(139, 92, 246, 0.3)",
-                    textAlign: "center",
-                  }}
-                >
-                  <div style={{ fontSize: "clamp(20px, 5vw, 28px)", fontWeight: 800, color: "white", marginBottom: "4px" }}>
-                    {participants}
-                  </div>
-                  <div style={{ fontSize: "clamp(10px, 2vw, 12px)", color: "#94a3b8", fontWeight: 600 }}>
-                    JOINED
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    padding: "16px",
-                    borderRadius: "12px",
-                    background: "rgba(34, 211, 238, 0.1)",
-                    border: "1px solid rgba(34, 211, 238, 0.3)",
-                    textAlign: "center",
-                  }}
-                >
-                  <div style={{ fontSize: "clamp(20px, 5vw, 28px)", fontWeight: 800, color: "white", marginBottom: "4px" }}>
-                    {spectators}
-                  </div>
-                  <div style={{ fontSize: "clamp(10px, 2vw, 12px)", color: "#94a3b8", fontWeight: 600 }}>
-                    WATCHING
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    padding: "16px",
-                    borderRadius: "12px",
-                    background: "rgba(16, 185, 129, 0.1)",
-                    border: "1px solid rgba(16, 185, 129, 0.3)",
-                    textAlign: "center",
-                  }}
-                >
-                  <div style={{ fontSize: "clamp(18px, 4.5vw, 24px)", fontWeight: 800, color: "white", marginBottom: "4px" }}>
-                    {displayRange}
-                  </div>
-                  <div style={{ fontSize: "clamp(10px, 2vw, 12px)", color: "#94a3b8", fontWeight: 600 }}>
-                    ACTIVE
-                  </div>
+            ) : (
+              <div style={{ marginBottom: 48, padding: '20px 32px', borderRadius: 16, background: 'rgba(34, 197, 94, 0.15)', border: '2px solid rgba(34, 197, 94, 0.4)', textAlign: 'center', boxShadow: '0 8px 24px rgba(34, 197, 94, 0.2)', animation: 'slideIn 0.6s ease-out 0.3s backwards' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, fontSize: 16, fontWeight: 700, color: '#22c55e' }}>
+                  <Trophy style={{ width: 22, height: 22 }} />
+                  YOU'RE IN! GET READY...
                 </div>
               </div>
+            )}
 
-              {/* Recent Players List */}
-              <div>
-                <div
-                  style={{
-                    fontSize: "clamp(13px, 2.8vw, 15px)",
-                    color: "#94a3b8",
-                    fontWeight: 600,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    marginBottom: "16px",
-                  }}
-                >
-                  Recent Joins
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "8px",
-                    maxHeight: "300px",
-                    overflowY: "auto",
-                  }}
-                >
-                  {recentPlayers.length === 0 ? (
-                    <div
-                      style={{
-                        padding: "24px",
-                        textAlign: "center",
-                        color: "#6b7280",
-                        fontSize: "14px",
-                      }}
-                    >
-                      Waiting for players to join...
-                    </div>
-                  ) : (
-                    recentPlayers.map((player, idx) => (
-                      <div
-                        key={player.user_id}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "12px",
-                          padding: "12px",
-                          borderRadius: "12px",
-                          background: "rgba(255, 255, 255, 0.03)",
-                          border: "1px solid rgba(255, 255, 255, 0.06)",
-                          animation: `slideIn 0.4s ease-out ${idx * 0.05}s backwards`,
-                        }}
-                      >
-                        {/* Avatar */}
-                        <div
-                          style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: "50%",
-                            background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontWeight: 700,
-                            fontSize: "16px",
-                            color: "white",
-                            flexShrink: 0,
-                          }}
-                        >
-                          {player.full_name.charAt(0).toUpperCase()}
-                        </div>
-
-                        {/* Name */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div
-                            style={{
-                              fontSize: "clamp(13px, 2.8vw, 15px)",
-                              fontWeight: 600,
-                              color: "white",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {player.full_name}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "clamp(10px, 2vw, 12px)",
-                              color: "#6b7280",
-                            }}
-                          >
-                            Just joined
-                          </div>
-                        </div>
-
-                        {/* Badge */}
-                        <div
-                          style={{
-                            padding: "4px 8px",
-                            borderRadius: "6px",
-                            background: "rgba(34, 197, 94, 0.15)",
-                            border: "1px solid rgba(34, 197, 94, 0.3)",
-                          }}
-                        >
-                          <Clock style={{ width: 14, height: 14, color: "#22c55e" }} />
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+            {/* Stats Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 20, marginBottom: 48, animation: 'slideIn 0.6s ease-out 0.4s backwards' }}>
+              <div style={{ padding: 24, borderRadius: 16, background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(139, 92, 246, 0.05))', border: '1px solid rgba(139, 92, 246, 0.3)', textAlign: 'center', transition: 'all 0.3s' }}>
+                <div style={{ fontSize: 36, fontWeight: 800, color: 'white', marginBottom: 8 }}>{state.participants_count}</div>
+                <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Joined</div>
+              </div>
+              <div style={{ padding: 24, borderRadius: 16, background: 'linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(34, 211, 238, 0.05))', border: '1px solid rgba(34, 211, 238, 0.3)', textAlign: 'center', transition: 'all 0.3s' }}>
+                <div style={{ fontSize: 36, fontWeight: 800, color: 'white', marginBottom: 8 }}>{state.spectators_count}</div>
+                <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Watching</div>
+              </div>
+              <div style={{ padding: 24, borderRadius: 16, background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05))', border: '1px solid rgba(16, 185, 129, 0.3)', textAlign: 'center', transition: 'all 0.3s' }}>
+                <div style={{ fontSize: 32, fontWeight: 800, color: 'white', marginBottom: 8 }}>{state.total_range}</div>
+                <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Range</div>
               </div>
             </div>
-          </div>
 
-          {/* Bottom Info */}
-          <div
-            style={{
-              marginTop: "32px",
-              padding: "20px",
-              borderRadius: "16px",
-              background: "rgba(139, 92, 246, 0.08)",
-              border: "1px solid rgba(139, 92, 246, 0.2)",
-              textAlign: "center",
-              animation: "slideIn 0.6s ease-out 0.3s backwards",
-            }}
-          >
-            <p
-              style={{
-                fontSize: "clamp(13px, 2.8vw, 15px)",
-                color: "#cbd5e1",
-                margin: 0,
-                lineHeight: 1.6,
-              }}
-            >
-              <strong style={{ color: "white" }}>You're in the lobby!</strong> The quiz will start
-              automatically when the countdown reaches 0. Get ready to compete!
-            </p>
+            {/* Recent Players */}
+            <div style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: 24, padding: 32, border: '1px solid rgba(139, 92, 246, 0.3)', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)', animation: 'slideIn 0.6s ease-out 0.5s backwards' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+                <Users style={{ width: 24, height: 24, color: '#8b5cf6' }} />
+                <h3 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: 'white' }}>Recent Joins</h3>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 400, overflowY: 'auto' }}>
+                {state.recent_players.length === 0 ? (
+                  <div style={{ padding: 48, textAlign: 'center', color: '#6b7280', fontSize: 14 }}>
+                    Waiting for players to join...
+                  </div>
+                ) : (
+                  state.recent_players.map((player, idx) => (
+                    <PlayerCard key={player.user_id} player={player} index={idx} />
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         </main>
       </div>
