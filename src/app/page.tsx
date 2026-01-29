@@ -1,12 +1,12 @@
 ﻿"use client";
 
 import { useState, useEffect, useCallback, useMemo, memo, useRef } from "react";
+import type { ComponentType, CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   Crown,
   Trophy,
-  Zap,
   Play,
   ArrowRight,
   Volume2,
@@ -37,34 +37,37 @@ const BLOCK_REASONS = {
 const PAGE_TYPE = "homepage" as const;
 
 // ============================================
-// TYPES
+// CANONICAL TYPES
 // ============================================
 interface CanonicalHomepageState {
-  // User state
   isAuthenticated: boolean;
   userId: string | null;
   liveCredits: number;
   ageVerified: boolean;
-  
-  // Round state
   nextRoundSeconds: number;
-  
-  // Presence
   activePlayers: number;
-  
-  // Stats
   totalRounds: number;
   totalParticipants: number;
-  
-  // Champions
   weeklyChampion: { name: string; score: number } | null;
   monthlyChampion: { name: string; score: number } | null;
-  
-  // Entry permissions
   canEnterLive: boolean;
   liveBlockReason: string | null;
   canEnterFree: boolean;
   freeBlockReason: string | null;
+}
+
+interface StatCardProps {
+  icon: ComponentType<{ style?: CSSProperties }>;
+  value: string;
+  label: string;
+}
+
+interface Champion {
+  period: string;
+  name: string;
+  score: number;
+  icon: ComponentType<{ style?: CSSProperties }>;
+  color: string;
 }
 
 // ============================================
@@ -76,11 +79,9 @@ function useCanonicalHomepageState() {
 
   const loadState = useCallback(async (): Promise<CanonicalHomepageState | null> => {
     try {
-      // A) Get auth user
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id || null;
 
-      // B) Get age_verified from profile (needed for RPC parameter)
       let profileAgeVerified = false;
 
       if (user?.id) {
@@ -93,7 +94,6 @@ function useCanonicalHomepageState() {
         profileAgeVerified = profileRow?.age_verified || false;
       }
 
-      // C) ✅ CANONICAL: Single RPC call for all homepage data
       const { data: homepage, error: homeErr } = await supabase.rpc(
         "get_homepage_state",
         { p_age_verified: profileAgeVerified }
@@ -101,27 +101,27 @@ function useCanonicalHomepageState() {
 
       if (homeErr) throw homeErr;
 
-      // D) Map RPC response to canonical state
       const canonicalState: CanonicalHomepageState = {
         isAuthenticated: homepage.is_authenticated,
         userId,
         liveCredits: homepage.live_credits,
         ageVerified: profileAgeVerified,
-
         nextRoundSeconds: homepage.next_round_in_seconds,
         activePlayers: homepage.active_players,
         totalRounds: homepage.total_rounds,
         totalParticipants: homepage.total_participants,
-
-        weeklyChampion: {
-          name: homepage.weekly_champion_name,
-          score: homepage.weekly_champion_score,
-        },
-        monthlyChampion: {
-          name: homepage.monthly_champion_name,
-          score: homepage.monthly_champion_score,
-        },
-
+        weeklyChampion: homepage.weekly_champion_name
+          ? {
+              name: homepage.weekly_champion_name,
+              score: homepage.weekly_champion_score ?? 0,
+            }
+          : null,
+        monthlyChampion: homepage.monthly_champion_name
+          ? {
+              name: homepage.monthly_champion_name,
+              score: homepage.monthly_champion_score ?? 0,
+            }
+          : null,
         canEnterLive: homepage.can_enter_live,
         liveBlockReason: homepage.live_block_reason,
         canEnterFree: homepage.can_enter_free,
@@ -176,7 +176,7 @@ function usePresence(pageType: string) {
     };
 
     sendHeartbeat();
-    const interval = setInterval(sendHeartbeat, 30000); // Canonical: 30 seconds (reduced spam)
+    const interval = setInterval(sendHeartbeat, 30000);
 
     return () => clearInterval(interval);
   }, [pageType]);
@@ -185,7 +185,7 @@ function usePresence(pageType: string) {
 // ============================================
 // UI COMPONENTS
 // ============================================
-const StatCard = memo(({ icon: Icon, value, label }: any) => (
+const StatCard = memo(({ icon: Icon, value, label }: StatCardProps) => (
   <div className="vx-stat-card">
     <Icon style={{ width: 20, height: 20, color: "#6b7280", marginBottom: 8 }} />
     <div className="vx-stat-value">{value}</div>
@@ -194,7 +194,7 @@ const StatCard = memo(({ icon: Icon, value, label }: any) => (
 ));
 StatCard.displayName = "StatCard";
 
-const ChampionCard = memo(({ champion }: any) => {
+const ChampionCard = memo(({ champion }: { champion: Champion }) => {
   const Icon = champion.icon;
 
   if (!champion.name || champion.name === "TBA" || champion.score === 0) {
@@ -563,10 +563,16 @@ export default function HomePage() {
   const [countdownSeconds, setCountdownSeconds] = useState(0);
   const hasInteractedRef = useRef(false);
 
-  // Countdown timer
+  // Cleanup music on unmount
   useEffect(() => {
-    if (!state) return;
-    setCountdownSeconds(state.nextRoundSeconds);
+    return () => {
+      stopMenuMusic();
+    };
+  }, []);
+
+  useEffect(() => {
+    const initial = state?.nextRoundSeconds ?? 0;
+    setCountdownSeconds(initial);
 
     const interval = setInterval(() => {
       setCountdownSeconds((prev) => Math.max(0, prev - 1));
@@ -575,7 +581,6 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, [state?.nextRoundSeconds]);
 
-  // Music auto-play on first interaction
   const handleFirstInteraction = useCallback(() => {
     if (!hasInteractedRef.current) {
       hasInteractedRef.current = true;
@@ -618,7 +623,6 @@ export default function HomePage() {
     if (!state?.userId) return;
 
     try {
-      // Update age verification in backend
       const { error } = await supabase
         .from("profiles")
         .update({ age_verified: true })
@@ -629,7 +633,6 @@ export default function HomePage() {
       setShowAgeModal(false);
       await refresh();
 
-      // Execute pending action
       if (pendingAction === "live") {
         router.push("/lobby");
       } else if (pendingAction === "free") {
@@ -655,7 +658,6 @@ export default function HomePage() {
       return;
     }
 
-    // ✅ CANONICAL: Use backend-calculated permission
     if (!state.canEnterLive) {
       if (state.liveBlockReason === BLOCK_REASONS.NO_CREDITS) {
         setShowNoRoundsModal(true);
@@ -680,7 +682,6 @@ export default function HomePage() {
       return;
     }
 
-    // ✅ CANONICAL: Use backend-calculated permission
     if (!state.canEnterFree) {
       if (state.freeBlockReason === BLOCK_REASONS.ALREADY_USED) {
         alert("You've already used your free quiz this week. Come back Monday!");
@@ -766,25 +767,72 @@ export default function HomePage() {
   return (
     <>
       <style jsx global>{`
-        * {
-          margin: 0;
-          padding: 0;
+        /* ========== CANONICAL GLOBAL RESET ========== */
+        html {
           box-sizing: border-box;
+          scroll-behavior: smooth;
+          -webkit-text-size-adjust: 100%;
+        }
+
+        *, *::before, *::after {
+          box-sizing: inherit;
         }
 
         body {
+          margin: 0;
+          padding: 0;
+          min-height: 100%;
+          text-rendering: optimizeLegibility;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
           background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
           color: #ffffff;
           overflow-x: hidden;
         }
 
+        h1, h2, h3, h4, h5, h6,
+        p, figure, blockquote, dl, dd {
+          margin: 0;
+        }
+
+        img, picture, video, canvas, svg {
+          display: block;
+          max-width: 100%;
+        }
+
+        input, button, textarea, select {
+          font: inherit;
+        }
+
+        button {
+          background: none;
+          border: none;
+          cursor: pointer;
+        }
+
+        a {
+          text-decoration: none;
+          color: inherit;
+        }
+
+        ul[role="list"], ol[role="list"] {
+          list-style: none;
+        }
+
+        :focus-visible {
+          outline: 2px solid #7c3aed;
+          outline-offset: 2px;
+        }
+
+        /* ========== LAYOUT CONTAINERS ========== */
         .vx-container {
           max-width: 1200px;
           margin: 0 auto;
           padding: 0 20px;
         }
 
+        /* ========== HEADER ========== */
         .vx-header {
           position: sticky;
           top: 0;
@@ -809,6 +857,7 @@ export default function HomePage() {
           flex-wrap: wrap;
         }
 
+        /* ========== LIVE BAR ========== */
         .vx-livebar {
           background: linear-gradient(90deg, rgba(34, 197, 94, 0.1), rgba(6, 182, 212, 0.1));
           border-bottom: 1px solid rgba(34, 197, 94, 0.2);
@@ -827,6 +876,7 @@ export default function HomePage() {
           font-size: 13px;
         }
 
+        /* ========== HERO SECTION ========== */
         .vx-hero {
           padding: 80px 0;
           text-align: center;
@@ -869,6 +919,7 @@ export default function HomePage() {
           line-height: 1.6;
         }
 
+        /* ========== COUNTDOWN ========== */
         .vx-countdown-panel {
           background: linear-gradient(135deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.6));
           border: 1px solid rgba(255, 255, 255, 0.1);
@@ -879,6 +930,7 @@ export default function HomePage() {
           backdrop-filter: blur(12px);
         }
 
+        /* ========== CTA BUTTONS ========== */
         .vx-cta-wrap {
           display: flex;
           flex-direction: column;
@@ -909,6 +961,7 @@ export default function HomePage() {
           box-shadow: 0 12px 24px rgba(124, 58, 237, 0.5);
         }
 
+        /* ========== STATS ========== */
         .vx-stats-grid {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -945,6 +998,7 @@ export default function HomePage() {
           letter-spacing: 0.1em;
         }
 
+        /* ========== CHAMPIONS ========== */
         .vx-champions-title {
           display: flex;
           align-items: center;
@@ -976,6 +1030,7 @@ export default function HomePage() {
           transform: translateY(-4px);
         }
 
+        /* ========== RESPONSIVE ========== */
         .vx-hide-mobile {
           display: flex;
         }
@@ -1017,9 +1072,9 @@ export default function HomePage() {
           }
         }
 
+        /* ========== ANIMATIONS ========== */
         @keyframes pulse {
-          0%,
-          100% {
+          0%, 100% {
             opacity: 1;
           }
           50% {
@@ -1351,7 +1406,8 @@ export default function HomePage() {
                     style={{
                       position: "absolute",
                       inset: 0,
-                      background: "linear-gradient(to right,#7c3aed,#d946ef)",
+                      background: "linear-gradient(to right, #7c3aed, #d946ef)",
+                      pointerEvents: "none",
                     }}
                   />
                   <Play
@@ -1374,7 +1430,8 @@ export default function HomePage() {
                     style={{
                       position: "absolute",
                       inset: 0,
-                      background: "linear-gradient(to right,#06b6d4,#22d3ee)",
+                      background: "linear-gradient(to right, #06b6d4, #22d3ee)",
+                      pointerEvents: "none",
                     }}
                   />
                   <Gift
