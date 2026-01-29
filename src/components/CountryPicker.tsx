@@ -2,14 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { Globe, Search } from "lucide-react";
-import { POPULAR_COUNTRIES, ALL_COUNTRIES, detectCountry } from "@/lib/countryService";
+import {
+  ALL_COUNTRIES,
+  POPULAR_COUNTRIES,
+  detectCountry,
+  Country,
+} from "@/lib/countryService";
 
 interface CountryPickerProps {
-  value: string;
-  onChange: (country: string) => void;
+  value: string; // ISO code: "GB"
+  onChange: (countryCode: string) => void;
   autoDetect?: boolean;
   showSearch?: boolean;
-  size?: "sm" | "md" | "lg";
 }
 
 export default function CountryPicker({
@@ -17,228 +21,155 @@ export default function CountryPicker({
   onChange,
   autoDetect = true,
   showSearch = true,
-  size = "md",
 }: CountryPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isDetecting, setIsDetecting] = useState(false);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(false);
   const [showAll, setShowAll] = useState(false);
-  const [hasDetected, setHasDetected] = useState(false);
 
-  // Auto-detect country only once
+  const selected = ALL_COUNTRIES.find((c) => c.code === value);
+
   useEffect(() => {
-    if (autoDetect && value === "🌍" && !hasDetected) {
-      handleAutoDetect();
-      setHasDetected(true);
+    if (autoDetect && !value) {
+      handleDetect();
     }
-  }, [autoDetect, value, hasDetected]);
+  }, []);
 
-  // Lock body scroll when dropdown open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isOpen]);
-
-  const handleAutoDetect = async () => {
-    setIsDetecting(true);
+  const handleDetect = async () => {
+    setLoading(true);
     try {
-      const countryData = await detectCountry();
-      onChange(countryData.flag);
-    } catch (error) {
-      console.error("Country detection failed:", error);
+      const code = await detectCountry();
+      const found = ALL_COUNTRIES.find((c) => c.code === code);
+      if (found) onChange(found.code);
     } finally {
-      setIsDetecting(false);
+      setLoading(false);
     }
   };
 
-  const filteredCountries = (showAll ? ALL_COUNTRIES : POPULAR_COUNTRIES).filter(
-    (country) =>
-      country.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      country.code.toLowerCase().includes(searchTerm.toLowerCase())
+  const list = (showAll ? ALL_COUNTRIES : POPULAR_COUNTRIES).filter(
+    (c) =>
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.code.toLowerCase().includes(search.toLowerCase())
   );
-
-  const selectedCountry = ALL_COUNTRIES.find((c) => c.flag === value);
-
-  const sizeStyles = {
-    sm: { fontSize: "24px", padding: "8px 12px", buttonHeight: "40px" },
-    md: { fontSize: "32px", padding: "12px 16px", buttonHeight: "50px" },
-    lg: { fontSize: "48px", padding: "16px 20px", buttonHeight: "60px" },
-  };
-
-  const currentSize = sizeStyles[size];
 
   return (
     <div style={{ position: "relative", width: "100%" }}>
-      {/* Selected Button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        disabled={isDetecting}
+        onClick={() => setIsOpen((v) => !v)}
+        disabled={loading}
         style={{
           width: "100%",
-          height: currentSize.buttonHeight,
-          padding: currentSize.padding,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "12px",
+          padding: "12px 16px",
           borderRadius: "12px",
-          border: "2px solid rgba(139, 92, 246, 0.5)",
-          background: "linear-gradient(135deg, rgba(30,27,75,0.8), rgba(15,23,42,0.9))",
+          border: "2px solid rgba(139,92,246,0.5)",
+          background: "#020817",
           color: "white",
-          fontSize: "16px",
-          fontWeight: 600,
-          cursor: isDetecting ? "wait" : "pointer",
-          transition: "all 0.3s ease",
-          backdropFilter: "blur(10px)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <span style={{ fontSize: currentSize.fontSize }}>
-            {isDetecting ? "🌍" : value}
-          </span>
-          <span style={{ color: "#cbd5e1" }}>
-            {isDetecting
-              ? "Detecting..."
-              : selectedCountry?.name || "Select Country"}
-          </span>
-        </div>
-        <Globe style={{ width: "20px", height: "20px", color: "#a78bfa" }} />
+        <span>
+          {selected?.flag || "🌍"} {selected?.name || "Select country"}
+        </span>
+        <Globe size={18} />
       </button>
 
-      {/* Dropdown */}
       {isOpen && (
-        <>
-          <div
-            onClick={() => setIsOpen(false)}
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(0,0,0,0.5)",
-              zIndex: 999,
-            }}
-          />
-
-          <div
-            style={{
-              position: "absolute",
-              top: "calc(100% + 8px)",
-              left: 0,
-              right: 0,
-              maxHeight: "400px",
-              borderRadius: "16px",
-              border: "2px solid rgba(139, 92, 246, 0.5)",
-              background: "linear-gradient(135deg, rgba(30,27,75,0.98), rgba(15,23,42,0.98))",
-              boxShadow:
-                "0 20px 60px rgba(0,0,0,0.8), 0 0 40px rgba(139,92,246,0.4)",
-              zIndex: 1000,
-              overflow: "hidden",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            {showSearch && (
-              <div style={{ padding: "16px" }}>
-                <div style={{ position: "relative" }}>
-                  <Search
-                    style={{
-                      position: "absolute",
-                      left: "12px",
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      width: "18px",
-                      height: "18px",
-                      color: "#94a3b8",
-                    }}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Search country..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "10px 12px 10px 40px",
-                      borderRadius: "8px",
-                      border: "1px solid rgba(139,92,246,0.3)",
-                      background: "rgba(15,23,42,0.6)",
-                      color: "white",
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {autoDetect && (
-              <button
-                onClick={handleAutoDetect}
-                disabled={isDetecting}
-                style={{
-                  padding: "12px 16px",
-                  background: "rgba(124,58,237,0.2)",
-                  color: "#a78bfa",
-                  fontWeight: 600,
-                  border: "none",
-                }}
-              >
-                🌍 Auto-detect my country
-              </button>
-            )}
-
-            <div style={{ overflowY: "auto", maxHeight: "280px" }}>
-              {filteredCountries.map((country) => (
-                <button
-                  key={country.code}
-                  onClick={() => {
-                    onChange(country.flag);
-                    setIsOpen(false);
-                    setSearchTerm("");
+        <div
+          style={{
+            position: "absolute",
+            top: "110%",
+            left: 0,
+            right: 0,
+            background: "#020817",
+            borderRadius: "12px",
+            border: "2px solid rgba(139,92,246,0.5)",
+            maxHeight: 300,
+            overflow: "auto",
+            zIndex: 50,
+          }}
+        >
+          {showSearch && (
+            <div style={{ padding: 8 }}>
+              <div style={{ position: "relative" }}>
+                <Search
+                  size={16}
+                  style={{
+                    position: "absolute",
+                    left: 10,
+                    top: "50%",
+                    transform: "translateY(-50%)",
                   }}
+                />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search..."
                   style={{
                     width: "100%",
-                    padding: "12px 16px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    background:
-                      value === country.flag
-                        ? "rgba(124,58,237,0.3)"
-                        : "transparent",
-                    border: "none",
+                    padding: "8px 8px 8px 32px",
+                    borderRadius: "8px",
+                    background: "#020817",
+                    border: "1px solid rgba(139,92,246,0.4)",
                     color: "white",
-                    cursor: "pointer",
                   }}
-                >
-                  <span style={{ fontSize: "24px" }}>{country.flag}</span>
-                  <span style={{ flex: 1 }}>{country.name}</span>
-                  {value === country.flag && (
-                    <span style={{ color: "#22c55e" }}>✓</span>
-                  )}
-                </button>
-              ))}
+                />
+              </div>
             </div>
+          )}
 
-            {!showAll && searchTerm === "" && (
-              <button
-                onClick={() => setShowAll(true)}
-                style={{
-                  padding: "12px 16px",
-                  background: "rgba(15,23,42,0.8)",
-                  color: "#a78bfa",
-                  border: "none",
-                }}
-              >
-                Show all countries →
-              </button>
-            )}
-          </div>
-        </>
+          <button
+            onClick={handleDetect}
+            style={{
+              width: "100%",
+              padding: 10,
+              background: "rgba(124,58,237,0.2)",
+              color: "#a78bfa",
+              border: "none",
+            }}
+          >
+            🌍 Auto detect
+          </button>
+
+          {list.map((c: Country) => (
+            <button
+              key={c.code}
+              onClick={() => {
+                onChange(c.code);
+                setIsOpen(false);
+              }}
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                display: "flex",
+                gap: 10,
+                background: value === c.code ? "rgba(124,58,237,0.3)" : "none",
+                color: "white",
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              <span>{c.flag}</span>
+              <span>{c.name}</span>
+            </button>
+          ))}
+
+          {!showAll && (
+            <button
+              onClick={() => setShowAll(true)}
+              style={{
+                width: "100%",
+                padding: 10,
+                background: "rgba(15,23,42,0.9)",
+                color: "#a78bfa",
+                border: "none",
+              }}
+            >
+              Show all →
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
