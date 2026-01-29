@@ -1513,7 +1513,6 @@ export default function QuizGamePage() {
                     accuracy: Math.round((correctCount / totalQuestions) * 100),
                     userName: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Anonymous',
                     userCountry: user?.user_metadata?.country || '🌍',
-                    userId: user?.id,
                     roundId: roundId ?? undefined,
                   }}
                   variant="full"
