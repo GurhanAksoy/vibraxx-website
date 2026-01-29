@@ -10,25 +10,29 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "VibraXX",
-    statusBarStyle: "black-translucent"
+    statusBarStyle: "black-translucent",
   },
   formatDetection: {
-    telephone: false
-  }
+    telephone: false,
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#020817"
+  themeColor: "#020817",
 };
 
 const inter = Inter({
   subsets: ["latin"],
-  display: "swap"
+  display: "swap",
 });
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en">
       <head>
@@ -37,10 +41,39 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
 
-      <body className={inter.className + " bg-[#020817] text-white antialiased"}>
+      <body className={`${inter.className} bg-[#020817] text-white antialiased`}>
+        {/* 🔲 PRELOAD OVERLAY */}
+        <div
+          id="vibraxx-preload-bg"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "#020817",
+            zIndex: 9999,
+            opacity: 1,
+            transition: "opacity 0.5s ease",
+            pointerEvents: "none",
+          }}
+        />
+
         {children}
 
-        {/* Service Worker Registration */}
+        {/* 🔻 PRELOAD FADE-OUT */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.addEventListener('load', () => {
+                const el = document.getElementById('vibraxx-preload-bg');
+                if (el) {
+                  el.style.opacity = '0';
+                  setTimeout(() => el.remove(), 600);
+                }
+              });
+            `,
+          }}
+        />
+
+        {/* 🔧 SERVICE WORKER REGISTER */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -64,7 +97,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   });
                 });
               }
-            `
+            `,
           }}
         />
       </body>

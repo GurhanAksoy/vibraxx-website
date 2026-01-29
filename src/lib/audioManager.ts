@@ -1,35 +1,45 @@
-// 📁 C:\Users\Gürhan Aksoy\Documents\GitHub\vibraxx-website\src\lib\audioManager.ts
+// src/lib/audioManager.ts
 
-let audio: HTMLAudioElement | null =
-  typeof window !== "undefined" ? (window as any).__vibraxx_audio || null : null;
+let audio: HTMLAudioElement | null = null;
+let initialized = false;
+
+function getAudio(): HTMLAudioElement {
+  if (!audio) {
+    audio = new Audio("/sounds/vibraxx.mp3");
+    audio.loop = true;
+    audio.preload = "auto";
+  }
+  return audio;
+}
+
+export function initMenuMusicOnFirstGesture() {
+  if (initialized || typeof window === "undefined") return;
+  initialized = true;
+
+  const handler = () => {
+    const a = getAudio();
+    a.play().catch(() => {});
+    document.removeEventListener("click", handler);
+  };
+
+  document.addEventListener("click", handler, { once: true });
+}
 
 export async function playMenuMusic() {
+  if (typeof window === "undefined") return;
+
+  const a = getAudio();
+  if (!a.paused) return;
+
   try {
-    if (!audio) {
-      audio = new Audio();
-      audio.src = "/sounds/vibraxx.mp3";
-      audio.loop = true;
-      audio.preload = "auto";
-      await audio.load();
-      (window as any).__vibraxx_audio = audio; // 🧠 Global referans
-    }
-
-    if (audio && !audio.paused) return;
-
-    await audio.play().catch(err => {
-      console.warn("Autoplay blocked by browser:", err);
-    });
-  } catch (err) {
-    console.error("🎵 playMenuMusic error:", err);
+    await a.play();
+  } catch {
+    // autoplay blocked → wait for user gesture
+    initMenuMusicOnFirstGesture();
   }
 }
 
 export function stopMenuMusic() {
-  const globalAudio =
-    typeof window !== "undefined" ? (window as any).__vibraxx_audio : audio;
-
-  if (globalAudio) {
-    globalAudio.pause();
-    globalAudio.currentTime = 0;
-  }
+  if (!audio) return;
+  audio.pause();
 }
