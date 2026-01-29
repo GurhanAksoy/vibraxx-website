@@ -151,8 +151,7 @@ function useCanonicalHomepageState() {
 
   ageVerified = profileRow?.age_verified || false;
 }
-      }
-
+     
       // I) Determine entry permissions
       let canEnterLive = false;
       let liveBlockReason: string | null = null;
