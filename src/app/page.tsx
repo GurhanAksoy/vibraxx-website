@@ -128,21 +128,29 @@ function useCanonicalHomepageState() {
       let freeQuizUsedThisWeek = false;
 
       if (isAuthenticated && userId) {
-        const { data: userState } = await supabase
-          .from("user_credits")
-          .select(`
-            live_credits,
-            free_quiz_used_this_week,
-            profiles!inner(age_verified)
-          `)
-          .eq("user_id", userId)
-          .single();
+  // A) Credits
+  const { data: creditRow, error: creditErr } = await supabase
+    .from("user_credits")
+    .select("live_credits, free_quiz_used_this_week")
+    .eq("user_id", userId)
+    .single();
 
-        if (userState) {
-          liveCredits = userState.live_credits || 0;
-          freeQuizUsedThisWeek = userState.free_quiz_used_this_week || false;
-          ageVerified = (userState.profiles as any)?.age_verified || false;
-        }
+  if (creditErr) console.error("creditErr", creditErr);
+
+  liveCredits = creditRow?.live_credits || 0;
+  freeQuizUsedThisWeek = creditRow?.free_quiz_used_this_week || false;
+
+  // B) Profile
+  const { data: profileRow, error: profileErr } = await supabase
+    .from("profiles")
+    .select("age_verified")
+    .eq("user_id", userId)
+    .single();
+
+  if (profileErr) console.error("profileErr", profileErr);
+
+  ageVerified = profileRow?.age_verified || false;
+}
       }
 
       // I) Determine entry permissions
