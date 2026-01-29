@@ -7,7 +7,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const nextConfig = {
   reactStrictMode: false,
 
-  // ✔ Turbopack aktif ama boş config — bu hatayı çözüyor
   turbopack: {
     resolveAlias: {
       "@": path.resolve(__dirname, "src"),
@@ -21,6 +20,16 @@ const nextConfig = {
       { protocol: "https", hostname: "cdn.supabase.com" },
       { protocol: "https", hostname: "api.dicebear.com" },
     ],
+  },
+
+  // 🔥 KRİTİK FIX
+  async rewrites() {
+    return [
+      {
+        source: "/manifest.json",
+        destination: "/public/manifest.json",
+      },
+    ];
   },
 };
 
