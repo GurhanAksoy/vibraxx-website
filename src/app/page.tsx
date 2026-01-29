@@ -78,122 +78,54 @@ function useCanonicalHomepageState() {
     try {
       // A) Get auth user
       const { data: { user } } = await supabase.auth.getUser();
-      const isAuthenticated = !!user;
       const userId = user?.id || null;
 
-      // B) Get next round countdown (canonical UTC-safe RPC)
-      const { data: nextRoundSeconds } = await supabase.rpc("get_next_round_seconds");
+      // B) Get age_verified from profile (needed for RPC parameter)
+      let profileAgeVerified = false;
 
-      // C) Get active players (organic presence)
-      const { data: presenceCount } = await supabase.rpc("get_presence_count", {
-        p_page_type: PAGE_TYPE,
-        p_round_id: null,
-      });
+      if (user?.id) {
+        const { data: profileRow } = await supabase
+          .from("profiles")
+          .select("age_verified")
+          .eq("user_id", user.id)
+          .single();
 
-      const activePlayers = presenceCount || 0;
-
-      // D) Get total rounds finished (canonical RPC)
-      const { data: totalRounds } = await supabase.rpc("count_finished_rounds");
-
-      // E) Get total unique participants (canonical RPC)
-      const { data: totalParticipants } = await supabase.rpc("count_total_participants");
-
-      // F) Get weekly champion
-      const { data: weeklyChamp } = await supabase
-        .from("leaderboard_weekly")
-        .select("full_name, total_score")
-        .eq("rank", 1)
-        .limit(1)
-        .single();
-
-      const weeklyChampion = weeklyChamp
-        ? { name: weeklyChamp.full_name, score: weeklyChamp.total_score }
-        : null;
-
-      // G) Get monthly champion
-      const { data: monthlyChamp } = await supabase
-        .from("leaderboard_monthly")
-        .select("full_name, total_score")
-        .eq("rank", 1)
-        .limit(1)
-        .single();
-
-      const monthlyChampion = monthlyChamp
-        ? { name: monthlyChamp.full_name, score: monthlyChamp.total_score }
-        : null;
-
-      // H) Get user state (credits + age verification + free quiz status - single query)
-      let liveCredits = 0;
-      let ageVerified = false;
-      let freeQuizUsedThisWeek = false;
-
-      if (isAuthenticated && userId) {
-  // A) Credits
-  const { data: creditRow, error: creditErr } = await supabase
-    .from("user_credits")
-    .select("live_credits, free_quiz_used_this_week")
-    .eq("user_id", userId)
-    .single();
-
-  if (creditErr) console.error("creditErr", creditErr);
-
-  liveCredits = creditRow?.live_credits || 0;
-  freeQuizUsedThisWeek = creditRow?.free_quiz_used_this_week || false;
-
-  // B) Profile
-  const { data: profileRow, error: profileErr } = await supabase
-    .from("profiles")
-    .select("age_verified")
-    .eq("user_id", userId)
-    .single();
-
-  if (profileErr) console.error("profileErr", profileErr);
-
-  ageVerified = profileRow?.age_verified || false;
-}
-     
-      // I) Determine entry permissions
-      let canEnterLive = false;
-      let liveBlockReason: string | null = null;
-
-      if (!isAuthenticated) {
-        liveBlockReason = BLOCK_REASONS.NOT_AUTHENTICATED;
-      } else if (!ageVerified) {
-        liveBlockReason = BLOCK_REASONS.NOT_AGE_VERIFIED;
-      } else if (liveCredits <= 0) {
-        liveBlockReason = BLOCK_REASONS.NO_CREDITS;
-      } else {
-        canEnterLive = true;
+        profileAgeVerified = profileRow?.age_verified || false;
       }
 
-      let canEnterFree = false;
-      let freeBlockReason: string | null = null;
+      // C) ✅ CANONICAL: Single RPC call for all homepage data
+      const { data: homepage, error: homeErr } = await supabase.rpc(
+        "get_homepage_state",
+        { p_age_verified: profileAgeVerified }
+      );
 
-      if (!isAuthenticated) {
-        freeBlockReason = BLOCK_REASONS.NOT_AUTHENTICATED;
-      } else if (!ageVerified) {
-        freeBlockReason = BLOCK_REASONS.NOT_AGE_VERIFIED;
-      } else if (freeQuizUsedThisWeek) {
-        freeBlockReason = BLOCK_REASONS.ALREADY_USED;
-      } else {
-        canEnterFree = true;
-      }
+      if (homeErr) throw homeErr;
 
+      // D) Map RPC response to canonical state
       const canonicalState: CanonicalHomepageState = {
-        isAuthenticated,
+        isAuthenticated: homepage.is_authenticated,
         userId,
-        liveCredits,
-        ageVerified,
-        nextRoundSeconds: nextRoundSeconds || 0,
-        activePlayers,
-        totalRounds: totalRounds || 0,
-        totalParticipants: totalParticipants || 0,
-        weeklyChampion,
-        monthlyChampion,
-        canEnterLive,
-        liveBlockReason,
-        canEnterFree,
-        freeBlockReason,
+        liveCredits: homepage.live_credits,
+        ageVerified: profileAgeVerified,
+
+        nextRoundSeconds: homepage.next_round_in_seconds,
+        activePlayers: homepage.active_players,
+        totalRounds: homepage.total_rounds,
+        totalParticipants: homepage.total_participants,
+
+        weeklyChampion: {
+          name: homepage.weekly_champion_name,
+          score: homepage.weekly_champion_score,
+        },
+        monthlyChampion: {
+          name: homepage.monthly_champion_name,
+          score: homepage.monthly_champion_score,
+        },
+
+        canEnterLive: homepage.can_enter_live,
+        liveBlockReason: homepage.live_block_reason,
+        canEnterFree: homepage.can_enter_free,
+        freeBlockReason: homepage.free_block_reason,
       };
 
       setState(canonicalState);
@@ -208,7 +140,7 @@ function useCanonicalHomepageState() {
 
   useEffect(() => {
     loadState();
-    const interval = setInterval(loadState, 5000);
+    const interval = setInterval(loadState, 15000);
     return () => clearInterval(interval);
   }, [loadState]);
 
@@ -244,7 +176,7 @@ function usePresence(pageType: string) {
     };
 
     sendHeartbeat();
-    const interval = setInterval(sendHeartbeat, 20000); // Canonical: 20 seconds
+    const interval = setInterval(sendHeartbeat, 30000); // Canonical: 30 seconds (reduced spam)
 
     return () => clearInterval(interval);
   }, [pageType]);
@@ -723,8 +655,11 @@ export default function HomePage() {
       return;
     }
 
-    if (state.liveCredits <= 0) {
-      setShowNoRoundsModal(true);
+    // ✅ CANONICAL: Use backend-calculated permission
+    if (!state.canEnterLive) {
+      if (state.liveBlockReason === BLOCK_REASONS.NO_CREDITS) {
+        setShowNoRoundsModal(true);
+      }
       return;
     }
 
@@ -745,8 +680,11 @@ export default function HomePage() {
       return;
     }
 
-    if (state.freeBlockReason === BLOCK_REASONS.ALREADY_USED) {
-      alert("You've already used your free quiz this week. Come back Monday!");
+    // ✅ CANONICAL: Use backend-calculated permission
+    if (!state.canEnterFree) {
+      if (state.freeBlockReason === BLOCK_REASONS.ALREADY_USED) {
+        alert("You've already used your free quiz this week. Come back Monday!");
+      }
       return;
     }
 
