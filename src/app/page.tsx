@@ -653,6 +653,13 @@ export default function HomePage() {
     console.log('[DEBUG] handleStartLiveQuiz called');
     console.log('[DEBUG] State:', state);
     
+    // ⚠️ TEMPORARY: Direct push for testing
+    console.log('[DEBUG] FORCING PUSH TO LOBBY');
+    router.push("/lobby");
+    return;
+    
+    // Original logic below (temporarily disabled)
+    /*
     if (!state) {
       console.log('[DEBUG] No state - returning');
       return;
@@ -681,6 +688,7 @@ export default function HomePage() {
 
     console.log('[DEBUG] All checks passed - pushing to lobby');
     router.push("/lobby");
+    */
   }, [state, handleSignIn, router]);
 
   const handleStartFreeQuiz = useCallback(() => {
