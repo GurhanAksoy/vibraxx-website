@@ -1238,23 +1238,47 @@ export default function HomePage() {
                     </button>
                   </>
                 ) : (
-                  <button
-                    onClick={handleSignIn}
-                    style={{
-                      padding: "10px 20px",
-                      borderRadius: 10,
-                      border: "none",
-                      background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-                      color: "white",
-                      fontSize: 14,
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      transition: "transform 0.2s",
-                      boxShadow: "0 8px 16px rgba(124, 58, 237, 0.4)",
-                    }}
-                  >
-                    Sign In
-                  </button>
+                  <>
+                    {/* ✅ SEÇENEK B: Leaderboard herkese açık */}
+                    <button
+                      onClick={() => router.push("/leaderboard")}
+                      style={{
+                        padding: "10px 20px",
+                        borderRadius: 10,
+                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        background: "rgba(255, 255, 255, 0.05)",
+                        color: "#94a3b8",
+                        fontSize: 14,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <BarChart3 style={{ width: 16, height: 16 }} />
+                      <span className="vx-hide-mobile">Leaderboard</span>
+                    </button>
+
+                    <button
+                      onClick={handleSignIn}
+                      style={{
+                        padding: "10px 20px",
+                        borderRadius: 10,
+                        border: "none",
+                        background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+                        color: "white",
+                        fontSize: 14,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        transition: "transform 0.2s",
+                        boxShadow: "0 8px 16px rgba(124, 58, 237, 0.4)",
+                      }}
+                    >
+                      Sign In
+                    </button>
+                  </>
                 )}
               </div>
             </div>
