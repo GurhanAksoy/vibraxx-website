@@ -42,6 +42,8 @@ const PAGE_TYPE = "homepage" as const;
 interface CanonicalHomepageState {
   isAuthenticated: boolean;
   userId: string | null;
+  userEmail: string | null;
+  userName: string | null;
   liveCredits: number;
   ageVerified: boolean;
   nextRoundSeconds: number;
@@ -81,6 +83,19 @@ function useCanonicalHomepageState() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id || null;
+      const userEmail = user?.email || null;
+      const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || null;
+
+      // 🔍 DEBUG - Window'a ekle
+      if (typeof window !== 'undefined') {
+        (window as any).__DEBUG_USER = {
+          email: userEmail,
+          name: userName,
+          metadata: user?.user_metadata,
+          full_user: user
+        };
+        console.log('[Homepage] User Info:', (window as any).__DEBUG_USER);
+      }
 
       // ✅ CANONICAL: Sadece RPC - Frontend karar vermiyor
       const { data: homepage, error: homeErr } = await supabase.rpc(
@@ -92,6 +107,8 @@ function useCanonicalHomepageState() {
       const canonicalState: CanonicalHomepageState = {
         isAuthenticated: homepage.is_authenticated,
         userId,
+        userEmail,
+        userName,
         liveCredits: homepage.live_credits,
         ageVerified: homepage.age_verified, // ✅ Backend'den geliyor
         nextRoundSeconds: homepage.next_round_in_seconds,
@@ -1136,6 +1153,25 @@ export default function HomePage() {
 
                 {state?.isAuthenticated ? (
                   <>
+                    {/* ✅ Kullanıcı Adı/Email - HER ZAMAN GÖRÜNÜR */}
+                    <div
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: 8,
+                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        background: "rgba(255, 255, 255, 0.05)",
+                        color: "#94a3b8",
+                        fontSize: 12,
+                        fontWeight: 500,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <User style={{ width: 12, height: 12 }} />
+                      {state.userName || state.userEmail?.split('@')[0] || 'User'}
+                    </div>
+
                     <div
                       className="vx-hide-mobile"
                       style={{
