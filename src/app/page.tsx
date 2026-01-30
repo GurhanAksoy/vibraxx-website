@@ -598,9 +598,6 @@ export default function HomePage() {
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: {
-          prompt: 'select_account', // ✅ Google hesap seçiciyi göster
-        },
       },
     });
   }, []);
