@@ -650,26 +650,36 @@ export default function HomePage() {
   }, [state?.userId, pendingAction, refresh, router]);
 
   const handleStartLiveQuiz = useCallback(() => {
-    if (!state) return;
+    console.log('[DEBUG] handleStartLiveQuiz called');
+    console.log('[DEBUG] State:', state);
+    
+    if (!state) {
+      console.log('[DEBUG] No state - returning');
+      return;
+    }
 
     if (!state.isAuthenticated) {
+      console.log('[DEBUG] Not authenticated - signing in');
       handleSignIn();
       return;
     }
 
     if (!state.ageVerified) {
+      console.log('[DEBUG] Not age verified - showing modal');
       setPendingAction("live");
       setShowAgeModal(true);
       return;
     }
 
     if (!state.canEnterLive) {
+      console.log('[DEBUG] Cannot enter live:', state.liveBlockReason);
       if (state.liveBlockReason === BLOCK_REASONS.NO_CREDITS) {
         setShowNoRoundsModal(true);
       }
       return;
     }
 
+    console.log('[DEBUG] All checks passed - pushing to lobby');
     router.push("/lobby");
   }, [state, handleSignIn, router]);
 
