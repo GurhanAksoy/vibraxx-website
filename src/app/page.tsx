@@ -82,21 +82,9 @@ function useCanonicalHomepageState() {
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id || null;
 
-      let profileAgeVerified = false;
-
-      if (user?.id) {
-        const { data: profileRow } = await supabase
-          .from("profiles")
-          .select("age_verified")
-          .eq("user_id", user.id)
-          .single();
-
-        profileAgeVerified = profileRow?.age_verified || false;
-      }
-
+      // ✅ CANONICAL: Sadece RPC - Frontend karar vermiyor
       const { data: homepage, error: homeErr } = await supabase.rpc(
-        "get_homepage_state",
-        { p_age_verified: profileAgeVerified }
+        "get_homepage_state"
       );
 
       if (homeErr) throw homeErr;
@@ -105,7 +93,7 @@ function useCanonicalHomepageState() {
         isAuthenticated: homepage.is_authenticated,
         userId,
         liveCredits: homepage.live_credits,
-        ageVerified: profileAgeVerified,
+        ageVerified: homepage.age_verified, // ✅ Backend'den geliyor
         nextRoundSeconds: homepage.next_round_in_seconds,
         activePlayers: homepage.active_players,
         totalRounds: homepage.total_rounds,
