@@ -96,113 +96,47 @@ function useCanonicalLobbyState() {
 
   const loadState = useCallback(async (): Promise<CanonicalLobbyState | null> => {
     try {
-      // A) Get auth user
+      // ✅ CANONICAL: Single RPC call - Backend decides everything
+      const { data: lobbyState, error } = await supabase.rpc("get_lobby_state");
+
+      if (error) {
+        console.error("[CanonicalLobby] RPC error:", error);
+        
+        // Handle specific error types
+        if (lobbyState?.requires_auth) {
+          setHasError(true);
+          return null;
+        }
+        if (lobbyState?.no_round) {
+          console.warn("[CanonicalLobby] No scheduled round");
+          setHasError(true);
+          return null;
+        }
+        
+        throw error;
+      }
+
+      // Get userId for local state
       const { data: { user } } = await supabase.auth.getUser();
-      const isAuthenticated = !!user;
       const userId = user?.id || null;
 
-      if (!isAuthenticated) {
-        setHasError(true);
-        return null;
-      }
-
-      // B) Get active round
-      const { data: roundData, error: roundError } = await supabase
-        .rpc("get_active_round")
-        .single();
-
-      if (roundError || !roundData) {
-        console.error("[Lobby] No active round found");
-        setHasError(true);
-        return null;
-      }
-
-      const round = roundData as RoundInfo;
-      const roundId = round.round_id;
-      const roundStatus = round.status;
-
-      // C) Get countdown
-      const { data: countdown } = await supabase.rpc("get_round_countdown", {
-        p_round_id: roundId,
-      });
-
-      const secondsToStart = Math.max(0, countdown || 0);
-      const isUrgent = secondsToStart <= URGENT_THRESHOLD && secondsToStart > 0;
-
-      // D) Get participants count
-      const { data: participantsCount } = await supabase.rpc(
-        "count_round_participants",
-        {
-          p_round_id: roundId,
-          p_source: "live",
-        }
-      );
-
-      // E) Get spectators count (presence)
-      const { data: spectatorsCount } = await supabase.rpc("get_presence_count", {
-        p_page_type: PAGE_TYPE,
-        p_round_id: roundId,
-      });
-
-      // F) Calculate total range
-      const totalActive = (participantsCount || 0) + (spectatorsCount || 0);
-      const rangeMin = Math.floor(totalActive / 10) * 10;
-      const rangeMax = rangeMin + 50;
-      const totalRange = `${rangeMin}-${rangeMax}`;
-
-      // G) Get recent players
-      const { data: recentPlayers } = await supabase.rpc("get_recent_players", {
-        p_round_id: roundId,
-      });
-
-      // H) Get user state
-      const { data: userStateData } = await supabase
-        .rpc("get_user_lobby_state", {
-          p_round_id: roundId,
-        })
-        .single();
-
-      const userState = userStateData as UserLobbyState | null;
-      const liveCredits = userState?.live_credits || 0;
-      const ageVerified = userState?.age_verified || false;
-      const userJoined = userState?.already_joined || false;
-
-      // I) Determine join permissions
-      let canJoin = false;
-      let joinBlockReason: string | null = null;
-
-      if (userJoined) {
-        joinBlockReason = BLOCK_REASONS.ALREADY_JOINED;
-      } else if (!ageVerified) {
-        joinBlockReason = BLOCK_REASONS.NOT_AGE_VERIFIED;
-      } else if (liveCredits <= 0) {
-        joinBlockReason = BLOCK_REASONS.NO_CREDITS;
-      } else if (roundStatus === "live") {
-        joinBlockReason = "round_already_started";
-      } else {
-        canJoin = true;
-      }
-
-      // J) Check if should redirect to quiz
-      const shouldRedirectToQuiz = roundStatus === "live" && userJoined;
-
       const canonicalState: CanonicalLobbyState = {
-        isAuthenticated,
+        isAuthenticated: !lobbyState.requires_auth,
         userId,
-        roundId,
-        roundStatus,
-        secondsToStart,
-        isUrgent,
-        liveCredits,
-        ageVerified,
-        userJoined,
-        canJoin,
-        joinBlockReason,
-        participantsCount: participantsCount || 0,
-        spectatorsCount: spectatorsCount || 0,
-        totalRange,
-        recentPlayers: (recentPlayers || []) as RecentPlayer[],
-        shouldRedirectToQuiz,
+        roundId: lobbyState.round_id,
+        roundStatus: lobbyState.round_status,
+        secondsToStart: lobbyState.seconds_to_start,
+        isUrgent: lobbyState.is_urgent,
+        liveCredits: lobbyState.user_credits,
+        ageVerified: true, // Backend already checked in can_join
+        userJoined: lobbyState.user_joined,
+        canJoin: lobbyState.can_join,
+        joinBlockReason: lobbyState.join_block_reason,
+        participantsCount: lobbyState.participants_count,
+        spectatorsCount: lobbyState.spectators_count,
+        totalRange: lobbyState.total_range,
+        recentPlayers: (lobbyState.recent_players || []) as RecentPlayer[],
+        shouldRedirectToQuiz: lobbyState.should_redirect_to_quiz,
       };
 
       setState(canonicalState);
