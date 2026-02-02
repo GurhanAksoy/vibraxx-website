@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useMemo, memo, useRef } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import {
   Crown,
   Trophy,
@@ -23,45 +22,44 @@ import { supabase } from "@/lib/supabaseClient";
 import { playMenuMusic, stopMenuMusic } from "@/lib/audioManager";
 
 // ============================================
-// 🎯 PRESENCE TRACKING HOOK (KANONİK)
+// PRESENCE HOOK (KANONİK)
 // ============================================
 function usePresence(pageType: string) {
   const sessionIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
 
     if (!sessionIdRef.current) {
-      const stored = sessionStorage.getItem('presence_session_id');
+      const stored = sessionStorage.getItem("presence_session_id");
       if (stored) {
         sessionIdRef.current = stored;
       } else {
         sessionIdRef.current = crypto.randomUUID();
-        sessionStorage.setItem('presence_session_id', sessionIdRef.current);
+        sessionStorage.setItem("presence_session_id", sessionIdRef.current);
       }
     }
 
     const sendHeartbeat = async () => {
       try {
-        await supabase.rpc('update_presence', {
+        await supabase.rpc("update_presence", {
           p_session_id: sessionIdRef.current,
           p_page_type: pageType,
-          p_round_id: null
+          p_round_id: null,
         });
       } catch (err) {
-        console.error('Presence heartbeat failed:', err);
+        console.error("[Presence] Heartbeat failed:", err);
       }
     };
 
     sendHeartbeat();
     const interval = setInterval(sendHeartbeat, 30000);
-
     return () => clearInterval(interval);
   }, [pageType]);
 }
 
 // ============================================
-// MEMOIZED COMPONENTS
+// MEMOIZED COMPONENTS (TASARIM DOKUNULMAZ)
 // ============================================
 const StatCard = memo(({ icon: Icon, value, label }: any) => (
   <div className="vx-stat-card">
@@ -74,7 +72,7 @@ StatCard.displayName = "StatCard";
 
 const ChampionCard = memo(({ champion }: any) => {
   const Icon = champion.icon;
-  
+
   if (!champion.name || champion.name === "TBA" || champion.score === 0) {
     return (
       <div className="vx-champ-card">
@@ -93,7 +91,6 @@ const ChampionCard = memo(({ champion }: any) => {
         >
           <Icon style={{ width: 28, height: 28, color: champion.color }} />
         </div>
-
         <div
           style={{
             fontSize: 10,
@@ -106,7 +103,6 @@ const ChampionCard = memo(({ champion }: any) => {
         >
           {champion.period} Champion
         </div>
-
         <div
           style={{
             fontSize: 14,
@@ -141,7 +137,6 @@ const ChampionCard = memo(({ champion }: any) => {
       >
         <Icon style={{ width: 28, height: 28, color: champion.color }} />
       </div>
-
       <div
         style={{
           fontSize: 10,
@@ -154,7 +149,6 @@ const ChampionCard = memo(({ champion }: any) => {
       >
         {champion.period} Champion
       </div>
-
       <div
         style={{
           fontSize: 18,
@@ -165,7 +159,6 @@ const ChampionCard = memo(({ champion }: any) => {
       >
         {champion.name}
       </div>
-
       <div
         style={{
           fontSize: 24,
@@ -223,21 +216,13 @@ const AgeVerificationModal = memo(({ onConfirm, onCancel }: any) => (
         >
           <AlertCircle style={{ width: 32, height: 32, color: "white" }} />
         </div>
-        <h3
-          style={{
-            fontSize: 24,
-            fontWeight: 700,
-            marginBottom: 12,
-            color: "white",
-          }}
-        >
+        <h3 style={{ fontSize: 24, fontWeight: 700, marginBottom: 12, color: "white" }}>
           Age Verification Required
         </h3>
         <p style={{ fontSize: 15, color: "#94a3b8", lineHeight: 1.6 }}>
           To participate in Live Quiz competitions with real prizes, you must be at least 18 years old.
         </p>
       </div>
-
       <div
         style={{
           background: "rgba(139, 92, 246, 0.1)",
@@ -260,7 +245,6 @@ const AgeVerificationModal = memo(({ onConfirm, onCancel }: any) => (
           </p>
         </div>
       </div>
-
       <div style={{ display: "flex", gap: 12 }}>
         <button
           onClick={onCancel}
@@ -345,14 +329,7 @@ const NoRoundsModal = memo(({ onBuyRounds, onCancel }: any) => (
         >
           <ShoppingCart style={{ width: 32, height: 32, color: "white" }} />
         </div>
-        <h3
-          style={{
-            fontSize: 24,
-            fontWeight: 700,
-            marginBottom: 12,
-            color: "white",
-          }}
-        >
+        <h3 style={{ fontSize: 24, fontWeight: 700, marginBottom: 12, color: "white" }}>
           No Rounds Available
         </h3>
         <p style={{ fontSize: 15, color: "#94a3b8", lineHeight: 1.6 }}>
@@ -360,7 +337,6 @@ const NoRoundsModal = memo(({ onBuyRounds, onCancel }: any) => (
           <strong style={{ color: "#fbbf24" }}>£1000 monthly prize</strong>!
         </p>
       </div>
-
       <div
         style={{
           background: "rgba(251, 191, 36, 0.1)",
@@ -383,7 +359,6 @@ const NoRoundsModal = memo(({ onBuyRounds, onCancel }: any) => (
           </p>
         </div>
       </div>
-
       <div style={{ display: "flex", gap: 12 }}>
         <button
           onClick={onCancel}
@@ -431,405 +406,160 @@ const NoRoundsModal = memo(({ onBuyRounds, onCancel }: any) => (
 ));
 NoRoundsModal.displayName = "NoRoundsModal";
 
+// ============================================
+// HOMEPAGE - KANONİK
+// ============================================
 export default function HomePage() {
-  const router = useRouter();
-
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [globalTimeLeft, setGlobalTimeLeft] = useState<number | null>(null);
-  const [activePlayers, setActivePlayers] = useState(0);
+  // ── STATE ──────────────────────────────────
   const [user, setUser] = useState<any>(null);
-  const [champions, setChampions] = useState<any[]>([]);
-  const [showAgeModal, setShowAgeModal] = useState(false);
-  const [pendingAction, setPendingAction] = useState<"live" | "free" | null>(null);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [userRounds, setUserRounds] = useState(0);
-  const [showNoRoundsModal, setShowNoRoundsModal] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // ✅ KANONİK: Real data states
+  // Modal state
+  const [showAgeModal, setShowAgeModal] = useState(false);
+  const [showNoRoundsModal, setShowNoRoundsModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"live" | "free" | null>(null);
+
+  // ── RPC DATA (tek karar merkezi) ───────────
+  const [activePlayers, setActivePlayers] = useState(0);
+  const [userRounds, setUserRounds] = useState(0);
+  const [ageVerified, setAgeVerified] = useState(false);
+  const [nextRoundStart, setNextRoundStart] = useState<number | null>(null);
   const [totalRounds, setTotalRounds] = useState(0);
   const [totalParticipants, setTotalParticipants] = useState(0);
+  const [champions, setChampions] = useState<any[]>([]);
 
-  const stats = useMemo(
-    () => ({ roundsPerDay: 288 }),
-    []
-  );
+  // ── REFS ───────────────────────────────────
+  const mountedRef = useRef(false);
+  const resumeIntentHandledRef = useRef(false);
 
-  const countdownPauseUntilRef = useRef<number>(0);
-  const mountedRef = useRef<boolean>(false);
-  const resumeIntentHandledRef = useRef<boolean>(false);
+  // ── COUNTDOWN (local tick, source: RPC) ────
+  const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
 
-  // ============================================
-  // 🎯 PRESENCE TRACKING (KANONİK)
-  // ============================================
-  usePresence('homepage');
+  useEffect(() => {
+    if (nextRoundStart === null) return;
+    const now = Math.floor(Date.now() / 1000);
+    setCountdownSeconds(Math.max(0, nextRoundStart - now));
+  }, [nextRoundStart]);
 
-  // ============================================
-  // FETCH USER ROUNDS
-  // ============================================
-  const fetchUserRounds = useCallback(async () => {
-    if (!user) {
-      setUserRounds(0);
-      return;
-    }
+  useEffect(() => {
+    if (countdownSeconds === null || countdownSeconds <= 0) return;
+    const tick = setInterval(() => {
+      setCountdownSeconds((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [countdownSeconds]);
 
+  // ── PRESENCE ───────────────────────────────
+  usePresence("homepage");
+
+  // ── FETCH HOMEPAGE STATE (tek RPC) ─────────
+  const fetchHomepageState = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from("user_credits")
-        .select("live_credits")
-        .eq("user_id", user.id)
-        .limit(1);
-
-      if (error) {
-        console.error("[UserRounds] Fetch error:", error);
-        setUserRounds(0);
+      const { data, error } = await supabase.rpc("get_homepage_state");
+      if (error || !data) {
+        console.error("[Homepage] RPC error:", error);
         return;
       }
+      if (!mountedRef.current) return;
 
-      setUserRounds(data?.[0]?.live_credits ?? 0);
-    } catch (err) {
-      console.error("[UserRounds] Fetch error:", err);
-      setUserRounds(0);
-    }
-  }, [user]);
-
-  const getFreshUserRounds = useCallback(async (): Promise<number | "error"> => {
-    if (!user) return "error";
-
-    try {
-      const { data, error } = await supabase
-        .from("user_credits")
-        .select("live_credits")
-        .eq("user_id", user.id)
-        .limit(1);
-
-      if (error) {
-        console.error("[FreshRounds] Error:", error);
-        return "error";
+      // Backend'den gelen verileri state'e yaz
+      if (data.active_players !== undefined) setActivePlayers(data.active_players);
+      if (data.user_credits !== undefined) setUserRounds(data.user_credits);
+      if (data.age_verified !== undefined) setAgeVerified(data.age_verified);
+      if (data.next_round_start !== undefined && data.next_round_start !== null) {
+        setNextRoundStart(Math.floor(new Date(data.next_round_start).getTime() / 1000));
       }
+      if (data.total_rounds !== undefined) setTotalRounds(data.total_rounds);
+      if (data.total_participants !== undefined) setTotalParticipants(data.total_participants);
 
-      return data?.[0]?.live_credits ?? 0;
-    } catch (err) {
-      console.error("[FreshRounds] Error:", err);
-      return "error";
-    }
-  }, [user]);
-
-  // ============================================
-  // LOAD GLOBAL ROUND STATE
-  // ============================================
-  const loadGlobalRoundState = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from("rounds")
-        .select("scheduled_start")
-        .eq("status", "scheduled")
-        .order("scheduled_start", { ascending: true })
-        .limit(1)
-        .single();
-
-      if (error || !data) return;
-
-      const scheduledStart = new Date(data.scheduled_start).getTime();
-      const now = Date.now();
-      const seconds = Math.floor((scheduledStart - now) / 1000);
-
-      if (!Number.isFinite(seconds)) return;
-
-      setGlobalTimeLeft(Math.max(0, seconds));
-    } catch (err) {
-      console.error("[Countdown] Round query failed:", err);
-    }
-  }, []);
-
-  // ============================================
-  // 🎯 FETCH ACTIVE PLAYERS (DÜZELTİLDİ - KANONİK)
-  // ============================================
-  const fetchActivePlayers = useCallback(async () => {
-    try {
-      const { data, error } = await supabase.rpc('get_presence_count', {
-        p_page_type: 'homepage',
-        p_round_id: null
-      });
-
-      if (error) {
-        console.error('[ActivePlayers] RPC error:', error);
-        return;
-      }
-
-      if (data !== null && data !== undefined) {
-        setActivePlayers(data);
-      }
-    } catch (err) {
-      console.error('[ActivePlayers] Error:', err);
-    }
-  }, []);
-
-  // ============================================
-  // 🎯 FETCH REAL STATS (DÜZELTİLDİ - KANONİK)
-  // ============================================
-  const fetchRealStats = useCallback(async () => {
-    try {
-      // Total finished rounds
-      const { count: roundsCount } = await supabase
-        .from('rounds')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'finished');
-      
-      if (roundsCount !== null) setTotalRounds(roundsCount);
-
-      // Total unique participants (from profiles table)
-      const { count: participantsCount } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
-      
-      if (participantsCount !== null) setTotalParticipants(participantsCount);
-    } catch (err) {
-      console.error('[RealStats] Error:', err);
-    }
-  }, []);
-
-  // ============================================
-  // DEFAULT CHAMPIONS
-  // ============================================
-  const getDefaultChampions = useCallback(
-    () => [
-      {
-        period: "Weekly",
-        name: "TBA",
-        score: 0,
-        gradient: "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
-        color: "#c084fc",
-        icon: Trophy,
-      },
-      {
-        period: "Monthly",
-        name: "TBA",
-        score: 0,
-        gradient: "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
-        color: "#22d3ee",
-        icon: Crown,
-      },
-    ],
-    []
-  );
-
-  // ============================================
-  // 🎯 FETCH CHAMPIONS (DÜZELTİLDİ - KANONİK)
-  // ============================================
-  const fetchChampions = useCallback(async () => {
-    try {
-      // Weekly champion from materialized view
-      const { data: weeklyData, error: weeklyError } = await supabase
-        .from('leaderboard_weekly')
-        .select('full_name, total_score')
-        .eq('rank', 1)
-        .limit(1)
-        .maybeSingle();
-
-      // Monthly champion from materialized view
-      const { data: monthlyData, error: monthlyError } = await supabase
-        .from('leaderboard_monthly')
-        .select('full_name, total_score')
-        .eq('rank', 1)
-        .limit(1)
-        .maybeSingle();
-
-      if (weeklyError) console.error('[Champions] Weekly error:', weeklyError);
-      if (monthlyError) console.error('[Champions] Monthly error:', monthlyError);
-
+      // Champions
       const icons = [Trophy, Crown];
       const colors = ["#c084fc", "#22d3ee"];
       const gradients = [
         "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
         "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
       ];
-
-      const champions = [
+      setChampions([
         {
           period: "Weekly",
-          name: weeklyData?.full_name || "TBA",
-          score: weeklyData?.total_score || 0,
+          name: data.weekly_champion_name || "TBA",
+          score: data.weekly_champion_score || 0,
           gradient: gradients[0],
           color: colors[0],
           icon: icons[0],
         },
         {
           period: "Monthly",
-          name: monthlyData?.full_name || "TBA",
-          score: monthlyData?.total_score || 0,
+          name: data.monthly_champion_name || "TBA",
+          score: data.monthly_champion_score || 0,
           gradient: gradients[1],
           color: colors[1],
           icon: icons[1],
         },
-      ];
-
-      setChampions(champions);
+      ]);
     } catch (err) {
-      console.error("[Champions] Error:", err);
-      setChampions(getDefaultChampions());
+      console.error("[Homepage] Fetch failed:", err);
     }
-  }, [getDefaultChampions]);
+  }, []);
 
-  // ============================================
-  // INITIAL MOUNT
-  // ============================================
+  // ── POLLING: tek interval, 15s ─────────────
+  useEffect(() => {
+    fetchHomepageState();
+    const interval = setInterval(fetchHomepageState, 15000);
+    return () => clearInterval(interval);
+  }, [fetchHomepageState]);
+
+  // ── AUTH ───────────────────────────────────
   useEffect(() => {
     mountedRef.current = true;
     const timer = setTimeout(() => setIsInitialLoad(false), 100);
-    return () => {
-      mountedRef.current = false;
-      clearTimeout(timer);
-    };
-  }, []);
 
-  useEffect(() => {
-    if (!isInitialLoad) {
-      const orbs = document.querySelectorAll(".animate-float");
-      orbs.forEach((orb, index) => {
-        setTimeout(() => {
-          if (!mountedRef.current) return;
-          (orb as HTMLElement).style.opacity = index === 0 ? "0.28" : "0.22";
-        }, 300 + index * 200);
-      });
-    }
-  }, [isInitialLoad]);
-
-  useEffect(() => {
-    if (user) fetchUserRounds();
-  }, [user, fetchUserRounds]);
-
-  // ============================================
-  // INITIAL DATA LOAD (KANONİK)
-  // ============================================
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadData = async () => {
-      try {
-        if (cancelled) return;
-
-        await Promise.all([
-          fetchActivePlayers(),
-          fetchChampions(),
-          loadGlobalRoundState(),
-          fetchRealStats(),
-        ]);
-      } catch (err) {
-        console.error("[InitialLoad] Error:", err);
-      }
-    };
-
-    loadData();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchActivePlayers, fetchChampions, loadGlobalRoundState, fetchRealStats]);
-
-  // ============================================
-  // POLLING
-  // ============================================
-  useEffect(() => {
-    const interval = setInterval(loadGlobalRoundState, 5000);
-    return () => clearInterval(interval);
-  }, [loadGlobalRoundState]);
-
-  useEffect(() => {
-    const playersInterval = setInterval(fetchActivePlayers, 15000);
-    const statsInterval = setInterval(fetchRealStats, 15000);
-
-    const countdownInterval = setInterval(() => {
-      const now = Date.now();
-      if (now < countdownPauseUntilRef.current) return;
-
-      setGlobalTimeLeft((prev) => (prev && prev > 0 ? prev - 1 : prev));
-    }, 1000);
-
-    return () => {
-      clearInterval(playersInterval);
-      clearInterval(statsInterval);
-      clearInterval(countdownInterval);
-    };
-  }, [fetchActivePlayers, fetchRealStats]);
-
-  // ============================================
-  // AUTH LISTENER
-  // ============================================
-  useEffect(() => {
     const loadUser = async () => {
       const { data } = await supabase.auth.getUser();
       setUser(data.user || null);
-
-      if (data.user && sessionStorage.getItem("pendingBuyRounds") === "true") {
-        sessionStorage.removeItem("pendingBuyRounds");
-        setTimeout(() => {
-          if (!mountedRef.current) return;
-          router.push("/buy");
-        }, 300);
-      }
     };
     loadUser();
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null);
-
-      if (event === "SIGNED_IN" && session?.user) {
-        if (sessionStorage.getItem("pendingBuyRounds") === "true") {
-          sessionStorage.removeItem("pendingBuyRounds");
-          setTimeout(() => {
-            if (!mountedRef.current) return;
-            router.push("/buy");
-          }, 300);
-        }
+      // User değiştiğinde homepage state yeniden çek
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+        fetchHomepageState();
       }
     });
 
-    return () => sub.subscription.unsubscribe();
-  }, [router]);
+    return () => {
+      mountedRef.current = false;
+      clearTimeout(timer);
+      sub.subscription.unsubscribe();
+    };
+  }, [fetchHomepageState]);
 
+  // ── POST-LOGIN INTENT (sign in sonrası resume) ─
   useEffect(() => {
     if (!user || resumeIntentHandledRef.current) return;
-
     const intent = sessionStorage.getItem("postLoginIntent");
     if (intent !== "live" && intent !== "free") return;
 
     resumeIntentHandledRef.current = true;
     sessionStorage.removeItem("postLoginIntent");
 
-    const ageOk = localStorage.getItem("vibraxx_age_verified") === "true";
+    // RPC yeniden çek (yeni user için credits/age)
+    fetchHomepageState().then(() => {
+      if (!mountedRef.current) return;
+      // Intent'i yeniden trigger: buton handler çağrılacak
+      if (intent === "live") navigateLive();
+      if (intent === "free") navigateFree();
+    });
+  }, [user, fetchHomepageState]);
 
-    if (!ageOk) {
-      setPendingAction(intent);
-      setShowAgeModal(true);
-      return;
-    }
-
-    if (intent === "live") {
-      getFreshUserRounds().then((remaining) => {
-        if (!mountedRef.current) return;
-
-        if (remaining === "error") {
-          alert("Round balance could not be verified. Please refresh and try again.");
-          return;
-        }
-
-        if (remaining <= 0) setShowNoRoundsModal(true);
-        else router.push("/lobby");
-      });
-    } else {
-      router.push("/free");
-    }
-  }, [user, router, getFreshUserRounds]);
-
-  // ============================================
-  // MUSIC HANDLERS
-  // ============================================
+  // ── MUSIC ──────────────────────────────────
   useEffect(() => {
     const handleFirstInteraction = () => {
       if (!hasInteracted) {
         setHasInteracted(true);
-
         const savedPref = localStorage.getItem("vibraxx_music");
         if (savedPref !== "false") {
           playMenuMusic();
@@ -838,15 +568,19 @@ export default function HomePage() {
         }
       }
     };
-
     document.addEventListener("click", handleFirstInteraction, { once: true });
     document.addEventListener("touchstart", handleFirstInteraction, { once: true });
-
     return () => {
       document.removeEventListener("click", handleFirstInteraction);
       document.removeEventListener("touchstart", handleFirstInteraction);
     };
   }, [hasInteracted]);
+
+  useEffect(() => {
+    const pref = localStorage.getItem("vibraxx_music");
+    if (pref === "true") setIsPlaying(true);
+    return () => stopMenuMusic();
+  }, []);
 
   const toggleMusic = useCallback(() => {
     if (isPlaying) {
@@ -860,130 +594,108 @@ export default function HomePage() {
     }
   }, [isPlaying]);
 
-  useEffect(() => {
-    const musicPref = localStorage.getItem("vibraxx_music");
-    if (musicPref === "true") {
-      setIsPlaying(true);
-    }
-    return () => stopMenuMusic();
-  }, []);
-
-  // ============================================
-  // AUTH ACTIONS
-  // ============================================
+  // ── AUTH ACTIONS ───────────────────────────
   const handleSignIn = useCallback(async () => {
-    const redirectUrl = `${window.location.origin}/auth/callback`;
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: redirectUrl },
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
   }, []);
 
   const handleSignOut = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setUserRounds(0);
     resumeIntentHandledRef.current = false;
   }, []);
 
+  // ── NAVIGATION HELPERS ─────────────────────
+  // ⚠️ window.location.href kullanılır - router.push çalışmıyor (confirmed)
+  const navigateLive = useCallback(() => {
+    // Age check → backend'den geldi
+    if (!ageVerified) {
+      setPendingAction("live");
+      setShowAgeModal(true);
+      return;
+    }
+    // Credits check → backend'den geldi
+    if (userRounds <= 0) {
+      setShowNoRoundsModal(true);
+      return;
+    }
+    window.location.href = "/lobby";
+  }, [ageVerified, userRounds]);
+
+  const navigateFree = useCallback(() => {
+    if (!ageVerified) {
+      setPendingAction("free");
+      setShowAgeModal(true);
+      return;
+    }
+    window.location.href = "/free";
+  }, [ageVerified]);
+
+  // ── CTA HANDLERS ───────────────────────────
+  const handleEnterLive = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!user) {
+        sessionStorage.setItem("postLoginIntent", "live");
+        handleSignIn();
+        return;
+      }
+      navigateLive();
+    },
+    [user, handleSignIn, navigateLive]
+  );
+
+  const handleEnterFree = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!user) {
+        sessionStorage.setItem("postLoginIntent", "free");
+        handleSignIn();
+        return;
+      }
+      navigateFree();
+    },
+    [user, handleSignIn, navigateFree]
+  );
+
+  // ── AGE VERIFY CONFIRM ─────────────────────
   const handleAgeVerification = useCallback(async () => {
+    // localStorage'a yaz (fallback - backend'de de set edilmeli)
     localStorage.setItem("vibraxx_age_verified", "true");
+    setAgeVerified(true);
 
     const action = pendingAction;
     setPendingAction(null);
     setShowAgeModal(false);
 
     if (action === "live") {
-      const remaining = await getFreshUserRounds();
-
-      if (remaining === "error") {
-        alert("Round balance could not be verified. Please refresh and try again.");
-        return;
-      }
-
-      if (remaining <= 0) {
+      if (userRounds <= 0) {
         setShowNoRoundsModal(true);
         return;
       }
-
-      router.push("/lobby");
+      window.location.href = "/lobby";
     }
-
     if (action === "free") {
-      router.push("/free");
+      window.location.href = "/free";
     }
-  }, [pendingAction, getFreshUserRounds, router]);
+  }, [pendingAction, userRounds]);
 
-  const checkAgeVerification = useCallback(() => {
-    return localStorage.getItem("vibraxx_age_verified") === "true";
-  }, []);
-
-  const handleStartLiveQuiz = useCallback(async () => {
-    console.log('[HomePage] handleStartLiveQuiz called');
-    
-    if (!user) {
-      console.log('[HomePage] No user, storing intent and signing in');
-      sessionStorage.setItem("postLoginIntent", "live");
-      await handleSignIn();
-      return;
-    }
-
-    console.log('[HomePage] User exists:', user.email);
-
-    if (!checkAgeVerification()) {
-      console.log('[HomePage] Age verification needed');
-      setPendingAction("live");
-      setShowAgeModal(true);
-      return;
-    }
-
-    console.log('[HomePage] Age verified, checking credits...');
-    const remaining = await getFreshUserRounds();
-    console.log('[HomePage] Credits remaining:', remaining);
-
-    if (remaining === "error") {
-      console.error('[HomePage] Error fetching credits');
-      alert("Round balance could not be verified. Please refresh and try again.");
-      return;
-    }
-
-    if (remaining <= 0) {
-      console.log('[HomePage] No credits, showing modal');
-      setShowNoRoundsModal(true);
-      return;
-    }
-
-    console.log('[HomePage] ✅ All checks passed, redirecting to /lobby');
-    router.push("/lobby");
-  }, [user, handleSignIn, checkAgeVerification, getFreshUserRounds, router]);
-
-  const handleStartFreeQuiz = useCallback(async () => {
-    if (!user) {
-      sessionStorage.setItem("postLoginIntent", "free");
-      await handleSignIn();
-      return;
-    }
-
-    if (!checkAgeVerification()) {
-      setPendingAction("free");
-      setShowAgeModal(true);
-      return;
-    }
-
-    router.push("/free");
-  }, [user, handleSignIn, checkAgeVerification, router]);
-
+  // ── FORMAT ─────────────────────────────────
   const formatTime = useCallback((seconds: number | null) => {
-    if (seconds === null || typeof seconds !== "number" || Number.isNaN(seconds))
-      return "--:--";
+    if (seconds === null || typeof seconds !== "number" || Number.isNaN(seconds)) return "--:--";
     const safe = Math.max(0, seconds);
     const m = Math.floor(safe / 60);
     const s = safe % 60;
     return `${m}:${s.toString().padStart(2, "0")}`;
   }, []);
 
-  // ============================================
-  // 🎯 STATS CARDS (KANONİK)
-  // ============================================
+  // ── MEMOIZED DATA ──────────────────────────
   const statsCards = useMemo(
     () => [
       { icon: Globe, value: `${activePlayers}+`, label: "Active Players" },
@@ -993,6 +705,9 @@ export default function HomePage() {
     [activePlayers, totalRounds, totalParticipants]
   );
 
+  // ============================================
+  // RENDER
+  // ============================================
   return (
     <>
       <style jsx global>{`
@@ -1012,42 +727,23 @@ export default function HomePage() {
         }
 
         @keyframes float {
-          0%,
-          100% {
-            transform: translateY(0px);
-          }
-          50% {
-            transform: translateY(-20px);
-          }
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
         }
 
         @keyframes glow {
-          0%,
-          100% {
-            opacity: 0.3;
-          }
-          50% {
-            opacity: 0.6;
-          }
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 0.6; }
         }
 
         @keyframes shimmer {
-          0% {
-            background-position: -200% center;
-          }
-          100% {
-            background-position: 200% center;
-          }
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
         }
 
         @keyframes pulse-slow {
-          0%,
-          100% {
-            opacity: 0.5;
-          }
-          50% {
-            opacity: 0.8;
-          }
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 0.8; }
         }
 
         .animate-float {
@@ -1111,6 +807,8 @@ export default function HomePage() {
           gap: 8px;
           flex-wrap: wrap;
         }
+
+        /* ── MOBİLE HIDE: sadece desktop ── */
         .vx-hide-mobile {
           display: none;
         }
@@ -1149,13 +847,8 @@ export default function HomePage() {
         }
 
         @keyframes pulse-glow {
-          0%,
-          100% {
-            box-shadow: 0 0 0 rgba(139, 92, 246, 0);
-          }
-          50% {
-            box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
-          }
+          0%, 100% { box-shadow: 0 0 0 rgba(139, 92, 246, 0); }
+          50% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.3); }
         }
 
         .vx-livebar-inner {
@@ -1198,70 +891,48 @@ export default function HomePage() {
           backdrop-filter: blur(10px);
           font-weight: 700;
           box-shadow: 0 0 20px rgba(251, 191, 36, 0.3), inset 0 0 20px rgba(251, 191, 36, 0.1);
-          position: relative;
-          overflow: hidden;
         }
 
         .vx-hero-badge::before {
           content: "";
           position: absolute;
-          top: 0;
-          left: -100%;
-          width: 100%;
-          height: 100%;
-          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-          animation: badge-shine 3s infinite;
-        }
-
-        @keyframes badge-shine {
-          0% {
-            left: -100%;
-          }
-          50%,
-          100% {
-            left: 100%;
-          }
+          inset: -1px;
+          border-radius: 9999px;
+          background: linear-gradient(135deg, rgba(251, 191, 36, 0.4), transparent);
+          z-index: -1;
         }
 
         @media (min-width: 640px) {
           .vx-hero-badge {
-            padding: 10px 24px;
             font-size: 14px;
-            margin-bottom: 14px;
+            padding: 10px 24px;
           }
         }
 
         .vx-hero-title {
-          font-size: clamp(26px, 6vw, 42px);
+          font-size: 56px;
           font-weight: 800;
-          line-height: 1.2;
-          margin-bottom: 18px;
-          letter-spacing: -0.03em;
+          line-height: 1.1;
+          margin-bottom: 16px;
         }
 
         .vx-hero-neon {
-          display: inline-block;
-          background: linear-gradient(90deg, #7c3aed, #22d3ee, #f97316, #d946ef, #7c3aed);
-          background-size: 250% 100%;
+          background: linear-gradient(135deg, #ffffff 0%, #a78bfa 50%, #ffffff 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
-          animation: shimmer 4s linear infinite;
-          text-shadow: 0 0 14px rgba(124, 58, 237, 0.45);
         }
 
         .vx-hero-subtitle {
-          font-size: 16px;
+          font-size: 20px;
           color: #94a3b8;
-          max-width: 640px;
-          margin: 0 auto 32px;
-          line-height: 1.6;
+          margin-bottom: 40px;
+          font-weight: 500;
         }
 
         @media (min-width: 640px) {
           .vx-hero-subtitle {
-            font-size: 18px;
-            margin-bottom: 40px;
+            font-size: 22px;
           }
         }
 
@@ -1323,6 +994,7 @@ export default function HomePage() {
           transition: transform 0.2s, box-shadow 0.2s;
           width: 100%;
           max-width: 320px;
+          color: white;
         }
 
         .vx-cta-btn:hover {
@@ -1551,66 +1223,54 @@ export default function HomePage() {
         }
 
         @media (min-width: 640px) {
-          .vx-footer-legal {
-            font-size: 12px;
-          }
-          .vx-footer-company {
-            font-size: 12px;
-          }
+          .vx-footer-legal { font-size: 12px; }
+          .vx-footer-company { font-size: 12px; }
         }
 
+        /* ── MOBILE OVERRIDES ── */
         @media (max-width: 640px) {
           .vx-hero-title {
             font-size: 36px !important;
             line-height: 1.2 !important;
             padding: 0 8px;
           }
-
           .vx-hero-subtitle {
             font-size: 16px !important;
             padding: 0 12px;
           }
-
           .vx-cta-wrap {
             flex-direction: column !important;
             gap: 12px !important;
             width: 100%;
             padding: 0 4px;
           }
-
           .vx-cta-btn {
             width: 100% !important;
             max-width: 100% !important;
             font-size: 14px !important;
           }
-
           .vx-livebar {
             padding: 10px 0 !important;
           }
-
           .vx-livebar-inner {
             font-size: 11px !important;
             gap: 6px !important;
             flex-wrap: wrap;
             justify-content: center;
           }
-
           .vx-stats-grid {
             grid-template-columns: 1fr !important;
             gap: 12px !important;
           }
-
           .vx-champions-grid {
             grid-template-columns: 1fr !important;
             gap: 16px !important;
           }
-
           .vx-footer-links {
             flex-direction: column !important;
             gap: 8px !important;
             align-items: center !important;
           }
-
           .vx-footer-divider {
             display: none !important;
           }
@@ -1628,7 +1288,7 @@ export default function HomePage() {
           transition: "opacity 0.3s ease-in",
         }}
       >
-        {/* Neon Orbs */}
+        {/* ── NEON ORBS (TASARIM DOKUNULMAZ) ── */}
         <div
           className="animate-float"
           style={{
@@ -1667,55 +1327,40 @@ export default function HomePage() {
           }}
         />
 
-        {/* Modals */}
+        {/* ── MODALS ── */}
         {showAgeModal && (
           <AgeVerificationModal
             onConfirm={handleAgeVerification}
-            onCancel={() => {
-              setShowAgeModal(false);
-              setPendingAction(null);
-            }}
+            onCancel={() => { setShowAgeModal(false); setPendingAction(null); }}
           />
         )}
 
         {showNoRoundsModal && (
           <NoRoundsModal
-            onBuyRounds={async () => {
+            onBuyRounds={() => {
               setShowNoRoundsModal(false);
-
               if (!user) {
-                alert(
-                  "Please sign in with Google to purchase rounds. You will be redirected to the login page."
-                );
                 sessionStorage.setItem("pendingBuyRounds", "true");
-                await supabase.auth.signInWithOAuth({
-                  provider: "google",
-                  options: {
-                    redirectTo: `${window.location.origin}/auth/callback`,
-                  },
-                });
+                handleSignIn();
                 return;
               }
-
-              router.push("/buy");
+              window.location.href = "/buy";
             }}
             onCancel={() => setShowNoRoundsModal(false)}
           />
         )}
 
-        {/* Header */}
+        {/* ── HEADER ── */}
         <header className="vx-header">
           <div className="vx-container">
             <div className="vx-header-inner">
-              <div
-                style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}
-                className="vx-logo-container"
-              >
+              {/* Logo: 100→80 (%20 küçüt) */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                 <div
                   style={{
                     position: "relative",
-                    width: 100,
-                    height: 100,
+                    width: 80,
+                    height: 80,
                     borderRadius: "9999px",
                     padding: 4,
                     background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)",
@@ -1752,7 +1397,7 @@ export default function HomePage() {
                       src="/images/logo.png"
                       alt="VibraXX Logo"
                       fill
-                      sizes="90px"
+                      sizes="72px"
                       style={{ objectFit: "contain" }}
                       priority
                     />
@@ -1773,6 +1418,7 @@ export default function HomePage() {
                 </div>
               </div>
 
+              {/* Header Right */}
               <div className="vx-header-right">
                 {/* Music Toggle */}
                 <button
@@ -1797,9 +1443,9 @@ export default function HomePage() {
                   )}
                 </button>
 
-                {/* Buy Round Button */}
+                {/* Buy Round - desktop only */}
                 <button
-                  onClick={() => router.push("/buy")}
+                  onClick={() => { window.location.href = "/buy"; }}
                   className="vx-hide-mobile"
                   aria-label="Buy quiz rounds"
                   style={{
@@ -1821,9 +1467,9 @@ export default function HomePage() {
                   {user && userRounds > 0 ? `${userRounds} Rounds` : "Buy Round"}
                 </button>
 
-                {/* Leaderboard */}
+                {/* Leaderboard - desktop only */}
                 <button
-                  onClick={() => router.push("/leaderboard")}
+                  onClick={() => { window.location.href = "/leaderboard"; }}
                   className="vx-hide-mobile"
                   aria-label="View leaderboard"
                   style={{
@@ -1847,8 +1493,10 @@ export default function HomePage() {
                 {/* Auth Section */}
                 {user ? (
                   <>
+                    {/* Profile - desktop only */}
                     <button
-                      onClick={() => router.push("/profile")}
+                      onClick={() => { window.location.href = "/profile"; }}
+                      className="vx-hide-mobile"
                       aria-label="View profile"
                       style={{
                         padding: "8px 16px",
@@ -1883,7 +1531,6 @@ export default function HomePage() {
                         />
                       </div>
                       <span
-                        className="vx-hide-mobile"
                         style={{
                           fontSize: 11,
                           color: "#e5e7eb",
@@ -1897,10 +1544,10 @@ export default function HomePage() {
                       </span>
                     </button>
 
+                    {/* Sign Out - MOBİLDE DE GÖRÜNÜR (vx-hide-mobile kaldırıldı) */}
                     <button
                       onClick={handleSignOut}
                       aria-label="Sign out"
-                      className="vx-hide-mobile"
                       style={{
                         position: "relative",
                         padding: "8px 18px",
@@ -1921,12 +1568,14 @@ export default function HomePage() {
                           position: "absolute",
                           inset: 0,
                           background: "linear-gradient(90deg,#ef4444,#f97316,#ef4444)",
+                          pointerEvents: "none",
                         }}
                       />
                       <span style={{ position: "relative", zIndex: 10 }}>Sign Out</span>
                     </button>
                   </>
                 ) : (
+                  /* Sign In */
                   <button
                     onClick={() => handleSignIn()}
                     aria-label="Sign in with Google"
@@ -1950,6 +1599,7 @@ export default function HomePage() {
                         position: "absolute",
                         inset: 0,
                         background: "linear-gradient(90deg,#7c3aed,#d946ef,#7c3aed)",
+                        pointerEvents: "none",
                       }}
                     />
                     <span style={{ position: "relative", zIndex: 10 }}>Sign in with Google</span>
@@ -1960,7 +1610,7 @@ export default function HomePage() {
           </div>
         </header>
 
-        {/* Live Banner */}
+        {/* ── LIVE BANNER ── */}
         <div className="vx-livebar">
           <div className="vx-container">
             <div className="vx-livebar-inner">
@@ -1987,15 +1637,7 @@ export default function HomePage() {
                   LIVE
                 </span>
               </div>
-
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  color: "#cbd5e1",
-                }}
-              >
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#cbd5e1" }}>
                 <Globe style={{ width: 14, height: 14, color: "#a78bfa" }} />
                 <span style={{ fontWeight: 700, color: "white" }}>{activePlayers.toLocaleString()}</span>
                 <span>players online</span>
@@ -2004,7 +1646,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Hero */}
+        {/* ── HERO ── */}
         <main className="vx-hero">
           <div className="vx-container">
             <div className="vx-hero-badge">
@@ -2040,7 +1682,7 @@ export default function HomePage() {
 
             <p className="vx-hero-subtitle">Global skill-based quiz competition</p>
 
-            {/* Countdown */}
+            {/* ── COUNTDOWN PANEL ── */}
             <div className="vx-countdown-panel">
               <div
                 style={{
@@ -2050,9 +1692,9 @@ export default function HomePage() {
                   right: -100,
                   height: 1.5,
                   background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)",
+                  pointerEvents: "none",
                 }}
               />
-
               <div
                 style={{
                   position: "absolute",
@@ -2094,7 +1736,7 @@ export default function HomePage() {
                       lineHeight: 1,
                     }}
                   >
-                    {formatTime(globalTimeLeft)}
+                    {formatTime(countdownSeconds)}
                   </div>
                 </div>
 
@@ -2153,17 +1795,12 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* CTA Buttons */}
+            {/* ── CTA BUTTONS ── */}
             <div className="vx-cta-wrap">
               <button
                 className="vx-cta-btn vx-cta-live"
                 type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  console.log('[CLICK] Enter Live Arena CLICKED');
-                  window.location.href = '/lobby';
-                }}
+                onClick={handleEnterLive}
                 aria-label="Enter live arena with prizes"
               >
                 <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right,#7c3aed,#d946ef)", pointerEvents: "none" }} />
@@ -2174,7 +1811,8 @@ export default function HomePage() {
 
               <button
                 className="vx-cta-btn vx-cta-free"
-                onClick={handleStartFreeQuiz}
+                type="button"
+                onClick={handleEnterFree}
                 aria-label="Try free practice quiz"
               >
                 <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right,#06b6d4,#22d3ee)", pointerEvents: "none" }} />
@@ -2184,19 +1822,18 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* Stats Cards */}
+            {/* ── STATS ── */}
             <div className="vx-stats-grid">
               {statsCards.map((stat, i) => (
                 <StatCard key={i} {...stat} />
               ))}
             </div>
 
-            {/* Champions */}
+            {/* ── CHAMPIONS ── */}
             <h2 className="vx-champions-title">
               <Crown style={{ width: 24, height: 24, color: "#facc15" }} />
               Top Champions
             </h2>
-
             <div className="vx-champions-grid">
               {champions.map((champion, i) => (
                 <ChampionCard key={i} champion={champion} />
@@ -2205,7 +1842,7 @@ export default function HomePage() {
           </div>
         </main>
 
-        {/* Trust Elements */}
+        {/* ── TRUST ELEMENTS ── */}
         <div
           style={{
             borderTop: "1px solid rgba(255, 255, 255, 0.05)",
@@ -2224,86 +1861,39 @@ export default function HomePage() {
                 margin: "0 auto",
               }}
             >
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    background: "rgba(34, 197, 94, 0.1)",
-                    border: "1px solid rgba(34, 197, 94, 0.2)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <CheckCircle style={{ width: 20, height: 20, color: "#22c55e" }} />
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>SSL Encrypted</div>
-                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>Bank-level security</div>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    background: "rgba(139, 92, 246, 0.1)",
-                    border: "1px solid rgba(139, 92, 246, 0.2)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <ShoppingCart style={{ width: 20, height: 20, color: "#8b5cf6" }} />
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>Stripe Verified</div>
-                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>Secure payments</div>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    background: "rgba(251, 191, 36, 0.1)",
-                    border: "1px solid rgba(251, 191, 36, 0.2)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <AlertCircle style={{ width: 20, height: 20, color: "#fbbf24" }} />
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>18+ Only</div>
-                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>Age verified</div>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    background: "rgba(6, 182, 212, 0.1)",
-                    border: "1px solid rgba(6, 182, 212, 0.2)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Globe style={{ width: 20, height: 20, color: "#06b6d4" }} />
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>Global Arena</div>
-                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>Worldwide players</div>
-              </div>
+              {[
+                { bg: "rgba(34, 197, 94, 0.1)", border: "rgba(34, 197, 94, 0.2)", icon: CheckCircle, iconColor: "#22c55e", title: "SSL Encrypted", sub: "Bank-level security" },
+                { bg: "rgba(139, 92, 246, 0.1)", border: "rgba(139, 92, 246, 0.2)", icon: ShoppingCart, iconColor: "#8b5cf6", title: "Stripe Verified", sub: "Secure payments" },
+                { bg: "rgba(251, 191, 36, 0.1)", border: "rgba(251, 191, 36, 0.2)", icon: AlertCircle, iconColor: "#fbbf24", title: "18+ Only", sub: "Age verified" },
+                { bg: "rgba(6, 182, 212, 0.1)", border: "rgba(6, 182, 212, 0.2)", icon: Globe, iconColor: "#06b6d4", title: "Global Arena", sub: "Worldwide players" },
+              ].map((item, i) => {
+                const Icon = item.icon;
+                return (
+                  <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
+                    <div
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 10,
+                        background: item.bg,
+                        border: `1px solid ${item.border}`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Icon style={{ width: 20, height: 20, color: item.iconColor }} />
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>{item.title}</div>
+                    <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>{item.sub}</div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
 
-        {/* Footer */}
+        {/* ── FOOTER ── */}
         <footer className="vx-footer">
           <div className="vx-container">
             <div className="vx-footer-legal">
@@ -2344,10 +1934,7 @@ export default function HomePage() {
                 Registered in England & Wales | All rights reserved
               </div>
               <div style={{ marginBottom: 10, textAlign: "center" }}>
-                <a
-                  href="mailto:team@vibraxx.com"
-                  style={{ color: "#a78bfa", textDecoration: "none", fontSize: 12, fontWeight: 600 }}
-                >
+                <a href="mailto:team@vibraxx.com" style={{ color: "#a78bfa", textDecoration: "none", fontSize: 12, fontWeight: 600 }}>
                   team@vibraxx.com
                 </a>
               </div>
