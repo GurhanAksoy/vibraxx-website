@@ -1,12 +1,12 @@
 ﻿"use client";
 
 import { useState, useEffect, useCallback, useMemo, memo, useRef } from "react";
-import type { ComponentType, CSSProperties } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   Crown,
   Trophy,
+  Zap,
   Play,
   ArrowRight,
   Volume2,
@@ -17,166 +17,39 @@ import {
   ShoppingCart,
   CheckCircle,
   AlertCircle,
-  User,
-  BarChart3,
+  BookOpen,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { playMenuMusic, stopMenuMusic } from "@/lib/audioManager";
-import Footer from "@/components/Footer";
 
 // ============================================
-// CANONICAL CONSTANTS
+// 🎯 PRESENCE TRACKING HOOK (KANONİK)
 // ============================================
-const BLOCK_REASONS = {
-  NOT_AUTHENTICATED: "not_authenticated",
-  NO_CREDITS: "no_credits",
-  NOT_AGE_VERIFIED: "not_age_verified",
-  ALREADY_USED: "already_used_this_week",
-} as const;
-
-const PAGE_TYPE = "homepage" as const;
-
-// ============================================
-// CANONICAL TYPES
-// ============================================
-interface CanonicalHomepageState {
-  isAuthenticated: boolean;
-  userId: string | null;
-  userEmail: string | null;
-  userName: string | null;
-  liveCredits: number;
-  ageVerified: boolean;
-  nextRoundSeconds: number;
-  activePlayers: number;
-  totalRounds: number;
-  totalParticipants: number;
-  weeklyChampion: { name: string; score: number } | null;
-  monthlyChampion: { name: string; score: number } | null;
-  canEnterLive: boolean;
-  liveBlockReason: string | null;
-  canEnterFree: boolean;
-  freeBlockReason: string | null;
-}
-
-interface StatCardProps {
-  icon: ComponentType<{ style?: CSSProperties }>;
-  value: string;
-  label: string;
-}
-
-interface Champion {
-  period: string;
-  name: string;
-  score: number;
-  icon: ComponentType<{ style?: CSSProperties }>;
-  color: string;
-}
-
-// ============================================
-// CANONICAL DATA HOOKS
-// ============================================
-function useCanonicalHomepageState() {
-  const [state, setState] = useState<CanonicalHomepageState | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const loadState = useCallback(async (): Promise<CanonicalHomepageState | null> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || null;
-      const userEmail = user?.email || null;
-      const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || null;
-
-      // 🔍 DEBUG - Window'a ekle
-      if (typeof window !== 'undefined') {
-        (window as any).__DEBUG_USER = {
-          email: userEmail,
-          name: userName,
-          metadata: user?.user_metadata,
-          full_user: user
-        };
-        console.log('[Homepage] User Info:', (window as any).__DEBUG_USER);
-      }
-
-      // ✅ CANONICAL: Sadece RPC - Frontend karar vermiyor
-      const { data: homepage, error: homeErr } = await supabase.rpc(
-        "get_homepage_state"
-      );
-
-      if (homeErr) throw homeErr;
-
-      const canonicalState: CanonicalHomepageState = {
-        isAuthenticated: homepage.is_authenticated,
-        userId,
-        userEmail,
-        userName,
-        liveCredits: homepage.live_credits,
-        ageVerified: homepage.age_verified, // ✅ Backend'den geliyor
-        nextRoundSeconds: homepage.next_round_in_seconds,
-        activePlayers: homepage.active_players,
-        totalRounds: homepage.total_rounds,
-        totalParticipants: homepage.total_participants,
-        weeklyChampion: homepage.weekly_champion_name
-          ? {
-              name: homepage.weekly_champion_name,
-              score: homepage.weekly_champion_score ?? 0,
-            }
-          : null,
-        monthlyChampion: homepage.monthly_champion_name
-          ? {
-              name: homepage.monthly_champion_name,
-              score: homepage.monthly_champion_score ?? 0,
-            }
-          : null,
-        canEnterLive: homepage.can_enter_live,
-        liveBlockReason: homepage.live_block_reason,
-        canEnterFree: homepage.can_enter_free,
-        freeBlockReason: homepage.free_block_reason,
-      };
-
-      setState(canonicalState);
-      return canonicalState;
-    } catch (err) {
-      console.error("[CanonicalHomepage] Error loading state:", err);
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadState();
-    const interval = setInterval(loadState, 15000);
-    return () => clearInterval(interval);
-  }, [loadState]);
-
-  return { state, isLoading, refresh: loadState };
-}
-
 function usePresence(pageType: string) {
   const sessionIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === 'undefined') return;
 
     if (!sessionIdRef.current) {
-      const stored = sessionStorage.getItem("presence_session_id");
+      const stored = sessionStorage.getItem('presence_session_id');
       if (stored) {
         sessionIdRef.current = stored;
       } else {
         sessionIdRef.current = crypto.randomUUID();
-        sessionStorage.setItem("presence_session_id", sessionIdRef.current);
+        sessionStorage.setItem('presence_session_id', sessionIdRef.current);
       }
     }
 
     const sendHeartbeat = async () => {
       try {
-        await supabase.rpc("update_presence", {
+        await supabase.rpc('update_presence', {
           p_session_id: sessionIdRef.current,
           p_page_type: pageType,
-          p_round_id: null,
+          p_round_id: null
         });
       } catch (err) {
-        console.error("Presence heartbeat failed:", err);
+        console.error('Presence heartbeat failed:', err);
       }
     };
 
@@ -188,9 +61,9 @@ function usePresence(pageType: string) {
 }
 
 // ============================================
-// UI COMPONENTS
+// MEMOIZED COMPONENTS
 // ============================================
-const StatCard = memo(({ icon: Icon, value, label }: StatCardProps) => (
+const StatCard = memo(({ icon: Icon, value, label }: any) => (
   <div className="vx-stat-card">
     <Icon style={{ width: 20, height: 20, color: "#6b7280", marginBottom: 8 }} />
     <div className="vx-stat-value">{value}</div>
@@ -199,9 +72,9 @@ const StatCard = memo(({ icon: Icon, value, label }: StatCardProps) => (
 ));
 StatCard.displayName = "StatCard";
 
-const ChampionCard = memo(({ champion }: { champion: Champion }) => {
+const ChampionCard = memo(({ champion }: any) => {
   const Icon = champion.icon;
-
+  
   if (!champion.name || champion.name === "TBA" || champion.score === 0) {
     return (
       <div className="vx-champ-card">
@@ -241,13 +114,11 @@ const ChampionCard = memo(({ champion }: { champion: Champion }) => {
             marginBottom: 8,
             color: "#94a3b8",
             textAlign: "center",
+            lineHeight: 1.4,
           }}
         >
-          To Be Announced
-        </div>
-
-        <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center" }}>
-          Start competing to claim this spot
+          {champion.period === "Weekly" && "Weekly rankings reset every Monday"}
+          {champion.period === "Monthly" && "Monthly rankings reset at month end (UTC)"}
         </div>
       </div>
     );
@@ -261,32 +132,14 @@ const ChampionCard = memo(({ champion }: { champion: Champion }) => {
           height: 64,
           margin: "0 auto 16px",
           borderRadius: 16,
-          background: `linear-gradient(135deg, ${champion.color}, ${champion.color}dd)`,
+          background: `linear-gradient(135deg, ${champion.color}15, ${champion.color}08)`,
+          border: `1px solid ${champion.color}30`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          boxShadow: `0 8px 24px ${champion.color}40`,
-          position: "relative",
         }}
       >
-        <Icon style={{ width: 28, height: 28, color: "white" }} />
-        <div
-          style={{
-            position: "absolute",
-            top: -4,
-            right: -4,
-            width: 20,
-            height: 20,
-            borderRadius: "50%",
-            background: "#facc15",
-            border: "2px solid #0f172a",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Crown style={{ width: 10, height: 10, color: "#0f172a" }} />
-        </div>
+        <Icon style={{ width: 28, height: 28, color: champion.color }} />
       </div>
 
       <div
@@ -304,11 +157,10 @@ const ChampionCard = memo(({ champion }: { champion: Champion }) => {
 
       <div
         style={{
-          fontSize: 16,
+          fontSize: 18,
           fontWeight: 700,
-          marginBottom: 4,
+          marginBottom: 8,
           color: "#ffffff",
-          textAlign: "center",
         }}
       >
         {champion.name}
@@ -316,10 +168,10 @@ const ChampionCard = memo(({ champion }: { champion: Champion }) => {
 
       <div
         style={{
-          fontSize: 13,
-          fontWeight: 600,
+          fontSize: 24,
+          fontWeight: 800,
           color: champion.color,
-          textAlign: "center",
+          lineHeight: 1,
         }}
       >
         {champion.score.toLocaleString()} pts
@@ -329,1048 +181,1493 @@ const ChampionCard = memo(({ champion }: { champion: Champion }) => {
 });
 ChampionCard.displayName = "ChampionCard";
 
-const AgeVerificationModal = memo(
-  ({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) => (
+const AgeVerificationModal = memo(({ onConfirm, onCancel }: any) => (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0, 0, 0, 0.85)",
+      backdropFilter: "blur(8px)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 100,
+      padding: "20px",
+    }}
+    onClick={onCancel}
+  >
     <div
       style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "rgba(0, 0, 0, 0.8)",
-        backdropFilter: "blur(8px)",
-        padding: 16,
+        background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+        borderRadius: 24,
+        padding: "32px",
+        maxWidth: 480,
+        width: "100%",
+        border: "1px solid rgba(139, 92, 246, 0.3)",
+        boxShadow: "0 20px 60px rgba(0, 0, 0, 0.5)",
       }}
-      onClick={onCancel}
+      onClick={(e) => e.stopPropagation()}
     >
-      <div
-        style={{
-          background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-          borderRadius: 16,
-          padding: 32,
-          maxWidth: 400,
-          width: "100%",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          boxShadow: "0 24px 48px rgba(0, 0, 0, 0.5)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div style={{ textAlign: "center", marginBottom: 24 }}>
         <div
           style={{
             width: 64,
             height: 64,
-            margin: "0 auto 24px",
-            borderRadius: 16,
-            background: "rgba(251, 191, 36, 0.1)",
-            border: "1px solid rgba(251, 191, 36, 0.2)",
+            margin: "0 auto 16px",
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, #7c3aed, #d946ef)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <AlertCircle style={{ width: 32, height: 32, color: "#fbbf24" }} />
+          <AlertCircle style={{ width: 32, height: 32, color: "white" }} />
         </div>
-
-        <h2
+        <h3
           style={{
             fontSize: 24,
-            fontWeight: 800,
-            color: "#ffffff",
-            textAlign: "center",
-            marginBottom: 16,
+            fontWeight: 700,
+            marginBottom: 12,
+            color: "white",
           }}
         >
           Age Verification Required
-        </h2>
-
-        <p
-          style={{
-            fontSize: 14,
-            color: "#94a3b8",
-            textAlign: "center",
-            lineHeight: 1.6,
-            marginBottom: 24,
-          }}
-        >
-          You must be 18 years or older to participate in VibraXX quiz competitions. By
-          continuing, you confirm that you meet this age requirement.
+        </h3>
+        <p style={{ fontSize: 15, color: "#94a3b8", lineHeight: 1.6 }}>
+          To participate in Live Quiz competitions with real prizes, you must be at least 18 years old.
         </p>
-
-        <div style={{ display: "flex", gap: 12 }}>
-          <button
-            onClick={onCancel}
-            style={{
-              flex: 1,
-              padding: "12px 24px",
-              borderRadius: 10,
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              background: "rgba(255, 255, 255, 0.05)",
-              color: "#94a3b8",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "all 0.2s",
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            style={{
-              flex: 1,
-              padding: "12px 24px",
-              borderRadius: 10,
-              border: "none",
-              background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-              color: "white",
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: "pointer",
-              transition: "all 0.2s",
-              boxShadow: "0 8px 16px rgba(124, 58, 237, 0.4)",
-            }}
-          >
-            I am 18+
-          </button>
-        </div>
       </div>
-    </div>
-  )
-);
-AgeVerificationModal.displayName = "AgeVerificationModal";
 
-const NoRoundsModal = memo(
-  ({ onBuyRounds, onCancel }: { onBuyRounds: () => void; onCancel: () => void }) => (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "rgba(0, 0, 0, 0.8)",
-        backdropFilter: "blur(8px)",
-        padding: 16,
-      }}
-      onClick={onCancel}
-    >
       <div
         style={{
-          background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+          background: "rgba(139, 92, 246, 0.1)",
           borderRadius: 16,
-          padding: 32,
-          maxWidth: 400,
-          width: "100%",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          boxShadow: "0 24px 48px rgba(0, 0, 0, 0.5)",
+          padding: 20,
+          marginBottom: 24,
+          border: "1px solid rgba(139, 92, 246, 0.2)",
         }}
-        onClick={(e) => e.stopPropagation()}
       >
+        <div style={{ display: "flex", alignItems: "start", gap: 12, marginBottom: 12 }}>
+          <CheckCircle style={{ width: 20, height: 20, color: "#a78bfa", flexShrink: 0, marginTop: 2 }} />
+          <p style={{ fontSize: 14, color: "#cbd5e1", margin: 0 }}>
+            I confirm that I am <strong style={{ color: "white" }}>18 years or older</strong>
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "start", gap: 12 }}>
+          <CheckCircle style={{ width: 20, height: 20, color: "#a78bfa", flexShrink: 0, marginTop: 2 }} />
+          <p style={{ fontSize: 14, color: "#cbd5e1", margin: 0 }}>
+            I agree to participate responsibly in quiz competitions
+          </p>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 12 }}>
+        <button
+          onClick={onCancel}
+          style={{
+            flex: 1,
+            padding: "14px 24px",
+            borderRadius: 12,
+            border: "1px solid rgba(148, 163, 253, 0.3)",
+            background: "transparent",
+            color: "#94a3b8",
+            fontSize: 15,
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: "all 0.2s",
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={onConfirm}
+          style={{
+            flex: 1,
+            padding: "14px 24px",
+            borderRadius: 12,
+            border: "none",
+            background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+            color: "white",
+            fontSize: 15,
+            fontWeight: 700,
+            cursor: "pointer",
+            transition: "all 0.2s",
+            boxShadow: "0 8px 24px rgba(124, 58, 237, 0.4)",
+          }}
+        >
+          I'm 18+ - Continue
+        </button>
+      </div>
+    </div>
+  </div>
+));
+AgeVerificationModal.displayName = "AgeVerificationModal";
+
+const NoRoundsModal = memo(({ onBuyRounds, onCancel }: any) => (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0, 0, 0, 0.85)",
+      backdropFilter: "blur(8px)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 100,
+      padding: "20px",
+    }}
+    onClick={onCancel}
+  >
+    <div
+      style={{
+        background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+        borderRadius: 24,
+        padding: "32px",
+        maxWidth: 480,
+        width: "100%",
+        border: "1px solid rgba(251, 191, 36, 0.3)",
+        boxShadow: "0 20px 60px rgba(251, 191, 36, 0.3)",
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div style={{ textAlign: "center", marginBottom: 24 }}>
         <div
           style={{
             width: 64,
             height: 64,
-            margin: "0 auto 24px",
-            borderRadius: 16,
-            background: "rgba(124, 58, 237, 0.1)",
-            border: "1px solid rgba(124, 58, 237, 0.2)",
+            margin: "0 auto 16px",
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, #f59e0b, #fbbf24)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <ShoppingCart style={{ width: 32, height: 32, color: "#7c3aed" }} />
+          <ShoppingCart style={{ width: 32, height: 32, color: "white" }} />
         </div>
-
-        <h2
+        <h3
           style={{
             fontSize: 24,
-            fontWeight: 800,
-            color: "#ffffff",
-            textAlign: "center",
-            marginBottom: 16,
+            fontWeight: 700,
+            marginBottom: 12,
+            color: "white",
           }}
         >
           No Rounds Available
-        </h2>
-
-        <p
-          style={{
-            fontSize: 14,
-            color: "#94a3b8",
-            textAlign: "center",
-            lineHeight: 1.6,
-            marginBottom: 24,
-          }}
-        >
-          You don't have any quiz rounds available. Purchase a single round or a bundle to
-          start competing for prizes!
+        </h3>
+        <p style={{ fontSize: 15, color: "#94a3b8", lineHeight: 1.6 }}>
+          You need to purchase rounds to enter the Live Quiz lobby and compete for the{" "}
+          <strong style={{ color: "#fbbf24" }}>£1000 monthly prize</strong>!
         </p>
+      </div>
 
-        <div style={{ display: "flex", gap: 12 }}>
-          <button
-            onClick={onCancel}
-            style={{
-              flex: 1,
-              padding: "12px 24px",
-              borderRadius: 10,
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              background: "rgba(255, 255, 255, 0.05)",
-              color: "#94a3b8",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "all 0.2s",
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onBuyRounds}
-            style={{
-              flex: 1,
-              padding: "12px 24px",
-              borderRadius: 10,
-              border: "none",
-              background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-              color: "white",
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: "pointer",
-              transition: "all 0.2s",
-              boxShadow: "0 8px 16px rgba(124, 58, 237, 0.4)",
-            }}
-          >
-            Buy Rounds
-          </button>
+      <div
+        style={{
+          background: "rgba(251, 191, 36, 0.1)",
+          borderRadius: 16,
+          padding: 20,
+          marginBottom: 24,
+          border: "1px solid rgba(251, 191, 36, 0.2)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "start", gap: 12, marginBottom: 12 }}>
+          <Trophy style={{ width: 20, height: 20, color: "#fbbf24", flexShrink: 0, marginTop: 2 }} />
+          <p style={{ fontSize: 14, color: "#cbd5e1", margin: 0 }}>
+            <strong style={{ color: "white" }}>Live competitions</strong> every 5 minutes
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "start", gap: 12 }}>
+          <Crown style={{ width: 20, height: 20, color: "#fbbf24", flexShrink: 0, marginTop: 2 }} />
+          <p style={{ fontSize: 14, color: "#cbd5e1", margin: 0 }}>
+            Compete for <strong style={{ color: "white" }}>real prizes</strong> and leaderboard glory
+          </p>
         </div>
       </div>
+
+      <div style={{ display: "flex", gap: 12 }}>
+        <button
+          onClick={onCancel}
+          style={{
+            flex: 1,
+            padding: "14px 24px",
+            borderRadius: 12,
+            border: "1px solid rgba(148, 163, 253, 0.3)",
+            background: "transparent",
+            color: "#94a3b8",
+            fontSize: 15,
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: "all 0.2s",
+          }}
+        >
+          Maybe Later
+        </button>
+        <button
+          onClick={onBuyRounds}
+          style={{
+            flex: 1,
+            padding: "14px 24px",
+            borderRadius: 12,
+            border: "none",
+            background: "linear-gradient(135deg, #f59e0b, #fbbf24)",
+            color: "white",
+            fontSize: 15,
+            fontWeight: 700,
+            cursor: "pointer",
+            transition: "all 0.2s",
+            boxShadow: "0 8px 24px rgba(251, 191, 36, 0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+          }}
+        >
+          <ShoppingCart style={{ width: 18, height: 18 }} />
+          Buy Rounds Now
+        </button>
+      </div>
     </div>
-  )
-);
+  </div>
+));
 NoRoundsModal.displayName = "NoRoundsModal";
 
-// ============================================
-// MAIN COMPONENT
-// ============================================
 export default function HomePage() {
   const router = useRouter();
-  const { state, isLoading, refresh } = useCanonicalHomepageState();
-  usePresence(PAGE_TYPE);
 
   const [isPlaying, setIsPlaying] = useState(false);
+  const [globalTimeLeft, setGlobalTimeLeft] = useState<number | null>(null);
+  const [activePlayers, setActivePlayers] = useState(0);
+  const [user, setUser] = useState<any>(null);
+  const [champions, setChampions] = useState<any[]>([]);
   const [showAgeModal, setShowAgeModal] = useState(false);
-  const [showNoRoundsModal, setShowNoRoundsModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<"live" | "free" | null>(null);
-  const [countdownSeconds, setCountdownSeconds] = useState(0);
-  const hasInteractedRef = useRef(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [userRounds, setUserRounds] = useState(0);
+  const [showNoRoundsModal, setShowNoRoundsModal] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
-  // Cleanup music on unmount
+  // ✅ KANONİK: Real data states
+  const [totalRounds, setTotalRounds] = useState(0);
+  const [totalParticipants, setTotalParticipants] = useState(0);
+
+  const stats = useMemo(
+    () => ({ roundsPerDay: 288 }),
+    []
+  );
+
+  const countdownPauseUntilRef = useRef<number>(0);
+  const mountedRef = useRef<boolean>(false);
+  const resumeIntentHandledRef = useRef<boolean>(false);
+
+  // ============================================
+  // 🎯 PRESENCE TRACKING (KANONİK)
+  // ============================================
+  usePresence('homepage');
+
+  // ============================================
+  // FETCH USER ROUNDS
+  // ============================================
+  const fetchUserRounds = useCallback(async () => {
+    if (!user) {
+      setUserRounds(0);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("user_credits")
+        .select("live_credits")
+        .eq("user_id", user.id)
+        .limit(1);
+
+      if (error) {
+        console.error("[UserRounds] Fetch error:", error);
+        setUserRounds(0);
+        return;
+      }
+
+      setUserRounds(data?.[0]?.live_credits ?? 0);
+    } catch (err) {
+      console.error("[UserRounds] Fetch error:", err);
+      setUserRounds(0);
+    }
+  }, [user]);
+
+  const getFreshUserRounds = useCallback(async (): Promise<number | "error"> => {
+    if (!user) return "error";
+
+    try {
+      const { data, error } = await supabase
+        .from("user_credits")
+        .select("live_credits")
+        .eq("user_id", user.id)
+        .limit(1);
+
+      if (error) {
+        console.error("[FreshRounds] Error:", error);
+        return "error";
+      }
+
+      return data?.[0]?.live_credits ?? 0;
+    } catch (err) {
+      console.error("[FreshRounds] Error:", err);
+      return "error";
+    }
+  }, [user]);
+
+  // ============================================
+  // LOAD GLOBAL ROUND STATE
+  // ============================================
+  const loadGlobalRoundState = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("rounds")
+        .select("scheduled_start")
+        .eq("status", "scheduled")
+        .order("scheduled_start", { ascending: true })
+        .limit(1)
+        .single();
+
+      if (error || !data) return;
+
+      const scheduledStart = new Date(data.scheduled_start).getTime();
+      const now = Date.now();
+      const seconds = Math.floor((scheduledStart - now) / 1000);
+
+      if (!Number.isFinite(seconds)) return;
+
+      setGlobalTimeLeft(Math.max(0, seconds));
+    } catch (err) {
+      console.error("[Countdown] Round query failed:", err);
+    }
+  }, []);
+
+  // ============================================
+  // 🎯 FETCH ACTIVE PLAYERS (DÜZELTİLDİ - KANONİK)
+  // ============================================
+  const fetchActivePlayers = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_presence_count', {
+        p_page_type: 'homepage',
+        p_round_id: null
+      });
+
+      if (error) {
+        console.error('[ActivePlayers] RPC error:', error);
+        return;
+      }
+
+      if (data !== null && data !== undefined) {
+        setActivePlayers(data);
+      }
+    } catch (err) {
+      console.error('[ActivePlayers] Error:', err);
+    }
+  }, []);
+
+  // ============================================
+  // 🎯 FETCH REAL STATS (DÜZELTİLDİ - KANONİK)
+  // ============================================
+  const fetchRealStats = useCallback(async () => {
+    try {
+      // Total finished rounds
+      const { count: roundsCount } = await supabase
+        .from('rounds')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'finished');
+      
+      if (roundsCount !== null) setTotalRounds(roundsCount);
+
+      // Total unique participants (from profiles table)
+      const { count: participantsCount } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+      
+      if (participantsCount !== null) setTotalParticipants(participantsCount);
+    } catch (err) {
+      console.error('[RealStats] Error:', err);
+    }
+  }, []);
+
+  // ============================================
+  // DEFAULT CHAMPIONS
+  // ============================================
+  const getDefaultChampions = useCallback(
+    () => [
+      {
+        period: "Weekly",
+        name: "TBA",
+        score: 0,
+        gradient: "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
+        color: "#c084fc",
+        icon: Trophy,
+      },
+      {
+        period: "Monthly",
+        name: "TBA",
+        score: 0,
+        gradient: "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
+        color: "#22d3ee",
+        icon: Crown,
+      },
+    ],
+    []
+  );
+
+  // ============================================
+  // 🎯 FETCH CHAMPIONS (DÜZELTİLDİ - KANONİK)
+  // ============================================
+  const fetchChampions = useCallback(async () => {
+    try {
+      // Weekly champion from materialized view
+      const { data: weeklyData, error: weeklyError } = await supabase
+        .from('leaderboard_weekly')
+        .select('full_name, total_score')
+        .eq('rank', 1)
+        .limit(1)
+        .maybeSingle();
+
+      // Monthly champion from materialized view
+      const { data: monthlyData, error: monthlyError } = await supabase
+        .from('leaderboard_monthly')
+        .select('full_name, total_score')
+        .eq('rank', 1)
+        .limit(1)
+        .maybeSingle();
+
+      if (weeklyError) console.error('[Champions] Weekly error:', weeklyError);
+      if (monthlyError) console.error('[Champions] Monthly error:', monthlyError);
+
+      const icons = [Trophy, Crown];
+      const colors = ["#c084fc", "#22d3ee"];
+      const gradients = [
+        "linear-gradient(to bottom right, #8b5cf6, #d946ef)",
+        "linear-gradient(to bottom right, #3b82f6, #06b6d4)",
+      ];
+
+      const champions = [
+        {
+          period: "Weekly",
+          name: weeklyData?.full_name || "TBA",
+          score: weeklyData?.total_score || 0,
+          gradient: gradients[0],
+          color: colors[0],
+          icon: icons[0],
+        },
+        {
+          period: "Monthly",
+          name: monthlyData?.full_name || "TBA",
+          score: monthlyData?.total_score || 0,
+          gradient: gradients[1],
+          color: colors[1],
+          icon: icons[1],
+        },
+      ];
+
+      setChampions(champions);
+    } catch (err) {
+      console.error("[Champions] Error:", err);
+      setChampions(getDefaultChampions());
+    }
+  }, [getDefaultChampions]);
+
+  // ============================================
+  // INITIAL MOUNT
+  // ============================================
   useEffect(() => {
+    mountedRef.current = true;
+    const timer = setTimeout(() => setIsInitialLoad(false), 100);
     return () => {
-      stopMenuMusic();
+      mountedRef.current = false;
+      clearTimeout(timer);
     };
   }, []);
 
   useEffect(() => {
-    const initial = state?.nextRoundSeconds ?? 0;
-    setCountdownSeconds(initial);
-
-    const interval = setInterval(() => {
-      setCountdownSeconds((prev) => Math.max(0, prev - 1));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [state?.nextRoundSeconds]);
-
-  const handleFirstInteraction = useCallback(() => {
-    if (!hasInteractedRef.current) {
-      hasInteractedRef.current = true;
-      playMenuMusic();
-      setIsPlaying(true);
+    if (!isInitialLoad) {
+      const orbs = document.querySelectorAll(".animate-float");
+      orbs.forEach((orb, index) => {
+        setTimeout(() => {
+          if (!mountedRef.current) return;
+          (orb as HTMLElement).style.opacity = index === 0 ? "0.28" : "0.22";
+        }, 300 + index * 200);
+      });
     }
-  }, []);
+  }, [isInitialLoad]);
 
   useEffect(() => {
-    const handleClick = () => handleFirstInteraction();
-    document.addEventListener("click", handleClick, { once: true });
-    return () => document.removeEventListener("click", handleClick);
-  }, [handleFirstInteraction]);
+    if (user) fetchUserRounds();
+  }, [user, fetchUserRounds]);
+
+  // ============================================
+  // INITIAL DATA LOAD (KANONİK)
+  // ============================================
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadData = async () => {
+      try {
+        if (cancelled) return;
+
+        await Promise.all([
+          fetchActivePlayers(),
+          fetchChampions(),
+          loadGlobalRoundState(),
+          fetchRealStats(),
+        ]);
+      } catch (err) {
+        console.error("[InitialLoad] Error:", err);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchActivePlayers, fetchChampions, loadGlobalRoundState, fetchRealStats]);
+
+  // ============================================
+  // POLLING
+  // ============================================
+  useEffect(() => {
+    const interval = setInterval(loadGlobalRoundState, 5000);
+    return () => clearInterval(interval);
+  }, [loadGlobalRoundState]);
+
+  useEffect(() => {
+    const playersInterval = setInterval(fetchActivePlayers, 15000);
+    const statsInterval = setInterval(fetchRealStats, 15000);
+
+    const countdownInterval = setInterval(() => {
+      const now = Date.now();
+      if (now < countdownPauseUntilRef.current) return;
+
+      setGlobalTimeLeft((prev) => (prev && prev > 0 ? prev - 1 : prev));
+    }, 1000);
+
+    return () => {
+      clearInterval(playersInterval);
+      clearInterval(statsInterval);
+      clearInterval(countdownInterval);
+    };
+  }, [fetchActivePlayers, fetchRealStats]);
+
+  // ============================================
+  // AUTH LISTENER
+  // ============================================
+  useEffect(() => {
+    const loadUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user || null);
+
+      if (data.user && sessionStorage.getItem("pendingBuyRounds") === "true") {
+        sessionStorage.removeItem("pendingBuyRounds");
+        setTimeout(() => {
+          if (!mountedRef.current) return;
+          router.push("/buy");
+        }, 300);
+      }
+    };
+    loadUser();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user || null);
+
+      if (event === "SIGNED_IN" && session?.user) {
+        if (sessionStorage.getItem("pendingBuyRounds") === "true") {
+          sessionStorage.removeItem("pendingBuyRounds");
+          setTimeout(() => {
+            if (!mountedRef.current) return;
+            router.push("/buy");
+          }, 300);
+        }
+      }
+    });
+
+    return () => sub.subscription.unsubscribe();
+  }, [router]);
+
+  useEffect(() => {
+    if (!user || resumeIntentHandledRef.current) return;
+
+    const intent = sessionStorage.getItem("postLoginIntent");
+    if (intent !== "live" && intent !== "free") return;
+
+    resumeIntentHandledRef.current = true;
+    sessionStorage.removeItem("postLoginIntent");
+
+    const ageOk = localStorage.getItem("vibraxx_age_verified") === "true";
+
+    if (!ageOk) {
+      setPendingAction(intent);
+      setShowAgeModal(true);
+      return;
+    }
+
+    if (intent === "live") {
+      getFreshUserRounds().then((remaining) => {
+        if (!mountedRef.current) return;
+
+        if (remaining === "error") {
+          alert("Round balance could not be verified. Please refresh and try again.");
+          return;
+        }
+
+        if (remaining <= 0) setShowNoRoundsModal(true);
+        else router.push("/lobby");
+      });
+    } else {
+      router.push("/free");
+    }
+  }, [user, router, getFreshUserRounds]);
+
+  // ============================================
+  // MUSIC HANDLERS
+  // ============================================
+  useEffect(() => {
+    const handleFirstInteraction = () => {
+      if (!hasInteracted) {
+        setHasInteracted(true);
+
+        const savedPref = localStorage.getItem("vibraxx_music");
+        if (savedPref !== "false") {
+          playMenuMusic();
+          setIsPlaying(true);
+          localStorage.setItem("vibraxx_music", "true");
+        }
+      }
+    };
+
+    document.addEventListener("click", handleFirstInteraction, { once: true });
+    document.addEventListener("touchstart", handleFirstInteraction, { once: true });
+
+    return () => {
+      document.removeEventListener("click", handleFirstInteraction);
+      document.removeEventListener("touchstart", handleFirstInteraction);
+    };
+  }, [hasInteracted]);
 
   const toggleMusic = useCallback(() => {
     if (isPlaying) {
       stopMenuMusic();
       setIsPlaying(false);
+      localStorage.setItem("vibraxx_music", "false");
     } else {
       playMenuMusic();
       setIsPlaying(true);
+      localStorage.setItem("vibraxx_music", "true");
     }
   }, [isPlaying]);
 
+  useEffect(() => {
+    const musicPref = localStorage.getItem("vibraxx_music");
+    if (musicPref === "true") {
+      setIsPlaying(true);
+    }
+    return () => stopMenuMusic();
+  }, []);
+
+  // ============================================
+  // AUTH ACTIONS
+  // ============================================
   const handleSignIn = useCallback(async () => {
+    const redirectUrl = `${window.location.origin}/auth/callback`;
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
+      options: { redirectTo: redirectUrl },
     });
   }, []);
 
   const handleSignOut = useCallback(async () => {
     await supabase.auth.signOut();
-    refresh();
-  }, [refresh]);
+    setUser(null);
+    resumeIntentHandledRef.current = false;
+  }, []);
 
   const handleAgeVerification = useCallback(async () => {
-    if (!state?.userId) return;
+    localStorage.setItem("vibraxx_age_verified", "true");
 
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ age_verified: true })
-        .eq("user_id", state.userId);
+    const action = pendingAction;
+    setPendingAction(null);
+    setShowAgeModal(false);
 
-      if (error) throw error;
+    if (action === "live") {
+      const remaining = await getFreshUserRounds();
 
-      setShowAgeModal(false);
-      await refresh();
-
-      if (pendingAction === "live") {
-        router.push("/lobby");
-      } else if (pendingAction === "free") {
-        router.push("/free-quiz");
+      if (remaining === "error") {
+        alert("Round balance could not be verified. Please refresh and try again.");
+        return;
       }
-      setPendingAction(null);
-    } catch (err) {
-      console.error("Age verification failed:", err);
-    }
-  }, [state?.userId, pendingAction, refresh, router]);
 
-  const handleStartLiveQuiz = useCallback(() => {
-    console.log('[DEBUG] handleStartLiveQuiz called');
-    console.log('[DEBUG] State:', state);
+      if (remaining <= 0) {
+        setShowNoRoundsModal(true);
+        return;
+      }
+
+      router.push("/lobby");
+    }
+
+    if (action === "free") {
+      router.push("/free");
+    }
+  }, [pendingAction, getFreshUserRounds, router]);
+
+  const checkAgeVerification = useCallback(() => {
+    return localStorage.getItem("vibraxx_age_verified") === "true";
+  }, []);
+
+  const handleStartLiveQuiz = useCallback(async () => {
+    console.log('[HomePage] handleStartLiveQuiz called');
     
-    // ⚠️ TEMPORARY: Direct push for testing
-    console.log('[DEBUG] FORCING PUSH TO LOBBY');
-    router.push("/lobby");
-    return;
-    
-    // Original logic below (temporarily disabled)
-    /*
-    if (!state) {
-      console.log('[DEBUG] No state - returning');
+    if (!user) {
+      console.log('[HomePage] No user, storing intent and signing in');
+      sessionStorage.setItem("postLoginIntent", "live");
+      await handleSignIn();
       return;
     }
 
-    if (!state.isAuthenticated) {
-      console.log('[DEBUG] Not authenticated - signing in');
-      handleSignIn();
-      return;
-    }
+    console.log('[HomePage] User exists:', user.email);
 
-    if (!state.ageVerified) {
-      console.log('[DEBUG] Not age verified - showing modal');
+    if (!checkAgeVerification()) {
+      console.log('[HomePage] Age verification needed');
       setPendingAction("live");
       setShowAgeModal(true);
       return;
     }
 
-    if (!state.canEnterLive) {
-      console.log('[DEBUG] Cannot enter live:', state.liveBlockReason);
-      if (state.liveBlockReason === BLOCK_REASONS.NO_CREDITS) {
-        setShowNoRoundsModal(true);
-      }
+    console.log('[HomePage] Age verified, checking credits...');
+    const remaining = await getFreshUserRounds();
+    console.log('[HomePage] Credits remaining:', remaining);
+
+    if (remaining === "error") {
+      console.error('[HomePage] Error fetching credits');
+      alert("Round balance could not be verified. Please refresh and try again.");
       return;
     }
 
-    console.log('[DEBUG] All checks passed - pushing to lobby');
+    if (remaining <= 0) {
+      console.log('[HomePage] No credits, showing modal');
+      setShowNoRoundsModal(true);
+      return;
+    }
+
+    console.log('[HomePage] ✅ All checks passed, redirecting to /lobby');
     router.push("/lobby");
-    */
-  }, [state, handleSignIn, router]);
+  }, [user, handleSignIn, checkAgeVerification, getFreshUserRounds, router]);
 
-  const handleStartFreeQuiz = useCallback(() => {
-    if (!state) return;
-
-    if (!state.isAuthenticated) {
-      handleSignIn();
+  const handleStartFreeQuiz = useCallback(async () => {
+    if (!user) {
+      sessionStorage.setItem("postLoginIntent", "free");
+      await handleSignIn();
       return;
     }
 
-    if (!state.ageVerified) {
+    if (!checkAgeVerification()) {
       setPendingAction("free");
       setShowAgeModal(true);
       return;
     }
 
-    if (!state.canEnterFree) {
-      if (state.freeBlockReason === BLOCK_REASONS.ALREADY_USED) {
-        alert("You've already used your free quiz this week. Come back Monday!");
-      }
-      return;
-    }
+    router.push("/free");
+  }, [user, handleSignIn, checkAgeVerification, router]);
 
-    router.push("/free-quiz");
-  }, [state, handleSignIn, router]);
+  const formatTime = useCallback((seconds: number | null) => {
+    if (seconds === null || typeof seconds !== "number" || Number.isNaN(seconds))
+      return "--:--";
+    const safe = Math.max(0, seconds);
+    const m = Math.floor(safe / 60);
+    const s = safe % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  }, []);
 
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
+  // ============================================
+  // 🎯 STATS CARDS (KANONİK)
+  // ============================================
   const statsCards = useMemo(
     () => [
-      {
-        icon: Globe,
-        value: state?.activePlayers?.toLocaleString() || "0",
-        label: "Active Players",
-      },
-      {
-        icon: Trophy,
-        value: state?.totalRounds?.toLocaleString() || "0",
-        label: "Rounds Played",
-      },
-      {
-        icon: Sparkles,
-        value: state?.totalParticipants?.toLocaleString() || "0",
-        label: "Total Players",
-      },
+      { icon: Globe, value: `${activePlayers}+`, label: "Active Players" },
+      { icon: Zap, value: `${totalRounds.toLocaleString()}+`, label: "Rounds Played" },
+      { icon: Trophy, value: `${totalParticipants.toLocaleString()}+`, label: "Competitors" },
     ],
-    [state]
+    [activePlayers, totalRounds, totalParticipants]
   );
-
-  const champions = useMemo(
-    () => [
-      {
-        period: "Weekly",
-        name: state?.weeklyChampion?.name || "TBA",
-        score: state?.weeklyChampion?.score || 0,
-        icon: Trophy,
-        color: "#06b6d4",
-      },
-      {
-        period: "Monthly",
-        name: state?.monthlyChampion?.name || "TBA",
-        score: state?.monthlyChampion?.score || 0,
-        icon: Crown,
-        color: "#facc15",
-      },
-    ],
-    [state]
-  );
-
-  if (isLoading) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
-        }}
-      >
-        <div
-          style={{
-            fontSize: 18,
-            fontWeight: 600,
-            color: "#ffffff",
-            animation: "pulse 2s ease-in-out infinite",
-          }}
-        >
-          Loading VibraXX...
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>
       <style jsx global>{`
-        /* ========== CANONICAL GLOBAL RESET ========== */
-        html {
-          box-sizing: border-box;
-          scroll-behavior: smooth;
-          -webkit-text-size-adjust: 100%;
+        :root {
+          color-scheme: dark;
+          background-color: #020817;
         }
 
-        *, *::before, *::after {
-          box-sizing: inherit;
+        * {
+          box-sizing: border-box;
         }
 
         body {
+          background-color: #020817;
           margin: 0;
           padding: 0;
-          min-height: 100%;
-          text-rendering: optimizeLegibility;
-          -webkit-font-smoothing: antialiased;
-          -moz-osx-font-smoothing: grayscale;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-          background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-          color: #ffffff;
-          overflow-x: hidden;
         }
 
-        h1, h2, h3, h4, h5, h6,
-        p, figure, blockquote, dl, dd {
-          margin: 0;
+        @keyframes float {
+          0%,
+          100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-20px);
+          }
         }
 
-        img, picture, video, canvas, svg {
-          display: block;
-          max-width: 100%;
+        @keyframes glow {
+          0%,
+          100% {
+            opacity: 0.3;
+          }
+          50% {
+            opacity: 0.6;
+          }
         }
 
-        input, button, textarea, select {
-          font: inherit;
+        @keyframes shimmer {
+          0% {
+            background-position: -200% center;
+          }
+          100% {
+            background-position: 200% center;
+          }
         }
 
-        button {
-          background: none;
-          border: none;
-          cursor: pointer;
+        @keyframes pulse-slow {
+          0%,
+          100% {
+            opacity: 0.5;
+          }
+          50% {
+            opacity: 0.8;
+          }
         }
 
-        a {
-          text-decoration: none;
-          color: inherit;
+        .animate-float {
+          animation: float 6s ease-in-out infinite;
+          will-change: transform;
+          animation-delay: 0.3s;
+          animation-fill-mode: backwards;
         }
 
-        ul[role="list"], ol[role="list"] {
-          list-style: none;
+        .animate-glow {
+          animation: glow 3s ease-in-out infinite;
+          animation-delay: 0.5s;
+          animation-fill-mode: backwards;
         }
 
-        :focus-visible {
-          outline: 2px solid #7c3aed;
-          outline-offset: 2px;
+        .animate-shimmer {
+          background-size: 200% 100%;
+          animation: shimmer 3s linear infinite;
+          animation-delay: 0.2s;
+          animation-fill-mode: backwards;
         }
 
-        /* ========== LAYOUT CONTAINERS ========== */
+        .animate-pulse-slow {
+          animation: pulse-slow 4s ease-in-out infinite;
+          animation-delay: 0.4s;
+          animation-fill-mode: backwards;
+        }
+
         .vx-container {
-          max-width: 1200px;
+          max-width: 1400px;
           margin: 0 auto;
-          padding: 0 20px;
+          padding: 0 16px;
+        }
+        @media (min-width: 640px) {
+          .vx-container {
+            padding: 0 24px;
+          }
         }
 
-        /* ========== HEADER ========== */
         .vx-header {
           position: sticky;
           top: 0;
-          z-index: 100;
-          background: rgba(15, 23, 42, 0.95);
-          backdrop-filter: blur(12px);
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-          padding: 16px 0;
+          z-index: 50;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+          backdrop-filter: blur(20px);
+          background: rgba(15, 23, 42, 0.92);
         }
 
         .vx-header-inner {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 16px;
+          gap: 10px;
+          padding: 8px 0;
+          flex-wrap: wrap;
         }
 
         .vx-header-right {
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 8px;
           flex-wrap: wrap;
         }
+        .vx-hide-mobile {
+          display: none;
+        }
 
-        /* ========== LIVE BAR ========== */
+        @media (min-width: 640px) {
+          .vx-header-inner {
+            height: 80px;
+            flex-wrap: nowrap;
+          }
+          .vx-header-right {
+            gap: 12px;
+          }
+          .vx-hide-mobile {
+            display: inline-flex;
+          }
+        }
+
+        @media (max-width: 639px) {
+          .vx-header-inner {
+            justify-content: space-between;
+            padding: 12px 0;
+          }
+          .vx-header-right {
+            justify-content: flex-end;
+          }
+        }
+
         .vx-livebar {
-          background: linear-gradient(90deg, rgba(34, 197, 94, 0.1), rgba(6, 182, 212, 0.1));
-          border-bottom: 1px solid rgba(34, 197, 94, 0.2);
-          padding: 12px 0;
+          z-index: 40;
+          border-bottom: 1px solid rgba(139, 92, 246, 0.3);
+          border-top: 1px solid rgba(139, 92, 246, 0.2);
+          backdrop-filter: blur(16px);
+          background: linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(217, 70, 239, 0.15));
+          font-size: 12px;
+          animation: pulse-glow 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse-glow {
+          0%,
+          100% {
+            box-shadow: 0 0 0 rgba(139, 92, 246, 0);
+          }
+          50% {
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+          }
         }
 
         .vx-livebar-inner {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 0 20px;
           display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 16px;
           flex-wrap: wrap;
-          font-size: 13px;
+          gap: 10px;
+          justify-content: center;
+          align-items: center;
+          padding: 8px 16px;
         }
 
-        /* ========== HERO SECTION ========== */
+        @media (min-width: 640px) {
+          .vx-livebar-inner {
+            font-size: 14px;
+            padding: 10px 24px;
+          }
+        }
+
         .vx-hero {
-          padding: 80px 0;
+          padding: 72px 16px 80px;
           text-align: center;
+        }
+        @media (min-width: 640px) {
+          .vx-hero {
+            padding: 96px 24px 96px;
+          }
         }
 
         .vx-hero-badge {
           display: inline-flex;
           align-items: center;
           gap: 8px;
-          padding: 8px 16px;
-          background: rgba(251, 191, 36, 0.1);
-          border: 1px solid rgba(251, 191, 36, 0.2);
-          border-radius: 50px;
-          font-size: 12px;
-          font-weight: 700;
+          padding: 8px 20px;
+          border-radius: 9999px;
+          border: 2px solid rgba(251, 191, 36, 0.4);
+          background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
           color: #fbbf24;
-          margin-bottom: 24px;
+          font-size: 12px;
+          margin-bottom: 12px;
+          backdrop-filter: blur(10px);
+          font-weight: 700;
+          box-shadow: 0 0 20px rgba(251, 191, 36, 0.3), inset 0 0 20px rgba(251, 191, 36, 0.1);
+          position: relative;
+          overflow: hidden;
+        }
+
+        .vx-hero-badge::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+          animation: badge-shine 3s infinite;
+        }
+
+        @keyframes badge-shine {
+          0% {
+            left: -100%;
+          }
+          50%,
+          100% {
+            left: 100%;
+          }
+        }
+
+        @media (min-width: 640px) {
+          .vx-hero-badge {
+            padding: 10px 24px;
+            font-size: 14px;
+            margin-bottom: 14px;
+          }
         }
 
         .vx-hero-title {
-          font-size: clamp(32px, 5vw, 56px);
-          font-weight: 900;
-          line-height: 1.1;
-          margin-bottom: 24px;
-          letter-spacing: -0.02em;
+          font-size: clamp(26px, 6vw, 42px);
+          font-weight: 800;
+          line-height: 1.2;
+          margin-bottom: 18px;
+          letter-spacing: -0.03em;
         }
 
         .vx-hero-neon {
-          background: linear-gradient(135deg, #7c3aed, #d946ef);
+          display: inline-block;
+          background: linear-gradient(90deg, #7c3aed, #22d3ee, #f97316, #d946ef, #7c3aed);
+          background-size: 250% 100%;
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
+          animation: shimmer 4s linear infinite;
+          text-shadow: 0 0 14px rgba(124, 58, 237, 0.45);
         }
 
         .vx-hero-subtitle {
-          font-size: clamp(16px, 2vw, 18px);
+          font-size: 16px;
           color: #94a3b8;
-          max-width: 600px;
-          margin: 0 auto 48px;
+          max-width: 640px;
+          margin: 0 auto 32px;
           line-height: 1.6;
         }
 
-        /* ========== COUNTDOWN ========== */
-        .vx-countdown-panel {
-          background: linear-gradient(135deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.6));
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 16px;
-          padding: 32px;
-          max-width: 400px;
-          margin: 0 auto 48px;
-          backdrop-filter: blur(12px);
+        @media (min-width: 640px) {
+          .vx-hero-subtitle {
+            font-size: 18px;
+            margin-bottom: 40px;
+          }
         }
 
-        /* ========== CTA BUTTONS ========== */
+        .vx-countdown-panel {
+          margin: 24px auto 28px;
+          max-width: 380px;
+          padding: 20px 26px;
+          border-radius: 18px;
+          background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+          border: 2px solid rgba(255, 255, 255, 0.15);
+          backdrop-filter: blur(20px);
+          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05),
+            inset 0 2px 0 rgba(255, 255, 255, 0.08);
+          position: relative;
+          overflow: hidden;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .vx-countdown-panel:hover {
+          transform: translateY(-4px);
+          border-color: rgba(255, 255, 255, 0.25);
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.1),
+            inset 0 2px 0 rgba(255, 255, 255, 0.12), 0 0 40px rgba(124, 58, 237, 0.3);
+        }
+
         .vx-cta-wrap {
           display: flex;
           flex-direction: column;
-          gap: 16px;
-          max-width: 500px;
-          margin: 0 auto 64px;
+          gap: 12px;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 48px;
+          width: 100%;
+          max-width: 100%;
+          padding: 0 16px;
+        }
+
+        @media (min-width: 640px) {
+          .vx-cta-wrap {
+            flex-direction: row;
+            margin-bottom: 64px;
+            padding: 0;
+          }
         }
 
         .vx-cta-btn {
           position: relative;
-          display: flex;
+          padding: 14px 28px;
+          border-radius: 14px;
+          border: none;
+          cursor: pointer;
+          display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 12px;
-          padding: 16px 32px;
-          border: none;
-          border-radius: 12px;
-          font-size: 16px;
+          gap: 10px;
           font-weight: 700;
-          color: white;
-          cursor: pointer;
-          transition: all 0.3s;
+          font-size: 16px;
           overflow: hidden;
+          transition: transform 0.2s, box-shadow 0.2s;
+          width: 100%;
+          max-width: 320px;
         }
 
         .vx-cta-btn:hover {
           transform: translateY(-2px);
-          box-shadow: 0 12px 24px rgba(124, 58, 237, 0.5);
+        }
+        .vx-cta-btn:active {
+          transform: translateY(0);
         }
 
-        /* ========== STATS ========== */
+        @media (min-width: 640px) {
+          .vx-cta-btn {
+            padding: 18px 34px;
+            font-size: 18px;
+            width: auto;
+            min-width: 220px;
+          }
+        }
+
+        .vx-cta-live {
+          box-shadow: 0 20px 40px -16px rgba(139, 92, 246, 0.6);
+        }
+        .vx-cta-free {
+          box-shadow: 0 20px 40px -16px rgba(34, 211, 238, 0.5);
+        }
+
         .vx-stats-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 24px;
+          grid-template-columns: 1fr;
+          gap: 20px;
           margin-bottom: 64px;
         }
 
+        @media (min-width: 640px) {
+          .vx-stats-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 24px;
+            margin-bottom: 80px;
+          }
+        }
+
         .vx-stat-card {
-          background: linear-gradient(135deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.6));
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          border-radius: 12px;
-          padding: 24px;
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
           text-align: center;
-          transition: all 0.3s;
+          border-radius: 16px;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+          backdrop-filter: blur(20px);
+          min-height: 120px;
+          padding: 1.5rem;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          overflow: hidden;
+        }
+
+        .vx-stat-card::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: -100px;
+          right: -100px;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
         }
 
         .vx-stat-card:hover {
-          border-color: rgba(124, 58, 237, 0.3);
-          transform: translateY(-4px);
+          transform: translateY(-2px);
+          border-color: rgba(255, 255, 255, 0.12);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
         }
 
-        .vx-stat-value {
-          font-size: 32px;
-          font-weight: 900;
-          color: #ffffff;
-          margin-bottom: 8px;
+        @media (min-width: 640px) {
+          .vx-stat-card {
+            min-height: 150px;
+            padding: 1.75rem;
+          }
         }
 
         .vx-stat-label {
+          color: #6b7280;
           font-size: 12px;
           font-weight: 600;
-          color: #6b7280;
           text-transform: uppercase;
           letter-spacing: 0.1em;
         }
 
-        /* ========== CHAMPIONS ========== */
+        .vx-stat-value {
+          font-weight: 800;
+          font-size: 28px;
+          color: #ffffff;
+        }
+
+        @media (min-width: 640px) {
+          .vx-stat-value {
+            font-size: 32px;
+          }
+        }
+
         .vx-champions-title {
+          font-size: 24px;
+          font-weight: 700;
+          margin-bottom: 24px;
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 12px;
-          font-size: 28px;
-          font-weight: 800;
-          margin-bottom: 32px;
+          gap: 10px;
+        }
+
+        @media (min-width: 640px) {
+          .vx-champions-title {
+            font-size: 32px;
+            margin-bottom: 32px;
+          }
         }
 
         .vx-champions-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-          gap: 24px;
-          margin-bottom: 64px;
+          grid-template-columns: 1fr;
+          gap: 16px;
+          margin-bottom: 56px;
+        }
+
+        @media (min-width: 768px) {
+          .vx-champions-grid {
+            grid-template-columns: repeat(2, minmax(0, 400px));
+            justify-content: center;
+            gap: 20px;
+          }
         }
 
         .vx-champ-card {
-          background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.8));
-          border: 1px solid rgba(255, 255, 255, 0.1);
+          position: relative;
+          padding: 24px;
           border-radius: 16px;
-          padding: 32px;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+          backdrop-filter: blur(20px);
           text-align: center;
-          transition: all 0.3s;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          overflow: hidden;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .vx-champ-card::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: -100px;
+          right: -100px;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
         }
 
         .vx-champ-card:hover {
-          border-color: rgba(124, 58, 237, 0.4);
-          transform: translateY(-4px);
+          transform: translateY(-2px);
+          border-color: rgba(255, 255, 255, 0.12);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
         }
 
-        /* ========== RESPONSIVE ========== */
-        .vx-hide-mobile {
+        @media (min-width: 640px) {
+          .vx-champ-card {
+            padding: 28px;
+          }
+        }
+
+        .vx-footer {
+          border-top: 1px solid rgba(255, 255, 255, 0.12);
+          background: rgba(9, 9, 13, 0.96);
+          backdrop-filter: blur(16px);
+          padding: 32px 16px 24px;
+          text-align: center;
+          color: #64748b;
+          font-size: 12px;
+        }
+
+        @media (min-width: 640px) {
+          .vx-footer {
+            font-size: 13px;
+            padding: 40px 24px 28px;
+          }
+        }
+
+        .vx-footer-links {
+          margin: 16px 0 20px;
           display: flex;
+          gap: 8px 20px;
+          justify-content: center;
+          flex-wrap: wrap;
+          align-items: center;
         }
 
-        @media (max-width: 768px) {
-          .vx-header-inner {
-            flex-wrap: wrap;
+        .vx-footer-divider {
+          width: 1px;
+          height: 14px;
+          background: rgba(255, 255, 255, 0.2);
+        }
+
+        .vx-footer-links a {
+          color: #94a3b8;
+          text-decoration: none;
+          transition: color 0.2s;
+          font-size: 12px;
+        }
+
+        .vx-footer-links a:hover {
+          color: #c4b5fd;
+        }
+
+        .vx-footer-legal {
+          max-width: 800px;
+          margin: 0 auto 16px;
+          font-size: 11px;
+          line-height: 1.6;
+          color: #64748b;
+        }
+
+        .vx-footer-company {
+          margin-top: 16px;
+          padding-top: 16px;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          font-size: 11px;
+          color: #64748b;
+        }
+
+        @media (min-width: 640px) {
+          .vx-footer-legal {
+            font-size: 12px;
+          }
+          .vx-footer-company {
+            font-size: 12px;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .vx-hero-title {
+            font-size: 36px !important;
+            line-height: 1.2 !important;
+            padding: 0 8px;
           }
 
-          .vx-header-right {
-            width: 100%;
-            justify-content: space-between;
-          }
-
-          .vx-hide-mobile {
-            display: none;
-          }
-
-          .vx-livebar-inner {
-            font-size: 11px;
-            gap: 8px;
-          }
-
-          .vx-hero {
-            padding: 48px 0;
+          .vx-hero-subtitle {
+            font-size: 16px !important;
+            padding: 0 12px;
           }
 
           .vx-cta-wrap {
-            max-width: 100%;
+            flex-direction: column !important;
+            gap: 12px !important;
+            width: 100%;
+            padding: 0 4px;
+          }
+
+          .vx-cta-btn {
+            width: 100% !important;
+            max-width: 100% !important;
+            font-size: 14px !important;
+          }
+
+          .vx-livebar {
+            padding: 10px 0 !important;
+          }
+
+          .vx-livebar-inner {
+            font-size: 11px !important;
+            gap: 6px !important;
+            flex-wrap: wrap;
+            justify-content: center;
           }
 
           .vx-stats-grid {
-            grid-template-columns: 1fr;
-            gap: 16px;
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
           }
 
           .vx-champions-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: 1fr !important;
+            gap: 16px !important;
           }
-        }
 
-        /* ========== ANIMATIONS ========== */
-        @keyframes pulse {
-          0%, 100% {
-            opacity: 1;
+          .vx-footer-links {
+            flex-direction: column !important;
+            gap: 8px !important;
+            align-items: center !important;
           }
-          50% {
-            opacity: 0.5;
+
+          .vx-footer-divider {
+            display: none !important;
           }
         }
       `}</style>
 
-      <div style={{ minHeight: "100vh", position: "relative" }}>
-        <header className="vx-header">
-          <div className="vx-container">
-            <div className="vx-header-inner">
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <Image
-                  src="/images/logo.png"
-                  alt="VibraXX Logo"
-                  width={40}
-                  height={40}
-                  style={{ borderRadius: 10 }}
-                />
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  <div
-                    style={{
-                      fontSize: 20,
-                      fontWeight: 800,
-                      color: "white",
-                      letterSpacing: "-0.02em",
-                      lineHeight: 1,
-                    }}
-                  >
-                    VibraXX
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 10,
-                      color: "#6b7280",
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.1em",
-                    }}
-                  >
-                    Global Quiz Arena
-                  </div>
-                </div>
-              </div>
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#020817",
+          color: "white",
+          position: "relative",
+          overflow: "hidden",
+          opacity: isInitialLoad ? 0 : 1,
+          transition: "opacity 0.3s ease-in",
+        }}
+      >
+        {/* Neon Orbs */}
+        <div
+          className="animate-float"
+          style={{
+            position: "fixed",
+            top: "60px",
+            left: "-40px",
+            width: "260px",
+            height: "260px",
+            borderRadius: "50%",
+            background: "#7c3aed",
+            opacity: 0,
+            filter: "blur(70px)",
+            zIndex: 0,
+            pointerEvents: "none",
+            animation: isInitialLoad ? "none" : undefined,
+            transition: "opacity 0.8s ease-in 0.3s",
+          }}
+        />
+        <div
+          className="animate-float"
+          style={{
+            position: "fixed",
+            bottom: "40px",
+            right: "-40px",
+            width: "260px",
+            height: "260px",
+            borderRadius: "50%",
+            background: "#d946ef",
+            opacity: 0,
+            filter: "blur(70px)",
+            zIndex: 0,
+            animationDelay: "2s",
+            pointerEvents: "none",
+            animation: isInitialLoad ? "none" : undefined,
+            transition: "opacity 0.8s ease-in 0.5s",
+          }}
+        />
 
-              <div className="vx-header-right">
-                <button
-                  onClick={toggleMusic}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    color: isPlaying ? "#22d3ee" : "#6b7280",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                  }}
-                  aria-label={isPlaying ? "Mute music" : "Play music"}
-                >
-                  {isPlaying ? (
-                    <Volume2 style={{ width: 18, height: 18 }} />
-                  ) : (
-                    <VolumeX style={{ width: 18, height: 18 }} />
-                  )}
-                </button>
-
-                {state?.isAuthenticated ? (
-                  <>
-                    {/* ✅ Kullanıcı Adı/Email - HER ZAMAN GÖRÜNÜR */}
-                    <div
-                      style={{
-                        padding: "6px 12px",
-                        borderRadius: 8,
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
-                        background: "rgba(255, 255, 255, 0.05)",
-                        color: "#94a3b8",
-                        fontSize: 12,
-                        fontWeight: 500,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                      }}
-                    >
-                      <User style={{ width: 12, height: 12 }} />
-                      {state.userName || state.userEmail?.split('@')[0] || 'User'}
-                    </div>
-
-                    <div
-                      className="vx-hide-mobile"
-                      style={{
-                        padding: "8px 16px",
-                        borderRadius: 10,
-                        border: "1px solid rgba(251, 191, 36, 0.3)",
-                        background: "rgba(251, 191, 36, 0.1)",
-                        color: "#fbbf24",
-                        fontSize: 13,
-                        fontWeight: 700,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                      }}
-                    >
-                      <Sparkles style={{ width: 14, height: 14 }} />
-                      {state?.liveCredits ?? 0} Rounds
-                    </div>
-
-                    <button
-                      onClick={() => router.push("/profile")}
-                      style={{
-                        padding: "10px 20px",
-                        borderRadius: 10,
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
-                        background: "rgba(255, 255, 255, 0.05)",
-                        color: "#94a3b8",
-                        fontSize: 14,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                      }}
-                    >
-                      <User style={{ width: 16, height: 16 }} />
-                      <span className="vx-hide-mobile">Profile</span>
-                    </button>
-
-                    <button
-                      onClick={() => router.push("/leaderboard")}
-                      style={{
-                        padding: "10px 20px",
-                        borderRadius: 10,
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
-                        background: "rgba(255, 255, 255, 0.05)",
-                        color: "#94a3b8",
-                        fontSize: 14,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                      }}
-                    >
-                      <BarChart3 style={{ width: 16, height: 16 }} />
-                      <span className="vx-hide-mobile">Leaderboard</span>
-                    </button>
-
-                    <button
-                      onClick={() => router.push("/buy")}
-                      style={{
-                        padding: "10px 20px",
-                        borderRadius: 10,
-                        border: "none",
-                        background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-                        color: "white",
-                        fontSize: 14,
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        transition: "transform 0.2s",
-                        boxShadow: "0 8px 16px rgba(124, 58, 237, 0.4)",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                      }}
-                    >
-                      <ShoppingCart style={{ width: 16, height: 16 }} />
-                      <span className="vx-hide-mobile">Buy</span>
-                    </button>
-
-                    <button
-                      onClick={handleSignOut}
-                      style={{
-                        padding: "10px 20px",
-                        borderRadius: 10,
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
-                        background: "rgba(255, 255, 255, 0.05)",
-                        color: "#94a3b8",
-                        fontSize: 14,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                      }}
-                      className="vx-hide-mobile"
-                    >
-                      Sign Out
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    {/* ✅ SEÇENEK B: Leaderboard herkese açık */}
-                    <button
-                      onClick={() => router.push("/leaderboard")}
-                      style={{
-                        padding: "10px 20px",
-                        borderRadius: 10,
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
-                        background: "rgba(255, 255, 255, 0.05)",
-                        color: "#94a3b8",
-                        fontSize: 14,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                      }}
-                    >
-                      <BarChart3 style={{ width: 16, height: 16 }} />
-                      <span className="vx-hide-mobile">Leaderboard</span>
-                    </button>
-
-                    <button
-                      onClick={handleSignIn}
-                      style={{
-                        padding: "10px 20px",
-                        borderRadius: 10,
-                        border: "none",
-                        background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-                        color: "white",
-                        fontSize: 14,
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        transition: "transform 0.2s",
-                        boxShadow: "0 8px 16px rgba(124, 58, 237, 0.4)",
-                      }}
-                    >
-                      Sign In
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <div className="vx-livebar">
-          <div className="vx-livebar-inner">
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                color: "#22c55e",
-                fontWeight: 700,
-              }}
-            >
-              <div
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: "50%",
-                  background: "#22c55e",
-                  animation: "pulse 2s ease-in-out infinite",
-                }}
-              />
-              LIVE NOW
-            </div>
-            <div style={{ color: "#94a3b8", fontWeight: 500 }}>
-              Next round in {formatTime(countdownSeconds)}
-            </div>
-            <div style={{ color: "#94a3b8", fontWeight: 500 }}>•</div>
-            <div style={{ color: "#fbbf24", fontWeight: 600 }}>
-              £1000 Monthly Prize Pool
-            </div>
-          </div>
-        </div>
-
+        {/* Modals */}
         {showAgeModal && (
           <AgeVerificationModal
             onConfirm={handleAgeVerification}
@@ -1380,156 +1677,529 @@ export default function HomePage() {
             }}
           />
         )}
+
         {showNoRoundsModal && (
           <NoRoundsModal
-            onBuyRounds={() => {
+            onBuyRounds={async () => {
               setShowNoRoundsModal(false);
+
+              if (!user) {
+                alert(
+                  "Please sign in with Google to purchase rounds. You will be redirected to the login page."
+                );
+                sessionStorage.setItem("pendingBuyRounds", "true");
+                await supabase.auth.signInWithOAuth({
+                  provider: "google",
+                  options: {
+                    redirectTo: `${window.location.origin}/auth/callback`,
+                  },
+                });
+                return;
+              }
+
               router.push("/buy");
             }}
             onCancel={() => setShowNoRoundsModal(false)}
           />
         )}
 
-        <main style={{ position: "relative", zIndex: 10 }}>
+        {/* Header */}
+        <header className="vx-header">
           <div className="vx-container">
-            <div className="vx-hero">
-              <div className="vx-hero-badge">
-                <Trophy style={{ width: 16, height: 16 }} />
-                <span>Compete for Real Prizes</span>
-              </div>
-
-              <h1 className="vx-hero-title">
-                Test Your Knowledge in the{" "}
-                <span className="vx-hero-neon">Global Quiz Arena</span>
-              </h1>
-
-              <p className="vx-hero-subtitle">
-                Join thousands of players worldwide. Answer 20 questions in 4 minutes. Climb
-                the leaderboard. Win big.
-              </p>
-
-              <div className="vx-countdown-panel">
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div className="vx-header-inner">
+              <div
+                style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}
+                className="vx-logo-container"
+              >
+                <div
+                  style={{
+                    position: "relative",
+                    width: 100,
+                    height: 100,
+                    borderRadius: "9999px",
+                    padding: 4,
+                    background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)",
+                    boxShadow: "0 0 30px rgba(124,58,237,0.6)",
+                    flexShrink: 0,
+                  }}
+                >
                   <div
+                    className="animate-glow"
                     style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.15em",
-                      color: "#6b7280",
-                      textAlign: "center",
+                      position: "absolute",
+                      inset: -5,
+                      borderRadius: "9999px",
+                      background: "radial-gradient(circle,#a855f7,transparent)",
+                      opacity: 0.4,
+                      filter: "blur(10px)",
+                      pointerEvents: "none",
                     }}
-                  >
-                    Next Round Starts In
-                  </div>
+                  />
                   <div
                     style={{
-                      fontSize: 48,
-                      fontWeight: 900,
-                      color: "#ffffff",
-                      textAlign: "center",
-                      letterSpacing: "-0.02em",
-                      fontVariantNumeric: "tabular-nums",
-                      lineHeight: 1,
-                    }}
-                  >
-                    {formatTime(countdownSeconds)}
-                  </div>
-                  <div
-                    style={{
+                      position: "relative",
+                      width: "100%",
+                      height: "100%",
+                      borderRadius: "9999px",
+                      backgroundColor: "#020817",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      gap: 6,
-                      fontSize: 12,
-                      color: "#6b7280",
-                      fontWeight: 500,
+                      overflow: "hidden",
                     }}
                   >
-                    <div
-                      style={{
-                        width: 4,
-                        height: 4,
-                        borderRadius: "50%",
-                        background: "#22c55e",
-                      }}
+                    <Image
+                      src="/images/logo.png"
+                      alt="VibraXX Logo"
+                      fill
+                      sizes="90px"
+                      style={{ objectFit: "contain" }}
+                      priority
                     />
-                    <span style={{ color: "#ffffff", fontWeight: 600 }}>
-                      {state?.activePlayers ?? 0}
-                    </span>
-                    <span>players ready</span>
                   </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span
+                    style={{
+                      fontSize: 13,
+                      color: "#c4b5fd",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.14em",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Live Quiz Arena
+                  </span>
                 </div>
               </div>
 
-              <div className="vx-cta-wrap">
+              <div className="vx-header-right">
+                {/* Music Toggle */}
                 <button
-                  className="vx-cta-btn vx-cta-live"
-                  onClick={handleStartLiveQuiz}
-                  aria-label="Enter live arena with prizes"
+                  onClick={toggleMusic}
+                  aria-label={isPlaying ? "Mute music" : "Play music"}
+                  style={{
+                    padding: 9,
+                    borderRadius: 12,
+                    border: "1px solid rgba(148,163,253,0.22)",
+                    background: "rgba(2,6,23,0.9)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                  }}
                 >
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      background: "linear-gradient(to right, #7c3aed, #d946ef)",
-                      pointerEvents: "none",
-                    }}
-                  />
-                  <Play
-                    style={{ position: "relative", zIndex: 10, width: 20, height: 20 }}
-                  />
-                  <span style={{ position: "relative", zIndex: 10 }}>
-                    Enter Live Arena
-                  </span>
-                  <ArrowRight
-                    style={{ position: "relative", zIndex: 10, width: 20, height: 20 }}
-                  />
+                  {isPlaying ? (
+                    <Volume2 style={{ width: 18, height: 18, color: "#a78bfa" }} />
+                  ) : (
+                    <VolumeX style={{ width: 18, height: 18, color: "#6b7280" }} />
+                  )}
                 </button>
 
+                {/* Buy Round Button */}
                 <button
-                  className="vx-cta-btn vx-cta-free"
-                  onClick={handleStartFreeQuiz}
-                  aria-label="Try free practice quiz"
+                  onClick={() => router.push("/buy")}
+                  className="vx-hide-mobile"
+                  aria-label="Buy quiz rounds"
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(251,191,36,0.3)",
+                    background: "linear-gradient(135deg, rgba(251,191,36,0.1), rgba(245,158,11,0.1))",
+                    color: "#fbbf24",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    transition: "all 0.2s",
+                  }}
                 >
+                  <ShoppingCart style={{ width: 14, height: 14 }} />
+                  {user && userRounds > 0 ? `${userRounds} Rounds` : "Buy Round"}
+                </button>
+
+                {/* Leaderboard */}
+                <button
+                  onClick={() => router.push("/leaderboard")}
+                  className="vx-hide-mobile"
+                  aria-label="View leaderboard"
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(148,163,253,0.22)",
+                    background: "transparent",
+                    color: "white",
+                    fontSize: 13,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    transition: "all 0.2s",
+                  }}
+                >
+                  <Trophy style={{ width: 14, height: 14, color: "#a78bfa" }} />
+                  Leaderboard
+                </button>
+
+                {/* Auth Section */}
+                {user ? (
+                  <>
+                    <button
+                      onClick={() => router.push("/profile")}
+                      aria-label="View profile"
+                      style={{
+                        padding: "8px 16px",
+                        borderRadius: 12,
+                        border: "1px solid rgba(148,163,253,0.26)",
+                        background: "rgba(9,9,13,0.96)",
+                        color: "white",
+                        fontSize: 13,
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        transition: "all 0.2s",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: "9999px",
+                          overflow: "hidden",
+                          backgroundColor: "#020817",
+                          border: "1px solid rgba(148,163,253,0.26)",
+                        }}
+                      >
+                        <Image
+                          src={user?.user_metadata?.avatar_url || "/images/logo.png"}
+                          alt="User avatar"
+                          width={20}
+                          height={20}
+                          style={{ objectFit: "cover" }}
+                        />
+                      </div>
+                      <span
+                        className="vx-hide-mobile"
+                        style={{
+                          fontSize: 11,
+                          color: "#e5e7eb",
+                          maxWidth: 100,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {user.user_metadata?.full_name || "Player"}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={handleSignOut}
+                      aria-label="Sign out"
+                      className="vx-hide-mobile"
+                      style={{
+                        position: "relative",
+                        padding: "8px 18px",
+                        borderRadius: 12,
+                        border: "none",
+                        cursor: "pointer",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: "white",
+                        overflow: "hidden",
+                        background: "transparent",
+                        transition: "transform 0.2s",
+                      }}
+                    >
+                      <div
+                        className="animate-shimmer"
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          background: "linear-gradient(90deg,#ef4444,#f97316,#ef4444)",
+                        }}
+                      />
+                      <span style={{ position: "relative", zIndex: 10 }}>Sign Out</span>
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => handleSignIn()}
+                    aria-label="Sign in with Google"
+                    style={{
+                      position: "relative",
+                      padding: "8px 18px",
+                      borderRadius: 12,
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "white",
+                      overflow: "hidden",
+                      background: "transparent",
+                      transition: "transform 0.2s",
+                    }}
+                  >
+                    <div
+                      className="animate-shimmer"
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        background: "linear-gradient(90deg,#7c3aed,#d946ef,#7c3aed)",
+                      }}
+                    />
+                    <span style={{ position: "relative", zIndex: 10 }}>Sign in with Google</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Live Banner */}
+        <div className="vx-livebar">
+          <div className="vx-container">
+            <div className="vx-livebar-inner">
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <div
+                  className="animate-pulse-slow"
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "9999px",
+                    background: "#22c55e",
+                    boxShadow: "0 0 12px #22c55e, 0 0 24px rgba(34, 197, 94, 0.4)",
+                  }}
+                />
+                <span
+                  style={{
+                    color: "#22c55e",
+                    fontWeight: 700,
+                    fontSize: 15,
+                    textShadow: "0 0 20px rgba(34, 197, 94, 0.5)",
+                    letterSpacing: "0.1em",
+                  }}
+                >
+                  LIVE
+                </span>
+              </div>
+
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  color: "#cbd5e1",
+                }}
+              >
+                <Globe style={{ width: 14, height: 14, color: "#a78bfa" }} />
+                <span style={{ fontWeight: 700, color: "white" }}>{activePlayers.toLocaleString()}</span>
+                <span>players online</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Hero */}
+        <main className="vx-hero">
+          <div className="vx-container">
+            <div className="vx-hero-badge">
+              <Crown style={{ width: 16, height: 16, color: "#fbbf24" }} />
+              Skill-based quiz. £1,000 monthly prize
+              <Trophy style={{ width: 16, height: 16, color: "#fbbf24" }} />
+            </div>
+
+            <div style={{ textAlign: "center", marginBottom: 28 }}>
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  padding: "8px 18px",
+                  borderRadius: 10,
+                  background: "rgba(34, 197, 94, 0.1)",
+                  border: "1px solid rgba(34, 197, 94, 0.3)",
+                  fontSize: 13,
+                  color: "#4ade80",
+                  fontWeight: 600,
+                }}
+              >
+                <AlertCircle style={{ width: 15, height: 15 }} />
+                *Terms apply
+              </div>
+            </div>
+
+            <h1 className="vx-hero-title">
+              <span className="vx-hero-neon">The Next Generation Live Quiz</span>
+            </h1>
+
+            <p className="vx-hero-subtitle">Global skill-based quiz competition</p>
+
+            {/* Countdown */}
+            <div className="vx-countdown-panel">
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: -100,
+                  right: -100,
+                  height: 1.5,
+                  background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)",
+                }}
+              />
+
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 0,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: "80%",
+                  height: 40,
+                  background: "radial-gradient(ellipse, rgba(124, 58, 237, 0.15), transparent)",
+                  filter: "blur(20px)",
+                  pointerEvents: "none",
+                }}
+              />
+
+              <div style={{ position: "relative", zIndex: 10 }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: "#9ca3af",
+                    marginBottom: 12,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.15em",
+                    textAlign: "center",
+                  }}
+                >
+                  Next Round
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
                   <div
                     style={{
-                      position: "absolute",
-                      inset: 0,
-                      background: "linear-gradient(to right, #06b6d4, #22d3ee)",
-                      pointerEvents: "none",
+                      fontSize: 42,
+                      fontWeight: 800,
+                      color: "#ffffff",
+                      fontFamily: "ui-monospace, monospace",
+                      letterSpacing: "0.02em",
+                      textShadow: "0 2px 12px rgba(0, 0, 0, 0.6), 0 0 30px rgba(255, 255, 255, 0.1)",
+                      lineHeight: 1,
                     }}
-                  />
-                  <Gift
-                    style={{ position: "relative", zIndex: 10, width: 20, height: 20 }}
-                  />
-                  <span style={{ position: "relative", zIndex: 10 }}>Try Free Quiz</span>
-                  <ArrowRight
-                    style={{ position: "relative", zIndex: 10, width: 20, height: 20 }}
-                  />
-                </button>
-              </div>
+                  >
+                    {formatTime(globalTimeLeft)}
+                  </div>
+                </div>
 
-              <div className="vx-stats-grid">
-                {statsCards.map((stat, i) => (
-                  <StatCard key={i} {...stat} />
-                ))}
-              </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 7,
+                      padding: "6px 14px",
+                      borderRadius: 10,
+                      background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+                      boxShadow: "0 0 24px rgba(34, 197, 94, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3)",
+                      border: "1px solid rgba(255, 255, 255, 0.2)",
+                    }}
+                  >
+                    <div
+                      className="animate-pulse-slow"
+                      style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: "50%",
+                        background: "#ffffff",
+                        boxShadow: "0 0 10px #ffffff, 0 0 20px rgba(255, 255, 255, 0.5)",
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "#ffffff",
+                        letterSpacing: "0.1em",
+                        textShadow: "0 1px 2px rgba(0, 0, 0, 0.3)",
+                      }}
+                    >
+                      LIVE
+                    </span>
+                  </div>
+                </div>
 
-              <h2 className="vx-champions-title">
-                <Crown style={{ width: 24, height: 24, color: "#facc15" }} />
-                Top Champions
-              </h2>
-
-              <div className="vx-champions-grid">
-                {champions.map((champion, i) => (
-                  <ChampionCard key={i} champion={champion} />
-                ))}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    fontSize: 12,
+                    color: "#6b7280",
+                    fontWeight: 500,
+                  }}
+                >
+                  <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#22c55e" }} />
+                  <span style={{ color: "#ffffff", fontWeight: 600 }}>{activePlayers.toLocaleString()}</span>
+                  <span>players ready</span>
+                </div>
               </div>
+            </div>
+
+            {/* CTA Buttons */}
+            <div className="vx-cta-wrap">
+              <button
+                className="vx-cta-btn vx-cta-live"
+                onClick={handleStartLiveQuiz}
+                aria-label="Enter live arena with prizes"
+              >
+                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right,#7c3aed,#d946ef)", pointerEvents: "none" }} />
+                <Play style={{ position: "relative", zIndex: 10, width: 20, height: 20 }} />
+                <span style={{ position: "relative", zIndex: 10 }}>Enter Live Arena</span>
+                <ArrowRight style={{ position: "relative", zIndex: 10, width: 20, height: 20 }} />
+              </button>
+
+              <button
+                className="vx-cta-btn vx-cta-free"
+                onClick={handleStartFreeQuiz}
+                aria-label="Try free practice quiz"
+              >
+                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right,#06b6d4,#22d3ee)", pointerEvents: "none" }} />
+                <Gift style={{ position: "relative", zIndex: 10, width: 20, height: 20 }} />
+                <span style={{ position: "relative", zIndex: 10 }}>Try Free Quiz</span>
+                <ArrowRight style={{ position: "relative", zIndex: 10, width: 20, height: 20 }} />
+              </button>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="vx-stats-grid">
+              {statsCards.map((stat, i) => (
+                <StatCard key={i} {...stat} />
+              ))}
+            </div>
+
+            {/* Champions */}
+            <h2 className="vx-champions-title">
+              <Crown style={{ width: 24, height: 24, color: "#facc15" }} />
+              Top Champions
+            </h2>
+
+            <div className="vx-champions-grid">
+              {champions.map((champion, i) => (
+                <ChampionCard key={i} champion={champion} />
+              ))}
             </div>
           </div>
         </main>
 
+        {/* Trust Elements */}
         <div
           style={{
             borderTop: "1px solid rgba(255, 255, 255, 0.05)",
@@ -1548,15 +2218,7 @@ export default function HomePage() {
                 margin: "0 auto",
               }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: 16,
-                }}
-              >
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
                 <div
                   style={{
                     width: 40,
@@ -1571,37 +2233,11 @@ export default function HomePage() {
                 >
                   <CheckCircle style={{ width: 20, height: 20, color: "#22c55e" }} />
                 </div>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "#ffffff",
-                    textAlign: "center",
-                  }}
-                >
-                  SSL Encrypted
-                </div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: "#6b7280",
-                    textAlign: "center",
-                    fontWeight: 500,
-                  }}
-                >
-                  Bank-level security
-                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>SSL Encrypted</div>
+                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>Bank-level security</div>
               </div>
 
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: 16,
-                }}
-              >
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
                 <div
                   style={{
                     width: 40,
@@ -1616,37 +2252,11 @@ export default function HomePage() {
                 >
                   <ShoppingCart style={{ width: 20, height: 20, color: "#8b5cf6" }} />
                 </div>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "#ffffff",
-                    textAlign: "center",
-                  }}
-                >
-                  Stripe Verified
-                </div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: "#6b7280",
-                    textAlign: "center",
-                    fontWeight: 500,
-                  }}
-                >
-                  Secure payments
-                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>Stripe Verified</div>
+                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>Secure payments</div>
               </div>
 
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: 16,
-                }}
-              >
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
                 <div
                   style={{
                     width: 40,
@@ -1661,37 +2271,11 @@ export default function HomePage() {
                 >
                   <AlertCircle style={{ width: 20, height: 20, color: "#fbbf24" }} />
                 </div>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "#ffffff",
-                    textAlign: "center",
-                  }}
-                >
-                  18+ Only
-                </div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: "#6b7280",
-                    textAlign: "center",
-                    fontWeight: 500,
-                  }}
-                >
-                  Age verified
-                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>18+ Only</div>
+                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>Age verified</div>
               </div>
 
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: 16,
-                }}
-              >
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
                 <div
                   style={{
                     width: 40,
@@ -1706,32 +2290,71 @@ export default function HomePage() {
                 >
                   <Globe style={{ width: 20, height: 20, color: "#06b6d4" }} />
                 </div>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "#ffffff",
-                    textAlign: "center",
-                  }}
-                >
-                  Global Arena
-                </div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: "#6b7280",
-                    textAlign: "center",
-                    fontWeight: 500,
-                  }}
-                >
-                  Worldwide players
-                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>Global Arena</div>
+                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>Worldwide players</div>
               </div>
             </div>
           </div>
         </div>
 
-        <Footer />
+        {/* Footer */}
+        <footer className="vx-footer">
+          <div className="vx-container">
+            <div className="vx-footer-legal">
+              <strong style={{ color: "#94a3b8" }}>Educational Quiz Competition.</strong> 18+ only. This is a 100% skill-based
+              knowledge competition with no element of chance. Entry fees apply. Prize pool activates with 3000+ monthly participants.
+              See{" "}
+              <a href="/terms" style={{ color: "#a78bfa", textDecoration: "underline" }}>
+                Terms & Conditions
+              </a>{" "}
+              for full details.
+            </div>
+
+            <nav className="vx-footer-links" aria-label="Footer navigation">
+              <a href="/privacy">Privacy Policy</a>
+              <span className="vx-footer-divider" />
+              <a href="/terms">Terms & Conditions</a>
+              <span className="vx-footer-divider" />
+              <a href="/cookies">Cookie Policy</a>
+              <span className="vx-footer-divider" />
+              <a href="/how-it-works">How It Works</a>
+              <span className="vx-footer-divider" />
+              <a href="/rules">Quiz Rules</a>
+              <span className="vx-footer-divider" />
+              <a href="/complaints">Complaints</a>
+              <span className="vx-footer-divider" />
+              <a href="/refunds">Refund Policy</a>
+              <span className="vx-footer-divider" />
+              <a href="/about">About Us</a>
+              <span className="vx-footer-divider" />
+              <a href="/contact">Contact</a>
+              <span className="vx-footer-divider" />
+              <a href="/faq">FAQ</a>
+            </nav>
+
+            <div className="vx-footer-company">
+              <div style={{ marginBottom: 8, textAlign: "center" }}>© 2025 VibraXX. Operated by Sermin Limited (UK)</div>
+              <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8, textAlign: "center" }}>
+                Registered in England & Wales | All rights reserved
+              </div>
+              <div style={{ marginBottom: 10, textAlign: "center" }}>
+                <a
+                  href="mailto:team@vibraxx.com"
+                  style={{ color: "#a78bfa", textDecoration: "none", fontSize: 12, fontWeight: 600 }}
+                >
+                  team@vibraxx.com
+                </a>
+              </div>
+              <div style={{ fontSize: 11, textAlign: "center" }}>
+                Payment processing by{" "}
+                <a href="https://stripe.com" target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa", textDecoration: "none" }}>
+                  Stripe
+                </a>{" "}
+                | Secure SSL encryption | Skill-based competition - Not gambling
+              </div>
+            </div>
+          </div>
+        </footer>
       </div>
     </>
   );
