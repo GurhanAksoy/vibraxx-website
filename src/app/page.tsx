@@ -2157,7 +2157,13 @@ export default function HomePage() {
             <div className="vx-cta-wrap">
               <button
                 className="vx-cta-btn vx-cta-live"
-                onClick={handleStartLiveQuiz}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('[CLICK] Enter Live Arena CLICKED');
+                  window.location.href = '/lobby';
+                }}
                 aria-label="Enter live arena with prizes"
               >
                 <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right,#7c3aed,#d946ef)", pointerEvents: "none" }} />
