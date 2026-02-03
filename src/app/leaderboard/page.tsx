@@ -347,7 +347,7 @@ export default function LeaderboardPage() {
                   </div>
                   <div style={{ fontSize: "clamp(64px, 12vw, 96px)", marginBottom: "clamp(16px, 3vw, 24px)", position: "relative", zIndex: 1, animation: "float 3s ease-in-out infinite" }}>🎁</div>
                   <div style={{ fontSize: "clamp(48px, 10vw, 72px)", fontWeight: 900, background: "linear-gradient(90deg, #a78bfa, #f0abfc)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1, marginBottom: "12px", position: "relative", zIndex: 1 }}>{data?.prize.amount} Credits</div>
-                  <div style={{ fontSize: "clamp(14px, 3vw, 18px)", color: "#c4b5fd", fontWeight: 600, marginBottom: "clamp(16px, 3vw, 24px)", position: "relative", zIndex: 1" }}>{data?.prize.sublabel}</div>
+                  <div style={{ fontSize: "clamp(14px, 3vw, 18px)", color: "#c4b5fd", fontWeight: 600, marginBottom: "clamp(16px, 3vw, 24px)", position: "relative", zIndex: 1 }}>{data?.prize.sublabel}</div>
                   <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "10px 20px", borderRadius: "999px", background: "rgba(139,92,246,0.2)", border: "1px solid rgba(139,92,246,0.5)", fontSize: "clamp(11px, 2.2vw, 14px)", color: "#cbd5e1", position: "relative", zIndex: 1 }}>
                     <Clock style={{ width: "16px", height: "16px" }} />
                     <span>Resets in {data?.countdown.days}d {data?.countdown.hours}h {data?.countdown.minutes}m</span>
