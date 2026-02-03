@@ -590,7 +590,7 @@ export default function LobbyPage() {
                       alt="VibraXX"
                       fill
                       sizes="72px"
-                      style={{ objectFit: "contain" }}
+                      style={{ objectFit: "contain", padding: "18%" }}
                       priority
                     />
                   </div>
