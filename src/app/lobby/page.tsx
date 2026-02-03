@@ -1411,7 +1411,7 @@ export default function LobbyPage() {
                                   color: "#fca5a5",
                                 }}
                               >
-                                {player.streak}
+                                {player.streak ?? 0}
                               </span>
                             </div>
                           )}
@@ -1423,7 +1423,7 @@ export default function LobbyPage() {
                             fontWeight: 600,
                           }}
                         >
-                          🏆 {player.total_score.toLocaleString()} points
+                          🏆 {(player.total_score ?? 0).toLocaleString()} points
                         </div>
                       </div>
                     </div>
