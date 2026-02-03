@@ -8,7 +8,7 @@ import {
   Flame,
   Volume2,
   VolumeX,
-  ChevronLeft,
+  Home,
   Shield,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -32,11 +32,9 @@ interface LobbyStateData {
   round_id: number;
   seconds_to_start: number;
   user_joined: boolean;
-  can_join: boolean;
   join_block_reason: string | null;
   should_redirect_to_quiz: boolean;
   participants_count: number;
-  total_range: string;
   recent_players: LobbyPlayer[];
 }
 
@@ -52,6 +50,7 @@ export default function LobbyPage() {
   const [showWarning, setShowWarning] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const isRedirectingRef = useRef(false);
 
   // ─── Audio refs ───
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -66,9 +65,6 @@ export default function LobbyPage() {
 
   // ─── Derived ───
   const isUrgent = localSeconds !== null && localSeconds <= 10 && localSeconds > 0;
-  const progress = lobbyState && localSeconds !== null
-    ? ((lobbyState.seconds_to_start - Math.max(localSeconds, 0)) / lobbyState.seconds_to_start) * 100
-    : 0;
 
   // === AUDIO INITIALIZATION ===
   useEffect(() => {
@@ -160,23 +156,31 @@ export default function LobbyPage() {
       if (lastRoundIdRef.current && lastRoundIdRef.current !== state.round_id) {
         setShowWarning(false);
         setIsRedirecting(false);
+        isRedirectingRef.current = false;
         alarmFiredRef.current = false;
       }
       lastRoundIdRef.current = state.round_id;
 
       setLobbyState(state);
-      setLocalSeconds(state.seconds_to_start);
+
+      // localSeconds sadece ilk kez veya round değişince sıfırlanır
+      // polling her 5s gelir ama timer'ı sıfırlamaz
+      if (!lastRoundIdRef.current || lastRoundIdRef.current !== state.round_id) {
+        setLocalSeconds(state.seconds_to_start);
+      }
+
       setIsLoading(false);
 
       // Round started + user joined → quiz
-      if (state.should_redirect_to_quiz && !isRedirecting) {
+      if (state.should_redirect_to_quiz && !isRedirectingRef.current) {
+        isRedirectingRef.current = true;
         setIsRedirecting(true);
         router.push("/quiz");
       }
     } catch (err) {
       console.error("[Lobby] RPC error:", err);
     }
-  }, [router, isRedirecting]);
+  }, [router]);
 
   // ─── Initial fetch + polling every 5s ───
   useEffect(() => {
@@ -239,11 +243,16 @@ export default function LobbyPage() {
 
     const joinAndGo = async () => {
       setIsRedirecting(true);
-      try {
-        await supabase.rpc("join_live_round", { p_round_id: lobbyState.round_id });
-      } catch (e) {
-        console.error("[Lobby] join_live_round failed:", e);
+
+      // Zaten joined ise sadece redirect — RPC çağırma
+      if (!lobbyState.user_joined) {
+        try {
+          await supabase.rpc("join_live_round", { p_round_id: lobbyState.round_id });
+        } catch (e) {
+          console.error("[Lobby] join_live_round failed:", e);
+        }
       }
+
       router.push("/quiz");
     };
 
@@ -310,7 +319,6 @@ export default function LobbyPage() {
                 fill
                 sizes="120px"
                 style={{ objectFit: "contain", padding: "8px" }}
-                priority
               />
             </div>
           </div>
@@ -343,20 +351,6 @@ export default function LobbyPage() {
   return (
     <>
       <style jsx global>{`
-        @keyframes pulse-ring {
-          0% {
-            transform: scale(0.95);
-            opacity: 1;
-          }
-          50% {
-            transform: scale(1);
-            opacity: 0.7;
-          }
-          100% {
-            transform: scale(0.95);
-            opacity: 1;
-          }
-        }
         @keyframes float {
           0%,
           100% {
@@ -392,19 +386,6 @@ export default function LobbyPage() {
             opacity: 1;
           }
         }
-        @keyframes neonPulse {
-          0%,
-          100% {
-            box-shadow: 0 0 20px rgba(139, 92, 246, 0.6),
-              0 0 40px rgba(139, 92, 246, 0.4),
-              inset 0 0 20px rgba(139, 92, 246, 0.2);
-          }
-          50% {
-            box-shadow: 0 0 30px rgba(217, 70, 239, 0.9),
-              0 0 60px rgba(217, 70, 239, 0.6),
-              inset 0 0 30px rgba(217, 70, 239, 0.3);
-          }
-        }
         @keyframes redAlarm {
           0%,
           100% {
@@ -426,10 +407,10 @@ export default function LobbyPage() {
             transform: translateX(0) rotate(0deg);
           }
           25% {
-            transform: translateX(-10px) rotate(-2deg);
+            transform: translateX(-4px) rotate(-1deg);
           }
           75% {
-            transform: translateX(10px) rotate(2deg);
+            transform: translateX(4px) rotate(1deg);
           }
         }
         @keyframes warningPulse {
@@ -439,23 +420,28 @@ export default function LobbyPage() {
             opacity: 1;
           }
           50% {
-            transform: scale(1.08);
+            transform: scale(1.03);
             opacity: 0.9;
           }
         }
-        @keyframes glowPulse {
+        @keyframes redPulse {
           0%,
           100% {
-            filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.6));
+            box-shadow: 0 0 40px rgba(239, 68, 68, 0.8),
+              0 0 80px rgba(239, 68, 68, 0.5);
           }
           50% {
-            filter: drop-shadow(0 0 20px rgba(251, 191, 36, 1));
+            box-shadow: 0 0 60px rgba(220, 38, 38, 1),
+              0 0 100px rgba(220, 38, 38, 0.7);
           }
         }
-
         .animate-slide-in {
           animation: slideIn 0.5s ease-out forwards;
           opacity: 0;
+        }
+
+        .animate-float {
+          animation: float 6s ease-in-out infinite;
         }
 
         * {
@@ -464,8 +450,11 @@ export default function LobbyPage() {
           padding: 0;
         }
 
+        html,
         body {
           overflow-x: hidden;
+          width: 100%;
+          max-width: 100vw;
         }
       `}</style>
 
@@ -553,31 +542,28 @@ export default function LobbyPage() {
                 justifyContent: "space-between",
               }}
             >
-              {/* Left: Logo + Chevron → Ana Sayfa */}
-              <button
-                onClick={() => router.push("/")}
+              {/* Left: Logo + Home Button */}
+              <div
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: "12px",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: 0,
+                  gap: "10px",
                   zIndex: 21,
                 }}
               >
-                {/* Logo — homepage ile EXACT AYNI */}
+                {/* Logo */}
                 <div
+                  onClick={() => router.push("/")}
                   style={{
                     position: "relative",
-                    width: "clamp(52px, 14vw, 80px)",
-                    height: "clamp(52px, 14vw, 80px)",
+                    width: "clamp(48px, 13vw, 72px)",
+                    height: "clamp(48px, 13vw, 72px)",
                     borderRadius: "9999px",
                     padding: 4,
                     background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)",
                     boxShadow: "0 0 30px rgba(124,58,237,0.6)",
                     flexShrink: 0,
+                    cursor: "pointer",
                   }}
                 >
                   <div
@@ -615,54 +601,20 @@ export default function LobbyPage() {
                   </div>
                 </div>
 
-                {/* Mobile brand label — sadece ≤640px'de görünür */}
-                <div
-                  className="show-on-small"
+                {/* Home Button */}
+                <button
+                  type="button"
+                  onClick={() => router.push("/")}
                   style={{
-                    display: "none",
-                    flexDirection: "column",
-                    gap: 1,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 800,
-                      backgroundImage: "linear-gradient(135deg, #a78bfa, #f0abfc)",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      backgroundClip: "text",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                      lineHeight: 1.1,
-                    }}
-                  >
-                    VibraXX
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 9,
-                      color: "#64748b",
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.1em",
-                    }}
-                  >
-                    Live Lobby
-                  </span>
-                </div>
-
-                {/* Chevron Icon */}
-                <div
-                  style={{
-                    width: "clamp(28px, 8vw, 34px)",
-                    height: "clamp(28px, 8vw, 34px)",
+                    width: "clamp(34px, 9vw, 38px)",
+                    height: "clamp(34px, 9vw, 38px)",
                     borderRadius: "12px",
                     border: "1px solid rgba(139, 92, 246, 0.3)",
                     background: "rgba(15, 23, 42, 0.85)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    cursor: "pointer",
                     transition: "all 0.25s",
                     boxShadow: "0 0 10px rgba(139, 92, 246, 0.15)",
                   }}
@@ -670,18 +622,16 @@ export default function LobbyPage() {
                     e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
                     e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.6)";
                     e.currentTarget.style.boxShadow = "0 0 18px rgba(139, 92, 246, 0.4)";
-                    e.currentTarget.style.transform = "translateX(-3px)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = "rgba(15, 23, 42, 0.85)";
                     e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.3)";
                     e.currentTarget.style.boxShadow = "0 0 10px rgba(139, 92, 246, 0.15)";
-                    e.currentTarget.style.transform = "translateX(0)";
                   }}
                 >
-                  <ChevronLeft style={{ width: 18, height: 18, color: "#a78bfa" }} />
-                </div>
-              </button>
+                  <Home style={{ width: 17, height: 17, color: "#a78bfa" }} />
+                </button>
+              </div>
 
               {/* Right: Sound Toggle */}
               <button
@@ -713,18 +663,16 @@ export default function LobbyPage() {
               </button>
             </div>
 
-            {/* Center: Logo + GLOBAL ARENA Text */}
+            {/* Center: GLOBAL ARENA — her zaman ortalı */}
             <div
-              className="hide-on-small"
               style={{
                 position: "absolute",
                 left: "50%",
                 top: "50%",
                 transform: "translate(-50%, -50%)",
                 zIndex: 20,
-                display: "flex",
-                alignItems: "center",
-                gap: "clamp(12px, 3vw, 16px)",
+                textAlign: "center",
+                pointerEvents: "none",
               }}
             >
               {/* GLOBAL ARENA Text */}
@@ -740,7 +688,6 @@ export default function LobbyPage() {
                     textTransform: "uppercase",
                     letterSpacing: "0.08em",
                     lineHeight: 1.2,
-                    textShadow: "0 0 20px rgba(167, 139, 250, 0.5)",
                   }}
                 >
                   GLOBAL ARENA
@@ -827,7 +774,6 @@ export default function LobbyPage() {
                   objectFit: "contain",
                   padding: "clamp(12px, 3vw, 20px)",
                 }}
-                priority
                 onError={(e) => {
                   const img = e.currentTarget;
                   const container = img.parentElement as HTMLDivElement;
@@ -884,7 +830,6 @@ export default function LobbyPage() {
                   WebkitTextFillColor: "transparent",
                   backgroundClip: "text",
                   marginBottom: "8px",
-                  textShadow: "0 0 30px rgba(251, 191, 36, 0.4)",
                 }}
               >
                 Your Brand Here
@@ -1020,7 +965,7 @@ export default function LobbyPage() {
             {/* Countdown Section */}
             <div
               style={{
-                padding: "clamp(32px, 6vw, 56px)",
+                padding: "clamp(20px, 6vw, 56px)",
                 borderRadius: "28px",
                 border:
                   isUrgent
@@ -1048,7 +993,7 @@ export default function LobbyPage() {
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "10px",
-                  padding: "10px 24px",
+                  padding: "clamp(8px, 2vw, 10px) clamp(14px, 4vw, 24px)",
                   borderRadius: "999px",
                   background:
                     isUrgent
@@ -1103,7 +1048,7 @@ export default function LobbyPage() {
                       "linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(220, 38, 38, 0.2))",
                     border: "3px solid #ef4444",
                     marginBottom: "clamp(20px, 4vw, 32px)",
-                    animation: "neonPulse 0.6s ease-in-out infinite",
+                    animation: "redPulse 0.6s ease-in-out infinite",
                     boxShadow: "0 0 40px rgba(239, 68, 68, 0.8)",
                   }}
                 >
@@ -1167,10 +1112,6 @@ export default function LobbyPage() {
                   backgroundClip: "text",
                   marginBottom: "clamp(24px, 5vw, 40px)",
                   fontFamily: "monospace",
-                  textShadow:
-                    isUrgent
-                      ? "0 0 50px rgba(239, 68, 68, 0.8)"
-                      : "0 0 50px rgba(167, 139, 250, 0.6)",
                   animation:
                     isUrgent
                       ? "warningPulse 0.4s ease-in-out infinite"
@@ -1179,43 +1120,6 @@ export default function LobbyPage() {
                 }}
               >
                 {localSeconds !== null ? formatTime(localSeconds) : "--:--"}
-              </div>
-
-              {/* Progress Bar */}
-              <div
-                style={{
-                  width: "100%",
-                  height: "14px",
-                  borderRadius: "999px",
-                  background: "rgba(30, 41, 59, 0.9)",
-                  overflow: "hidden",
-                  marginBottom: "clamp(24px, 5vw, 40px)",
-                  border:
-                    isUrgent
-                      ? "2px solid rgba(239, 68, 68, 0.5)"
-                      : "2px solid rgba(139, 92, 246, 0.4)",
-                  boxShadow:
-                    isUrgent
-                      ? "0 0 20px rgba(239, 68, 68, 0.5), inset 0 0 10px rgba(239, 68, 68, 0.3)"
-                      : "0 0 15px rgba(139, 92, 246, 0.4)",
-                }}
-              >
-                <div
-                  style={{
-                    width: `${Math.min(progress, 100)}%`,
-                    height: "100%",
-                    background:
-                      isUrgent
-                        ? "linear-gradient(90deg, #ef4444, #dc2626)"
-                        : "linear-gradient(90deg, #7c3aed, #d946ef)",
-                    borderRadius: "999px",
-                    transition: "width 1s linear",
-                    boxShadow:
-                      isUrgent
-                        ? "0 0 25px rgba(239, 68, 68, 1)"
-                        : "0 0 25px rgba(139, 92, 246, 0.9)",
-                  }}
-                />
               </div>
 
               {/* Info Message */}
@@ -1240,7 +1144,7 @@ export default function LobbyPage() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
                   gap: "clamp(14px, 3.5vw, 20px)",
                   maxWidth: "900px",
                   margin: "0 auto",
@@ -1440,7 +1344,7 @@ export default function LobbyPage() {
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.background = "rgba(139, 92, 246, 0.1)";
-                        e.currentTarget.style.transform = "translateX(8px)";
+                        e.currentTarget.style.transform = "translateX(4px)";
                         e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.4)";
                       }}
                       onMouseLeave={(e) => {
@@ -1544,33 +1448,6 @@ export default function LobbyPage() {
                 )}
               </div>
 
-              {/* Total Players Info */}
-              <div
-                style={{
-                  marginTop: "clamp(15px, 3.4vw, 21px)",
-                  padding: "clamp(12px, 3vw, 16px)",
-                  borderRadius: "16px",
-                  background:
-                    "linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(217, 70, 239, 0.1))",
-                  border: "2px solid rgba(139, 92, 246, 0.3)",
-                  textAlign: "center",
-                  boxShadow: "0 0 20px rgba(139, 92, 246, 0.25)",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "clamp(12px, 2.4vw, 14px)",
-                    color: "#cbd5e1",
-                    fontWeight: 600,
-                  }}
-                >
-                  🌍{" "}
-                  <strong style={{ color: "#c4b5fd", fontWeight: 800 }}>
-                    {lobbyState?.total_range ?? "0"}
-                  </strong>{" "}
-                  players in this round
-                </div>
-              </div>
             </div>
           </div>
         </main>
@@ -1584,21 +1461,8 @@ export default function LobbyPage() {
         }
 
         @media (max-width: 640px) {
-          .hide-on-small {
-            display: none !important;
-          }
-          .show-on-small {
-            display: flex !important;
-          }
-
           header > div {
             position: relative !important;
-          }
-        }
-
-        @media (max-width: 899px) {
-          .hide-mobile {
-            display: none !important;
           }
         }
 
