@@ -1,470 +1,341 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, memo } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Users,
   Clock,
   Sparkles,
+  Flame,
   Volume2,
   VolumeX,
-  ArrowLeft,
-  Trophy,
-  Globe,
-  Play,
-  Flame,
-  User,
-  BarChart3,
-  ShoppingCart,
+  ChevronLeft,
+  Shield,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
-import Footer from "@/components/Footer";
+import Image from "next/image";
 
-// ============================================
-// CANONICAL CONSTANTS
-// ============================================
-const BLOCK_REASONS = {
-  NOT_AUTHENTICATED: "not_authenticated",
-  NO_CREDITS: "no_credits",
-  NOT_AGE_VERIFIED: "not_age_verified",
-  ALREADY_JOINED: "already_joined",
-} as const;
-
-const PAGE_TYPE = "lobby" as const;
-const URGENT_THRESHOLD = 30; // seconds
-
-// ============================================
-// TYPES
-// ============================================
-interface RoundInfo {
-  round_id: bigint;
-  status: "scheduled" | "live";
-  scheduled_start: string;
-  started_at: string | null;
-}
-
-interface UserLobbyState {
-  live_credits: number;
-  age_verified: boolean;
-  already_joined: boolean;
-}
-
-interface RecentPlayer {
+interface LobbyPlayer {
   user_id: string;
   full_name: string;
-  joined_at: string;
-}
-
-interface CanonicalLobbyState {
-  // Auth
-  isAuthenticated: boolean;
-  userId: string | null;
-
-  // Round info
-  roundId: bigint | null;
-  roundStatus: "scheduled" | "live" | null;
-  
-  // Countdown
-  secondsToStart: number;
-  isUrgent: boolean;
-  
-  // User state
-  liveCredits: number;
-  ageVerified: boolean;
-  userJoined: boolean;
-  canJoin: boolean;
-  joinBlockReason: string | null;
-  
-  // Participants
-  participantsCount: number;
-  spectatorsCount: number;
-  totalRange: string;
-  recentPlayers: RecentPlayer[];
-  
-  // Redirects
-  shouldRedirectToQuiz: boolean;
+  avatar_url: string;
+  total_score: number;
+  streak: number;
 }
 
 // ============================================
-// CANONICAL LOBBY STATE HOOK
+// LOBBY STATE — get_lobby_state RPC shape
 // ============================================
-function useCanonicalLobbyState() {
-  const [state, setState] = useState<CanonicalLobbyState | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
-
-  const loadState = useCallback(async (): Promise<CanonicalLobbyState | null> => {
-    try {
-      // ✅ CANONICAL: Single RPC call - Backend decides everything
-      const { data: lobbyState, error } = await supabase.rpc("get_lobby_state");
-
-      if (error) {
-        console.error("[CanonicalLobby] RPC error:", error);
-        
-        // Handle specific error types
-        if (lobbyState?.requires_auth) {
-          setHasError(true);
-          return null;
-        }
-        if (lobbyState?.no_round) {
-          console.warn("[CanonicalLobby] No scheduled round");
-          setHasError(true);
-          return null;
-        }
-        
-        throw error;
-      }
-
-      // Get userId for local state
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || null;
-
-      const canonicalState: CanonicalLobbyState = {
-        isAuthenticated: !lobbyState.requires_auth,
-        userId,
-        roundId: lobbyState.round_id,
-        roundStatus: lobbyState.round_status,
-        secondsToStart: lobbyState.seconds_to_start,
-        isUrgent: lobbyState.is_urgent,
-        liveCredits: lobbyState.user_credits,
-        ageVerified: true, // Backend already checked in can_join
-        userJoined: lobbyState.user_joined,
-        canJoin: lobbyState.can_join,
-        joinBlockReason: lobbyState.join_block_reason,
-        participantsCount: lobbyState.participants_count,
-        spectatorsCount: lobbyState.spectators_count,
-        totalRange: lobbyState.total_range,
-        recentPlayers: (lobbyState.recent_players || []) as RecentPlayer[],
-        shouldRedirectToQuiz: lobbyState.should_redirect_to_quiz,
-      };
-
-      setState(canonicalState);
-      setHasError(false);
-      return canonicalState;
-    } catch (err) {
-      console.error("[CanonicalLobby] Error loading state:", err);
-      setHasError(true);
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadState();
-    const interval = setInterval(loadState, 5000); // Canonical: 5 seconds
-    return () => clearInterval(interval);
-  }, [loadState]);
-
-  return { state, isLoading, hasError, refresh: loadState };
+interface LobbyStateData {
+  requires_auth: boolean;
+  no_round: boolean;
+  round_id: number;
+  seconds_to_start: number;
+  user_joined: boolean;
+  can_join: boolean;
+  join_block_reason: string | null;
+  should_redirect_to_quiz: boolean;
+  participants_count: number;
+  total_range: string;
+  recent_players: LobbyPlayer[];
 }
 
-// ============================================
-// PRESENCE HOOK
-// ============================================
-function usePresence(pageType: string, roundId: bigint | null) {
-  const sessionIdRef = useRef<string | undefined>(undefined);
+export default function LobbyPage() {
+  const router = useRouter();
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!roundId) return;
+  // ─── Canonical State (get_lobby_state) ───
+  const [lobbyState, setLobbyState] = useState<LobbyStateData | null>(null);
+  const [localSeconds, setLocalSeconds] = useState<number | null>(null);
 
-    if (!sessionIdRef.current) {
-      const stored = sessionStorage.getItem("presence_session_id");
-      if (stored) {
-        sessionIdRef.current = stored;
-      } else {
-        sessionIdRef.current = crypto.randomUUID();
-        sessionStorage.setItem("presence_session_id", sessionIdRef.current);
-      }
-    }
-
-    const sendHeartbeat = async () => {
-      try {
-        await supabase.rpc("update_presence", {
-          p_session_id: sessionIdRef.current,
-          p_page_type: pageType,
-          p_round_id: roundId,
-        });
-      } catch (err) {
-        console.error("Presence heartbeat failed:", err);
-      }
-    };
-
-    sendHeartbeat();
-    const interval = setInterval(sendHeartbeat, 20000); // Canonical: 20 seconds
-
-    return () => clearInterval(interval);
-  }, [pageType, roundId]);
-}
-
-// ============================================
-// DETERMINISTIC AUDIO CONTROLLER
-// ============================================
-function useAudioController(isUrgent: boolean, shouldRedirect: boolean) {
+  // ─── UI State ───
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showWarning, setShowWarning] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
+  // ─── Audio refs ───
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const alarmRef = useRef<HTMLAudioElement | null>(null);
-  const beepRef = useRef<HTMLAudioElement | null>(null);
+  const countdownBeepRef = useRef<HTMLAudioElement | null>(null);
   const hasInteractedRef = useRef(false);
-  const lastAlarmPlayedRef = useRef(false);
-  const lastBeepPlayedRef = useRef(false);
+  const alarmFiredRef = useRef(false);
+  const mountedRef = useRef(true);
 
+  // ─── Round change detection ───
+  const lastRoundIdRef = useRef<number | null>(null);
+
+  // ─── Derived ───
+  const isUrgent = localSeconds !== null && localSeconds <= 10 && localSeconds > 0;
+  const progress = lobbyState && localSeconds !== null
+    ? ((lobbyState.seconds_to_start - Math.max(localSeconds, 0)) / lobbyState.seconds_to_start) * 100
+    : 0;
+
+  // === AUDIO INITIALIZATION ===
   useEffect(() => {
+    mountedRef.current = true;
     if (typeof window === "undefined") return;
 
-    const handleFirstInteraction = () => {
-      if (hasInteractedRef.current) return;
-      hasInteractedRef.current = true;
+    const audio = new Audio("/sounds/vibraxx.mp3");
+    audio.loop = true;
+    audioRef.current = audio;
 
-      if (!audioRef.current) {
-        audioRef.current = new Audio("/audio/vibraxx.mp3");
-        audioRef.current.loop = true;
-        audioRef.current.volume = 0.3;
+    alarmRef.current = new Audio("/sounds/alarm.mp3");
+    countdownBeepRef.current = new Audio("/sounds/countdown.mp3");
+
+    return () => {
+      mountedRef.current = false;
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
       }
-
-      if (!alarmRef.current) {
-        alarmRef.current = new Audio("/audio/alarm.mp3");
-        alarmRef.current.volume = 0.6;
+      if (alarmRef.current) {
+        alarmRef.current.pause();
+        alarmRef.current = null;
       }
-
-      if (!beepRef.current) {
-        beepRef.current = new Audio("/audio/beep.mp3");
-        beepRef.current.volume = 0.5;
+      if (countdownBeepRef.current) {
+        countdownBeepRef.current.pause();
+        countdownBeepRef.current = null;
       }
-
-      audioRef.current.play().catch(() => {});
-      setIsPlaying(true);
     };
-
-    document.addEventListener("click", handleFirstInteraction, { once: true });
-    return () => document.removeEventListener("click", handleFirstInteraction);
   }, []);
 
+  // === CLICK ANYWHERE TO PLAY MUSIC ===
   useEffect(() => {
-    if (!hasInteractedRef.current) return;
+    const handleFirstClick = () => {
+      if (!hasInteractedRef.current) {
+        hasInteractedRef.current = true;
+        setIsPlaying(true);
+        if (audioRef.current) {
+          audioRef.current.play().catch(() => {});
+        }
+      }
+    };
 
-    if (isUrgent && !lastAlarmPlayedRef.current) {
-      alarmRef.current?.play().catch(() => {});
-      lastAlarmPlayedRef.current = true;
-    } else if (!isUrgent) {
-      lastAlarmPlayedRef.current = false;
-    }
-  }, [isUrgent]);
+    document.addEventListener("click", handleFirstClick, { once: true });
 
+    return () => {
+      document.removeEventListener("click", handleFirstClick);
+    };
+  }, []);
+
+  // === PLAY / PAUSE CONTROL ===
   useEffect(() => {
-    if (!hasInteractedRef.current) return;
-
-    if (shouldRedirect && !lastBeepPlayedRef.current) {
-      beepRef.current?.play().catch(() => {});
-      lastBeepPlayedRef.current = true;
-    }
-  }, [shouldRedirect]);
-
-  const toggleMusic = useCallback(() => {
     if (!audioRef.current) return;
-
     if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
       audioRef.current.play().catch(() => {});
-      setIsPlaying(true);
+    } else {
+      audioRef.current.pause();
     }
   }, [isPlaying]);
 
-  return { isPlaying, toggleMusic };
-}
-
-// ============================================
-// UI COMPONENTS
-// ============================================
-const PlayerCard = memo(
-  ({ player, index }: { player: RecentPlayer; index: number }) => (
-    <div
-      style={{
-        padding: 16,
-        borderRadius: 12,
-        background: "rgba(139, 92, 246, 0.05)",
-        border: "1px solid rgba(139, 92, 246, 0.2)",
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        animation: `slideIn 0.3s ease-out ${index * 0.05}s backwards`,
-      }}
-    >
-      <div
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: "50%",
-          background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "white",
-          fontWeight: 700,
-          fontSize: 14,
-        }}
-      >
-        {player.full_name.charAt(0).toUpperCase()}
-      </div>
-      <div style={{ flex: 1 }}>
-        <div
-          style={{
-            fontSize: 14,
-            fontWeight: 600,
-            color: "#ffffff",
-            marginBottom: 2,
-          }}
-        >
-          {player.full_name}
-        </div>
-        <div style={{ fontSize: 11, color: "#6b7280" }}>
-          Joined {new Date(player.joined_at).toLocaleTimeString()}
-        </div>
-      </div>
-      <Trophy style={{ width: 18, height: 18, color: "#fbbf24" }} />
-    </div>
-  )
-);
-PlayerCard.displayName = "PlayerCard";
-
-// ============================================
-// MAIN COMPONENT
-// ============================================
-export default function LobbyPage() {
-  const router = useRouter();
-  const { state, isLoading, hasError, refresh } = useCanonicalLobbyState();
-  usePresence(PAGE_TYPE, state?.roundId || null);
-
-  const { isPlaying, toggleMusic } = useAudioController(
-    state?.isUrgent || false,
-    state?.shouldRedirectToQuiz || false
-  );
-
-  const [countdownSeconds, setCountdownSeconds] = useState(0);
-
-  // Countdown timer
-  useEffect(() => {
-    if (!state) return;
-    setCountdownSeconds(state.secondsToStart);
-
-    const interval = setInterval(() => {
-      setCountdownSeconds((prev) => Math.max(0, prev - 1));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [state?.secondsToStart]);
-
-  // Auto-redirect when quiz starts
-  useEffect(() => {
-    if (state?.shouldRedirectToQuiz) {
-      setTimeout(() => router.push("/quiz"), 2000);
-    }
-  }, [state?.shouldRedirectToQuiz, router]);
-
-  const handleJoinRound = useCallback(async () => {
-    if (!state || !state.canJoin) return;
-
+  // ============================================
+  // FETCH LOBBY STATE — tek source (canonical)
+  // ============================================
+  const fetchLobbyState = useCallback(async () => {
     try {
-      const { data, error } = await supabase.rpc("join_live_round", {
-        p_round_id: state.roundId,
-      });
+      const { data, error } = await supabase.rpc("get_lobby_state");
+      if (error || !data || !mountedRef.current) return;
 
-      if (error) throw error;
+      const state = data as LobbyStateData;
 
-      const result = data as { success: boolean; error?: string };
-      if (!result.success) {
-        alert(result.error || "Failed to join round");
+      // Auth guard → home
+      if (state.requires_auth) {
+        router.push("/");
         return;
       }
 
-      await refresh();
+      // No round → home
+      if (state.no_round) {
+        router.push("/");
+        return;
+      }
+
+      // No credits + not joined → buy
+      if (state.join_block_reason === "no_credits" && !state.user_joined) {
+        router.push("/buy");
+        return;
+      }
+
+      // Round changed → reset UI
+      if (lastRoundIdRef.current && lastRoundIdRef.current !== state.round_id) {
+        setShowWarning(false);
+        setIsRedirecting(false);
+        alarmFiredRef.current = false;
+      }
+      lastRoundIdRef.current = state.round_id;
+
+      setLobbyState(state);
+      setLocalSeconds(state.seconds_to_start);
+      setIsLoading(false);
+
+      // Round started + user joined → quiz
+      if (state.should_redirect_to_quiz && !isRedirecting) {
+        setIsRedirecting(true);
+        router.push("/quiz");
+      }
     } catch (err) {
-      console.error("Join round error:", err);
-      alert("Failed to join round. Please try again.");
+      console.error("[Lobby] RPC error:", err);
     }
-  }, [state, refresh]);
+  }, [router, isRedirecting]);
 
-  const handleSignOut = useCallback(async () => {
-    await supabase.auth.signOut();
-    router.push("/");
-  }, [router]);
+  // ─── Initial fetch + polling every 5s ───
+  useEffect(() => {
+    fetchLobbyState();
+    const interval = setInterval(fetchLobbyState, 5000);
+    return () => clearInterval(interval);
+  }, [fetchLobbyState]);
 
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  // ============================================
+  // LOCAL TICK (1s) — senkro korunur
+  // ============================================
+  useEffect(() => {
+    if (localSeconds === null) return;
+
+    const tick = setInterval(() => {
+      if (!mountedRef.current) return;
+      setLocalSeconds((prev) => {
+        if (prev === null) return null;
+        const next = prev - 1;
+        if (next <= 0) {
+          clearInterval(tick);
+          return 0;
+        }
+        return next;
+      });
+    }, 1000);
+
+    return () => clearInterval(tick);
+  }, [lobbyState?.round_id]); // round değişince yeni tick
+
+  // === WARNING & SOUND EFFECTS ===
+  useEffect(() => {
+    if (localSeconds === null) return;
+
+    if (localSeconds === 10) {
+      setShowWarning(true);
+      if (isPlaying && alarmRef.current && !alarmFiredRef.current) {
+        alarmFiredRef.current = true;
+        alarmRef.current.currentTime = 0;
+        alarmRef.current.play().catch(() => {});
+      }
+    }
+
+    if (localSeconds <= 10 && localSeconds > 0) {
+      if (isPlaying && countdownBeepRef.current) {
+        countdownBeepRef.current.currentTime = 0;
+        countdownBeepRef.current.play().catch(() => {});
+      }
+    }
+
+    if (localSeconds > 10) {
+      setShowWarning(false);
+      alarmFiredRef.current = false;
+    }
+  }, [localSeconds, isPlaying]);
+
+  // === AUTO-JOIN + REDIRECT — countdown 0 ===
+  useEffect(() => {
+    if (localSeconds !== 0 || isRedirecting || !lobbyState) return;
+
+    const joinAndGo = async () => {
+      setIsRedirecting(true);
+      try {
+        await supabase.rpc("join_live_round", { p_round_id: lobbyState.round_id });
+      } catch (e) {
+        console.error("[Lobby] join_live_round failed:", e);
+      }
+      router.push("/quiz");
+    };
+
+    joinAndGo();
+  }, [localSeconds, isRedirecting, lobbyState, router]);
+
+  // === WARNING HELPERS ===
+  const getWarningMessage = () => {
+    if (localSeconds !== null && localSeconds <= 3) return "🚀 QUIZ STARTING NOW!";
+    if (localSeconds !== null && localSeconds <= 5) return "⚡ GET READY!";
+    if (localSeconds !== null && localSeconds <= 10) return "⏰ FINAL COUNTDOWN!";
+    return "Quiz Starting Soon";
   };
 
+  // === FORMAT MM:SS ===
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  };
+
+  // === LOADING STATE ===
   if (isLoading) {
     return (
       <div
         style={{
           minHeight: "100vh",
+          background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+          color: "white",
         }}
       >
-        <div
-          style={{
-            fontSize: 18,
-            fontWeight: 600,
-            color: "#ffffff",
-            animation: "pulse 2s ease-in-out infinite",
-          }}
-        >
-          Loading lobby...
+        <div style={{ textAlign: "center" }}>
+          <div
+            style={{
+              width: 120,
+              height: 120,
+              margin: "0 auto 24px",
+              position: "relative",
+              borderRadius: "50%",
+              padding: 4,
+              background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+              boxShadow: "0 0 40px rgba(124, 58, 237, 0.7)",
+            }}
+          >
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                height: "100%",
+                borderRadius: "50%",
+                backgroundColor: "#020817",
+                overflow: "hidden",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Image
+                src="/images/logo.png"
+                alt="VibraXX"
+                fill
+                sizes="120px"
+                style={{ objectFit: "contain", padding: "8px" }}
+                priority
+              />
+            </div>
+          </div>
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              margin: "0 auto 20px",
+              border: "4px solid rgba(139, 92, 246, 0.3)",
+              borderTop: "4px solid #a78bfa",
+              borderRadius: "50%",
+              animation: "spin 1s linear infinite",
+            }}
+          />
+          <p style={{ fontSize: 18, color: "#94a3b8", fontWeight: 600 }}>
+            Loading Premium Lobby...
+          </p>
         </div>
-      </div>
-    );
-  }
-
-  if (hasError || !state) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
-          padding: 20,
-        }}
-      >
-        <div
-          style={{
-            fontSize: 24,
-            fontWeight: 700,
-            color: "#ef4444",
-            marginBottom: 16,
-          }}
-        >
-          No Active Round
-        </div>
-        <div style={{ fontSize: 16, color: "#94a3b8", marginBottom: 32 }}>
-          Please wait for the next round to start.
-        </div>
-        <button
-          onClick={() => router.push("/")}
-          style={{
-            padding: "12px 24px",
-            borderRadius: 10,
-            border: "none",
-            background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-            color: "white",
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: "pointer",
-          }}
-        >
-          Back to Home
-        </button>
+        <style jsx>{`
+          @keyframes spin {
+            to {
+              transform: rotate(360deg);
+            }
+          }
+        `}</style>
       </div>
     );
   }
@@ -472,779 +343,1292 @@ export default function LobbyPage() {
   return (
     <>
       <style jsx global>{`
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
-
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-          background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-          color: #ffffff;
-          overflow-x: hidden;
-        }
-
-        .vx-container {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 0 20px;
-        }
-
-        .vx-header {
-          position: sticky;
-          top: 0;
-          z-index: 100;
-          background: rgba(15, 23, 42, 0.95);
-          backdrop-filter: blur(12px);
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-          padding: 16px 0;
-        }
-
-        .vx-header-inner {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 16px;
-        }
-
-        .vx-header-right {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          flex-wrap: wrap;
-        }
-
-        .vx-hide-mobile {
-          display: flex;
-        }
-
-        @media (max-width: 768px) {
-          .vx-header-inner {
-            flex-wrap: wrap;
-          }
-
-          .vx-header-right {
-            width: 100%;
-            justify-content: space-between;
-          }
-
-          .vx-hide-mobile {
-            display: none;
-          }
-        }
-
-        @keyframes pulse {
-          0%,
-          100% {
+        @keyframes pulse-ring {
+          0% {
+            transform: scale(0.95);
             opacity: 1;
           }
           50% {
-            opacity: 0.5;
+            transform: scale(1);
+            opacity: 0.7;
           }
-        }
-
-        @keyframes slideIn {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
+          100% {
+            transform: scale(0.95);
             opacity: 1;
-            transform: translateY(0);
           }
         }
-
+        @keyframes float {
+          0%,
+          100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-20px);
+          }
+        }
         @keyframes shimmer {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }
+        @keyframes hero-shimmer {
           0% {
             background-position: 0% 50%;
           }
           100% {
-            background-position: 200% 50%;
+            background-position: 100% 50%;
           }
         }
-
-        @keyframes countdownPulse {
+        @keyframes slideIn {
+          from {
+            transform: translateY(20px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        @keyframes neonPulse {
           0%,
           100% {
-            box-shadow: 0 20px 60px rgba(239, 68, 68, 0.5);
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.6),
+              0 0 40px rgba(139, 92, 246, 0.4),
+              inset 0 0 20px rgba(139, 92, 246, 0.2);
           }
           50% {
-            box-shadow: 0 20px 60px rgba(239, 68, 68, 0.8);
+            box-shadow: 0 0 30px rgba(217, 70, 239, 0.9),
+              0 0 60px rgba(217, 70, 239, 0.6),
+              inset 0 0 30px rgba(217, 70, 239, 0.3);
           }
         }
-
-        @keyframes pulse-glow {
+        @keyframes redAlarm {
           0%,
           100% {
+            box-shadow: 0 0 40px rgba(239, 68, 68, 0.8),
+              0 0 80px rgba(239, 68, 68, 0.6),
+              inset 0 0 40px rgba(239, 68, 68, 0.3);
+            border-color: rgba(239, 68, 68, 0.8);
+          }
+          50% {
+            box-shadow: 0 0 60px rgba(220, 38, 38, 1),
+              0 0 120px rgba(220, 38, 38, 0.8),
+              inset 0 0 60px rgba(220, 38, 38, 0.5);
+            border-color: rgba(220, 38, 38, 1);
+          }
+        }
+        @keyframes shake {
+          0%,
+          100% {
+            transform: translateX(0) rotate(0deg);
+          }
+          25% {
+            transform: translateX(-10px) rotate(-2deg);
+          }
+          75% {
+            transform: translateX(10px) rotate(2deg);
+          }
+        }
+        @keyframes warningPulse {
+          0%,
+          100% {
+            transform: scale(1);
             opacity: 1;
           }
           50% {
-            opacity: 0.7;
+            transform: scale(1.08);
+            opacity: 0.9;
           }
+        }
+        @keyframes glowPulse {
+          0%,
+          100% {
+            filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.6));
+          }
+          50% {
+            filter: drop-shadow(0 0 20px rgba(251, 191, 36, 1));
+          }
+        }
+
+        .animate-slide-in {
+          animation: slideIn 0.5s ease-out forwards;
+          opacity: 0;
+        }
+
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+
+        body {
+          overflow-x: hidden;
         }
       `}</style>
 
-      <div style={{ minHeight: "100vh", position: "relative" }}>
-        <header className="vx-header">
-          <div className="vx-container">
-            <div className="vx-header-inner">
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <button
-                  onClick={() => router.push("/")}
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+          color: "white",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        {/* Animated Background Orbs */}
+        <div
+          className="animate-float"
+          style={{
+            position: "fixed",
+            top: "-150px",
+            left: "-150px",
+            width: "500px",
+            height: "500px",
+            borderRadius: "50%",
+            background:
+              "radial-gradient(circle, rgba(139, 92, 246, 0.4), transparent)",
+            filter: "blur(90px)",
+            pointerEvents: "none",
+            zIndex: 0,
+          }}
+        />
+        <div
+          className="animate-float"
+          style={{
+            position: "fixed",
+            bottom: "-150px",
+            right: "-150px",
+            width: "500px",
+            height: "500px",
+            borderRadius: "50%",
+            background:
+              "radial-gradient(circle, rgba(217, 70, 239, 0.4), transparent)",
+            filter: "blur(90px)",
+            pointerEvents: "none",
+            zIndex: 0,
+            animationDelay: "2s",
+          }}
+        />
+
+        {/* RED WARNING Overlay */}
+        {showWarning && isUrgent && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: `radial-gradient(circle, rgba(239, 68, 68, 0.25), transparent)`,
+              pointerEvents: "none",
+              zIndex: 40,
+              animation: "warningPulse 0.6s ease-in-out infinite",
+            }}
+          />
+        )}
+
+        {/* Top Header Bar */}
+        <header
+          style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 50,
+            background: "rgba(15, 23, 42, 0.95)",
+            backdropFilter: "blur(20px)",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+          }}
+        >
+          <div
+            style={{
+              maxWidth: "1400px",
+              margin: "0 auto",
+              padding: "clamp(14px, 3.6vw, 19px) clamp(19px, 4.8vw, 38px)",
+              position: "relative",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              {/* Left: Logo + Chevron → Ana Sayfa */}
+              <button
+                onClick={() => router.push("/")}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 0,
+                  zIndex: 21,
+                }}
+              >
+                {/* Logo — homepage ile EXACT AYNI */}
+                <div
                   style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    color: "#94a3b8",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    transition: "all 0.2s",
+                    position: "relative",
+                    width: "clamp(52px, 14vw, 80px)",
+                    height: "clamp(52px, 14vw, 80px)",
+                    borderRadius: "9999px",
+                    padding: 4,
+                    background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)",
+                    boxShadow: "0 0 30px rgba(124,58,237,0.6)",
+                    flexShrink: 0,
                   }}
-                  aria-label="Back to home"
                 >
-                  <ArrowLeft style={{ width: 18, height: 18 }} />
-                </button>
-
-                <Image
-                  src="/images/logo.png"
-                  alt="VibraXX Logo"
-                  width={40}
-                  height={40}
-                  style={{ borderRadius: 10 }}
-                />
-
-                <div style={{ display: "flex", flexDirection: "column" }}>
                   <div
                     style={{
-                      fontSize: 20,
+                      position: "absolute",
+                      inset: -5,
+                      borderRadius: "9999px",
+                      background: "radial-gradient(circle,#a855f7,transparent)",
+                      opacity: 0.4,
+                      filter: "blur(10px)",
+                      pointerEvents: "none",
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: "relative",
+                      width: "100%",
+                      height: "100%",
+                      borderRadius: "9999px",
+                      backgroundColor: "#020817",
+                      overflow: "hidden",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Image
+                      src="/images/logo.png"
+                      alt="VibraXX"
+                      fill
+                      sizes="72px"
+                      style={{ objectFit: "contain" }}
+                      priority
+                    />
+                  </div>
+                </div>
+
+                {/* Mobile brand label — sadece ≤640px'de görünür */}
+                <div
+                  className="show-on-small"
+                  style={{
+                    display: "none",
+                    flexDirection: "column",
+                    gap: 1,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 13,
                       fontWeight: 800,
-                      color: "white",
-                      letterSpacing: "-0.02em",
-                      lineHeight: 1,
+                      backgroundImage: "linear-gradient(135deg, #a78bfa, #f0abfc)",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      backgroundClip: "text",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      lineHeight: 1.1,
                     }}
                   >
                     VibraXX
-                  </div>
-                  <div
+                  </span>
+                  <span
                     style={{
-                      fontSize: 10,
-                      color: "#6b7280",
-                      fontWeight: 600,
+                      fontSize: 9,
+                      color: "#64748b",
+                      fontWeight: 700,
                       textTransform: "uppercase",
                       letterSpacing: "0.1em",
                     }}
                   >
                     Live Lobby
-                  </div>
+                  </span>
                 </div>
-              </div>
 
-              <div className="vx-header-right">
-                <button
-                  onClick={toggleMusic}
+                {/* Chevron Icon */}
+                <div
                   style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    color: isPlaying ? "#22d3ee" : "#6b7280",
+                    width: "clamp(28px, 8vw, 34px)",
+                    height: "clamp(28px, 8vw, 34px)",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(139, 92, 246, 0.3)",
+                    background: "rgba(15, 23, 42, 0.85)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    cursor: "pointer",
-                    transition: "all 0.2s",
+                    transition: "all 0.25s",
+                    boxShadow: "0 0 10px rgba(139, 92, 246, 0.15)",
                   }}
-                  aria-label={isPlaying ? "Mute music" : "Play music"}
-                >
-                  {isPlaying ? (
-                    <Volume2 style={{ width: 18, height: 18 }} />
-                  ) : (
-                    <VolumeX style={{ width: 18, height: 18 }} />
-                  )}
-                </button>
-
-                <div
-                  className="vx-hide-mobile"
-                  style={{
-                    padding: "8px 16px",
-                    borderRadius: 10,
-                    border: "1px solid rgba(251, 191, 36, 0.3)",
-                    background: "rgba(251, 191, 36, 0.1)",
-                    color: "#fbbf24",
-                    fontSize: 13,
-                    fontWeight: 700,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
+                    e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.6)";
+                    e.currentTarget.style.boxShadow = "0 0 18px rgba(139, 92, 246, 0.4)";
+                    e.currentTarget.style.transform = "translateX(-3px)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "rgba(15, 23, 42, 0.85)";
+                    e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.3)";
+                    e.currentTarget.style.boxShadow = "0 0 10px rgba(139, 92, 246, 0.15)";
+                    e.currentTarget.style.transform = "translateX(0)";
                   }}
                 >
-                  <Sparkles style={{ width: 14, height: 14 }} />
-                  {state.liveCredits} Rounds
+                  <ChevronLeft style={{ width: 18, height: 18, color: "#a78bfa" }} />
                 </div>
+              </button>
 
-                <button
-                  onClick={() => router.push("/profile")}
+              {/* Right: Sound Toggle */}
+              <button
+                onClick={() => setIsPlaying(!isPlaying)}
+                style={{
+                  padding: "11px",
+                  borderRadius: "12px",
+                  border: "1px solid rgba(148, 163, 253, 0.3)",
+                  background: "rgba(15, 23, 42, 0.8)",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "all 0.3s",
+                  zIndex: 21,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(15, 23, 42, 0.8)";
+                }}
+              >
+                {isPlaying ? (
+                  <Volume2 style={{ width: 20, height: 20, color: "#a78bfa" }} />
+                ) : (
+                  <VolumeX style={{ width: 20, height: 20, color: "#6b7280" }} />
+                )}
+              </button>
+            </div>
+
+            {/* Center: Logo + GLOBAL ARENA Text */}
+            <div
+              className="hide-on-small"
+              style={{
+                position: "absolute",
+                left: "50%",
+                top: "50%",
+                transform: "translate(-50%, -50%)",
+                zIndex: 20,
+                display: "flex",
+                alignItems: "center",
+                gap: "clamp(12px, 3vw, 16px)",
+              }}
+            >
+              {/* GLOBAL ARENA Text */}
+              <div>
+                <div
                   style={{
-                    padding: "10px 20px",
-                    borderRadius: 10,
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    color: "#94a3b8",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
+                    fontSize: "clamp(16px, 3.5vw, 22px)",
+                    fontWeight: 900,
+                    backgroundImage: "linear-gradient(135deg, #a78bfa, #f0abfc)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    lineHeight: 1.2,
+                    textShadow: "0 0 20px rgba(167, 139, 250, 0.5)",
                   }}
                 >
-                  <User style={{ width: 16, height: 16 }} />
-                  <span className="vx-hide-mobile">Profile</span>
-                </button>
-
-                <button
-                  onClick={() => router.push("/leaderboard")}
+                  GLOBAL ARENA
+                </div>
+                <div
                   style={{
-                    padding: "10px 20px",
-                    borderRadius: 10,
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    color: "#94a3b8",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  <BarChart3 style={{ width: 16, height: 16 }} />
-                  <span className="vx-hide-mobile">Leaderboard</span>
-                </button>
-
-                <button
-                  onClick={() => router.push("/buy")}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: 10,
-                    border: "none",
-                    background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-                    color: "white",
-                    fontSize: 14,
+                    fontSize: "clamp(9px, 1.8vw, 11px)",
+                    color: "#64748b",
                     fontWeight: 700,
-                    cursor: "pointer",
-                    transition: "transform 0.2s",
-                    boxShadow: "0 8px 16px rgba(124, 58, 237, 0.4)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.14em",
+                    textAlign: "center",
+                    marginTop: 2,
                   }}
                 >
-                  <ShoppingCart style={{ width: 16, height: 16 }} />
-                  <span className="vx-hide-mobile">Buy</span>
-                </button>
-
-                <button
-                  onClick={handleSignOut}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: 10,
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    color: "#94a3b8",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                  }}
-                  className="vx-hide-mobile"
-                >
-                  Sign Out
-                </button>
+                  LIVE LOBBY
+                </div>
               </div>
             </div>
           </div>
         </header>
 
-        <main style={{ padding: "48px 0", position: "relative", zIndex: 10 }}>
-          <div className="vx-container">
-            {/* Hero Section */}
+        {/* Main Content */}
+        <main
+          style={{
+            position: "relative",
+            zIndex: 10,
+            maxWidth: "1400px",
+            margin: "0 auto",
+            padding: "clamp(24px, 5vw, 40px) clamp(16px, 4vw, 32px)",
+          }}
+        >
+          {/* Sponsor Banner */}
+          <div
+            style={{
+              marginBottom: "clamp(24px, 5vw, 36px)",
+              padding: "clamp(16px, 3.5vw, 28px)",
+              borderRadius: "20px",
+              background:
+                "linear-gradient(135deg, rgba(251, 191, 36, 0.18), rgba(245, 158, 11, 0.12))",
+              border: "2px solid rgba(251, 191, 36, 0.5)",
+              backdropFilter: "blur(20px)",
+              position: "relative",
+              overflow: "hidden",
+              boxShadow:
+                "0 0 30px rgba(251, 191, 36, 0.3), inset 0 0 40px rgba(251, 191, 36, 0.06)",
+              minHeight: "clamp(100px, 18vw, 160px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
             <div
               style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "50%",
+                height: "100%",
+                background:
+                  "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent)",
+                animation: "shimmer 3s infinite",
+                pointerEvents: "none",
+              }}
+            />
+
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                height: "100%",
+                minHeight: "clamp(100px, 18vw, 160px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Image
+                src="/images/sponsor.png"
+                alt="Official Sponsor"
+                fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
+                style={{
+                  objectFit: "contain",
+                  padding: "clamp(12px, 3vw, 20px)",
+                }}
+                priority
+                onError={(e) => {
+                  const img = e.currentTarget;
+                  const container = img.parentElement as HTMLDivElement;
+                  if (container) {
+                    container.style.display = "none";
+                    const placeholder = container.nextElementSibling as HTMLDivElement;
+                    if (placeholder) placeholder.style.display = "block";
+                  }
+                }}
+              />
+            </div>
+
+            <div
+              id="sponsor-placeholder"
+              style={{
+                position: "relative",
+                zIndex: 10,
                 textAlign: "center",
-                marginBottom: 48,
-                animation: "slideIn 0.6s ease-out",
+                display: "none",
               }}
             >
               <div
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: 8,
-                  padding: "8px 20px",
-                  borderRadius: 9999,
-                  border: "2px solid rgba(251, 191, 36, 0.4)",
-                  background:
-                    "linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1))",
-                  color: "#fbbf24",
-                  fontSize: 12,
-                  marginBottom: 20,
-                  backdropFilter: "blur(10px)",
-                  fontWeight: 700,
-                  boxShadow:
-                    "0 0 20px rgba(251, 191, 36, 0.3), inset 0 0 20px rgba(251, 191, 36, 0.1)",
+                  gap: "6px",
+                  padding: "4px 12px",
+                  borderRadius: "999px",
+                  background: "rgba(251, 191, 36, 0.25)",
+                  border: "1px solid rgba(251, 191, 36, 0.6)",
+                  marginBottom: "10px",
                 }}
               >
-                <Globe style={{ width: 16, height: 16 }} />
-                Global Live Arena
-              </div>
-
-              <h1
-                style={{
-                  fontSize: "clamp(32px, 7vw, 52px)",
-                  fontWeight: 800,
-                  lineHeight: 1.2,
-                  marginBottom: 20,
-                  letterSpacing: "-0.03em",
-                  color: "white",
-                }}
-              >
+                <Sparkles style={{ width: 12, height: 12, color: "#fbbf24" }} />
                 <span
                   style={{
-                    display: "inline-block",
-                    background:
-                      "linear-gradient(90deg, #7c3aed, #22d3ee, #f97316, #d946ef, #7c3aed)",
-                    backgroundSize: "250% 100%",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    backgroundClip: "text",
-                    animation: "shimmer 4s linear infinite",
+                    fontSize: "clamp(9px, 1.8vw, 11px)",
+                    fontWeight: 700,
+                    color: "#fbbf24",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
                   }}
                 >
-                  Prepare for Battle
+                  Sponsor Space Available
                 </span>
-              </h1>
+              </div>
+
+              <h2
+                style={{
+                  fontSize: "clamp(18px, 4.5vw, 32px)",
+                  fontWeight: 900,
+                  backgroundImage: "linear-gradient(135deg, #fbbf24, #f59e0b)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                  marginBottom: "8px",
+                  textShadow: "0 0 30px rgba(251, 191, 36, 0.4)",
+                }}
+              >
+                Your Brand Here
+              </h2>
 
               <p
                 style={{
-                  fontSize: "clamp(15px, 3.5vw, 18px)",
-                  color: "#cbd5e1",
-                  maxWidth: 600,
-                  margin: "0 auto 16px",
-                  lineHeight: 1.7,
-                  fontWeight: 500,
+                  fontSize: "clamp(11px, 2.8vw, 14px)",
+                  color: "#fcd34d",
+                  fontWeight: 600,
+                  marginBottom: "12px",
+                  lineHeight: 1.4,
+                }}
+              >
+                Reach 12,000+ active quiz players daily!
+              </p>
+
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  flexWrap: "wrap",
+                  justifyContent: "center",
+                }}
+              >
+                <div
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    background: "rgba(15, 23, 42, 0.6)",
+                    border: "1px solid rgba(251, 191, 36, 0.3)",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "clamp(9px, 2vw, 11px)",
+                      color: "#cbd5e1",
+                    }}
+                  >
+                    📊 <strong style={{ color: "#fbbf24" }}>12K+</strong> Players
+                  </span>
+                </div>
+                <div
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    background: "rgba(15, 23, 42, 0.6)",
+                    border: "1px solid rgba(251, 191, 36, 0.3)",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "clamp(9px, 2vw, 11px)",
+                      color: "#cbd5e1",
+                    }}
+                  >
+                    🎯 <strong style={{ color: "#fbbf24" }}>Premium</strong> Spot
+                  </span>
+                </div>
+                <div
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    background: "rgba(15, 23, 42, 0.6)",
+                    border: "1px solid rgba(251, 191, 36, 0.3)",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "clamp(9px, 2vw, 11px)",
+                      color: "#cbd5e1",
+                    }}
+                  >
+                    💰 <strong style={{ color: "#fbbf24" }}>High</strong> ROI
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Hero Text — anasayfa ile uyumlu */}
+          <div
+            style={{
+              textAlign: "center",
+              marginBottom: "clamp(28px, 5vw, 40px)",
+            }}
+          >
+            <h1
+              style={{
+                fontSize: "clamp(26px, 6vw, 42px)",
+                fontWeight: 800,
+                lineHeight: 1.2,
+                letterSpacing: "-0.03em",
+                marginBottom: 14,
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-block",
+                  background: "linear-gradient(90deg, #7c3aed, #22d3ee, #f97316, #d946ef, #7c3aed)",
+                  backgroundSize: "250% 100%",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                  animation: "hero-shimmer 4s linear infinite",
                 }}
               >
                 Challenge yourself. Challenge the world.
-              </p>
-
-              <p
-                style={{
-                  fontSize: 14,
-                  color: "#94a3b8",
-                  maxWidth: 600,
-                  margin: "0 auto",
-                  lineHeight: 1.6,
-                }}
-              >
-                {state.userJoined
-                  ? "You're locked in! The quiz starts when the countdown ends."
-                  : "Join now to compete for prizes and glory."}
-              </p>
-            </div>
-
-            {/* Premium Countdown Panel */}
-            <div
+              </span>
+            </h1>
+            <p
               style={{
-                margin: "32px auto 48px",
-                maxWidth: 520,
-                padding: state.isUrgent ? "24px 32px 32px" : "32px",
-                borderRadius: 24,
-                background: "linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)",
-                border: state.isUrgent
-                  ? "3px solid rgba(239, 68, 68, 0.6)"
-                  : "2px solid rgba(255, 255, 255, 0.15)",
-                backdropFilter: "blur(20px)",
-                boxShadow: state.isUrgent
-                  ? "0 20px 60px rgba(239, 68, 68, 0.5), 0 0 40px rgba(239, 68, 68, 0.3)"
-                  : "0 12px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05), inset 0 2px 0 rgba(255, 255, 255, 0.08)",
-                position: "relative",
-                overflow: "hidden",
-                animation: state.isUrgent
-                  ? "countdownPulse 1s ease-in-out infinite"
-                  : "slideIn 0.6s ease-out 0.2s backwards",
+                fontSize: "clamp(15px, 3.2vw, 17px)",
+                color: "#94a3b8",
+                maxWidth: 640,
+                margin: "0 auto",
+                lineHeight: 1.6,
+                fontWeight: 500,
               }}
             >
-              {state.isUrgent && (
-                <div
+              Join now to compete for skill-based rewards and global ranking
+            </p>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr",
+              gap: "clamp(24px, 5vw, 40px)",
+            }}
+          >
+            {/* Countdown Section */}
+            <div
+              style={{
+                padding: "clamp(32px, 6vw, 56px)",
+                borderRadius: "28px",
+                border:
+                  isUrgent
+                    ? "3px solid #ef4444"
+                    : "3px solid rgba(139, 92, 246, 0.6)",
+                background:
+                  isUrgent
+                    ? "linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.1))"
+                    : "rgba(15, 23, 42, 0.85)",
+                backdropFilter: "blur(25px)",
+                textAlign: "center",
+                animation:
+                  showWarning && isUrgent
+                    ? "redAlarm 0.8s ease-in-out infinite, shake 0.5s ease-in-out infinite"
+                    : "none",
+                boxShadow:
+                  isUrgent
+                    ? "0 0 60px rgba(239, 68, 68, 0.6)"
+                    : "0 0 40px rgba(139, 92, 246, 0.4)",
+              }}
+            >
+              {/* Status Badge */}
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "10px 24px",
+                  borderRadius: "999px",
+                  background:
+                    isUrgent
+                      ? "rgba(239, 68, 68, 0.25)"
+                      : "rgba(34, 197, 94, 0.25)",
+                  border:
+                    isUrgent
+                      ? "2px solid rgba(239, 68, 68, 0.6)"
+                      : "2px solid rgba(34, 197, 94, 0.5)",
+                  marginBottom: "clamp(20px, 4vw, 32px)",
+                  boxShadow:
+                    isUrgent
+                      ? "0 0 25px rgba(239, 68, 68, 0.5)"
+                      : "0 0 20px rgba(34, 197, 94, 0.4)",
+                }}
+              >
+                <Shield
                   style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    padding: "10px",
-                    background: "rgba(239, 68, 68, 0.25)",
-                    borderBottom: "1px solid rgba(239, 68, 68, 0.5)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 8,
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: "#ef4444",
-                    animation: "pulse-glow 1s ease-in-out infinite",
+                    width: 20,
+                    height: 20,
+                    color:
+                      isUrgent
+                        ? "#ef4444"
+                        : "#4ade80",
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: "clamp(12px, 2.8vw, 14px)",
+                    fontWeight: 800,
+                    color:
+                      isUrgent
+                        ? "#fca5a5"
+                        : "#4ade80",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
                   }}
                 >
-                  <Flame style={{ width: 16, height: 16 }} />
-                  QUIZ STARTING SOON!
+                  {isUrgent
+                    ? "🚨 STARTING NOW!"
+                    : "✓ You're in the Lobby"}
+                </span>
+              </div>
+
+              {/* Warning Message */}
+              {showWarning && isUrgent && (
+                <div
+                  style={{
+                    padding: "20px 28px",
+                    borderRadius: "20px",
+                    background:
+                      "linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(220, 38, 38, 0.2))",
+                    border: "3px solid #ef4444",
+                    marginBottom: "clamp(20px, 4vw, 32px)",
+                    animation: "neonPulse 0.6s ease-in-out infinite",
+                    boxShadow: "0 0 40px rgba(239, 68, 68, 0.8)",
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: "clamp(20px, 5vw, 32px)",
+                      fontWeight: 900,
+                      color: "#fca5a5",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.12em",
+                      textShadow: "0 0 30px #ef4444",
+                      margin: 0,
+                    }}
+                  >
+                    {getWarningMessage()}
+                  </p>
                 </div>
               )}
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.15em",
-                    color: "#6b7280",
-                    textAlign: "center",
-                  }}
-                >
-                  {state.userJoined ? "Quiz Starts In" : "Join Before"}
-                </div>
-
-                <div
-                  style={{
-                    fontSize: "clamp(56px, 15vw, 80px)",
-                    fontWeight: 900,
-                    background: state.isUrgent
-                      ? "linear-gradient(135deg, #ef4444, #dc2626)"
-                      : "linear-gradient(135deg, #7c3aed, #22d3ee)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    backgroundClip: "text",
-                    textAlign: "center",
-                    letterSpacing: "-0.02em",
-                    fontVariantNumeric: "tabular-nums",
-                    lineHeight: 1,
-                    filter: state.isUrgent
-                      ? "drop-shadow(0 0 20px rgba(239, 68, 68, 0.6))"
-                      : "drop-shadow(0 0 20px rgba(124, 58, 237, 0.5))",
-                  }}
-                >
-                  {formatTime(countdownSeconds)}
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 8,
-                    fontSize: 13,
-                    color: "#6b7280",
-                    fontWeight: 500,
-                  }}
-                >
-                  <Clock
-                    style={{
-                      width: 16,
-                      height: 16,
-                      color: state.isUrgent ? "#ef4444" : "#8b5cf6",
-                    }}
-                  />
-                  <span style={{ color: "#ffffff", fontWeight: 600 }}>
-                    {state.spectatorsCount}
-                  </span>
-                  <span>watching live</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Join Button or Status */}
-            {!state.userJoined ? (
-              <div
+              {/* Countdown Title */}
+              <h1
                 style={{
-                  marginBottom: 48,
-                  textAlign: "center",
-                  animation: "slideIn 0.6s ease-out 0.3s backwards",
+                  fontSize: "clamp(22px, 5.5vw, 36px)",
+                  fontWeight: 800,
+                  marginBottom: "clamp(16px, 3vw, 24px)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "14px",
+                  flexWrap: "wrap",
+                  color:
+                    isUrgent
+                      ? "#fca5a5"
+                      : "white",
                 }}
               >
-                <button
-                  onClick={handleJoinRound}
-                  disabled={!state.canJoin}
+                <Clock
                   style={{
-                    position: "relative",
-                    padding: "18px 48px",
-                    borderRadius: 14,
-                    border: "none",
-                    cursor: state.canJoin ? "pointer" : "not-allowed",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 12,
-                    fontWeight: 700,
-                    fontSize: 18,
-                    overflow: "hidden",
-                    transition: "transform 0.2s, box-shadow 0.2s",
-                    opacity: state.canJoin ? 1 : 0.5,
-                    boxShadow: state.canJoin
-                      ? "0 20px 40px -16px rgba(139, 92, 246, 0.6)"
-                      : "none",
+                    width: "clamp(28px, 7vw, 36px)",
+                    height: "clamp(28px, 7vw, 36px)",
+                    color:
+                      isUrgent
+                        ? "#ef4444"
+                        : "#a78bfa",
                   }}
-                  onMouseEnter={(e) =>
-                    state.canJoin && (e.currentTarget.style.transform = "translateY(-2px)")
-                  }
-                  onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
+                />
+                Quiz Starting In
+              </h1>
+
+              {/* Countdown Timer */}
+              <div
+                style={{
+                  fontSize: "clamp(56px, 18vw, 120px)",
+                  fontWeight: 900,
+                  backgroundImage:
+                    isUrgent
+                      ? "linear-gradient(135deg, #ef4444, #dc2626)"
+                      : "linear-gradient(135deg, #a78bfa, #f0abfc)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                  marginBottom: "clamp(24px, 5vw, 40px)",
+                  fontFamily: "monospace",
+                  textShadow:
+                    isUrgent
+                      ? "0 0 50px rgba(239, 68, 68, 0.8)"
+                      : "0 0 50px rgba(167, 139, 250, 0.6)",
+                  animation:
+                    isUrgent
+                      ? "warningPulse 0.4s ease-in-out infinite"
+                      : "none",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                {localSeconds !== null ? formatTime(localSeconds) : "--:--"}
+              </div>
+
+              {/* Progress Bar */}
+              <div
+                style={{
+                  width: "100%",
+                  height: "14px",
+                  borderRadius: "999px",
+                  background: "rgba(30, 41, 59, 0.9)",
+                  overflow: "hidden",
+                  marginBottom: "clamp(24px, 5vw, 40px)",
+                  border:
+                    isUrgent
+                      ? "2px solid rgba(239, 68, 68, 0.5)"
+                      : "2px solid rgba(139, 92, 246, 0.4)",
+                  boxShadow:
+                    isUrgent
+                      ? "0 0 20px rgba(239, 68, 68, 0.5), inset 0 0 10px rgba(239, 68, 68, 0.3)"
+                      : "0 0 15px rgba(139, 92, 246, 0.4)",
+                }}
+              >
+                <div
+                  style={{
+                    width: `${Math.min(progress, 100)}%`,
+                    height: "100%",
+                    background:
+                      isUrgent
+                        ? "linear-gradient(90deg, #ef4444, #dc2626)"
+                        : "linear-gradient(90deg, #7c3aed, #d946ef)",
+                    borderRadius: "999px",
+                    transition: "width 1s linear",
+                    boxShadow:
+                      isUrgent
+                        ? "0 0 25px rgba(239, 68, 68, 1)"
+                        : "0 0 25px rgba(139, 92, 246, 0.9)",
+                  }}
+                />
+              </div>
+
+              {/* Info Message */}
+              <p
+                style={{
+                  fontSize: "clamp(14px, 3.2vw, 17px)",
+                  color:
+                    isUrgent
+                      ? "#fca5a5"
+                      : "#cbd5e1",
+                  marginBottom: "clamp(28px, 6vw, 40px)",
+                  lineHeight: 1.7,
+                  fontWeight: 600,
+                }}
+              >
+                {isUrgent
+                  ? "🔥 Get ready! You'll be automatically entered when the countdown ends!"
+                  : "You're in. Get ready!"}
+              </p>
+
+              {/* Quiz Info Grid - 3 Cards Centered */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                  gap: "clamp(14px, 3.5vw, 20px)",
+                  maxWidth: "900px",
+                  margin: "0 auto",
+                }}
+              >
+                <div
+                  style={{
+                    padding: "clamp(14px, 3.5vw, 20px)",
+                    borderRadius: "16px",
+                    background: "rgba(139, 92, 246, 0.15)",
+                    border: "2px solid rgba(139, 92, 246, 0.3)",
+                    boxShadow: "0 0 15px rgba(139, 92, 246, 0.2)",
+                  }}
                 >
                   <div
                     style={{
-                      position: "absolute",
-                      inset: 0,
-                      background: "linear-gradient(to right, #7c3aed, #d946ef)",
+                      fontSize: "clamp(11px, 2.3vw, 13px)",
+                      color: "#94a3b8",
+                      marginBottom: "6px",
+                      fontWeight: 600,
                     }}
-                  />
-                  <Play
-                    style={{
-                      position: "relative",
-                      zIndex: 10,
-                      width: 20,
-                      height: 20,
-                      color: "white",
-                    }}
-                  />
-                  <span style={{ position: "relative", zIndex: 10, color: "white" }}>
-                    {state.joinBlockReason === BLOCK_REASONS.NO_CREDITS
-                      ? "No Rounds Left"
-                      : "Join Arena"}
-                  </span>
-                </button>
-                {state.joinBlockReason === BLOCK_REASONS.NO_CREDITS && (
-                  <div style={{ marginTop: 16, fontSize: 14, color: "#94a3b8" }}>
-                    <button
-                      onClick={() => router.push("/buy")}
-                      style={{
-                        color: "#fbbf24",
-                        textDecoration: "underline",
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        fontSize: 14,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Buy more rounds
-                    </button>
+                  >
+                    Format
                   </div>
-                )}
-              </div>
-            ) : (
-              <div
-                style={{
-                  marginBottom: 48,
-                  padding: "20px 32px",
-                  borderRadius: 16,
-                  background: "rgba(34, 197, 94, 0.15)",
-                  border: "2px solid rgba(34, 197, 94, 0.4)",
-                  textAlign: "center",
-                  boxShadow: "0 8px 24px rgba(34, 197, 94, 0.2)",
-                  animation: "slideIn 0.6s ease-out 0.3s backwards",
-                }}
-              >
+                  <div
+                    style={{
+                      fontSize: "clamp(16px, 3.5vw, 20px)",
+                      fontWeight: 800,
+                      color: "#c4b5fd",
+                    }}
+                  >
+                    Multiple Choice
+                  </div>
+                </div>
                 <div
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 12,
-                    fontSize: 16,
-                    fontWeight: 700,
-                    color: "#22c55e",
+                    padding: "clamp(14px, 3.5vw, 20px)",
+                    borderRadius: "16px",
+                    background: "rgba(236, 72, 153, 0.15)",
+                    border: "2px solid rgba(236, 72, 153, 0.3)",
+                    boxShadow: "0 0 15px rgba(236, 72, 153, 0.2)",
                   }}
                 >
-                  <Trophy style={{ width: 22, height: 22 }} />
-                  YOU'RE IN! GET READY...
+                  <div
+                    style={{
+                      fontSize: "clamp(11px, 2.3vw, 13px)",
+                      color: "#94a3b8",
+                      marginBottom: "6px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Time Limit
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "clamp(16px, 3.5vw, 20px)",
+                      fontWeight: 800,
+                      color: "#f9a8d4",
+                    }}
+                  >
+                    6 seconds
+                  </div>
+                </div>
+                <div
+                  style={{
+                    padding: "clamp(14px, 3.5vw, 20px)",
+                    borderRadius: "16px",
+                    background: "rgba(34, 197, 94, 0.15)",
+                    border: "2px solid rgba(34, 197, 94, 0.3)",
+                    boxShadow: "0 0 15px rgba(34, 197, 94, 0.2)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "clamp(11px, 2.3vw, 13px)",
+                      color: "#94a3b8",
+                      marginBottom: "6px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Points
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "clamp(16px, 3.5vw, 20px)",
+                      fontWeight: 800,
+                      color: "#86efac",
+                    }}
+                  >
+                    2 per correct
+                  </div>
                 </div>
               </div>
-            )}
 
-            {/* Stats Grid */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                gap: 20,
-                marginBottom: 48,
-                animation: "slideIn 0.6s ease-out 0.4s backwards",
-              }}
-            >
               <div
                 style={{
-                  padding: 24,
-                  borderRadius: 16,
-                  background:
-                    "linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(139, 92, 246, 0.05))",
-                  border: "1px solid rgba(139, 92, 246, 0.3)",
-                  textAlign: "center",
-                  transition: "all 0.3s",
+                  marginTop: "clamp(20px, 4.5vw, 28px)",
+                  padding: "clamp(14px, 3.5vw, 20px)",
+                  borderRadius: "14px",
+                  background: "rgba(59, 130, 246, 0.12)",
+                  border: "2px solid rgba(59, 130, 246, 0.25)",
                 }}
               >
                 <div
                   style={{
-                    fontSize: 36,
-                    fontWeight: 800,
-                    color: "white",
-                    marginBottom: 8,
-                  }}
-                >
-                  {state.participantsCount}
-                </div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "#94a3b8",
+                    fontSize: "clamp(13px, 3vw, 15px)",
+                    color: "#bfdbfe",
                     fontWeight: 600,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
                   }}
                 >
-                  Joined
-                </div>
-              </div>
-              <div
-                style={{
-                  padding: 24,
-                  borderRadius: 16,
-                  background:
-                    "linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(34, 211, 238, 0.05))",
-                  border: "1px solid rgba(34, 211, 238, 0.3)",
-                  textAlign: "center",
-                  transition: "all 0.3s",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 36,
-                    fontWeight: 800,
-                    color: "white",
-                    marginBottom: 8,
-                  }}
-                >
-                  {state.spectatorsCount}
-                </div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "#94a3b8",
-                    fontWeight: 600,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                  }}
-                >
-                  Watching
-                </div>
-              </div>
-              <div
-                style={{
-                  padding: 24,
-                  borderRadius: 16,
-                  background:
-                    "linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05))",
-                  border: "1px solid rgba(16, 185, 129, 0.3)",
-                  textAlign: "center",
-                  transition: "all 0.3s",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 32,
-                    fontWeight: 800,
-                    color: "white",
-                    marginBottom: 8,
-                  }}
-                >
-                  {state.totalRange}
-                </div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "#94a3b8",
-                    fontWeight: 600,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                  }}
-                >
-                  Active Range
+                  💡 <strong style={{ color: "white" }}>Pro Tip:</strong> Speed matters. Answer fast and accurately to dominate the leaderboard.
                 </div>
               </div>
             </div>
 
-            {/* Recent Players */}
+            {/* Players Section */}
             <div
               style={{
-                background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-                borderRadius: 24,
-                padding: 32,
-                border: "1px solid rgba(139, 92, 246, 0.3)",
-                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
-                animation: "slideIn 0.6s ease-out 0.5s backwards",
+                padding: "clamp(21px, 4.5vw, 30px)",
+                borderRadius: "28px",
+                border: "2px solid rgba(255, 255, 255, 0.12)",
+                background: "rgba(15, 23, 42, 0.7)",
+                backdropFilter: "blur(25px)",
+                boxShadow: "0 0 30px rgba(139, 92, 246, 0.2)",
               }}
             >
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 12,
-                  marginBottom: 24,
+                  justifyContent: "space-between",
+                  marginBottom: "clamp(18px, 3.75vw, 24px)",
+                  flexWrap: "wrap",
+                  gap: "14px",
                 }}
               >
-                <Users style={{ width: 24, height: 24, color: "#8b5cf6" }} />
-                <h3 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: "white" }}>
-                  Recent Joins
+                <h3
+                  style={{
+                    fontSize: "clamp(17px, 3.4vw, 20px)",
+                    fontWeight: 800,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                  }}
+                >
+                  <Users
+                    style={{
+                      width: "clamp(19px, 4.1vw, 24px)",
+                      height: "clamp(19px, 4.1vw, 24px)",
+                      color: "#c4b5fd",
+                    }}
+                  />
+                  Players in Lobby
                 </h3>
+                <div
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "10px",
+                    background: "rgba(139, 92, 246, 0.25)",
+                    border: "2px solid rgba(139, 92, 246, 0.4)",
+                    fontSize: "clamp(12px, 2.25vw, 14px)",
+                    fontWeight: 800,
+                    color: "#c4b5fd",
+                    boxShadow: "0 0 15px rgba(139, 92, 246, 0.3)",
+                  }}
+                >
+                  {lobbyState?.participants_count ?? 0}
+                </div>
               </div>
 
               <div
                 style={{
                   display: "flex",
                   flexDirection: "column",
-                  gap: 12,
-                  maxHeight: 400,
+                  gap: "clamp(9px, 1.9vw, 12px)",
+                  maxHeight: "min(412px, 38vh)",
                   overflowY: "auto",
+                  paddingRight: "8px",
                 }}
               >
-                {state.recentPlayers.length === 0 ? (
+                {lobbyState?.recent_players && lobbyState.recent_players.length > 0 ? (
+                  lobbyState.recent_players.map((player, idx) => (
+                    <div
+                      key={player.user_id}
+                      className="animate-slide-in"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "clamp(10px, 2.6vw, 13px)",
+                        padding: "clamp(10px, 2.6vw, 15px)",
+                        borderRadius: "18px",
+                        border: "1px solid rgba(255, 255, 255, 0.12)",
+                        background: "rgba(255, 255, 255, 0.04)",
+                        transition: "all 0.3s",
+                        animationDelay: `${idx * 0.1}s`,
+                        boxShadow: "0 0 15px rgba(0, 0, 0, 0.2)",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "rgba(139, 92, 246, 0.1)";
+                        e.currentTarget.style.transform = "translateX(8px)";
+                        e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.4)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)";
+                        e.currentTarget.style.transform = "translateX(0)";
+                        e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)";
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: "clamp(33px, 8.25vw, 40px)",
+                          height: "clamp(33px, 8.25vw, 40px)",
+                          borderRadius: "50%",
+                          border: "3px solid rgba(139, 92, 246, 0.6)",
+                          overflow: "hidden",
+                          flexShrink: 0,
+                          position: "relative",
+                          boxShadow: "0 0 15px rgba(139, 92, 246, 0.4)",
+                        }}
+                      >
+                        <Image
+                          src={player.avatar_url || "/images/logo.png"}
+                          alt={player.full_name}
+                          fill
+                          sizes="40px"
+                          style={{ objectFit: "cover" }}
+                        />
+                      </div>
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            marginBottom: "5px",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: "clamp(13px, 2.6vw, 15px)",
+                              fontWeight: 700,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {player.full_name || "Anonymous"}
+                          </span>
+                          {player.streak >= 10 && (
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "5px",
+                                padding: "3px 10px",
+                                borderRadius: "8px",
+                                background: "rgba(239, 68, 68, 0.25)",
+                                border: "1px solid rgba(239, 68, 68, 0.4)",
+                                boxShadow: "0 0 10px rgba(239, 68, 68, 0.3)",
+                              }}
+                            >
+                              <Flame style={{ width: 13, height: 13, color: "#fca5a5" }} />
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  fontWeight: 800,
+                                  color: "#fca5a5",
+                                }}
+                              >
+                                {player.streak}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "clamp(10px, 2.1vw, 12px)",
+                            color: "#94a3b8",
+                            fontWeight: 600,
+                          }}
+                        >
+                          🏆 {player.total_score.toLocaleString()} points
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
                   <div
                     style={{
-                      padding: 48,
+                      padding: "clamp(21px, 4.5vw, 30px)",
                       textAlign: "center",
-                      color: "#6b7280",
-                      fontSize: 14,
+                      color: "#64748b",
+                      fontSize: "clamp(12px, 2.4vw, 14px)",
+                      fontWeight: 600,
                     }}
                   >
                     Waiting for players to join...
                   </div>
-                ) : (
-                  state.recentPlayers.map((player, idx) => (
-                    <PlayerCard key={player.user_id} player={player} index={idx} />
-                  ))
                 )}
+              </div>
+
+              {/* Total Players Info */}
+              <div
+                style={{
+                  marginTop: "clamp(15px, 3.4vw, 21px)",
+                  padding: "clamp(12px, 3vw, 16px)",
+                  borderRadius: "16px",
+                  background:
+                    "linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(217, 70, 239, 0.1))",
+                  border: "2px solid rgba(139, 92, 246, 0.3)",
+                  textAlign: "center",
+                  boxShadow: "0 0 20px rgba(139, 92, 246, 0.25)",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "clamp(12px, 2.4vw, 14px)",
+                    color: "#cbd5e1",
+                    fontWeight: 600,
+                  }}
+                >
+                  🌍{" "}
+                  <strong style={{ color: "#c4b5fd", fontWeight: 800 }}>
+                    {lobbyState?.total_range ?? "0"}
+                  </strong>{" "}
+                  players in this round
+                </div>
               </div>
             </div>
           </div>
         </main>
-
-        <Footer />
       </div>
+
+      <style jsx>{`
+        @media (min-width: 900px) {
+          main > div:last-child {
+            grid-template-columns: 1.3fr 1fr;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .hide-on-small {
+            display: none !important;
+          }
+          .show-on-small {
+            display: flex !important;
+          }
+
+          header > div {
+            position: relative !important;
+          }
+        }
+
+        @media (max-width: 899px) {
+          .hide-mobile {
+            display: none !important;
+          }
+        }
+
+        ::-webkit-scrollbar {
+          width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+          background: rgba(15, 23, 42, 0.7);
+          border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+          background: linear-gradient(
+            135deg,
+            rgba(139, 92, 246, 0.7),
+            rgba(217, 70, 239, 0.5)
+          );
+          border-radius: 10px;
+          border: 2px solid rgba(15, 23, 42, 0.7);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(
+            135deg,
+            rgba(139, 92, 246, 0.9),
+            rgba(217, 70, 239, 0.7)
+          );
+        }
+      `}</style>
     </>
   );
 }
