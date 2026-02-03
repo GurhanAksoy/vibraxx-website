@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
@@ -1259,4 +1260,5 @@ export default function LeaderboardPage() {
     </>
   );
 }
+
 
