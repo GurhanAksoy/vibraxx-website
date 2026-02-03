@@ -1405,12 +1405,7 @@ export default function HomePage() {
                       alt="VibraXX Logo"
                       fill
                       sizes="72px"
-                      style={{ objectFit: "contain" }}
-                      priority
-                    />
-                  </div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      style={{ objectFit: "contain", padding: "18%" }}
                   <span
                     style={{
                       fontSize: 13,
