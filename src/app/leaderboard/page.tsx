@@ -2,248 +2,278 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
-import {
-  Crown,
-  Trophy,
-  Star,
-  Target,
-  Clock,
-  Users,
-  Gift,
-  Sparkles,
-  Volume2,
-  VolumeX,
-  ChevronRight,
-  Home,
-  User,
-  BarChart3,
-  ShoppingCart,
+import { 
+  Crown, Trophy, Star, Target, Clock, Users,
+  Sparkles, Volume2, VolumeX, ChevronRight, Home
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import Footer from "@/components/Footer";
 
-// ============================================
-// CANONICAL CONSTANTS
-// ============================================
+// ✅ TIER CONFIGURATION (Profile page ile aynı)
 const TIERS = {
-  BRONZE: {
-    min: 0,
-    max: 500,
-    name: "Bronze",
-    icon: "🥉",
-    color: "#cd7f32",
-    gradient: "linear-gradient(135deg, #cd7f32, #b8651f)",
-  },
-  SILVER: {
-    min: 500,
-    max: 2000,
-    name: "Silver",
-    icon: "🥈",
-    color: "#c0c0c0",
-    gradient: "linear-gradient(135deg, #c0c0c0, #a8a8a8)",
-  },
-  GOLD: {
-    min: 2000,
-    max: 5000,
-    name: "Gold",
-    icon: "🥇",
-    color: "#ffd700",
-    gradient: "linear-gradient(135deg, #ffd700, #ffed4e)",
-  },
-  DIAMOND: {
-    min: 5000,
-    max: Infinity,
-    name: "Diamond",
-    icon: "💎",
-    color: "#b9f2ff",
-    gradient: "linear-gradient(135deg, #b9f2ff, #7dd3fc)",
-  },
+  BRONZE: { min: 0, max: 500, name: "Bronze", icon: "🥉", color: "#cd7f32", gradient: "linear-gradient(135deg, #cd7f32, #b8651f)" },
+  SILVER: { min: 500, max: 2000, name: "Silver", icon: "🥈", color: "#c0c0c0", gradient: "linear-gradient(135deg, #c0c0c0, #a8a8a8)" },
+  GOLD: { min: 2000, max: 5000, name: "Gold", icon: "🥇", color: "#ffd700", gradient: "linear-gradient(135deg, #ffd700, #ffed4e)" },
+  DIAMOND: { min: 5000, max: Infinity, name: "Diamond", icon: "💎", color: "#b9f2ff", gradient: "linear-gradient(135deg, #b9f2ff, #7dd3fc)" },
 };
 
-const PRIZE_UNLOCK_THRESHOLD = 3000;
-const PAGE_TYPE = "leaderboard" as const;
-
-// ============================================
-// TYPES
-// ============================================
-interface CanonicalPlayer {
-  user_id: string;
+interface Player {
+  id: string;
   rank: number;
-  full_name: string;
-  total_score: number;
-  correct_answers: number;
-  wrong_answers: number;
-  rounds_played: number;
+  name: string;
+  score: number;
+  correct: number;
+  wrong: number;
+  rounds: number;
   accuracy: number;
+  tier: string;
+  tierIcon: string;
+  tierColor: string;
 }
 
-interface LeaderboardStats {
-  total_players: number;
-  top_score: number;
-  avg_accuracy: number;
-  total_rounds_played: number;
-  reset_at: string;
+// ─── PODIUM CARD ───────────────────────────────────────────
+// place: 1 | 2 | 3  →  her place için renk/boyut/davranış farklı
+// Tasarım pixel-exact korunur, sadece tekrar eden inline JSX → component
+const PODIUM_CFG = {
+  1: {
+    order: 2, animDelay: "0.2s", glowClass: "animate-glow",
+    hoverY: "-12px",
+    card: { pad: "clamp(24px, 5vw, 36px)", radius: "clamp(20px, 4vw, 28px)", border: "4px solid rgba(251,191,36,0.8)", bg: "linear-gradient(135deg, rgba(251,191,36,0.25), rgba(245,158,11,0.2))", blur: "25px", shadow: "0 0 60px rgba(251,191,36,0.6)" },
+    medal: { size: "clamp(90px, 18vw, 120px)", pad: "5px", ring: "linear-gradient(135deg, #fbbf24, #f59e0b)", glow: "0 0 50px rgba(251,191,36,0.8)", emoji: "🥇", emojiSize: "clamp(40px, 8vw, 60px)", margin: "0 auto clamp(20px, 4vw, 24px)" },
+    badge: { size: "clamp(36px, 7vw, 48px)", bottom: "-10px", border: "3px solid #0f172a", fontSize: "clamp(16px, 3.5vw, 24px)" },
+    name: { size: "clamp(18px, 4vw, 24px)", weight: 900, mb: "6px" },
+    tier: { gap: "6px", pad: "6px 14px", borderFn: (c: string) => `2px solid ${c}`, bgFn: (c: string) => `${c}25`, mb: "16px", fontSize: "clamp(11px, 2.2vw, 14px)", iconStyle: { fontSize: "clamp(14px, 3vw, 18px)" }, iconWeight: 800 },
+    score: { size: "clamp(32px, 7vw, 48px)", gradient: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)", mb: "12px" },
+    showCrown: true,
+    stats: "grid", // 1st: 2-col grid
+  },
+  2: {
+    order: 1, animDelay: "0.1s", glowClass: "",
+    hoverY: "-8px",
+    card: { pad: "clamp(20px, 4vw, 28px)", radius: "clamp(16px, 3vw, 24px)", border: "3px solid rgba(192,192,192,0.6)", bg: "linear-gradient(135deg, rgba(192,192,192,0.2), rgba(156,163,175,0.15))", blur: "20px", shadow: "0 0 40px rgba(192,192,192,0.4)" },
+    medal: { size: "clamp(70px, 14vw, 100px)", pad: "4px", ring: "linear-gradient(135deg, #d1d5db, #9ca3af)", glow: "0 0 30px rgba(192,192,192,0.6)", emoji: "🥈", emojiSize: "clamp(32px, 6vw, 48px)", margin: "0 auto clamp(16px, 3vw, 20px)" },
+    badge: { size: "clamp(32px, 6vw, 40px)", bottom: "-8px", border: "2px solid #0f172a", fontSize: "clamp(14px, 3vw, 20px)" },
+    name: { size: "clamp(14px, 3vw, 18px)", weight: 800, mb: "4px" },
+    tier: { gap: "4px", pad: "4px 10px", borderFn: (c: string) => `1px solid ${c}60`, bgFn: (c: string) => `${c}20`, mb: "12px", fontSize: "clamp(10px, 2vw, 12px)", iconStyle: {}, iconWeight: 700 },
+    score: { size: "clamp(24px, 5vw, 36px)", gradient: "linear-gradient(90deg, #d1d5db, #9ca3af)", mb: "8px" },
+    showCrown: false,
+    stats: "column",
+  },
+  3: {
+    order: 3, animDelay: "0.15s", glowClass: "",
+    hoverY: "-8px",
+    card: { pad: "clamp(20px, 4vw, 28px)", radius: "clamp(16px, 3vw, 24px)", border: "3px solid rgba(217,119,6,0.6)", bg: "linear-gradient(135deg, rgba(217,119,6,0.2), rgba(194,65,12,0.15))", blur: "20px", shadow: "0 0 40px rgba(217,119,6,0.4)" },
+    medal: { size: "clamp(70px, 14vw, 100px)", pad: "4px", ring: "linear-gradient(135deg, #d97706, #c2410c)", glow: "0 0 30px rgba(217,119,6,0.6)", emoji: "🥉", emojiSize: "clamp(32px, 6vw, 48px)", margin: "0 auto clamp(16px, 3vw, 20px)" },
+    badge: { size: "clamp(32px, 6vw, 40px)", bottom: "-8px", border: "2px solid #0f172a", fontSize: "clamp(14px, 3vw, 20px)" },
+    name: { size: "clamp(14px, 3vw, 18px)", weight: 800, mb: "4px" },
+    tier: { gap: "4px", pad: "4px 10px", borderFn: (c: string) => `1px solid ${c}60`, bgFn: (c: string) => `${c}20`, mb: "12px", fontSize: "clamp(10px, 2vw, 12px)", iconStyle: {}, iconWeight: 700 },
+    score: { size: "clamp(24px, 5vw, 36px)", gradient: "linear-gradient(90deg, #d97706, #c2410c)", mb: "8px" },
+    showCrown: false,
+    stats: "column",
+  },
+} as const;
+
+function PodiumCard({ player, place }: { player: Player; place: 1 | 2 | 3 }) {
+  const c = PODIUM_CFG[place];
+
+  return (
+    <div
+      className={`animate-slide-up podium-${place === 1 ? "1st" : place === 2 ? "2nd" : "3rd"}`}
+      style={{ order: c.order, animationDelay: c.animDelay }}
+    >
+      <div
+        className={c.glowClass || undefined}
+        style={{
+          padding: c.card.pad,
+          borderRadius: c.card.radius,
+          border: c.card.border,
+          background: c.card.bg,
+          backdropFilter: `blur(${c.card.blur})`,
+          textAlign: "center" as const,
+          boxShadow: c.card.shadow,
+          transition: "transform 0.3s",
+          cursor: "default",
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.transform = `translateY(${c.hoverY})`)}
+        onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
+      >
+        {/* Crown — sadece 1st */}
+        {c.showCrown && (
+          <Crown className="animate-crown" style={{
+            width: "clamp(32px, 6vw, 48px)",
+            height: "clamp(32px, 6vw, 48px)",
+            color: "#fbbf24",
+            margin: "0 auto clamp(12px, 2.5vw, 16px)",
+          }} />
+        )}
+
+        {/* Medal Ring */}
+        <div style={{
+          position: "relative",
+          width: c.medal.size,
+          height: c.medal.size,
+          margin: c.medal.margin,
+          borderRadius: "50%",
+          padding: c.medal.pad,
+          background: c.medal.ring,
+          boxShadow: c.medal.glow,
+        }}>
+          <div style={{
+            width: "100%", height: "100%",
+            borderRadius: "50%",
+            background: "#1e293b",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: c.medal.emojiSize,
+          }}>
+            {c.medal.emoji}
+          </div>
+          {/* Rank number badge */}
+          <div style={{
+            position: "absolute",
+            bottom: c.badge.bottom,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: c.badge.size,
+            height: c.badge.size,
+            borderRadius: "50%",
+            background: c.medal.ring,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            border: c.badge.border,
+            color: "#0f172a",
+            fontWeight: 900,
+            fontSize: c.badge.fontSize,
+          }}>
+            {place}
+          </div>
+        </div>
+
+        {/* Name */}
+        <h2 style={{
+          fontSize: c.name.size,
+          fontWeight: c.name.weight,
+          marginBottom: c.name.mb,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap" as const,
+        }}>
+          {player.name}
+        </h2>
+
+        {/* Tier Badge */}
+        <div style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: c.tier.gap,
+          padding: c.tier.pad,
+          borderRadius: "999px",
+          background: c.tier.bgFn(player.tierColor),
+          border: c.tier.borderFn(player.tierColor),
+          marginBottom: c.tier.mb,
+          fontSize: c.tier.fontSize,
+        }}>
+          <span style={c.tier.iconStyle}>{player.tierIcon}</span>
+          <span style={{ color: player.tierColor, fontWeight: c.tier.iconWeight }}>
+            {player.tier}
+          </span>
+        </div>
+
+        {/* Score */}
+        <div style={{
+          fontSize: c.score.size,
+          fontWeight: 900,
+          background: c.score.gradient,
+          backgroundClip: "text",
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent",
+          marginBottom: c.score.mb,
+        }}>
+          {(player.score ?? 0).toLocaleString()}
+        </div>
+
+        {/* Stats — 1st: grid, 2nd/3rd: column */}
+        {c.stats === "grid" ? (
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "8px",
+            fontSize: "clamp(11px, 2.2vw, 14px)",
+          }}>
+            <div>
+              <div style={{ color: "#22c55e", fontWeight: 700 }}>{player.accuracy}%</div>
+              <div style={{ color: "#94a3b8", fontSize: "clamp(9px, 1.8vw, 11px)" }}>accuracy</div>
+            </div>
+            <div>
+              <div style={{ color: "#38bdf8", fontWeight: 700 }}>{player.rounds}</div>
+              <div style={{ color: "#94a3b8", fontSize: "clamp(9px, 1.8vw, 11px)" }}>rounds</div>
+            </div>
+          </div>
+        ) : (
+          <div style={{
+            fontSize: "clamp(10px, 2vw, 12px)",
+            color: "#94a3b8",
+            display: "flex",
+            flexDirection: "column" as const,
+            gap: "4px",
+          }}>
+            <span>{player.accuracy}% accuracy</span>
+            <span>{player.rounds} rounds</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
+// ────────────────────────────────────────────────────────────
 
-interface LeaderboardSnapshot {
-  players: CanonicalPlayer[];
-  stats: LeaderboardStats;
-}
-
-interface EnrichedPlayer extends CanonicalPlayer {
-  tier: typeof TIERS[keyof typeof TIERS];
-}
-
-// ============================================
-// PRESENCE HOOK
-// ============================================
-function usePresence(pageType: string) {
-  const sessionIdRef = useRef<string | undefined>(undefined);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    if (!sessionIdRef.current) {
-      const stored = sessionStorage.getItem("presence_session_id");
-      if (stored) {
-        sessionIdRef.current = stored;
-      } else {
-        sessionIdRef.current = crypto.randomUUID();
-        sessionStorage.setItem("presence_session_id", sessionIdRef.current);
-      }
-    }
-
-    const sendHeartbeat = async () => {
-      try {
-        await supabase.rpc("update_presence", {
-          p_session_id: sessionIdRef.current,
-          p_page_type: pageType,
-          p_round_id: null,
-        });
-      } catch (err) {
-        console.error("Presence heartbeat failed:", err);
-      }
-    };
-
-    sendHeartbeat();
-    const interval = setInterval(sendHeartbeat, 20000); // Canonical: 20 seconds
-
-    return () => clearInterval(interval);
-  }, [pageType]);
-}
-
-// ============================================
-// CANONICAL LEADERBOARD HOOK
-// ============================================
-function useCanonicalLeaderboard(scope: "weekly" | "monthly") {
-  const [snapshot, setSnapshot] = useState<LeaderboardSnapshot | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
-
-  const loadLeaderboard = useCallback(async () => {
-    try {
-      setIsLoading(true);
-
-      const { data, error } = await supabase.rpc("get_leaderboard_snapshot", {
-        p_scope: scope,
-      });
-
-      if (error) {
-        console.error("[Leaderboard] RPC error:", error);
-        setHasError(true);
-        return;
-      }
-
-      if (data) {
-        setSnapshot(data as LeaderboardSnapshot);
-        setHasError(false);
-      }
-    } catch (err) {
-      console.error("[Leaderboard] Error:", err);
-      setHasError(true);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [scope]);
-
-  useEffect(() => {
-    loadLeaderboard();
-    const interval = setInterval(loadLeaderboard, 30000); // 30 seconds
-    return () => clearInterval(interval);
-  }, [loadLeaderboard]);
-
-  return { snapshot, isLoading, hasError, refresh: loadLeaderboard };
-}
-
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
-function getTierInfo(totalScore: number): typeof TIERS[keyof typeof TIERS] {
-  if (totalScore >= TIERS.DIAMOND.min) return TIERS.DIAMOND;
-  if (totalScore >= TIERS.GOLD.min) return TIERS.GOLD;
-  if (totalScore >= TIERS.SILVER.min) return TIERS.SILVER;
-  return TIERS.BRONZE;
-}
-
-function calculateTimeRemaining(resetAt: string): {
-  days: number;
-  hours: number;
-  minutes: number;
-} {
-  const now = Date.now();
-  const target = new Date(resetAt).getTime();
-  const diff = Math.max(0, target - now);
-
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
-  return { days, hours, minutes };
-}
-
-// ============================================
-// MAIN COMPONENT
-// ============================================
 export default function LeaderboardPage() {
   const router = useRouter();
-
+  
   // Core State
-  const [activeTab, setActiveTab] = useState<"weekly" | "monthly">("weekly");
-  const { snapshot, isLoading, hasError } = useCanonicalLeaderboard(activeTab);
-  usePresence(PAGE_TYPE);
-
-  // Music State
+  const [activeTab, setActiveTab] = useState<'weekly' | 'monthly'>('weekly');
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Stats — players'dan türetilir (useMemo, ayrı state yok)
+  const [totalRounds, setTotalRounds] = useState(0); // prize unlock: toplam rounds_played
+  const [timeRemaining, setTimeRemaining] = useState({ days: 0, hours: 0, minutes: 0 });
+  
+  // Prize unlock constants
+  const PRIZE_UNLOCK_THRESHOLD = 3000;
+  
+  // Background Music State
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Time countdown state
-  const [timeRemaining, setTimeRemaining] = useState({ days: 0, hours: 0, minutes: 0 });
+  // ✅ GET TIER INFO
+  const getTierInfo = useCallback((totalScore: number) => {
+    if (totalScore >= TIERS.DIAMOND.min) return TIERS.DIAMOND;
+    if (totalScore >= TIERS.GOLD.min) return TIERS.GOLD;
+    if (totalScore >= TIERS.SILVER.min) return TIERS.SILVER;
+    return TIERS.BRONZE;
+  }, []);
 
-  // SEO
+  // ✅ SEO
   useEffect(() => {
-    document.title = `${
-      activeTab === "weekly" ? "Weekly" : "Monthly"
-    } Leaderboard - VibraXX`;
-
+    document.title = `${activeTab === 'weekly' ? 'Weekly' : 'Monthly'} Leaderboard - VibraXX`;
+    
     const metaDesc = document.querySelector('meta[name="description"]');
     if (metaDesc) {
-      metaDesc.setAttribute(
-        "content",
-        `Compete for £1,000 monthly prize. View ${activeTab} VibraXX leaderboard rankings in UK's premier skill-based quiz competition.`
-      );
+      metaDesc.setAttribute("content", `Compete for £1,000 monthly prize. View ${activeTab} VibraXX leaderboard rankings in UK's premier skill-based quiz competition.`);
     }
   }, [activeTab]);
 
-  // Background Music Setup
+  // ✅ BACKGROUND MUSIC
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const audio = new Audio("/audio/vibraxx.mp3");
+    const audio = new Audio("/sounds/vibraxx.mp3");
     audio.loop = true;
     audio.volume = 0.3;
     audioRef.current = audio;
+
+    const musicEnabled = localStorage.getItem("vibraxx_music_enabled");
+    if (musicEnabled === "true") {
+      setIsMusicPlaying(true);
+    }
 
     return () => {
       if (audioRef.current) {
@@ -253,14 +283,16 @@ export default function LeaderboardPage() {
     };
   }, []);
 
-  // Auto-play on first interaction
   useEffect(() => {
     const handleFirstInteraction = () => {
       if (!hasInteracted) {
         setHasInteracted(true);
-        if (audioRef.current) {
-          audioRef.current.play().catch(() => {});
+        const musicEnabled = localStorage.getItem("vibraxx_music_enabled");
+        
+        // Autoplay on first interaction (unless user explicitly disabled it)
+        if (musicEnabled !== "false" && audioRef.current) {
           setIsMusicPlaying(true);
+          audioRef.current.play().catch(err => console.log("Audio blocked:", err));
         }
       }
     };
@@ -269,827 +301,947 @@ export default function LeaderboardPage() {
     return () => document.removeEventListener("click", handleFirstInteraction);
   }, [hasInteracted]);
 
-  const toggleMusic = useCallback(() => {
-    if (!audioRef.current) return;
+  useEffect(() => {
+    if (!audioRef.current || !hasInteracted) return;
 
     if (isMusicPlaying) {
-      audioRef.current.pause();
-      setIsMusicPlaying(false);
+      audioRef.current.play().catch(err => console.log("Play error:", err));
+      localStorage.setItem("vibraxx_music_enabled", "true");
     } else {
-      audioRef.current.play().catch(() => {});
-      setIsMusicPlaying(true);
+      audioRef.current.pause();
+      localStorage.setItem("vibraxx_music_enabled", "false");
     }
-  }, [isMusicPlaying]);
+  }, [isMusicPlaying, hasInteracted]);
 
-  const handleSignOut = useCallback(async () => {
-    await supabase.auth.signOut();
-    router.push("/");
-  }, [router]);
+  const toggleMusic = useCallback(() => {
+    setIsMusicPlaying(prev => !prev);
+  }, []);
 
-  // Time remaining countdown (based on backend reset_at)
+  // ✅ CALCULATE TIME REMAINING
   useEffect(() => {
-    if (!snapshot?.stats.reset_at) return;
+    const calculateTimeRemaining = () => {
+      const now = new Date();
+      let targetDate: Date;
 
-    const updateCountdown = () => {
-      setTimeRemaining(calculateTimeRemaining(snapshot.stats.reset_at));
+      if (activeTab === 'weekly') {
+        // Next Sunday 23:59:59 UTC
+        targetDate = new Date(now);
+        const daysUntilSunday = (7 - now.getUTCDay()) % 7 || 7;
+        targetDate.setUTCDate(now.getUTCDate() + daysUntilSunday);
+        targetDate.setUTCHours(23, 59, 59, 999);
+      } else {
+        // End of current month 23:59:59 UTC
+        targetDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+      }
+
+      const diff = targetDate.getTime() - now.getTime();
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+      setTimeRemaining({ days, hours, minutes });
     };
 
-    updateCountdown();
-    const interval = setInterval(updateCountdown, 60000); // Update every minute
+    calculateTimeRemaining();
+    const interval = setInterval(calculateTimeRemaining, 60000); // Update every minute
 
     return () => clearInterval(interval);
-  }, [snapshot?.stats.reset_at]);
+  }, [activeTab]);
 
-  // Enrich players with tier info (UI-only decoration)
-  const enrichedPlayers: EnrichedPlayer[] = useMemo(() => {
-    if (!snapshot?.players) return [];
+  // ✅ FETCH LEADERBOARD DATA (YENİ SUPABASE ŞEMASI)
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      setLoading(true);
 
-    return snapshot.players.map((player) => ({
-      ...player,
-      tier: getTierInfo(player.total_score),
-    }));
-  }, [snapshot?.players]);
+      try {
+        const { data, error } = await supabase.rpc("get_leaderboard_snapshot", {
+          p_tab: activeTab,  // 'weekly' | 'monthly'
+        });
 
-  const top3 = enrichedPlayers.slice(0, 3);
-  const restPlayers = enrichedPlayers.slice(3);
+        if (error) {
+          console.error(`Leaderboard ${activeTab} error:`, error);
+          setPlayers([]);
+          return;
+        }
 
-  // Prize unlock progress
-  const prizeUnlockProgress = snapshot?.stats.total_rounds_played
-    ? Math.min(
-        Math.round((snapshot.stats.total_rounds_played / PRIZE_UNLOCK_THRESHOLD) * 100),
-        100
-      )
-    : 0;
+        if (!data || data.length === 0) {
+          setPlayers([]);
+          setTotalRounds(0);
+          return;
+        }
 
-  const isPrizeUnlocked = (snapshot?.stats.total_rounds_played || 0) >= PRIZE_UNLOCK_THRESHOLD;
+        // Map to Player format with tier info
+        const leaderboard: Player[] = data.map((player: any) => {
+          const tier = getTierInfo(player.total_score || 0);
+          const totalQuestions = (player.correct_answers || 0) + (player.wrong_answers || 0);
+          const accuracy = totalQuestions > 0 
+            ? Math.round(((player.correct_answers || 0) / totalQuestions) * 100)
+            : 0;
 
-  if (isLoading) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
-        }}
-      >
-        <div
-          style={{
-            fontSize: 18,
-            fontWeight: 600,
-            color: "#ffffff",
-            animation: "pulse 2s ease-in-out infinite",
-          }}
-        >
-          Loading leaderboard...
-        </div>
-      </div>
-    );
-  }
+          return {
+            id: player.user_id,
+            rank: player.rank,
+            name: player.full_name || "Anonymous",
+            score: player.total_score || 0,
+            correct: player.correct_answers || 0,
+            wrong: player.wrong_answers || 0,
+            rounds: player.rounds_played || 0,
+            accuracy,
+            tier: tier.name,
+            tierIcon: tier.icon,
+            tierColor: tier.color,
+          };
+        });
 
-  if (hasError || !snapshot) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
-          padding: 20,
-        }}
-      >
-        <div
-          style={{
-            fontSize: 24,
-            fontWeight: 700,
-            color: "#ef4444",
-            marginBottom: 16,
-          }}
-        >
-          Failed to Load Leaderboard
-        </div>
-        <button
-          onClick={() => router.push("/")}
-          style={{
-            padding: "12px 24px",
-            borderRadius: 10,
-            border: "none",
-            background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-            color: "white",
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: "pointer",
-          }}
-        >
-          Back to Home
-        </button>
-      </div>
-    );
-  }
+        setPlayers(leaderboard);
+
+        // prize unlock progress: toplam rounds
+        setTotalRounds(leaderboard.reduce((sum, p) => sum + p.rounds, 0));
+
+      } catch (error) {
+        console.error(`Leaderboard ${activeTab} error:`, error);
+        setPlayers([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLeaderboard();
+  }, [activeTab, getTierInfo]);
+
+  const top3 = useMemo(() => players.slice(0, 3), [players]);
+  const restPlayers = useMemo(() => players.slice(3), [players]);
+
+  // Stats — players'dan türetilen, ayrı state yok
+  const totalPlayers = players.length;
+  const topScore = players[0]?.score ?? 0;
+  const avgAccuracy = useMemo(() => {
+    if (players.length === 0) return 0;
+    return Math.round(players.reduce((sum, p) => sum + p.accuracy, 0) / players.length);
+  }, [players]);
 
   return (
     <>
       <style jsx global>{`
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
+        * { box-sizing: border-box; }
+        body { overflow-x: hidden; }
+        
+        @keyframes spin {
+          to { transform: rotate(360deg); }
         }
-
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-          background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-          color: #ffffff;
-          overflow-x: hidden;
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.8; }
         }
-
-        .vx-container {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 0 20px;
+        @keyframes glow {
+          0%, 100% { box-shadow: 0 0 20px rgba(251,191,36,0.4); }
+          50% { box-shadow: 0 0 40px rgba(251,191,36,0.8); }
         }
-
-        .vx-header {
-          position: sticky;
-          top: 0;
-          z-index: 100;
-          background: rgba(15, 23, 42, 0.95);
-          backdrop-filter: blur(12px);
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-          padding: 16px 0;
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
         }
-
-        .vx-header-inner {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 16px;
+        @keyframes slideUp {
+          from { transform: translateY(20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
         }
-
-        .vx-header-right {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          flex-wrap: wrap;
+        @keyframes crownBounce {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          50% { transform: translateY(-15px) rotate(5deg); }
         }
-
-        .vx-hide-mobile {
-          display: flex;
-        }
+        
+        .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+        .animate-glow { animation: glow 2s ease-in-out infinite; }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+        .animate-slide-up { animation: slideUp 0.5s ease-out; }
+        .animate-crown { animation: crownBounce 2s ease-in-out infinite; }
 
         @media (max-width: 768px) {
-          .vx-header-inner {
-            flex-wrap: wrap;
+          .mobile-hide { display: none !important; }
+          .mobile-grid { 
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
           }
-
-          .vx-header-right {
-            width: 100%;
-            justify-content: space-between;
-          }
-
-          .vx-hide-mobile {
-            display: none !important;
-          }
+          .mobile-stack { flex-direction: column !important; }
+          .podium-2nd { order: 2 !important; }
+          .podium-1st { order: 1 !important; }
+          .podium-3rd { order: 3 !important; }
+          .prize-pool-content { flex-direction: column !important; }
+          .prize-pool-info { text-align: center !important; }
+          .prize-pool-countdown { justify-content: center !important; }
+          button { min-height: 44px !important; }
         }
-
-        .animate-slide-up {
-          opacity: 0;
-          animation: slideUp 0.6s ease-out forwards;
-        }
-
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes pulse {
-          0%,
-          100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.5;
-          }
-        }
-
-        .mobile-hide {
-          display: inline;
-        }
-
-        @media (max-width: 640px) {
-          .mobile-hide {
-            display: none;
+        
+        @media (max-width: 375px) {
+          nav button {
+            padding: 8px 16px !important;
+            font-size: 12px !important;
+            letter-spacing: 0.3px !important;
           }
         }
       `}</style>
 
-      <div style={{ minHeight: "100vh", position: "relative" }}>
-        {/* Header */}
-        <header className="vx-header">
-          <div className="vx-container">
-            <div className="vx-header-inner">
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <button
-                  onClick={() => router.push("/")}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    color: "#94a3b8",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                  }}
-                  aria-label="Back to home"
-                >
-                  <Home style={{ width: 18, height: 18 }} />
-                </button>
-
-                <Image
-                  src="/images/logo.png"
-                  alt="VibraXX Logo"
-                  width={40}
-                  height={40}
-                  style={{ borderRadius: 10 }}
-                />
-
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  <div
-                    style={{
-                      fontSize: 20,
-                      fontWeight: 800,
-                      color: "white",
-                      letterSpacing: "-0.02em",
-                      lineHeight: 1,
-                    }}
-                  >
-                    VibraXX
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 10,
-                      color: "#6b7280",
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.1em",
-                    }}
-                  >
-                    Leaderboard
-                  </div>
-                </div>
-              </div>
-
-              <div className="vx-header-right">
-                <button
-                  onClick={toggleMusic}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    color: isMusicPlaying ? "#22d3ee" : "#6b7280",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                  }}
-                  aria-label={isMusicPlaying ? "Mute music" : "Play music"}
-                >
-                  {isMusicPlaying ? (
-                    <Volume2 style={{ width: 18, height: 18 }} />
-                  ) : (
-                    <VolumeX style={{ width: 18, height: 18 }} />
-                  )}
-                </button>
-
-                <button
-                  onClick={() => router.push("/profile")}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: 10,
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    color: "#94a3b8",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  <User style={{ width: 16, height: 16 }} />
-                  <span className="vx-hide-mobile">Profile</span>
-                </button>
-
-                <button
-                  onClick={() => router.push("/buy")}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: 10,
-                    border: "none",
-                    background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-                    color: "white",
-                    fontSize: 14,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    transition: "transform 0.2s",
-                    boxShadow: "0 8px 16px rgba(124, 58, 237, 0.4)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  <ShoppingCart style={{ width: 16, height: 16 }} />
-                  <span className="vx-hide-mobile">Buy</span>
-                </button>
-
-                <button
-                  onClick={handleSignOut}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: 10,
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    color: "#94a3b8",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                  }}
-                  className="vx-hide-mobile"
-                >
-                  Sign Out
-                </button>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* Main Content */}
-        <main style={{ padding: "48px 0" }}>
-          <div className="vx-container">
-            {/* Hero */}
-            <div style={{ textAlign: "center", marginBottom: 48 }}>
-              <h1
+      <div style={{
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 25%, #312e81 50%, #1e1b4b 75%, #0f172a 100%)",
+        backgroundSize: "400% 400%",
+        color: "white",
+        paddingBottom: "0",
+      }}>
+        
+        <div style={{ padding: "clamp(20px, 5vw, 40px) clamp(16px, 4vw, 24px)" }}>
+          
+          {/* HEADER */}
+          <header style={{
+            maxWidth: "1400px",
+            margin: "0 auto clamp(24px, 5vw, 40px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "16px",
+            flexWrap: "wrap",
+          }}>
+            {/* Left: Home + Music */}
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+            }}>
+              <button
+                onClick={() => router.push("/")}
                 style={{
-                  fontSize: "clamp(32px, 8vw, 56px)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "10px 16px",
+                  borderRadius: "12px",
+                  border: "2px solid rgba(139,92,246,0.5)",
+                  background: "rgba(15,23,42,0.8)",
+                  color: "white",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  transition: "all 0.3s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#a78bfa";
+                  e.currentTarget.style.background = "rgba(139,92,246,0.2)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(139,92,246,0.5)";
+                  e.currentTarget.style.background = "rgba(15,23,42,0.8)";
+                }}>
+                <Home style={{ width: "18px", height: "18px" }} />
+                <span>Home</span>
+              </button>
+
+              {/* Music Button - Küçük */}
+              <button
+                onClick={toggleMusic}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "10px",
+                  border: "2px solid rgba(139,92,246,0.5)",
+                  background: isMusicPlaying 
+                    ? "linear-gradient(135deg, rgba(139,92,246,0.95), rgba(124,58,237,0.95))"
+                    : "rgba(15,23,42,0.8)",
+                  cursor: "pointer",
+                  transition: "all 0.3s ease",
+                  boxShadow: isMusicPlaying 
+                    ? "0 0 15px rgba(139,92,246,0.5)"
+                    : "none",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#a78bfa";
+                  e.currentTarget.style.transform = "scale(1.05)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(139,92,246,0.5)";
+                  e.currentTarget.style.transform = "scale(1)";
+                }}
+                title={isMusicPlaying ? "Mute Music" : "Play Music"}>
+                {isMusicPlaying ? (
+                  <Volume2 className="animate-pulse" style={{
+                    width: "18px",
+                    height: "18px",
+                    color: "white",
+                  }} />
+                ) : (
+                  <VolumeX style={{
+                    width: "18px",
+                    height: "18px",
+                    color: "#94a3b8",
+                  }} />
+                )}
+              </button>
+            </div>
+
+            {/* Center: Weekly/Monthly Tabs */}
+            <nav style={{
+              display: "flex",
+              gap: "8px",
+              padding: "4px",
+              borderRadius: "12px",
+              background: "rgba(15,23,42,0.8)",
+              border: "2px solid rgba(139,92,246,0.3)",
+            }}>
+              {(['weekly', 'monthly'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  style={{
+                    padding: "10px 20px",
+                    borderRadius: "10px",
+                    border: "none",
+                    background: activeTab === tab 
+                      ? "linear-gradient(135deg, #7c3aed, #d946ef)"
+                      : "transparent",
+                    color: activeTab === tab ? "white" : "#94a3b8",
+                    fontSize: "13px",
+                    fontWeight: 800,
+                    textTransform: "uppercase",
+                    cursor: "pointer",
+                    transition: "all 0.3s",
+                    letterSpacing: "0.5px",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (activeTab !== tab) {
+                      e.currentTarget.style.color = "#cbd5e1";
+                      e.currentTarget.style.background = "rgba(139,92,246,0.15)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (activeTab !== tab) {
+                      e.currentTarget.style.color = "#94a3b8";
+                      e.currentTarget.style.background = "transparent";
+                    }
+                  }}>
+                  {tab === 'weekly' ? '📅 Weekly' : '📆 Monthly'}
+                </button>
+              ))}
+            </nav>
+
+            {/* Right: Live Indicator */}
+            <div style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "8px 16px",
+              borderRadius: "999px",
+              background: "rgba(34,197,94,0.15)",
+              border: "1px solid rgba(34,197,94,0.5)",
+            }}>
+              <div className="animate-pulse" style={{
+                width: "8px",
+                height: "8px",
+                borderRadius: "50%",
+                background: "#22c55e",
+              }} />
+              <span style={{ fontSize: "12px", color: "#22c55e", fontWeight: 600 }}>
+                Live
+              </span>
+            </div>
+          </header>
+
+          <main style={{ maxWidth: "1400px", margin: "0 auto" }}>
+            
+            {/* === HERO SECTION === */}
+            <div className="animate-slide-up" style={{
+              padding: "clamp(32px, 6vw, 48px) clamp(24px, 5vw, 40px)",
+              borderRadius: "clamp(20px, 4vw, 28px)",
+              border: "2px solid rgba(251,191,36,0.5)",
+              background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(251,191,36,0.3)",
+              backdropFilter: "blur(20px)",
+              marginBottom: "clamp(24px, 5vw, 40px)",
+              textAlign: "center",
+            }}>
+              
+              {/* Title */}
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "16px",
+                marginBottom: "clamp(20px, 4vw, 32px)",
+                flexWrap: "wrap",
+              }}>
+                <Trophy className="animate-float" style={{
+                  width: "clamp(32px, 7vw, 48px)",
+                  height: "clamp(32px, 7vw, 48px)",
+                  color: "#fbbf24",
+                }} />
+                <h1 style={{
+                  fontSize: "clamp(24px, 5vw, 48px)",
                   fontWeight: 900,
-                  marginBottom: 16,
-                  background: "linear-gradient(90deg, #7c3aed, #22d3ee, #7c3aed)",
-                  backgroundSize: "200% 100%",
+                  background: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)",
+                  backgroundClip: "text",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}
-              >
-                Global Leaderboard
-              </h1>
-              <p
-                style={{
+                  textTransform: "uppercase",
+                  letterSpacing: "2px",
+                }}>
+                  {activeTab === 'weekly' ? 'Weekly' : 'Monthly'} Leaderboard
+                </h1>
+                <Trophy className="animate-float" style={{
+                  width: "clamp(32px, 7vw, 48px)",
+                  height: "clamp(32px, 7vw, 48px)",
+                  color: "#fbbf24",
+                }} />
+              </div>
+
+              {/* Premium Prize Pool with Progress Ring */}
+              <div className="animate-glow" style={{
+                padding: "clamp(32px, 6vw, 48px) clamp(24px, 5vw, 40px)",
+                borderRadius: "clamp(20px, 4vw, 28px)",
+                background: "linear-gradient(135deg, rgba(251,191,36,0.25), rgba(245,158,11,0.2))",
+                border: "3px solid rgba(251,191,36,0.6)",
+                marginBottom: "clamp(24px, 5vw, 32px)",
+                position: "relative",
+                overflow: "hidden",
+              }}>
+                {/* Background particles */}
+                <div style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: "radial-gradient(circle at 50% 50%, rgba(251,191,36,0.15) 0%, transparent 70%)",
+                  pointerEvents: "none",
+                }} />
+
+                {/* Title */}
+                <div style={{
                   fontSize: "clamp(14px, 3vw, 18px)",
-                  color: "#94a3b8",
-                  maxWidth: 600,
-                  margin: "0 auto",
-                }}
-              >
-                Compete with players worldwide. Climb the ranks. Win prizes.
-              </p>
-            </div>
-
-            {/* Tabs */}
-            <div
-              style={{
-                display: "flex",
-                gap: 12,
-                justifyContent: "center",
-                marginBottom: 32,
-              }}
-            >
-              <button
-                onClick={() => setActiveTab("weekly")}
-                style={{
-                  padding: "12px 32px",
-                  borderRadius: 12,
-                  border: "none",
-                  background:
-                    activeTab === "weekly"
-                      ? "linear-gradient(135deg, #7c3aed, #d946ef)"
-                      : "rgba(255, 255, 255, 0.05)",
-                  color: "white",
-                  fontSize: 16,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                }}
-              >
-                Weekly
-              </button>
-              <button
-                onClick={() => setActiveTab("monthly")}
-                style={{
-                  padding: "12px 32px",
-                  borderRadius: 12,
-                  border: "none",
-                  background:
-                    activeTab === "monthly"
-                      ? "linear-gradient(135deg, #7c3aed, #d946ef)"
-                      : "rgba(255, 255, 255, 0.05)",
-                  color: "white",
-                  fontSize: 16,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                }}
-              >
-                Monthly
-              </button>
-            </div>
-
-            {/* Stats Grid */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                gap: 20,
-                marginBottom: 48,
-              }}
-            >
-              <div
-                style={{
-                  padding: 24,
-                  borderRadius: 16,
-                  background: "rgba(139, 92, 246, 0.1)",
-                  border: "1px solid rgba(139, 92, 246, 0.3)",
+                  color: "#fcd34d",
+                  fontWeight: 800,
+                  marginBottom: "clamp(24px, 5vw, 32px)",
+                  textTransform: "uppercase",
+                  letterSpacing: "1.5px",
                   textAlign: "center",
-                }}
-              >
-                <Users style={{ width: 32, height: 32, color: "#8b5cf6", margin: "0 auto 12px" }} />
-                <div style={{ fontSize: 32, fontWeight: 900, color: "white", marginBottom: 4 }}>
-                  {snapshot.stats.total_players.toLocaleString()}
+                  position: "relative",
+                  zIndex: 1,
+                }}>
+                  💰 {activeTab === 'weekly' ? 'Weekly' : 'Monthly'} Prize Pool
                 </div>
-                <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase" }}>
-                  Total Players
-                </div>
-              </div>
 
-              <div
-                style={{
-                  padding: 24,
-                  borderRadius: 16,
-                  background: "rgba(34, 211, 238, 0.1)",
-                  border: "1px solid rgba(34, 211, 238, 0.3)",
-                  textAlign: "center",
-                }}
-              >
-                <Trophy style={{ width: 32, height: 32, color: "#22d3ee", margin: "0 auto 12px" }} />
-                <div style={{ fontSize: 32, fontWeight: 900, color: "white", marginBottom: 4 }}>
-                  {snapshot.stats.top_score.toLocaleString()}
-                </div>
-                <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase" }}>
-                  Top Score
-                </div>
-              </div>
-
-              <div
-                style={{
-                  padding: 24,
-                  borderRadius: 16,
-                  background: "rgba(34, 197, 94, 0.1)",
-                  border: "1px solid rgba(34, 197, 94, 0.3)",
-                  textAlign: "center",
-                }}
-              >
-                <Target style={{ width: 32, height: 32, color: "#22c55e", margin: "0 auto 12px" }} />
-                <div style={{ fontSize: 32, fontWeight: 900, color: "white", marginBottom: 4 }}>
-                  {Math.round(snapshot.stats.avg_accuracy)}%
-                </div>
-                <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase" }}>
-                  Avg Accuracy
-                </div>
-              </div>
-
-              <div
-                style={{
-                  padding: 24,
-                  borderRadius: 16,
-                  background: "rgba(251, 191, 36, 0.1)",
-                  border: "1px solid rgba(251, 191, 36, 0.3)",
-                  textAlign: "center",
-                }}
-              >
-                <Clock style={{ width: 32, height: 32, color: "#fbbf24", margin: "0 auto 12px" }} />
-                <div style={{ fontSize: 20, fontWeight: 900, color: "white", marginBottom: 4 }}>
-                  {timeRemaining.days}d {timeRemaining.hours}h {timeRemaining.minutes}m
-                </div>
-                <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase" }}>
-                  Until Reset
-                </div>
-              </div>
-            </div>
-
-            {/* Prize Unlock Progress (Monthly Only) */}
-            {activeTab === "monthly" && (
-              <div
-                style={{
-                  padding: 32,
-                  borderRadius: 24,
-                  background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-                  border: `2px solid ${isPrizeUnlocked ? "#22c55e" : "#fbbf24"}`,
-                  marginBottom: 48,
-                }}
-              >
-                <div
-                  style={{
+                {/* Main Content - Circular Progress */}
+                <div className="prize-pool-content" style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "clamp(32px, 6vw, 48px)",
+                  position: "relative",
+                  zIndex: 1,
+                }}>
+                  
+                  {/* Circular Progress Ring */}
+                  <div style={{
+                    position: "relative",
+                    width: "clamp(160px, 30vw, 200px)",
+                    height: "clamp(160px, 30vw, 200px)",
                     display: "flex",
                     alignItems: "center",
-                    gap: 12,
-                    marginBottom: 16,
-                  }}
-                >
-                  <Gift
-                    style={{
-                      width: 28,
-                      height: 28,
-                      color: isPrizeUnlocked ? "#22c55e" : "#fbbf24",
-                    }}
-                  />
-                  <h3 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>
-                    £1,000 Monthly Prize
-                  </h3>
-                </div>
+                    justifyContent: "center",
+                  }}>
+                    {/* SVG Progress Ring */}
+                    <svg
+                      width="100%"
+                      height="100%"
+                      viewBox="0 0 200 200"
+                      style={{
+                        transform: "rotate(-90deg)",
+                        filter: totalRounds >= PRIZE_UNLOCK_THRESHOLD 
+                          ? "drop-shadow(0 0 20px rgba(251,191,36,0.8))"
+                          : "drop-shadow(0 0 10px rgba(139,92,246,0.5))",
+                      }}>
+                      {/* Background Circle */}
+                      <circle
+                        cx="100"
+                        cy="100"
+                        r="85"
+                        fill="none"
+                        stroke="rgba(15,23,42,0.6)"
+                        strokeWidth="12"
+                      />
+                      {/* Progress Circle */}
+                      <circle
+                        cx="100"
+                        cy="100"
+                        r="85"
+                        fill="none"
+                        stroke={totalRounds >= PRIZE_UNLOCK_THRESHOLD 
+                          ? "url(#goldGradient)" 
+                          : "url(#purpleGradient)"}
+                        strokeWidth="12"
+                        strokeLinecap="round"
+                        strokeDasharray={`${2 * Math.PI * 85}`}
+                        strokeDashoffset={`${2 * Math.PI * 85 * (1 - Math.min(totalRounds / PRIZE_UNLOCK_THRESHOLD, 1))}`}
+                        style={{
+                          transition: "stroke-dashoffset 1s ease-out, stroke 0.5s ease",
+                        }}
+                      />
+                      {/* Gradients */}
+                      <defs>
+                        <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#fbbf24" />
+                          <stop offset="50%" stopColor="#f59e0b" />
+                          <stop offset="100%" stopColor="#fbbf24" />
+                        </linearGradient>
+                        <linearGradient id="purpleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#8b5cf6" />
+                          <stop offset="50%" stopColor="#d946ef" />
+                          <stop offset="100%" stopColor="#8b5cf6" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
 
-                <div
-                  style={{
-                    width: "100%",
-                    height: 12,
-                    borderRadius: 999,
-                    background: "rgba(255, 255, 255, 0.1)",
-                    overflow: "hidden",
-                    marginBottom: 12,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: `${prizeUnlockProgress}%`,
-                      height: "100%",
-                      background: isPrizeUnlocked
-                        ? "linear-gradient(90deg, #22c55e, #10b981)"
-                        : "linear-gradient(90deg, #fbbf24, #f59e0b)",
-                      transition: "width 0.3s",
-                    }}
-                  />
-                </div>
+                    {/* Center Content */}
+                    <div style={{
+                      position: "absolute",
+                      top: "50%",
+                      left: "50%",
+                      transform: "translate(-50%, -50%)",
+                      textAlign: "center",
+                    }}>
+                      {/* Icon */}
+                      <div style={{
+                        fontSize: "clamp(32px, 6vw, 48px)",
+                        marginBottom: "8px",
+                        animation: totalRounds >= PRIZE_UNLOCK_THRESHOLD 
+                          ? "float 2s ease-in-out infinite"
+                          : totalRounds >= PRIZE_UNLOCK_THRESHOLD * 0.95
+                          ? "pulse 1s ease-in-out infinite"
+                          : "none",
+                      }}>
+                        {totalRounds >= PRIZE_UNLOCK_THRESHOLD ? "🎉" : "🔒"}
+                      </div>
+                      {/* Percentage */}
+                      <div style={{
+                        fontSize: "clamp(24px, 5vw, 36px)",
+                        fontWeight: 900,
+                        background: totalRounds >= PRIZE_UNLOCK_THRESHOLD
+                          ? "linear-gradient(90deg, #fbbf24, #f59e0b)"
+                          : "linear-gradient(90deg, #8b5cf6, #d946ef)",
+                        backgroundClip: "text",
+                        WebkitBackgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                        lineHeight: 1,
+                      }}>
+                        {Math.round((totalRounds / PRIZE_UNLOCK_THRESHOLD) * 100)}%
+                      </div>
+                    </div>
+                  </div>
 
-                <div style={{ fontSize: 14, color: "#94a3b8" }}>
-                  {isPrizeUnlocked ? (
-                    <span style={{ color: "#22c55e", fontWeight: 600 }}>
-                      ✓ Prize Unlocked! Winner announced at month end.
-                    </span>
-                  ) : (
-                    <>
-                      {snapshot.stats.total_rounds_played.toLocaleString()} /{" "}
-                      {PRIZE_UNLOCK_THRESHOLD.toLocaleString()} rounds played
-                    </>
-                  )}
+                  {/* Right Side - Info */}
+                  <div className="prize-pool-info" style={{
+                    flex: 1,
+                    textAlign: "left",
+                  }}>
+                    {/* Prize Amount */}
+                    <div style={{
+                      fontSize: "clamp(48px, 10vw, 80px)",
+                      fontWeight: 900,
+                      background: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)",
+                      backgroundClip: "text",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      lineHeight: 1,
+                      marginBottom: "16px",
+                      filter: totalRounds >= PRIZE_UNLOCK_THRESHOLD
+                        ? "drop-shadow(0 0 20px rgba(251,191,36,0.6))"
+                        : "none",
+                    }}>
+                      £1,000
+                    </div>
+
+                    {/* Status */}
+                    {totalRounds >= PRIZE_UNLOCK_THRESHOLD ? (
+                      <div style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        padding: "10px 20px",
+                        borderRadius: "999px",
+                        background: "linear-gradient(135deg, rgba(34,197,94,0.25), rgba(21,128,61,0.2))",
+                        border: "2px solid rgba(34,197,94,0.6)",
+                        marginBottom: "16px",
+                      }}>
+                        <Sparkles style={{ width: "20px", height: "20px", color: "#22c55e" }} />
+                        <span style={{
+                          fontSize: "clamp(12px, 2.5vw, 16px)",
+                          fontWeight: 800,
+                          color: "#22c55e",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                        }}>
+                          PRIZE ACTIVE!
+                        </span>
+                      </div>
+                    ) : (
+                      <div style={{
+                        marginBottom: "16px",
+                      }}>
+                        <div style={{
+                          fontSize: "clamp(14px, 3vw, 18px)",
+                          fontWeight: 700,
+                          color: "#fcd34d",
+                          marginBottom: "8px",
+                        }}>
+                          {totalRounds.toLocaleString()} / {PRIZE_UNLOCK_THRESHOLD.toLocaleString()} Purchases
+                        </div>
+                        <div style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          padding: "8px 16px",
+                          borderRadius: "999px",
+                          background: "rgba(139,92,246,0.2)",
+                          border: "1px solid rgba(139,92,246,0.5)",
+                        }}>
+                          <Target style={{ width: "16px", height: "16px", color: "#a78bfa" }} />
+                          <span style={{
+                            fontSize: "clamp(11px, 2.2vw, 14px)",
+                            fontWeight: 700,
+                            color: "#a78bfa",
+                          }}>
+                            {(PRIZE_UNLOCK_THRESHOLD - totalRounds).toLocaleString()} more to unlock!
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Countdown */}
+                    <div className="prize-pool-countdown" style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "flex-start",
+                      gap: "8px",
+                      fontSize: "clamp(11px, 2.2vw, 14px)",
+                      color: "#cbd5e1",
+                    }}>
+                      <Clock style={{ width: "16px", height: "16px" }} />
+                      <span>
+                        Resets in {timeRemaining.days}d {timeRemaining.hours}h {timeRemaining.minutes}m
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            )}
 
-            {/* Players List */}
-            {enrichedPlayers.length === 0 ? (
-              <div
-                style={{
-                  padding: 64,
-                  textAlign: "center",
-                  color: "#6b7280",
-                  fontSize: 16,
-                }}
-              >
-                No players yet. Be the first to compete!
+              {/* Stats Cards */}
+              <div className="mobile-grid" style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                gap: "clamp(12px, 3vw, 16px)",
+              }}>
+                
+                {/* Total Players */}
+                <div style={{
+                  padding: "clamp(16px, 3vw, 20px)",
+                  borderRadius: "14px",
+                  background: "linear-gradient(135deg, rgba(139,92,246,0.2), rgba(124,58,237,0.15))",
+                  border: "2px solid rgba(139,92,246,0.5)",
+                }}>
+                  <Users style={{
+                    width: "clamp(20px, 4vw, 28px)",
+                    height: "clamp(20px, 4vw, 28px)",
+                    color: "#a78bfa",
+                    margin: "0 auto 8px",
+                  }} />
+                  <div style={{
+                    fontSize: "clamp(20px, 4vw, 32px)",
+                    fontWeight: 900,
+                    color: "#a78bfa",
+                    lineHeight: 1,
+                    marginBottom: "4px",
+                  }}>
+                    {totalPlayers.toLocaleString()}
+                  </div>
+                  <div style={{
+                    fontSize: "clamp(10px, 2vw, 12px)",
+                    color: "#c4b5fd",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                  }}>
+                    Players
+                  </div>
+                </div>
+
+                {/* Top Score */}
+                <div style={{
+                  padding: "clamp(16px, 3vw, 20px)",
+                  borderRadius: "14px",
+                  background: "linear-gradient(135deg, rgba(34,197,94,0.2), rgba(21,128,61,0.15))",
+                  border: "2px solid rgba(34,197,94,0.5)",
+                }}>
+                  <Star style={{
+                    width: "clamp(20px, 4vw, 28px)",
+                    height: "clamp(20px, 4vw, 28px)",
+                    color: "#22c55e",
+                    margin: "0 auto 8px",
+                  }} />
+                  <div style={{
+                    fontSize: "clamp(20px, 4vw, 32px)",
+                    fontWeight: 900,
+                    color: "#22c55e",
+                    lineHeight: 1,
+                    marginBottom: "4px",
+                  }}>
+                    {topScore.toLocaleString()}
+                  </div>
+                  <div style={{
+                    fontSize: "clamp(10px, 2vw, 12px)",
+                    color: "#86efac",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                  }}>
+                    Top Score
+                  </div>
+                </div>
+
+                {/* Avg Accuracy */}
+                <div style={{
+                  padding: "clamp(16px, 3vw, 20px)",
+                  borderRadius: "14px",
+                  background: "linear-gradient(135deg, rgba(56,189,248,0.2), rgba(14,165,233,0.15))",
+                  border: "2px solid rgba(56,189,248,0.5)",
+                }}>
+                  <Target style={{
+                    width: "clamp(20px, 4vw, 28px)",
+                    height: "clamp(20px, 4vw, 28px)",
+                    color: "#38bdf8",
+                    margin: "0 auto 8px",
+                  }} />
+                  <div style={{
+                    fontSize: "clamp(20px, 4vw, 32px)",
+                    fontWeight: 900,
+                    color: "#38bdf8",
+                    lineHeight: 1,
+                    marginBottom: "4px",
+                  }}>
+                    {avgAccuracy}%
+                  </div>
+                  <div style={{
+                    fontSize: "clamp(10px, 2vw, 12px)",
+                    color: "#7dd3fc",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                  }}>
+                    Avg Accuracy
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* === LOADING === */}
+            {loading ? (
+              <div style={{
+                padding: "clamp(60px, 12vw, 100px)",
+                textAlign: "center",
+              }}>
+                <div style={{
+                  width: "60px",
+                  height: "60px",
+                  borderRadius: "50%",
+                  border: "4px solid rgba(139,92,246,0.3)",
+                  borderTopColor: "#a78bfa",
+                  animation: "spin 1s linear infinite",
+                  margin: "0 auto 20px",
+                }} />
+                <p style={{ color: "#94a3b8", fontSize: "16px" }}>Loading leaderboard...</p>
+              </div>
+            ) : players.length === 0 ? (
+              <div style={{
+                padding: "clamp(60px, 12vw, 100px)",
+                textAlign: "center",
+                borderRadius: "20px",
+                border: "2px solid rgba(139,92,246,0.3)",
+                background: "rgba(15,23,42,0.6)",
+              }}>
+                <Trophy style={{
+                  width: "48px",
+                  height: "48px",
+                  color: "#64748b",
+                  margin: "0 auto 16px",
+                }} />
+                <p style={{ color: "#94a3b8", fontSize: "16px" }}>No players yet. Be the first!</p>
               </div>
             ) : (
               <>
-                {/* Top 3 Podium */}
-                {top3.length > 0 && (
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                      gap: 20,
-                      marginBottom: 48,
-                    }}
-                  >
-                    {top3.map((player, idx) => (
-                      <div
-                        key={player.user_id}
-                        style={{
-                          padding: 32,
-                          borderRadius: 24,
-                          background: player.tier.gradient,
-                          textAlign: "center",
-                          position: "relative",
-                          boxShadow: `0 12px 40px ${player.tier.color}40`,
-                        }}
-                      >
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: -16,
-                            left: "50%",
-                            transform: "translateX(-50%)",
-                            width: 48,
-                            height: 48,
-                            borderRadius: "50%",
-                            background: "white",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: 24,
-                          }}
-                        >
-                          {player.rank === 1 ? "🥇" : player.rank === 2 ? "🥈" : "🥉"}
-                        </div>
+                {/* === TOP 3 PODIUM === */}
+                <div className="mobile-stack" style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: "clamp(16px, 3vw, 24px)",
+                  marginBottom: "clamp(32px, 6vw, 48px)",
+                  alignItems: "end",
+                }}>
+                  
+                  {/* 2nd Place */}
+                  {top3[1] && <PodiumCard player={top3[1]} place={2} />}
 
-                        <div style={{ marginTop: 24, marginBottom: 12 }}>
-                          <div style={{ fontSize: 20, fontWeight: 800, color: "white" }}>
-                            {player.full_name}
-                          </div>
-                          <div style={{ fontSize: 14, color: "rgba(255,255,255,0.8)" }}>
-                            Rank #{player.rank}
-                          </div>
-                        </div>
+                  {/* 1st Place */}
+                  {top3[0] && <PodiumCard player={top3[0]} place={1} />}
 
-                        <div
-                          style={{
-                            fontSize: 36,
-                            fontWeight: 900,
-                            color: "white",
-                            marginBottom: 8,
-                          }}
-                        >
-                          {player.total_score.toLocaleString()}
-                        </div>
+                  {/* 3rd Place */}
+                  {top3[2] && <PodiumCard player={top3[2]} place={3} />}
+                </div>
 
-                        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.8)" }}>
-                          {player.accuracy}% accuracy • {player.rounds_played} rounds
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Rest of Players */}
+                {/* === REST OF LEADERBOARD === */}
                 {restPlayers.length > 0 && (
-                  <div
-                    style={{
-                      padding: 32,
-                      borderRadius: 24,
-                      background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-                      border: "1px solid rgba(139, 92, 246, 0.3)",
-                    }}
-                  >
-                    <h2
-                      style={{
-                        fontSize: 24,
-                        fontWeight: 900,
-                        marginBottom: 24,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                      }}
-                    >
-                      <Sparkles style={{ width: 24, height: 24, color: "#a78bfa" }} />
+                  <div className="animate-slide-up" style={{
+                    padding: "clamp(24px, 5vw, 32px)",
+                    borderRadius: "clamp(16px, 3vw, 24px)",
+                    border: "2px solid rgba(139,92,246,0.5)",
+                    background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)",
+                    boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+                    backdropFilter: "blur(20px)",
+                    animationDelay: "0.3s",
+                  }}>
+                    
+                    <h2 style={{
+                      fontSize: "clamp(18px, 4vw, 24px)",
+                      fontWeight: 900,
+                      marginBottom: "clamp(20px, 4vw, 24px)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                    }}>
+                      <Sparkles style={{ width: "24px", height: "24px", color: "#a78bfa" }} />
                       Ranked Players
                     </h2>
 
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "12px",
+                    }}>
                       {restPlayers.map((player, idx) => (
                         <div
-                          key={player.user_id}
+                          key={player.id}
+                          className="animate-slide-up"
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: 16,
-                            padding: 16,
-                            borderRadius: 14,
-                            background: "rgba(139, 92, 246, 0.05)",
-                            border: "1px solid rgba(139, 92, 246, 0.2)",
+                            gap: "clamp(12px, 2.5vw, 16px)",
+                            padding: "clamp(12px, 2.5vw, 16px)",
+                            borderRadius: "14px",
+                            background: "rgba(139,92,246,0.05)",
+                            border: "1px solid rgba(139,92,246,0.2)",
                             transition: "all 0.3s",
+                            cursor: "pointer",
+                            animationDelay: `${Math.min(idx * 0.03, 0.5)}s`,
                           }}
-                        >
-                          {/* Rank */}
-                          <div
-                            style={{
-                              width: 48,
-                              height: 48,
-                              borderRadius: 10,
-                              background:
-                                player.rank <= 10
-                                  ? "linear-gradient(135deg, #8b5cf6, #7c3aed)"
-                                  : "rgba(139, 92, 246, 0.2)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: 16,
-                              fontWeight: 900,
-                              color: "white",
-                              flexShrink: 0,
-                            }}
-                          >
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "rgba(139,92,246,0.15)";
+                            e.currentTarget.style.borderColor = "rgba(139,92,246,0.5)";
+                            e.currentTarget.style.transform = "translateX(8px)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "rgba(139,92,246,0.05)";
+                            e.currentTarget.style.borderColor = "rgba(139,92,246,0.2)";
+                            e.currentTarget.style.transform = "translateX(0)";
+                          }}>
+                          
+                          {/* Rank Badge */}
+                          <div style={{
+                            width: "clamp(36px, 7vw, 48px)",
+                            height: "clamp(36px, 7vw, 48px)",
+                            borderRadius: "10px",
+                            background: player.rank <= 10 
+                              ? "linear-gradient(135deg, #8b5cf6, #7c3aed)"
+                              : "rgba(139,92,246,0.2)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "clamp(12px, 2.5vw, 16px)",
+                            fontWeight: 900,
+                            color: "white",
+                            flexShrink: 0,
+                            boxShadow: player.rank <= 10 ? "0 4px 12px rgba(139,92,246,0.5)" : "none",
+                          }}>
                             #{player.rank}
                           </div>
 
                           {/* Player Info */}
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 8,
-                                marginBottom: 4,
-                              }}
-                            >
-                              <span
-                                style={{
-                                  fontSize: 16,
-                                  fontWeight: 800,
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {player.full_name}
+                            <div style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                              marginBottom: "4px",
+                            }}>
+                              <span style={{
+                                fontSize: "clamp(14px, 3vw, 16px)",
+                                fontWeight: 800,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}>
+                                {player.name}
                               </span>
-                              <span style={{ fontSize: 16 }}>{player.tier.icon}</span>
+                              <span style={{ fontSize: "clamp(14px, 3vw, 16px)" }}>
+                                {player.tierIcon}
+                              </span>
                             </div>
-                            <div
-                              style={{
-                                fontSize: 12,
-                                color: "#64748b",
-                                display: "flex",
-                                gap: 10,
-                              }}
-                            >
+                            <div style={{
+                              fontSize: "clamp(10px, 2vw, 12px)",
+                              color: "#64748b",
+                              display: "flex",
+                              gap: "10px",
+                              flexWrap: "wrap",
+                            }}>
                               <span style={{ color: "#22c55e" }}>
                                 {player.accuracy}% acc
                               </span>
                               <span className="mobile-hide">•</span>
                               <span className="mobile-hide">
-                                {player.rounds_played} rounds
+                                {player.rounds} rounds
                               </span>
                             </div>
                           </div>
 
                           {/* Score */}
-                          <div
-                            style={{
-                              padding: "12px 20px",
-                              borderRadius: 10,
-                              background: "rgba(139, 92, 246, 0.15)",
-                              border: "1px solid rgba(139, 92, 246, 0.3)",
-                              textAlign: "right",
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: 22,
-                                fontWeight: 900,
-                                background: "linear-gradient(90deg, #a78bfa, #f0abfc)",
-                                backgroundClip: "text",
-                                WebkitBackgroundClip: "text",
-                                WebkitTextFillColor: "transparent",
-                              }}
-                            >
-                              {player.total_score.toLocaleString()}
+                          <div style={{
+                            padding: "clamp(8px, 2vw, 12px) clamp(12px, 2.5vw, 20px)",
+                            borderRadius: "10px",
+                            background: "rgba(139,92,246,0.15)",
+                            border: "1px solid rgba(139,92,246,0.3)",
+                            textAlign: "right",
+                          }}>
+                            <div style={{
+                              fontSize: "clamp(16px, 3.5vw, 22px)",
+                              fontWeight: 900,
+                              background: "linear-gradient(90deg, #a78bfa, #f0abfc)",
+                              backgroundClip: "text",
+                              WebkitBackgroundClip: "text",
+                              WebkitTextFillColor: "transparent",
+                            }}>
+                              {(player.score ?? 0).toLocaleString()}
                             </div>
-                            <div style={{ fontSize: 11, color: "#64748b" }}>points</div>
+                            <div style={{
+                              fontSize: "clamp(9px, 1.8vw, 11px)",
+                              color: "#64748b",
+                            }}>
+                              points
+                            </div>
                           </div>
 
-                          <ChevronRight
+                          <ChevronRight 
                             className="mobile-hide"
                             style={{
-                              width: 20,
-                              height: 20,
+                              width: "20px",
+                              height: "20px",
                               color: "#64748b",
                               flexShrink: 0,
-                            }}
+                            }} 
                           />
                         </div>
                       ))}
@@ -1098,8 +1250,9 @@ export default function LeaderboardPage() {
                 )}
               </>
             )}
-          </div>
-        </main>
+
+          </main>
+        </div>
 
         <Footer />
       </div>
