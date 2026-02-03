@@ -10,56 +10,56 @@ import {
   ArrowRight,
   Volume2,
   VolumeX,
-  Sparkles,
   Globe,
   Gift,
   ShoppingCart,
   CheckCircle,
   AlertCircle,
-  BookOpen,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { playMenuMusic, stopMenuMusic } from "@/lib/audioManager";
+import Footer from "@/components/Footer";
 
 // ============================================
-// PRESENCE HOOK (KANONİK)
+// 🎯 PRESENCE TRACKING HOOK (KANONİK)
 // ============================================
 function usePresence(pageType: string) {
   const sessionIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === 'undefined') return;
 
     if (!sessionIdRef.current) {
-      const stored = sessionStorage.getItem("presence_session_id");
+      const stored = sessionStorage.getItem('presence_session_id');
       if (stored) {
         sessionIdRef.current = stored;
       } else {
         sessionIdRef.current = crypto.randomUUID();
-        sessionStorage.setItem("presence_session_id", sessionIdRef.current);
+        sessionStorage.setItem('presence_session_id', sessionIdRef.current);
       }
     }
 
     const sendHeartbeat = async () => {
       try {
-        await supabase.rpc("update_presence", {
+        await supabase.rpc('update_presence', {
           p_session_id: sessionIdRef.current,
           p_page_type: pageType,
-          p_round_id: null,
+          p_round_id: null
         });
       } catch (err) {
-        console.error("[Presence] Heartbeat failed:", err);
+        console.error('Presence heartbeat failed:', err);
       }
     };
 
     sendHeartbeat();
     const interval = setInterval(sendHeartbeat, 30000);
+
     return () => clearInterval(interval);
   }, [pageType]);
 }
 
 // ============================================
-// MEMOIZED COMPONENTS (TASARIM DOKUNULMAZ)
+// MEMOIZED COMPONENTS
 // ============================================
 const StatCard = memo(({ icon: Icon, value, label }: any) => (
   <div className="vx-stat-card">
@@ -72,7 +72,7 @@ StatCard.displayName = "StatCard";
 
 const ChampionCard = memo(({ champion }: any) => {
   const Icon = champion.icon;
-
+  
   if (!champion.name || champion.name === "TBA" || champion.score === 0) {
     return (
       <div className="vx-champ-card">
@@ -91,6 +91,7 @@ const ChampionCard = memo(({ champion }: any) => {
         >
           <Icon style={{ width: 28, height: 28, color: champion.color }} />
         </div>
+
         <div
           style={{
             fontSize: 10,
@@ -103,6 +104,7 @@ const ChampionCard = memo(({ champion }: any) => {
         >
           {champion.period} Champion
         </div>
+
         <div
           style={{
             fontSize: 14,
@@ -137,6 +139,7 @@ const ChampionCard = memo(({ champion }: any) => {
       >
         <Icon style={{ width: 28, height: 28, color: champion.color }} />
       </div>
+
       <div
         style={{
           fontSize: 10,
@@ -149,6 +152,7 @@ const ChampionCard = memo(({ champion }: any) => {
       >
         {champion.period} Champion
       </div>
+
       <div
         style={{
           fontSize: 18,
@@ -159,6 +163,7 @@ const ChampionCard = memo(({ champion }: any) => {
       >
         {champion.name}
       </div>
+
       <div
         style={{
           fontSize: 24,
@@ -216,13 +221,21 @@ const AgeVerificationModal = memo(({ onConfirm, onCancel }: any) => (
         >
           <AlertCircle style={{ width: 32, height: 32, color: "white" }} />
         </div>
-        <h3 style={{ fontSize: 24, fontWeight: 700, marginBottom: 12, color: "white" }}>
+        <h3
+          style={{
+            fontSize: 24,
+            fontWeight: 700,
+            marginBottom: 12,
+            color: "white",
+          }}
+        >
           Age Verification Required
         </h3>
         <p style={{ fontSize: 15, color: "#94a3b8", lineHeight: 1.6 }}>
           To participate in Live Quiz competitions with real prizes, you must be at least 18 years old.
         </p>
       </div>
+
       <div
         style={{
           background: "rgba(139, 92, 246, 0.1)",
@@ -245,6 +258,7 @@ const AgeVerificationModal = memo(({ onConfirm, onCancel }: any) => (
           </p>
         </div>
       </div>
+
       <div style={{ display: "flex", gap: 12 }}>
         <button
           onClick={onCancel}
@@ -329,7 +343,14 @@ const NoRoundsModal = memo(({ onBuyRounds, onCancel }: any) => (
         >
           <ShoppingCart style={{ width: 32, height: 32, color: "white" }} />
         </div>
-        <h3 style={{ fontSize: 24, fontWeight: 700, marginBottom: 12, color: "white" }}>
+        <h3
+          style={{
+            fontSize: 24,
+            fontWeight: 700,
+            marginBottom: 12,
+            color: "white",
+          }}
+        >
           No Rounds Available
         </h3>
         <p style={{ fontSize: 15, color: "#94a3b8", lineHeight: 1.6 }}>
@@ -337,6 +358,7 @@ const NoRoundsModal = memo(({ onBuyRounds, onCancel }: any) => (
           <strong style={{ color: "#fbbf24" }}>£1000 monthly prize</strong>!
         </p>
       </div>
+
       <div
         style={{
           background: "rgba(251, 191, 36, 0.1)",
@@ -359,6 +381,7 @@ const NoRoundsModal = memo(({ onBuyRounds, onCancel }: any) => (
           </p>
         </div>
       </div>
+
       <div style={{ display: "flex", gap: 12 }}>
         <button
           onClick={onCancel}
@@ -406,55 +429,35 @@ const NoRoundsModal = memo(({ onBuyRounds, onCancel }: any) => (
 ));
 NoRoundsModal.displayName = "NoRoundsModal";
 
-// ============================================
-// HOMEPAGE - KANONİK
-// ============================================
 export default function HomePage() {
-  // ── STATE ──────────────────────────────────
-  const [user, setUser] = useState<any>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [hasInteracted, setHasInteracted] = useState(false);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-
-  // Modal state
-  const [showAgeModal, setShowAgeModal] = useState(false);
-  const [showNoRoundsModal, setShowNoRoundsModal] = useState(false);
-  const [pendingAction, setPendingAction] = useState<"live" | "free" | null>(null);
-
-  // ── RPC DATA (tek karar merkezi) ───────────
+  const [globalTimeLeft, setGlobalTimeLeft] = useState<number | null>(null);
   const [activePlayers, setActivePlayers] = useState(0);
+  const [user, setUser] = useState<any>(null);
+  const [champions, setChampions] = useState<any[]>([]);
+  const [showAgeModal, setShowAgeModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"live" | "free" | null>(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [userRounds, setUserRounds] = useState(0);
-  const [ageVerified, setAgeVerified] = useState(false);
-  const [nextRoundStart, setNextRoundStart] = useState<number | null>(null);
+  const [showNoRoundsModal, setShowNoRoundsModal] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
+
+  // ✅ KANONİK: Real data states
   const [totalRounds, setTotalRounds] = useState(0);
   const [totalParticipants, setTotalParticipants] = useState(0);
-  const [champions, setChampions] = useState<any[]>([]);
 
-  // ── REFS ───────────────────────────────────
-  const mountedRef = useRef(false);
-  const resumeIntentHandledRef = useRef(false);
+  const countdownPauseUntilRef = useRef<number>(0);
+  const mountedRef = useRef<boolean>(false);
+  const resumeIntentHandledRef = useRef<boolean>(false);
 
-  // ── COUNTDOWN (local tick, source: RPC) ────
-  const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
+  // ============================================
+  // 🎯 PRESENCE TRACKING (KANONİK)
+  // ============================================
+  usePresence('homepage');
 
-  useEffect(() => {
-    if (nextRoundStart === null) return;
-    const now = Math.floor(Date.now() / 1000);
-    setCountdownSeconds(Math.max(0, nextRoundStart - now));
-  }, [nextRoundStart]);
-
-  useEffect(() => {
-    if (countdownSeconds === null || countdownSeconds <= 0) return;
-    const tick = setInterval(() => {
-      setCountdownSeconds((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
-    }, 1000);
-    return () => clearInterval(tick);
-  }, [countdownSeconds]);
-
-  // ── PRESENCE ───────────────────────────────
-  usePresence("homepage");
-
-  // ── FETCH HOMEPAGE STATE (tek RPC) ─────────
+  // ============================================
+  // 🎯 FETCH HOMEPAGE STATE (KANONİK - TEK RPC)
+  // ============================================
   const fetchHomepageState = useCallback(async () => {
     try {
       const { data, error } = await supabase.rpc("get_homepage_state");
@@ -464,15 +467,16 @@ export default function HomePage() {
       }
       if (!mountedRef.current) return;
 
-      // Backend'den gelen verileri state'e yaz
-      if (data.active_players !== undefined) setActivePlayers(data.active_players);
-      if (data.user_credits !== undefined) setUserRounds(data.user_credits);
-      if (data.age_verified !== undefined) setAgeVerified(data.age_verified);
-      if (data.next_round_start !== undefined && data.next_round_start !== null) {
-        setNextRoundStart(Math.floor(new Date(data.next_round_start).getTime() / 1000));
-      }
-      if (data.total_rounds !== undefined) setTotalRounds(data.total_rounds);
+      // Tüm veri backend'den gelir — frontend karar vermez
+      if (data.active_players !== undefined)     setActivePlayers(data.active_players);
+      if (data.live_credits !== undefined)       setUserRounds(data.live_credits);
+      if (data.total_rounds !== undefined)       setTotalRounds(data.total_rounds);
       if (data.total_participants !== undefined) setTotalParticipants(data.total_participants);
+
+      // Countdown: RPC zaten seconds veriyor
+      if (data.next_round_in_seconds != null) {
+        setGlobalTimeLeft(Math.max(0, data.next_round_in_seconds));
+      }
 
       // Champions
       const icons = [Trophy, Crown];
@@ -504,62 +508,122 @@ export default function HomePage() {
     }
   }, []);
 
-  // ── POLLING: tek interval, 15s ─────────────
+  // ============================================
+  // INITIAL MOUNT
+  // ============================================
+  useEffect(() => {
+    mountedRef.current = true;
+    const timer = setTimeout(() => setIsInitialLoad(false), 100);
+    return () => {
+      mountedRef.current = false;
+      clearTimeout(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isInitialLoad) {
+      const orbs = document.querySelectorAll(".animate-float");
+      orbs.forEach((orb, index) => {
+        setTimeout(() => {
+          if (!mountedRef.current) return;
+          (orb as HTMLElement).style.opacity = index === 0 ? "0.28" : "0.22";
+        }, 300 + index * 200);
+      });
+    }
+  }, [isInitialLoad]);
+
+  // ============================================
+  // INITIAL DATA LOAD + POLLING (KANONİK - TEK RPC)
+  // ============================================
   useEffect(() => {
     fetchHomepageState();
     const interval = setInterval(fetchHomepageState, 15000);
     return () => clearInterval(interval);
   }, [fetchHomepageState]);
 
-  // ── AUTH ───────────────────────────────────
+  // Countdown tick: lokal sayım, source RPC
   useEffect(() => {
-    mountedRef.current = true;
-    const timer = setTimeout(() => setIsInitialLoad(false), 100);
+    const countdownInterval = setInterval(() => {
+      const now = Date.now();
+      if (now < countdownPauseUntilRef.current) return;
+      setGlobalTimeLeft((prev) => (prev && prev > 0 ? prev - 1 : prev));
+    }, 1000);
+    return () => clearInterval(countdownInterval);
+  }, []);
 
+  // ============================================
+  // AUTH LISTENER
+  // ============================================
+  useEffect(() => {
     const loadUser = async () => {
       const { data } = await supabase.auth.getUser();
       setUser(data.user || null);
+
+      if (data.user && sessionStorage.getItem("pendingBuyRounds") === "true") {
+        sessionStorage.removeItem("pendingBuyRounds");
+        setTimeout(() => {
+          if (!mountedRef.current) return;
+          window.location.href = "/buy";
+        }, 300);
+      }
     };
     loadUser();
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null);
-      // User değiştiğinde homepage state yeniden çek
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
-        fetchHomepageState();
+
+      if (event === "SIGNED_IN" && session?.user) {
+        if (sessionStorage.getItem("pendingBuyRounds") === "true") {
+          sessionStorage.removeItem("pendingBuyRounds");
+          setTimeout(() => {
+            if (!mountedRef.current) return;
+            window.location.href = "/buy";
+          }, 300);
+        }
       }
     });
 
-    return () => {
-      mountedRef.current = false;
-      clearTimeout(timer);
-      sub.subscription.unsubscribe();
-    };
-  }, [fetchHomepageState]);
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
-  // ── POST-LOGIN INTENT (sign in sonrası resume) ─
   useEffect(() => {
     if (!user || resumeIntentHandledRef.current) return;
+
     const intent = sessionStorage.getItem("postLoginIntent");
     if (intent !== "live" && intent !== "free") return;
 
     resumeIntentHandledRef.current = true;
     sessionStorage.removeItem("postLoginIntent");
 
-    // RPC yeniden çek (yeni user için credits/age)
-    fetchHomepageState().then(() => {
-      if (!mountedRef.current) return;
-      // Intent'i yeniden trigger: buton handler çağrılacak
-      if (intent === "live") navigateLive();
-      if (intent === "free") navigateFree();
-    });
+    const ageOk = localStorage.getItem("vibraxx_age_verified") === "true";
+
+    if (!ageOk) {
+      setPendingAction(intent);
+      setShowAgeModal(true);
+      return;
+    }
+
+    if (intent === "live") {
+      // RPC refresh → live_credits güncel gelsin
+      fetchHomepageState().then(() => {
+        if (!mountedRef.current) return;
+        // userRounds state useEffect'te güncellenir ama burada sync check yapamayız
+        // → modal flow ile handle edel: lobby middleware credits kontrol eder
+        window.location.href = "/lobby";
+      });
+    } else {
+      window.location.href = "/free";
+    }
   }, [user, fetchHomepageState]);
 
-  // ── MUSIC ──────────────────────────────────
+  // ============================================
+  // MUSIC HANDLERS
+  // ============================================
   useEffect(() => {
     const handleFirstInteraction = () => {
       if (!hasInteracted) {
         setHasInteracted(true);
+
         const savedPref = localStorage.getItem("vibraxx_music");
         if (savedPref !== "false") {
           playMenuMusic();
@@ -568,19 +632,15 @@ export default function HomePage() {
         }
       }
     };
+
     document.addEventListener("click", handleFirstInteraction, { once: true });
     document.addEventListener("touchstart", handleFirstInteraction, { once: true });
+
     return () => {
       document.removeEventListener("click", handleFirstInteraction);
       document.removeEventListener("touchstart", handleFirstInteraction);
     };
   }, [hasInteracted]);
-
-  useEffect(() => {
-    const pref = localStorage.getItem("vibraxx_music");
-    if (pref === "true") setIsPlaying(true);
-    return () => stopMenuMusic();
-  }, []);
 
   const toggleMusic = useCallback(() => {
     if (isPlaying) {
@@ -594,108 +654,57 @@ export default function HomePage() {
     }
   }, [isPlaying]);
 
-  // ── AUTH ACTIONS ───────────────────────────
+  useEffect(() => {
+    const musicPref = localStorage.getItem("vibraxx_music");
+    if (musicPref === "true") {
+      setIsPlaying(true);
+    }
+    return () => stopMenuMusic();
+  }, []);
+
+  // ============================================
+  // AUTH ACTIONS
+  // ============================================
   const handleSignIn = useCallback(async () => {
+    const redirectUrl = `${window.location.origin}/auth/callback`;
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: redirectUrl },
     });
   }, []);
 
   const handleSignOut = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
-    setUserRounds(0);
     resumeIntentHandledRef.current = false;
   }, []);
 
-  // ── NAVIGATION HELPERS ─────────────────────
-  // ⚠️ window.location.href kullanılır - router.push çalışmıyor (confirmed)
-  const navigateLive = useCallback(() => {
-    // Age check → backend'den geldi
-    if (!ageVerified) {
-      setPendingAction("live");
-      setShowAgeModal(true);
-      return;
-    }
-    // Credits check → backend'den geldi
-    if (userRounds <= 0) {
-      setShowNoRoundsModal(true);
-      return;
-    }
-    window.location.href = "/lobby";
-  }, [ageVerified, userRounds]);
-
-  const navigateFree = useCallback(() => {
-    if (!ageVerified) {
-      setPendingAction("free");
-      setShowAgeModal(true);
-      return;
-    }
-    window.location.href = "/free";
-  }, [ageVerified]);
-
-  // ── CTA HANDLERS ───────────────────────────
-  const handleEnterLive = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!user) {
-        sessionStorage.setItem("postLoginIntent", "live");
-        handleSignIn();
-        return;
-      }
-      navigateLive();
-    },
-    [user, handleSignIn, navigateLive]
-  );
-
-  const handleEnterFree = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!user) {
-        sessionStorage.setItem("postLoginIntent", "free");
-        handleSignIn();
-        return;
-      }
-      navigateFree();
-    },
-    [user, handleSignIn, navigateFree]
-  );
-
-  // ── AGE VERIFY CONFIRM ─────────────────────
   const handleAgeVerification = useCallback(async () => {
-    // localStorage'a yaz (fallback - backend'de de set edilmeli)
     localStorage.setItem("vibraxx_age_verified", "true");
-    setAgeVerified(true);
 
     const action = pendingAction;
     setPendingAction(null);
     setShowAgeModal(false);
 
-    if (action === "live") {
-      if (userRounds <= 0) {
-        setShowNoRoundsModal(true);
-        return;
-      }
-      window.location.href = "/lobby";
-    }
-    if (action === "free") {
-      window.location.href = "/free";
-    }
-  }, [pendingAction, userRounds]);
+    // RPC refresh → backend age_verified güncel
+    await fetchHomepageState();
 
-  // ── FORMAT ─────────────────────────────────
+    if (action === "live") window.location.href = "/lobby";
+    if (action === "free") window.location.href = "/free";
+  }, [pendingAction, fetchHomepageState]);
+
   const formatTime = useCallback((seconds: number | null) => {
-    if (seconds === null || typeof seconds !== "number" || Number.isNaN(seconds)) return "--:--";
+    if (seconds === null || typeof seconds !== "number" || Number.isNaN(seconds))
+      return "--:--";
     const safe = Math.max(0, seconds);
     const m = Math.floor(safe / 60);
     const s = safe % 60;
     return `${m}:${s.toString().padStart(2, "0")}`;
   }, []);
 
-  // ── MEMOIZED DATA ──────────────────────────
+  // ============================================
+  // 🎯 STATS CARDS (KANONİK)
+  // ============================================
   const statsCards = useMemo(
     () => [
       { icon: Globe, value: `${activePlayers}+`, label: "Active Players" },
@@ -705,9 +714,6 @@ export default function HomePage() {
     [activePlayers, totalRounds, totalParticipants]
   );
 
-  // ============================================
-  // RENDER
-  // ============================================
   return (
     <>
       <style jsx global>{`
@@ -727,23 +733,42 @@ export default function HomePage() {
         }
 
         @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-20px); }
+          0%,
+          100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-20px);
+          }
         }
 
         @keyframes glow {
-          0%, 100% { opacity: 0.3; }
-          50% { opacity: 0.6; }
+          0%,
+          100% {
+            opacity: 0.3;
+          }
+          50% {
+            opacity: 0.6;
+          }
         }
 
         @keyframes shimmer {
-          0% { background-position: -200% center; }
-          100% { background-position: 200% center; }
+          0% {
+            background-position: -200% center;
+          }
+          100% {
+            background-position: 200% center;
+          }
         }
 
         @keyframes pulse-slow {
-          0%, 100% { opacity: 0.5; }
-          50% { opacity: 0.8; }
+          0%,
+          100% {
+            opacity: 0.5;
+          }
+          50% {
+            opacity: 0.8;
+          }
         }
 
         .animate-float {
@@ -807,8 +832,6 @@ export default function HomePage() {
           gap: 8px;
           flex-wrap: wrap;
         }
-
-        /* ── MOBİLE HIDE: sadece desktop ── */
         .vx-hide-mobile {
           display: none;
         }
@@ -847,8 +870,13 @@ export default function HomePage() {
         }
 
         @keyframes pulse-glow {
-          0%, 100% { box-shadow: 0 0 0 rgba(139, 92, 246, 0); }
-          50% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.3); }
+          0%,
+          100% {
+            box-shadow: 0 0 0 rgba(139, 92, 246, 0);
+          }
+          50% {
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+          }
         }
 
         .vx-livebar-inner {
@@ -891,48 +919,70 @@ export default function HomePage() {
           backdrop-filter: blur(10px);
           font-weight: 700;
           box-shadow: 0 0 20px rgba(251, 191, 36, 0.3), inset 0 0 20px rgba(251, 191, 36, 0.1);
+          position: relative;
+          overflow: hidden;
         }
 
         .vx-hero-badge::before {
           content: "";
           position: absolute;
-          inset: -1px;
-          border-radius: 9999px;
-          background: linear-gradient(135deg, rgba(251, 191, 36, 0.4), transparent);
-          z-index: -1;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+          animation: badge-shine 3s infinite;
+        }
+
+        @keyframes badge-shine {
+          0% {
+            left: -100%;
+          }
+          50%,
+          100% {
+            left: 100%;
+          }
         }
 
         @media (min-width: 640px) {
           .vx-hero-badge {
-            font-size: 14px;
             padding: 10px 24px;
+            font-size: 14px;
+            margin-bottom: 14px;
           }
         }
 
         .vx-hero-title {
-          font-size: 56px;
+          font-size: clamp(26px, 6vw, 42px);
           font-weight: 800;
-          line-height: 1.1;
-          margin-bottom: 16px;
+          line-height: 1.2;
+          margin-bottom: 18px;
+          letter-spacing: -0.03em;
         }
 
         .vx-hero-neon {
-          background: linear-gradient(135deg, #ffffff 0%, #a78bfa 50%, #ffffff 100%);
+          display: inline-block;
+          background: linear-gradient(90deg, #7c3aed, #22d3ee, #f97316, #d946ef, #7c3aed);
+          background-size: 250% 100%;
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
+          animation: shimmer 4s linear infinite;
+          text-shadow: 0 0 14px rgba(124, 58, 237, 0.45);
         }
 
         .vx-hero-subtitle {
-          font-size: 20px;
+          font-size: 16px;
           color: #94a3b8;
-          margin-bottom: 40px;
-          font-weight: 500;
+          max-width: 640px;
+          margin: 0 auto 32px;
+          line-height: 1.6;
         }
 
         @media (min-width: 640px) {
           .vx-hero-subtitle {
-            font-size: 22px;
+            font-size: 18px;
+            margin-bottom: 40px;
           }
         }
 
@@ -994,7 +1044,6 @@ export default function HomePage() {
           transition: transform 0.2s, box-shadow 0.2s;
           width: 100%;
           max-width: 320px;
-          color: white;
         }
 
         .vx-cta-btn:hover {
@@ -1163,117 +1212,60 @@ export default function HomePage() {
           }
         }
 
-        .vx-footer {
-          border-top: 1px solid rgba(255, 255, 255, 0.12);
-          background: rgba(9, 9, 13, 0.96);
-          backdrop-filter: blur(16px);
-          padding: 32px 16px 24px;
-          text-align: center;
-          color: #64748b;
-          font-size: 12px;
-        }
-
-        @media (min-width: 640px) {
-          .vx-footer {
-            font-size: 13px;
-            padding: 40px 24px 28px;
-          }
-        }
-
-        .vx-footer-links {
-          margin: 16px 0 20px;
-          display: flex;
-          gap: 8px 20px;
-          justify-content: center;
-          flex-wrap: wrap;
-          align-items: center;
-        }
-
-        .vx-footer-divider {
-          width: 1px;
-          height: 14px;
-          background: rgba(255, 255, 255, 0.2);
-        }
-
-        .vx-footer-links a {
-          color: #94a3b8;
-          text-decoration: none;
-          transition: color 0.2s;
-          font-size: 12px;
-        }
-
-        .vx-footer-links a:hover {
-          color: #c4b5fd;
-        }
-
-        .vx-footer-legal {
-          max-width: 800px;
-          margin: 0 auto 16px;
-          font-size: 11px;
-          line-height: 1.6;
-          color: #64748b;
-        }
-
-        .vx-footer-company {
-          margin-top: 16px;
-          padding-top: 16px;
-          border-top: 1px solid rgba(255, 255, 255, 0.08);
-          font-size: 11px;
-          color: #64748b;
-        }
-
-        @media (min-width: 640px) {
-          .vx-footer-legal { font-size: 12px; }
-          .vx-footer-company { font-size: 12px; }
-        }
-
-        /* ── MOBILE OVERRIDES ── */
         @media (max-width: 640px) {
+          .vx-countdown-panel {
+            padding: 16px 18px;
+            margin-left: 12px;
+            margin-right: 12px;
+          }
+          .vx-countdown-time {
+            font-size: 34px !important;
+          }
           .vx-hero-title {
             font-size: 36px !important;
             line-height: 1.2 !important;
             padding: 0 8px;
           }
+
           .vx-hero-subtitle {
             font-size: 16px !important;
             padding: 0 12px;
           }
+
           .vx-cta-wrap {
             flex-direction: column !important;
             gap: 12px !important;
             width: 100%;
             padding: 0 4px;
           }
+
           .vx-cta-btn {
             width: 100% !important;
             max-width: 100% !important;
             font-size: 14px !important;
           }
+
           .vx-livebar {
             padding: 10px 0 !important;
           }
+
           .vx-livebar-inner {
             font-size: 11px !important;
             gap: 6px !important;
             flex-wrap: wrap;
             justify-content: center;
           }
+
           .vx-stats-grid {
             grid-template-columns: 1fr !important;
             gap: 12px !important;
           }
+
           .vx-champions-grid {
             grid-template-columns: 1fr !important;
             gap: 16px !important;
           }
-          .vx-footer-links {
-            flex-direction: column !important;
-            gap: 8px !important;
-            align-items: center !important;
-          }
-          .vx-footer-divider {
-            display: none !important;
-          }
+
         }
       `}</style>
 
@@ -1288,7 +1280,7 @@ export default function HomePage() {
           transition: "opacity 0.3s ease-in",
         }}
       >
-        {/* ── NEON ORBS (TASARIM DOKUNULMAZ) ── */}
+        {/* Neon Orbs */}
         <div
           className="animate-float"
           style={{
@@ -1327,35 +1319,50 @@ export default function HomePage() {
           }}
         />
 
-        {/* ── MODALS ── */}
+        {/* Modals */}
         {showAgeModal && (
           <AgeVerificationModal
             onConfirm={handleAgeVerification}
-            onCancel={() => { setShowAgeModal(false); setPendingAction(null); }}
+            onCancel={() => {
+              setShowAgeModal(false);
+              setPendingAction(null);
+            }}
           />
         )}
 
         {showNoRoundsModal && (
           <NoRoundsModal
-            onBuyRounds={() => {
+            onBuyRounds={async () => {
               setShowNoRoundsModal(false);
+
               if (!user) {
+                alert(
+                  "Please sign in with Google to purchase rounds. You will be redirected to the login page."
+                );
                 sessionStorage.setItem("pendingBuyRounds", "true");
-                handleSignIn();
+                await supabase.auth.signInWithOAuth({
+                  provider: "google",
+                  options: {
+                    redirectTo: `${window.location.origin}/auth/callback`,
+                  },
+                });
                 return;
               }
+
               window.location.href = "/buy";
             }}
             onCancel={() => setShowNoRoundsModal(false)}
           />
         )}
 
-        {/* ── HEADER ── */}
+        {/* Header */}
         <header className="vx-header">
           <div className="vx-container">
             <div className="vx-header-inner">
-              {/* Logo: 100→80 (%20 küçüt) */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}
+                className="vx-logo-container"
+              >
                 <div
                   style={{
                     position: "relative",
@@ -1418,7 +1425,6 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Header Right */}
               <div className="vx-header-right">
                 {/* Music Toggle */}
                 <button
@@ -1443,7 +1449,7 @@ export default function HomePage() {
                   )}
                 </button>
 
-                {/* Buy Round - desktop only */}
+                {/* Buy Round Button */}
                 <button
                   onClick={() => { window.location.href = "/buy"; }}
                   className="vx-hide-mobile"
@@ -1467,7 +1473,7 @@ export default function HomePage() {
                   {user && userRounds > 0 ? `${userRounds} Rounds` : "Buy Round"}
                 </button>
 
-                {/* Leaderboard - desktop only */}
+                {/* Leaderboard */}
                 <button
                   onClick={() => { window.location.href = "/leaderboard"; }}
                   className="vx-hide-mobile"
@@ -1493,10 +1499,8 @@ export default function HomePage() {
                 {/* Auth Section */}
                 {user ? (
                   <>
-                    {/* Profile - desktop only */}
                     <button
                       onClick={() => { window.location.href = "/profile"; }}
-                      className="vx-hide-mobile"
                       aria-label="View profile"
                       style={{
                         padding: "8px 16px",
@@ -1531,6 +1535,7 @@ export default function HomePage() {
                         />
                       </div>
                       <span
+                        className="vx-hide-mobile"
                         style={{
                           fontSize: 11,
                           color: "#e5e7eb",
@@ -1544,7 +1549,6 @@ export default function HomePage() {
                       </span>
                     </button>
 
-                    {/* Sign Out - MOBİLDE DE GÖRÜNÜR (vx-hide-mobile kaldırıldı) */}
                     <button
                       onClick={handleSignOut}
                       aria-label="Sign out"
@@ -1568,14 +1572,12 @@ export default function HomePage() {
                           position: "absolute",
                           inset: 0,
                           background: "linear-gradient(90deg,#ef4444,#f97316,#ef4444)",
-                          pointerEvents: "none",
                         }}
                       />
                       <span style={{ position: "relative", zIndex: 10 }}>Sign Out</span>
                     </button>
                   </>
                 ) : (
-                  /* Sign In */
                   <button
                     onClick={() => handleSignIn()}
                     aria-label="Sign in with Google"
@@ -1599,7 +1601,6 @@ export default function HomePage() {
                         position: "absolute",
                         inset: 0,
                         background: "linear-gradient(90deg,#7c3aed,#d946ef,#7c3aed)",
-                        pointerEvents: "none",
                       }}
                     />
                     <span style={{ position: "relative", zIndex: 10 }}>Sign in with Google</span>
@@ -1610,7 +1611,7 @@ export default function HomePage() {
           </div>
         </header>
 
-        {/* ── LIVE BANNER ── */}
+        {/* Live Banner */}
         <div className="vx-livebar">
           <div className="vx-container">
             <div className="vx-livebar-inner">
@@ -1637,7 +1638,15 @@ export default function HomePage() {
                   LIVE
                 </span>
               </div>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#cbd5e1" }}>
+
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  color: "#cbd5e1",
+                }}
+              >
                 <Globe style={{ width: 14, height: 14, color: "#a78bfa" }} />
                 <span style={{ fontWeight: 700, color: "white" }}>{activePlayers.toLocaleString()}</span>
                 <span>players online</span>
@@ -1646,7 +1655,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* ── HERO ── */}
+        {/* Hero */}
         <main className="vx-hero">
           <div className="vx-container">
             <div className="vx-hero-badge">
@@ -1682,7 +1691,7 @@ export default function HomePage() {
 
             <p className="vx-hero-subtitle">Global skill-based quiz competition</p>
 
-            {/* ── COUNTDOWN PANEL ── */}
+            {/* Countdown */}
             <div className="vx-countdown-panel">
               <div
                 style={{
@@ -1692,9 +1701,9 @@ export default function HomePage() {
                   right: -100,
                   height: 1.5,
                   background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)",
-                  pointerEvents: "none",
                 }}
               />
+
               <div
                 style={{
                   position: "absolute",
@@ -1726,6 +1735,7 @@ export default function HomePage() {
 
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
                   <div
+                    className="vx-countdown-time"
                     style={{
                       fontSize: 42,
                       fontWeight: 800,
@@ -1736,7 +1746,7 @@ export default function HomePage() {
                       lineHeight: 1,
                     }}
                   >
-                    {formatTime(countdownSeconds)}
+                    {formatTime(globalTimeLeft)}
                   </div>
                 </div>
 
@@ -1795,12 +1805,38 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* ── CTA BUTTONS ── */}
+            {/* CTA Buttons */}
             <div className="vx-cta-wrap">
               <button
                 className="vx-cta-btn vx-cta-live"
                 type="button"
-                onClick={handleEnterLive}
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+
+                  // Auth check
+                  if (!user) {
+                    sessionStorage.setItem("postLoginIntent", "live");
+                    await handleSignIn();
+                    return;
+                  }
+
+                  // Age check (localStorage fallback + modal)
+                  const ageOk = localStorage.getItem("vibraxx_age_verified") === "true";
+                  if (!ageOk) {
+                    setPendingAction("live");
+                    setShowAgeModal(true);
+                    return;
+                  }
+
+                  // Credits check — userRounds RPC'den geldi
+                  if (userRounds <= 0) {
+                    setShowNoRoundsModal(true);
+                    return;
+                  }
+
+                  window.location.href = '/lobby';
+                }}
                 aria-label="Enter live arena with prizes"
               >
                 <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right,#7c3aed,#d946ef)", pointerEvents: "none" }} />
@@ -1812,7 +1848,27 @@ export default function HomePage() {
               <button
                 className="vx-cta-btn vx-cta-free"
                 type="button"
-                onClick={handleEnterFree}
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+
+                  // Auth check
+                  if (!user) {
+                    sessionStorage.setItem("postLoginIntent", "free");
+                    await handleSignIn();
+                    return;
+                  }
+
+                  // Age check
+                  const ageOk = localStorage.getItem("vibraxx_age_verified") === "true";
+                  if (!ageOk) {
+                    setPendingAction("free");
+                    setShowAgeModal(true);
+                    return;
+                  }
+
+                  window.location.href = '/free';
+                }}
                 aria-label="Try free practice quiz"
               >
                 <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right,#06b6d4,#22d3ee)", pointerEvents: "none" }} />
@@ -1822,18 +1878,19 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* ── STATS ── */}
+            {/* Stats Cards */}
             <div className="vx-stats-grid">
               {statsCards.map((stat, i) => (
                 <StatCard key={i} {...stat} />
               ))}
             </div>
 
-            {/* ── CHAMPIONS ── */}
+            {/* Champions */}
             <h2 className="vx-champions-title">
               <Crown style={{ width: 24, height: 24, color: "#facc15" }} />
               Top Champions
             </h2>
+
             <div className="vx-champions-grid">
               {champions.map((champion, i) => (
                 <ChampionCard key={i} champion={champion} />
@@ -1842,7 +1899,7 @@ export default function HomePage() {
           </div>
         </main>
 
-        {/* ── TRUST ELEMENTS ── */}
+        {/* Trust Elements */}
         <div
           style={{
             borderTop: "1px solid rgba(255, 255, 255, 0.05)",
@@ -1855,99 +1912,93 @@ export default function HomePage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
                 gap: 24,
                 maxWidth: 1024,
                 margin: "0 auto",
               }}
             >
-              {[
-                { bg: "rgba(34, 197, 94, 0.1)", border: "rgba(34, 197, 94, 0.2)", icon: CheckCircle, iconColor: "#22c55e", title: "SSL Encrypted", sub: "Bank-level security" },
-                { bg: "rgba(139, 92, 246, 0.1)", border: "rgba(139, 92, 246, 0.2)", icon: ShoppingCart, iconColor: "#8b5cf6", title: "Stripe Verified", sub: "Secure payments" },
-                { bg: "rgba(251, 191, 36, 0.1)", border: "rgba(251, 191, 36, 0.2)", icon: AlertCircle, iconColor: "#fbbf24", title: "18+ Only", sub: "Age verified" },
-                { bg: "rgba(6, 182, 212, 0.1)", border: "rgba(6, 182, 212, 0.2)", icon: Globe, iconColor: "#06b6d4", title: "Global Arena", sub: "Worldwide players" },
-              ].map((item, i) => {
-                const Icon = item.icon;
-                return (
-                  <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
-                    <div
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 10,
-                        background: item.bg,
-                        border: `1px solid ${item.border}`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Icon style={{ width: 20, height: 20, color: item.iconColor }} />
-                    </div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>{item.title}</div>
-                    <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>{item.sub}</div>
-                  </div>
-                );
-              })}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    background: "rgba(34, 197, 94, 0.1)",
+                    border: "1px solid rgba(34, 197, 94, 0.2)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <CheckCircle style={{ width: 20, height: 20, color: "#22c55e" }} />
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>SSL Encrypted</div>
+                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>Bank-level security</div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    background: "rgba(139, 92, 246, 0.1)",
+                    border: "1px solid rgba(139, 92, 246, 0.2)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <ShoppingCart style={{ width: 20, height: 20, color: "#8b5cf6" }} />
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>Stripe Verified</div>
+                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>Secure payments</div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    background: "rgba(251, 191, 36, 0.1)",
+                    border: "1px solid rgba(251, 191, 36, 0.2)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <AlertCircle style={{ width: 20, height: 20, color: "#fbbf24" }} />
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>18+ Only</div>
+                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>Age verified</div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    background: "rgba(6, 182, 212, 0.1)",
+                    border: "1px solid rgba(6, 182, 212, 0.2)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Globe style={{ width: 20, height: 20, color: "#06b6d4" }} />
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", textAlign: "center" }}>Global Arena</div>
+                <div style={{ fontSize: 11, color: "#6b7280", textAlign: "center", fontWeight: 500 }}>Worldwide players</div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* ── FOOTER ── */}
-        <footer className="vx-footer">
-          <div className="vx-container">
-            <div className="vx-footer-legal">
-              <strong style={{ color: "#94a3b8" }}>Educational Quiz Competition.</strong> 18+ only. This is a 100% skill-based
-              knowledge competition with no element of chance. Entry fees apply. Prize pool activates with 3000+ monthly participants.
-              See{" "}
-              <a href="/terms" style={{ color: "#a78bfa", textDecoration: "underline" }}>
-                Terms & Conditions
-              </a>{" "}
-              for full details.
-            </div>
-
-            <nav className="vx-footer-links" aria-label="Footer navigation">
-              <a href="/privacy">Privacy Policy</a>
-              <span className="vx-footer-divider" />
-              <a href="/terms">Terms & Conditions</a>
-              <span className="vx-footer-divider" />
-              <a href="/cookies">Cookie Policy</a>
-              <span className="vx-footer-divider" />
-              <a href="/how-it-works">How It Works</a>
-              <span className="vx-footer-divider" />
-              <a href="/rules">Quiz Rules</a>
-              <span className="vx-footer-divider" />
-              <a href="/complaints">Complaints</a>
-              <span className="vx-footer-divider" />
-              <a href="/refunds">Refund Policy</a>
-              <span className="vx-footer-divider" />
-              <a href="/about">About Us</a>
-              <span className="vx-footer-divider" />
-              <a href="/contact">Contact</a>
-              <span className="vx-footer-divider" />
-              <a href="/faq">FAQ</a>
-            </nav>
-
-            <div className="vx-footer-company">
-              <div style={{ marginBottom: 8, textAlign: "center" }}>© 2025 VibraXX. Operated by Sermin Limited (UK)</div>
-              <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8, textAlign: "center" }}>
-                Registered in England & Wales | All rights reserved
-              </div>
-              <div style={{ marginBottom: 10, textAlign: "center" }}>
-                <a href="mailto:team@vibraxx.com" style={{ color: "#a78bfa", textDecoration: "none", fontSize: 12, fontWeight: 600 }}>
-                  team@vibraxx.com
-                </a>
-              </div>
-              <div style={{ fontSize: 11, textAlign: "center" }}>
-                Payment processing by{" "}
-                <a href="https://stripe.com" target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa", textDecoration: "none" }}>
-                  Stripe
-                </a>{" "}
-                | Secure SSL encryption | Skill-based competition - Not gambling
-              </div>
-            </div>
-          </div>
-        </footer>
+        {/* Footer */}
+        <Footer />
       </div>
     </>
   );
