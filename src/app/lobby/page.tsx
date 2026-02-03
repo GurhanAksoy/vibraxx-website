@@ -152,20 +152,25 @@ export default function LobbyPage() {
         return;
       }
 
+      // isNewRound → ref UPDATE'DEN ÖNCE hesaplana
+      const isNewRound = lastRoundIdRef.current === null || lastRoundIdRef.current !== state.round_id;
+
       // Round changed → reset UI
-      if (lastRoundIdRef.current && lastRoundIdRef.current !== state.round_id) {
+      if (lastRoundIdRef.current !== null && lastRoundIdRef.current !== state.round_id) {
         setShowWarning(false);
         setIsRedirecting(false);
         isRedirectingRef.current = false;
         alarmFiredRef.current = false;
       }
+
+      // Ref SONRA update
       lastRoundIdRef.current = state.round_id;
 
       setLobbyState(state);
 
       // localSeconds sadece ilk kez veya round değişince sıfırlanır
-      // polling her 5s gelir ama timer'ı sıfırlamaz
-      if (!lastRoundIdRef.current || lastRoundIdRef.current !== state.round_id) {
+      // polling her 5s gelir ama localSeconds overwrite etmez
+      if (isNewRound) {
         setLocalSeconds(state.seconds_to_start);
       }
 
@@ -190,26 +195,16 @@ export default function LobbyPage() {
   }, [fetchLobbyState]);
 
   // ============================================
-  // LOCAL TICK (1s) — senkro korunur
+  // LOCAL TICK (1s) — ana sayfa ile aynı pattern
+  // Bağımsız interval, RPC gelince setLocalSeconds overwrite eder
   // ============================================
   useEffect(() => {
-    if (localSeconds === null) return;
-
     const tick = setInterval(() => {
       if (!mountedRef.current) return;
-      setLocalSeconds((prev) => {
-        if (prev === null) return null;
-        const next = prev - 1;
-        if (next <= 0) {
-          clearInterval(tick);
-          return 0;
-        }
-        return next;
-      });
+      setLocalSeconds((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
     }, 1000);
-
     return () => clearInterval(tick);
-  }, [lobbyState?.round_id]); // round değişince yeni tick
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // === WARNING & SOUND EFFECTS ===
   useEffect(() => {
@@ -992,8 +987,8 @@ export default function LobbyPage() {
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: "10px",
-                  padding: "clamp(8px, 2vw, 10px) clamp(14px, 4vw, 24px)",
+                  gap: "8px",
+                  padding: "clamp(8px, 2vw, 10px) clamp(12px, 3.5vw, 24px)",
                   borderRadius: "999px",
                   background:
                     isUrgent
@@ -1012,8 +1007,8 @@ export default function LobbyPage() {
               >
                 <Shield
                   style={{
-                    width: 20,
-                    height: 20,
+                    width: "clamp(16px, 4vw, 20px)",
+                    height: "clamp(16px, 4vw, 20px)",
                     color:
                       isUrgent
                         ? "#ef4444"
@@ -1042,7 +1037,7 @@ export default function LobbyPage() {
               {showWarning && isUrgent && (
                 <div
                   style={{
-                    padding: "20px 28px",
+                    padding: "clamp(12px, 3vw, 20px) clamp(14px, 4vw, 28px)",
                     borderRadius: "20px",
                     background:
                       "linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(220, 38, 38, 0.2))",
@@ -1058,7 +1053,7 @@ export default function LobbyPage() {
                       fontWeight: 900,
                       color: "#fca5a5",
                       textTransform: "uppercase",
-                      letterSpacing: "0.12em",
+                      letterSpacing: "0.06em",
                       textShadow: "0 0 30px #ef4444",
                       margin: 0,
                     }}
@@ -1144,15 +1139,15 @@ export default function LobbyPage() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-                  gap: "clamp(14px, 3.5vw, 20px)",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: "clamp(8px, 2.5vw, 20px)",
                   maxWidth: "900px",
                   margin: "0 auto",
                 }}
               >
                 <div
                   style={{
-                    padding: "clamp(14px, 3.5vw, 20px)",
+                    padding: "clamp(10px, 2.5vw, 20px)",
                     borderRadius: "16px",
                     background: "rgba(139, 92, 246, 0.15)",
                     border: "2px solid rgba(139, 92, 246, 0.3)",
@@ -1161,9 +1156,9 @@ export default function LobbyPage() {
                 >
                   <div
                     style={{
-                      fontSize: "clamp(11px, 2.3vw, 13px)",
+                      fontSize: "clamp(9px, 2vw, 13px)",
                       color: "#94a3b8",
-                      marginBottom: "6px",
+                      marginBottom: "4px",
                       fontWeight: 600,
                     }}
                   >
@@ -1171,7 +1166,7 @@ export default function LobbyPage() {
                   </div>
                   <div
                     style={{
-                      fontSize: "clamp(16px, 3.5vw, 20px)",
+                      fontSize: "clamp(11px, 2.8vw, 18px)",
                       fontWeight: 800,
                       color: "#c4b5fd",
                     }}
@@ -1181,7 +1176,7 @@ export default function LobbyPage() {
                 </div>
                 <div
                   style={{
-                    padding: "clamp(14px, 3.5vw, 20px)",
+                    padding: "clamp(10px, 2.5vw, 20px)",
                     borderRadius: "16px",
                     background: "rgba(236, 72, 153, 0.15)",
                     border: "2px solid rgba(236, 72, 153, 0.3)",
@@ -1190,9 +1185,9 @@ export default function LobbyPage() {
                 >
                   <div
                     style={{
-                      fontSize: "clamp(11px, 2.3vw, 13px)",
+                      fontSize: "clamp(9px, 2vw, 13px)",
                       color: "#94a3b8",
-                      marginBottom: "6px",
+                      marginBottom: "4px",
                       fontWeight: 600,
                     }}
                   >
@@ -1200,7 +1195,7 @@ export default function LobbyPage() {
                   </div>
                   <div
                     style={{
-                      fontSize: "clamp(16px, 3.5vw, 20px)",
+                      fontSize: "clamp(11px, 2.8vw, 18px)",
                       fontWeight: 800,
                       color: "#f9a8d4",
                     }}
@@ -1210,7 +1205,7 @@ export default function LobbyPage() {
                 </div>
                 <div
                   style={{
-                    padding: "clamp(14px, 3.5vw, 20px)",
+                    padding: "clamp(10px, 2.5vw, 20px)",
                     borderRadius: "16px",
                     background: "rgba(34, 197, 94, 0.15)",
                     border: "2px solid rgba(34, 197, 94, 0.3)",
@@ -1219,9 +1214,9 @@ export default function LobbyPage() {
                 >
                   <div
                     style={{
-                      fontSize: "clamp(11px, 2.3vw, 13px)",
+                      fontSize: "clamp(9px, 2vw, 13px)",
                       color: "#94a3b8",
-                      marginBottom: "6px",
+                      marginBottom: "4px",
                       fontWeight: 600,
                     }}
                   >
@@ -1229,7 +1224,7 @@ export default function LobbyPage() {
                   </div>
                   <div
                     style={{
-                      fontSize: "clamp(16px, 3.5vw, 20px)",
+                      fontSize: "clamp(11px, 2.8vw, 18px)",
                       fontWeight: 800,
                       color: "#86efac",
                     }}
@@ -1242,7 +1237,7 @@ export default function LobbyPage() {
               <div
                 style={{
                   marginTop: "clamp(20px, 4.5vw, 28px)",
-                  padding: "clamp(14px, 3.5vw, 20px)",
+                  padding: "clamp(10px, 2.5vw, 20px)",
                   borderRadius: "14px",
                   background: "rgba(59, 130, 246, 0.12)",
                   border: "2px solid rgba(59, 130, 246, 0.25)",
