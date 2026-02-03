@@ -1406,6 +1406,8 @@ export default function HomePage() {
                       fill
                       sizes="72px"
                       style={{ objectFit: "contain", padding: "18%" }}
+                    />
+                  </div>
                   <span
                     style={{
                       fontSize: 13,
