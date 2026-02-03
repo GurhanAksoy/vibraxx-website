@@ -1408,7 +1408,8 @@ export default function HomePage() {
                       style={{ objectFit: "contain", padding: "18%" }}
                     />
                   </div>
-                  <span
+                </div>
+                <span
                     style={{
                       fontSize: 13,
                       color: "#c4b5fd",
@@ -1419,7 +1420,6 @@ export default function HomePage() {
                   >
                     Live Quiz Arena
                   </span>
-                </div>
               </div>
 
               <div className="vx-header-right">
