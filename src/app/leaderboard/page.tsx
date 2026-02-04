@@ -97,32 +97,38 @@ function PodiumCard({ player, place }: { player: Player; place: 1 | 2 | 3 }) {
         
         {/* Medal + Avatar */}
         <div style={{ position: "relative", width: c.medal.size, height: c.medal.size, margin: c.medal.margin, borderRadius: "50%", padding: c.medal.pad, background: c.medal.ring, boxShadow: c.medal.glow }}>
-          {/* Avatar veya emoji */}
-          {player.avatar_url ? (
-            <div style={{ width: "100%", height: "100%", borderRadius: "50%", overflow: "hidden", background: "#1e293b" }}>
+          {/* Avatar container */}
+          <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: "#1e293b", overflow: "hidden", position: "relative" }}>
+            {/* Try to load avatar if URL exists */}
+            {player.avatar_url && (
               <Image 
                 src={player.avatar_url} 
                 alt={player.full_name}
-                width={120}
-                height={120}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                fill
+                sizes="120px"
+                style={{ objectFit: "cover" }}
                 onError={(e) => {
-                  // Fallback to emoji if image fails
+                  // Hide broken image
                   e.currentTarget.style.display = 'none';
-                  if (e.currentTarget.nextSibling) {
-                    (e.currentTarget.nextSibling as HTMLElement).style.display = 'flex';
-                  }
                 }}
               />
-              {/* Emoji fallback (hidden by default) */}
-              <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: "#1e293b", display: "none", alignItems: "center", justifyContent: "center", fontSize: c.medal.emojiSize }}>{c.medal.emoji}</div>
+            )}
+            {/* Emoji - always render as fallback */}
+            <div style={{ 
+              position: player.avatar_url ? 'absolute' : 'relative',
+              inset: 0,
+              display: "flex", 
+              alignItems: "center", 
+              justifyContent: "center", 
+              fontSize: c.medal.emojiSize,
+              zIndex: player.avatar_url ? 0 : 1
+            }}>
+              {c.medal.emoji}
             </div>
-          ) : (
-            <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: "#1e293b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: c.medal.emojiSize }}>{c.medal.emoji}</div>
-          )}
+          </div>
           
           {/* Rank badge */}
-          <div style={{ position: "absolute", bottom: c.badge.bottom, left: "50%", transform: "translateX(-50%)", width: c.badge.size, height: c.badge.size, borderRadius: "50%", background: c.medal.ring, display: "flex", alignItems: "center", justifyContent: "center", border: c.badge.border, color: "#0f172a", fontWeight: 900, fontSize: c.badge.fontSize }}>{place}</div>
+          <div style={{ position: "absolute", bottom: c.badge.bottom, left: "50%", transform: "translateX(-50%)", width: c.badge.size, height: c.badge.size, borderRadius: "50%", background: c.medal.ring, display: "flex", alignItems: "center", justifyContent: "center", border: c.badge.border, color: "#0f172a", fontWeight: 900, fontSize: c.badge.fontSize, zIndex: 2 }}>{place}</div>
         </div>
         <h2 style={{ fontSize: c.name.size, fontWeight: c.name.weight, marginBottom: c.name.mb, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{player.full_name}</h2>
         <div style={{ display: "inline-flex", alignItems: "center", gap: c.tier.gap, padding: c.tier.pad, borderRadius: "999px", background: `${player.tier_color}${place === 1 ? '25' : '20'}`, border: `${place === 1 ? '2px' : '1px'} solid ${player.tier_color}${place === 1 ? '' : '60'}`, marginBottom: c.tier.mb, fontSize: c.tier.fontSize }}>
@@ -306,6 +312,14 @@ export default function LeaderboardPage() {
           return;
         }
         
+        // DEBUG: Check if avatar_url comes from DB
+        if (rpcData?.players?.[0]) {
+          console.log("🔍 First player has avatar_url?", !!rpcData.players[0].avatar_url);
+          if (rpcData.players[0].avatar_url) {
+            console.log("   Avatar URL:", rpcData.players[0].avatar_url);
+          }
+        }
+        
         setData(rpcData || null);
       } catch (error) {
         console.error(`Leaderboard exception:`, error);
@@ -422,8 +436,22 @@ export default function LeaderboardPage() {
             <div style={{ display: "flex", alignItems: "center", gap: "clamp(12px, 2.5vw, 16px)" }}>
               {/* Logo - Lobby ile AYNI */}
               <div
-                onClick={() => router.push("/")}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') router.push('/'); }}
+                onClick={() => {
+                  try {
+                    router.push("/");
+                  } catch (error) {
+                    window.location.href = "/";
+                  }
+                }}
+                onKeyDown={(e) => { 
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    try {
+                      router.push('/');
+                    } catch (error) {
+                      window.location.href = "/";
+                    }
+                  }
+                }}
                 role="button"
                 tabIndex={0}
                 aria-label="Go to homepage"
