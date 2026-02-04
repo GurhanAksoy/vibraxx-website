@@ -6,7 +6,10 @@ export const metadata: Metadata = {
   title: "VIBRAXX - 24/7 Quiz Arena",
   description: "Global skill-based quiz arena.",
   applicationName: "VibraXX",
-  manifest: "/manifest.json",
+
+  // ❌ BUNU SİLDİK → 401 crash sebebiydi
+  // manifest: "/manifest.json",
+
   appleWebApp: {
     capable: true,
     title: "VibraXX",
@@ -36,11 +39,16 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* ✅ MANUEL MANIFEST (safe path) */}
+        <link rel="manifest" href="/manifest.json" />
+
         {/* iOS / PWA */}
         <link rel="apple-touch-icon" href="/icons/apple-icon-180.png" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
+
       <body className={`${inter.className} bg-[#020817] text-white antialiased`}>
+
         {/* 🔲 PRELOAD OVERLAY */}
         <div
           id="vibraxx-preload-bg"
@@ -54,8 +62,10 @@ export default function RootLayout({
             pointerEvents: "none",
           }}
         />
+
         {children}
-        {/* 🔻 PRELOAD FADE-OUT */}
+
+        {/* 🔻 PRELOAD FADE-OUT (SAFE) */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -64,77 +74,52 @@ export default function RootLayout({
                 if (el) {
                   el.style.opacity = '0';
                   setTimeout(() => {
-                    if (el && el.parentNode) {
-                      el.parentNode.removeChild(el);
-                    }
+                    try { el.remove(); } catch(e) {}
                   }, 600);
                 }
               });
             `,
           }}
         />
+
         {/* 🔧 SERVICE WORKER + PWA INSTALL HANDLER */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              // ═══ SERVICE WORKER REGISTER ═══
               if ('serviceWorker' in navigator) {
                 window.addEventListener('load', () => {
-                  navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(reg => {
-                    console.log('[PWA] Service Worker registered');
-                    
-                    if (reg.waiting) {
-                      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-                    }
-                    
-                    reg.addEventListener('updatefound', () => {
-                      const newWorker = reg.installing;
-                      if (newWorker) {
-                        newWorker.addEventListener('statechange', () => {
-                          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            console.log('[PWA] New version available');
-                          }
-                        });
+                  navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                    .then(reg => {
+                      console.log('[PWA] Service Worker registered');
+                      if (reg.waiting) {
+                        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
                       }
-                    });
-                  }).catch(err => {
-                    console.error('[PWA] Service Worker registration failed:', err);
-                  });
+                    })
+                    .catch(err => console.error('[PWA] SW error:', err));
                 });
               }
-              
-              // ═══ PWA INSTALL PROMPT (Android Chrome, Edge) ═══
+
               let deferredPrompt = null;
-              
+
               window.addEventListener('beforeinstallprompt', (e) => {
-                console.log('[PWA] Install prompt available');
                 e.preventDefault();
                 deferredPrompt = e;
-                
-                // Show install banner after 2 seconds
                 setTimeout(() => {
                   if (deferredPrompt) {
                     deferredPrompt.prompt();
-                    deferredPrompt.userChoice.then((choiceResult) => {
-                      console.log('[PWA] User choice:', choiceResult.outcome);
-                      deferredPrompt = null;
-                    });
+                    deferredPrompt = null;
                   }
                 }, 2000);
               });
-              
-              // ═══ PWA INSTALL SUCCESS ═══
+
               window.addEventListener('appinstalled', () => {
-                console.log('[PWA] App installed successfully');
                 deferredPrompt = null;
               });
-              
-              // ═══ iOS DETECTION (Safari) ═══
-              const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+              const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
               const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-              
               if (isIOS && !isStandalone) {
-                console.log('[PWA] iOS detected - Manual install: Share → Add to Home Screen');
+                console.log('[PWA] iOS manual install required');
               }
             `,
           }}
