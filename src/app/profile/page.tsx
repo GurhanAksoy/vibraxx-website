@@ -1,614 +1,358 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
+import CountryPicker from "@/components/CountryPicker";
 import Footer from "@/components/Footer";
 import {
-  User,
-  Mail,
-  Trophy,
-  Target,
-  Flame,
-  TrendingUp,
-  Calendar,
-  Award,
-  Star,
-  Crown,
-  LogOut,
-  Edit,
-  Save,
-  X,
-  BarChart3,
-  Clock,
-  Zap,
-  Shield,
-  Gift,
-  ChevronRight,
-  Activity,
-  Sparkles,
-  ShoppingCart,
-  Medal,
-  Rocket,
-  Brain,
-  Volume2,
-  VolumeX,
-  Home,
-  TrendingDown,
-  CheckCircle,
+  User, Mail, Trophy, Target, Flame, TrendingUp, Calendar, Award, Crown,
+  LogOut, Edit, Save, X, Send, CheckCircle, XCircle, BarChart3, Zap,
+  Gift, ChevronRight, Activity, Sparkles, ShoppingCart,
+  AlertCircle, Volume2, VolumeX, Clock, Star,
 } from "lucide-react";
 
-// ============================================
-// CANONICAL CONSTANTS
-// ============================================
-const TIERS = {
-  BRONZE: {
-    min: 0,
-    max: 500,
-    name: "Bronze",
-    icon: "🥉",
-    color: "#cd7f32",
-    gradient: "linear-gradient(135deg, #cd7f32, #b8651f)",
-  },
-  SILVER: {
-    min: 500,
-    max: 2000,
-    name: "Silver",
-    icon: "🥈",
-    color: "#c0c0c0",
-    gradient: "linear-gradient(135deg, #c0c0c0, #a8a8a8)",
-  },
-  GOLD: {
-    min: 2000,
-    max: 5000,
-    name: "Gold",
-    icon: "🥇",
-    color: "#ffd700",
-    gradient: "linear-gradient(135deg, #ffd700, #ffed4e)",
-  },
-  DIAMOND: {
-    min: 5000,
-    max: Infinity,
-    name: "Diamond",
-    icon: "💎",
-    color: "#b9f2ff",
-    gradient: "linear-gradient(135deg, #b9f2ff, #7dd3fc)",
-  },
-};
+// ═══════════════════════════════════════════════════════════
+// TYPES (DB-driven, no business logic)
+// ═══════════════════════════════════════════════════════════
 
-const PAGE_TYPE = "profile" as const;
-
-// ============================================
-// CANONICAL TYPES
-// ============================================
-interface ProfileInfo {
-  user_id: string;
-  full_name: string;
-  country_code: string | null;
-  age_verified: boolean;
-  created_at: string;
+interface ProfileData {
+  profile: {
+    id: string;
+    full_name: string;
+    avatar_url: string;
+    country: string;
+    created_at: string;
+  };
+  stats: {
+    total_score: number;
+    total_questions: number;
+    correct_answers: number;
+    wrong_answers: number;
+    accuracy_percentage: number;
+    rounds_played: number;
+    tier: TierInfo;
+    tier_progress: TierProgress;
+  };
+  credits: {
+    live_credits: number;
+  };
+  rankings: {
+    weekly_rank: number | null;
+    monthly_rank: number | null;
+  };
+  personal_bests: {
+    highest_score: number;
+    best_accuracy: number;
+    perfect_rounds: number;
+    total_rounds: number;
+  };
+  today_stats: PeriodStats | null;
+  month_stats: PeriodStats | null;
+  recent_history: RoundHistory[];
+  chart_data: ChartDay[];
+  achievements: Achievement[];
+  weekly_challenge: WeeklyChallenge;
 }
 
-interface Credits {
-  live_credits: number;
-  free_quiz_used: boolean;
-  free_quiz_last_used: string | null;
+interface TierInfo {
+  name: string;
+  icon: string;
+  color: string;
+  gradient: string;
+  min: number;
+  max: number;
 }
 
-interface Stats {
+interface TierProgress {
+  progress: number;
+  next_tier: TierInfo | null;
+  points_needed: number;
+}
+
+interface PeriodStats {
   total_score: number;
-  rounds_played: number;
+  total_questions: number;
   correct_answers: number;
   wrong_answers: number;
-  total_questions: number;
   accuracy_percentage: number;
-}
-
-interface PersonalBests {
-  highest_score: number;
-  best_accuracy: number;
-  perfect_rounds: number;
-  total_rounds: number;
-}
-
-interface Rankings {
-  weekly_rank: number | null;
-  monthly_rank: number | null;
+  rounds_played: number;
 }
 
 interface RoundHistory {
+  id: number;
   round_id: number;
   score: number;
   correct_answers: number;
   wrong_answers: number;
-  joined_at: string;
+  created_at: string;
   source: string;
 }
 
-interface ChartDataPoint {
+interface ChartDay {
   date: string;
   score: number;
-}
-
-interface CanonicalProfileSnapshot {
-  profile: ProfileInfo;
-  credits: Credits;
-  lifetime_stats: Stats;
-  today_stats: Stats;
-  week_stats: Stats;
-  month_stats: Stats;
-  personal_bests: PersonalBests;
-  rankings: Rankings;
-  recent_history: RoundHistory[];
-  chart_data: ChartDataPoint[];
-  achievements: Achievement[];
 }
 
 interface Achievement {
   id: string;
   title: string;
   description: string;
-  icon: string;  // String icon name from backend
+  icon: string;
   unlocked: boolean;
-  progress: number;
+  progress?: number;
+  target?: number;
+}
+
+interface WeeklyChallenge {
+  current: number;
   target: number;
+  completed: boolean;
 }
 
-// ============================================
-// PRESENCE HOOK
-// ============================================
-function usePresence(pageType: string) {
-  const sessionIdRef = useRef<string | undefined>(undefined);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    if (!sessionIdRef.current) {
-      const stored = sessionStorage.getItem("presence_session_id");
-      if (stored) {
-        sessionIdRef.current = stored;
-      } else {
-        sessionIdRef.current = crypto.randomUUID();
-        sessionStorage.setItem("presence_session_id", sessionIdRef.current);
-      }
-    }
-
-    const sendHeartbeat = async () => {
-      try {
-        await supabase.rpc("update_presence", {
-          p_session_id: sessionIdRef.current,
-          p_page_type: pageType,
-          p_round_id: null,
-        });
-      } catch (err) {
-        console.error("Presence heartbeat failed:", err);
-      }
-    };
-
-    sendHeartbeat();
-    const interval = setInterval(sendHeartbeat, 30000); // 30 seconds (reduced spam)
-
-    return () => clearInterval(interval);
-  }, [pageType]);
-}
-
-// ============================================
-// CANONICAL PROFILE HOOK
-// ============================================
-function useCanonicalProfile() {
-  const [snapshot, setSnapshot] = useState<CanonicalProfileSnapshot | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
-
-  const loadProfile = useCallback(async () => {
-    try {
-      setIsLoading(true);
-
-      const { data, error } = await supabase.rpc("get_profile_snapshot");
-
-      if (error) {
-        console.error("[Profile] RPC error:", error);
-        setHasError(true);
-        return;
-      }
-
-      if (data) {
-        setSnapshot(data as CanonicalProfileSnapshot);
-        setHasError(false);
-      }
-    } catch (err) {
-      console.error("[Profile] Error:", err);
-      setHasError(true);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadProfile();
-    const interval = setInterval(loadProfile, 30000);
-    return () => clearInterval(interval);
-  }, [loadProfile]);
-
-  return { snapshot, isLoading, hasError, refresh: loadProfile };
-}
-
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
-function getTierInfo(totalScore: number): typeof TIERS[keyof typeof TIERS] {
-  if (totalScore >= TIERS.DIAMOND.min) return TIERS.DIAMOND;
-  if (totalScore >= TIERS.GOLD.min) return TIERS.GOLD;
-  if (totalScore >= TIERS.SILVER.min) return TIERS.SILVER;
-  return TIERS.BRONZE;
-}
-
-// Icon mapping for achievement icons (backend returns string names)
-const ACHIEVEMENT_ICONS: Record<string, any> = {
-  Trophy,
-  Star,
-  Target,
-  Calendar,
-  Crown,
-  Medal,
-  Brain,
-  Rocket,
-};
-
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function formatRelativeTime(dateString: string): string {
-  const now = Date.now();
-  const then = new Date(dateString).getTime();
-  const diff = now - then;
-
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-
-  if (days > 0) return `${days}d ago`;
-  if (hours > 0) return `${hours}h ago`;
-  if (minutes > 0) return `${minutes}m ago`;
-  return "Just now";
-}
-
-// ============================================
-// UI COMPONENTS
-// ============================================
-const StatCard = ({
-  icon: Icon,
-  label,
-  value,
-  subtitle,
-  color,
-}: {
-  icon: any;
-  label: string;
-  value: string | number;
-  subtitle?: string;
-  color: string;
-}) => (
-  <div
-    style={{
-      padding: "clamp(16px, 3vw, 24px)",
-      borderRadius: 16,
-      background: "linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.8))",
-      border: `1px solid ${color}40`,
-      transition: "all 0.3s",
-    }}
-  >
-    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-      <div
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: 10,
-          background: `${color}20`,
-          border: `1px solid ${color}40`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Icon style={{ width: 20, height: 20, color }} />
-      </div>
-      <div style={{ fontSize: 12, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase" }}>
-        {label}
-      </div>
-    </div>
-    <div style={{ fontSize: "clamp(28px, 6vw, 36px)", fontWeight: 900, color: "white", marginBottom: 4 }}>
-      {value}
-    </div>
-    {subtitle && <div style={{ fontSize: 12, color: "#6b7280" }}>{subtitle}</div>}
-  </div>
-);
-
-const AchievementCard = ({ achievement }: { achievement: Achievement }) => {
-  const Icon = ACHIEVEMENT_ICONS[achievement.icon] ?? Trophy;  // Nullish coalescing for safety
-  const progress = achievement.progress || 0;
-  const target = achievement.target || 1;
-  const percentage = Math.min((progress / target) * 100, 100);
-
-  return (
-    <div
-      style={{
-        padding: "clamp(16px, 3vw, 20px)",
-        borderRadius: 16,
-        background: achievement.unlocked
-          ? "linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(16, 185, 129, 0.05))"
-          : "linear-gradient(135deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.6))",
-        border: achievement.unlocked
-          ? "1px solid rgba(34, 197, 94, 0.3)"
-          : "1px solid rgba(255, 255, 255, 0.05)",
-        opacity: achievement.unlocked ? 1 : 0.7,
-        transition: "all 0.3s",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "start", gap: 12, marginBottom: 12 }}>
-        <div
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: 12,
-            background: achievement.unlocked
-              ? "linear-gradient(135deg, #22c55e, #10b981)"
-              : "rgba(255, 255, 255, 0.05)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
-          <Icon style={{ width: 24, height: 24, color: "white" }} />
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: "clamp(14px, 3vw, 16px)",
-              fontWeight: 700,
-              color: "white",
-              marginBottom: 4,
-            }}
-          >
-            {achievement.title}
-          </div>
-          <div style={{ fontSize: "clamp(11px, 2.5vw, 13px)", color: "#94a3b8" }}>
-            {achievement.description}
-          </div>
-        </div>
-        {achievement.unlocked && (
-          <CheckCircle style={{ width: 20, height: 20, color: "#22c55e", flexShrink: 0 }} />
-        )}
-      </div>
-
-      {!achievement.unlocked && achievement.target && (
-        <div>
-          <div
-            style={{
-              width: "100%",
-              height: 8,
-              borderRadius: 999,
-              background: "rgba(255, 255, 255, 0.05)",
-              overflow: "hidden",
-              marginBottom: 8,
-            }}
-          >
-            <div
-              style={{
-                width: `${percentage}%`,
-                height: "100%",
-                background: "linear-gradient(90deg, #8b5cf6, #a78bfa)",
-                transition: "width 0.3s",
-              }}
-            />
-          </div>
-          <div style={{ fontSize: 11, color: "#6b7280", textAlign: "right" }}>
-            {progress} / {target}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const EditProfileModal = ({
-  currentName,
-  currentCountry,
-  onSave,
-  onCancel,
-  isSaving,
-}: {
-  currentName: string;
-  currentCountry: string | null;
-  onSave: (name: string, country: string) => void;
-  onCancel: () => void;
-  isSaving: boolean;
-}) => {
-  const [name, setName] = useState(currentName);
-  const [country, setCountry] = useState(currentCountry || "");
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "rgba(0, 0, 0, 0.8)",
-        backdropFilter: "blur(8px)",
-        padding: 20,
-      }}
-      onClick={onCancel}
-    >
-      <div
-        style={{
-          background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-          borderRadius: 24,
-          padding: "clamp(24px, 5vw, 32px)",
-          maxWidth: 500,
-          width: "100%",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          boxShadow: "0 24px 48px rgba(0, 0, 0, 0.5)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-          <h2 style={{ fontSize: "clamp(20px, 4vw, 24px)", fontWeight: 800, color: "white" }}>
-            Edit Profile
-          </h2>
-          <button
-            onClick={onCancel}
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              background: "rgba(255, 255, 255, 0.05)",
-              color: "#94a3b8",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-            }}
-          >
-            <X style={{ width: 18, height: 18 }} />
-          </button>
-        </div>
-
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 13, fontWeight: 600, color: "#94a3b8", marginBottom: 8, display: "block" }}>
-            Full Name
-          </label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              borderRadius: 12,
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              background: "rgba(255, 255, 255, 0.05)",
-              color: "white",
-              fontSize: 14,
-              fontWeight: 600,
-            }}
-            placeholder="Enter your name"
-          />
-        </div>
-
-        <div style={{ marginBottom: 24 }}>
-          <label style={{ fontSize: 13, fontWeight: 600, color: "#94a3b8", marginBottom: 8, display: "block" }}>
-            Country
-          </label>
-          <input
-            type="text"
-            value={country}
-            onChange={(e) => setCountry(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              borderRadius: 12,
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              background: "rgba(255, 255, 255, 0.05)",
-              color: "white",
-              fontSize: 14,
-              fontWeight: 600,
-            }}
-            placeholder="Country code (e.g., GB)"
-          />
-        </div>
-
-        <div style={{ display: "flex", gap: 12 }}>
-          <button
-            onClick={onCancel}
-            style={{
-              flex: 1,
-              padding: "12px 24px",
-              borderRadius: 12,
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              background: "rgba(255, 255, 255, 0.05)",
-              color: "#94a3b8",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => onSave(name, country)}
-            disabled={isSaving || !name.trim()}
-            style={{
-              flex: 1,
-              padding: "12px 24px",
-              borderRadius: 12,
-              border: "none",
-              background: isSaving
-                ? "rgba(139, 92, 246, 0.5)"
-                : "linear-gradient(135deg, #7c3aed, #d946ef)",
-              color: "white",
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: isSaving ? "not-allowed" : "pointer",
-              opacity: !name.trim() ? 0.5 : 1,
-            }}
-          >
-            {isSaving ? "Saving..." : "Save Changes"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ============================================
+// ═══════════════════════════════════════════════════════════
 // MAIN COMPONENT
-// ============================================
+// ═══════════════════════════════════════════════════════════
+
 export default function ProfilePage() {
   const router = useRouter();
-  const { snapshot, isLoading, hasError, refresh } = useCanonicalProfile();
-  usePresence(PAGE_TYPE);
 
+  // Core State (DB-driven data)
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [userEmail, setUserEmail] = useState("");
+  
   // UI State
+  const [isLoading, setIsLoading] = useState(true);
+  const [isVerifying, setIsVerifying] = useState(true);
+  const [securityPassed, setSecurityPassed] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editCountry, setEditCountry] = useState("🌍");
   const [isSaving, setIsSaving] = useState(false);
-
-  // Music State
+  
+  // Background Music
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  
+  // Contact Form
+  const [showContactForm, setShowContactForm] = useState(false);
+  const [contactMessage, setContactMessage] = useState("");
+  const [contactSubject, setContactSubject] = useState("");
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<"idle" | "success" | "error">("idle");
 
-  // SEO
+  // ═══════════════════════════════════════════════════════════
+  // SECURITY CHECK
+  // ═══════════════════════════════════════════════════════════
   useEffect(() => {
-    document.title = "My Profile - VibraXX";
-    const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) {
-      metaDesc.setAttribute(
-        "content",
-        "View your VibraXX profile, stats, rankings, and achievements."
-      );
+    const verifyAuth = async () => {
+      try {
+        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError || !authUser) {
+          router.push("/");
+          return;
+        }
+
+        setUserEmail(authUser.email || "");
+        setSecurityPassed(true);
+        setIsVerifying(false);
+
+      } catch (error) {
+        console.error("Auth verification error:", error);
+        router.push("/");
+      }
+    };
+
+    verifyAuth();
+  }, [router]);
+
+  // ═══════════════════════════════════════════════════════════
+  // FETCH PROFILE DATA (SINGLE RPC CALL)
+  // ═══════════════════════════════════════════════════════════
+  useEffect(() => {
+    if (!securityPassed) return;
+
+    const fetchProfileData = async () => {
+      setIsLoading(true);
+
+      try {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) return;
+
+        // ✅ CANONICAL: Single RPC call, DB gives all orders
+        const { data, error } = await supabase.rpc("get_user_profile_data", {
+          p_user_id: authUser.id
+        });
+
+        if (error) {
+          console.error("Error fetching profile data:", error);
+          setIsLoading(false);
+          return;
+        }
+
+        if (!data) {
+          console.error("No profile data returned");
+          setIsLoading(false);
+          return;
+        }
+
+        // ✅ GUARD: Validate critical data from DB
+        if (!data.stats?.tier) {
+          console.error("Critical data missing: tier not returned from DB");
+          setIsLoading(false);
+          return;
+        }
+
+        if (!data.profile) {
+          console.error("Critical data missing: profile not returned from DB");
+          setIsLoading(false);
+          return;
+        }
+
+        // Set data (no calculations, DB provides everything)
+        setProfileData(data);
+        setEditName(data.profile?.full_name || "User");
+        setEditCountry(data.profile?.country || "🌍");
+        setIsLoading(false);
+
+      } catch (err) {
+        console.error("Error fetching user data:", err);
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfileData();
+  }, [securityPassed]);
+
+  // ═══════════════════════════════════════════════════════════
+  // REALTIME SUBSCRIPTIONS (FULL OPTIMIZED)
+  // ═══════════════════════════════════════════════════════════
+  useEffect(() => {
+    if (!profileData?.profile?.id) return;
+
+    let refreshTimeout: NodeJS.Timeout;
+
+    // ✅ Debounced refresh function (prevents excessive RPC calls)
+    const debouncedRefresh = () => {
+      clearTimeout(refreshTimeout);
+      refreshTimeout = setTimeout(async () => {
+        console.log("[Realtime] Refreshing profile data...");
+        
+        const { data, error } = await supabase.rpc("get_user_profile_data", {
+          p_user_id: profileData.profile.id,
+        });
+        
+        if (!error && data) {
+          setProfileData(data);
+          console.log("[Realtime] Profile updated");
+        }
+      }, 500); // 500ms debounce
+    };
+
+    // ═══════════════════════════════════════════════════════════
+    // CHANNEL 1: SCORE LEDGER (game results)
+    // ═══════════════════════════════════════════════════════════
+    const scoreChannel = supabase
+      .channel(`profile-scores-${profileData.profile.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*", // INSERT, UPDATE, DELETE
+          schema: "public",
+          table: "score_ledger",
+          filter: `user_id=eq.${profileData.profile.id}`,
+        },
+        (payload) => {
+          console.log("[Realtime] Score ledger changed:", payload);
+          debouncedRefresh();
+        }
+      )
+      .subscribe();
+
+    // ═══════════════════════════════════════════════════════════
+    // CHANNEL 2: USER CREDITS (purchases, rewards)
+    // ═══════════════════════════════════════════════════════════
+    const creditsChannel = supabase
+      .channel(`profile-credits-${profileData.profile.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE", // Credits only update, never insert/delete
+          schema: "public",
+          table: "user_credits",
+          filter: `user_id=eq.${profileData.profile.id}`,
+        },
+        (payload) => {
+          console.log("[Realtime] Credits changed:", payload);
+          debouncedRefresh();
+        }
+      )
+      .subscribe();
+
+    // ═══════════════════════════════════════════════════════════
+    // CHANNEL 3: LEADERBOARDS (rank changes)
+    // ═══════════════════════════════════════════════════════════
+    const leaderboardChannel = supabase
+      .channel(`profile-leaderboard-${profileData.profile.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "leaderboard_weekly",
+          filter: `user_id=eq.${profileData.profile.id}`,
+        },
+        (payload) => {
+          console.log("[Realtime] Weekly leaderboard changed:", payload);
+          debouncedRefresh();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "leaderboard_monthly",
+          filter: `user_id=eq.${profileData.profile.id}`,
+        },
+        (payload) => {
+          console.log("[Realtime] Monthly leaderboard changed:", payload);
+          debouncedRefresh();
+        }
+      )
+      .subscribe();
+
+    console.log("[Realtime] All channels subscribed for user:", profileData.profile.id);
+
+    // ✅ CLEANUP: Remove all channels on unmount
+    return () => {
+      clearTimeout(refreshTimeout);
+      supabase.removeChannel(scoreChannel);
+      supabase.removeChannel(creditsChannel);
+      supabase.removeChannel(leaderboardChannel);
+      console.log("[Realtime] All channels unsubscribed");
+    };
+  }, [profileData?.profile?.id]);
+
+  // ═══════════════════════════════════════════════════════════
+  // BACKGROUND MUSIC
+  // ═══════════════════════════════════════════════════════════
+  useEffect(() => {
+    // ✅ GUARD: Prevent memory leak on re-mount
+    if (!audioRef.current) {
+      const audio = new Audio("/sounds/vibraxx.mp3");
+      audio.loop = true;
+      audio.volume = 0.3;
+      audioRef.current = audio;
     }
-  }, []);
 
-  // Music Setup
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const audio = new Audio("/audio/vibraxx.mp3");
-    audio.loop = true;
-    audio.volume = 0.3;
-    audioRef.current = audio;
+    const musicEnabled = localStorage.getItem("vibraxx_music_enabled");
+    if (musicEnabled === "true") {
+      setIsMusicPlaying(true);
+    }
 
     return () => {
       if (audioRef.current) {
@@ -622,9 +366,9 @@ export default function ProfilePage() {
     const handleFirstInteraction = () => {
       if (!hasInteracted) {
         setHasInteracted(true);
-        if (audioRef.current) {
-          audioRef.current.play().catch(() => {});
-          setIsMusicPlaying(true);
+        const musicEnabled = localStorage.getItem("vibraxx_music_enabled");
+        if (musicEnabled === "true" && audioRef.current) {
+          audioRef.current.play().catch(err => console.log("Audio autoplay blocked:", err));
         }
       }
     };
@@ -633,759 +377,1842 @@ export default function ProfilePage() {
     return () => document.removeEventListener("click", handleFirstInteraction);
   }, [hasInteracted]);
 
-  const toggleMusic = useCallback(() => {
-    if (!audioRef.current) return;
+  useEffect(() => {
+    if (!audioRef.current || !hasInteracted) return;
 
     if (isMusicPlaying) {
-      audioRef.current.pause();
-      setIsMusicPlaying(false);
+      audioRef.current.play().catch(err => console.log("Audio play error:", err));
+      localStorage.setItem("vibraxx_music_enabled", "true");
     } else {
-      audioRef.current.play().catch(() => {});
-      setIsMusicPlaying(true);
+      audioRef.current.pause();
+      localStorage.setItem("vibraxx_music_enabled", "false");
     }
-  }, [isMusicPlaying]);
+  }, [isMusicPlaying, hasInteracted]);
 
-  const handleSignOut = useCallback(async () => {
+  const toggleMusic = useCallback(() => {
+    setIsMusicPlaying(prev => !prev);
+  }, []);
+
+  // ═══════════════════════════════════════════════════════════
+  // SAVE PROFILE
+  // ═══════════════════════════════════════════════════════════
+  const handleSaveProfile = useCallback(async () => {
+    if (!profileData || !editName.trim()) return;
+
+    setIsSaving(true);
+
+    try {
+      await supabase.auth.updateUser({
+        data: { 
+          full_name: editName.trim(),
+          country: editCountry
+        }
+      });
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ 
+          full_name: editName.trim(),
+          country: editCountry 
+        })
+        .eq("id", profileData.profile.id);
+
+      if (!error) {
+        setProfileData({
+          ...profileData,
+          profile: {
+            ...profileData.profile,
+            full_name: editName.trim(),
+            country: editCountry
+          }
+        });
+        setIsEditing(false);
+      }
+    } catch (err) {
+      console.error("Error updating profile:", err);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [profileData, editName, editCountry]);
+
+  // ═══════════════════════════════════════════════════════════
+  // SEND CONTACT EMAIL
+  // ═══════════════════════════════════════════════════════════
+  const handleSendEmail = useCallback(async () => {
+    if (!profileData || !contactSubject.trim() || !contactMessage.trim()) return;
+
+    setIsSendingEmail(true);
+    setEmailStatus("idle");
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from_email: userEmail,
+          from_name: profileData.profile.full_name,
+          subject: contactSubject,
+          message: contactMessage,
+          user_id: profileData.profile.id,
+        }),
+      });
+
+      if (response.ok) {
+        setEmailStatus("success");
+        setContactMessage("");
+        setContactSubject("");
+        setTimeout(() => {
+          setShowContactForm(false);
+          setEmailStatus("idle");
+        }, 2000);
+      } else {
+        setEmailStatus("error");
+      }
+    } catch (err) {
+      console.error("Error sending email:", err);
+      setEmailStatus("error");
+    } finally {
+      setIsSendingEmail(false);
+    }
+  }, [profileData, userEmail, contactSubject, contactMessage]);
+
+  // ═══════════════════════════════════════════════════════════
+  // LOGOUT
+  // ═══════════════════════════════════════════════════════════
+  const handleLogout = useCallback(async () => {
     await supabase.auth.signOut();
     router.push("/");
   }, [router]);
 
-  const handleSaveProfile = useCallback(
-    async (name: string, country: string) => {
-      setIsSaving(true);
-
-      try {
-        // Update name
-        const { data: nameResult } = await supabase.rpc("update_profile_name", {
-          p_full_name: name,
-        });
-
-        if (nameResult && !nameResult.success) {
-          alert(nameResult.error || "Failed to update name");
-          setIsSaving(false);
-          return;
-        }
-
-        // Update country
-        const { data: countryResult } = await supabase.rpc("update_profile_country", {
-          p_country_code: country,
-        });
-
-        if (countryResult && !countryResult.success) {
-          alert(countryResult.error || "Failed to update country");
-          setIsSaving(false);
-          return;
-        }
-
-        await refresh();
-        setIsEditing(false);
-      } catch (err) {
-        console.error("Profile update error:", err);
-        alert("Failed to update profile");
-      } finally {
-        setIsSaving(false);
-      }
-    },
-    [refresh]
-  );
-
-  // Derived data
-  const tier = useMemo(
-    () => (snapshot ? getTierInfo(snapshot.lifetime_stats.total_score) : TIERS.BRONZE),
-    [snapshot?.lifetime_stats.total_score]
-  );
-
-  // Achievements come from backend now
-  const achievements = snapshot?.achievements || [];
-
-  const unlockedAchievements = achievements.filter((a) => a.unlocked);
-  const lockedAchievements = achievements.filter((a) => !a.unlocked);
+  // ═══════════════════════════════════════════════════════════
+  // LOADING STATES
+  // ═══════════════════════════════════════════════════════════
+  if (isVerifying) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "20px",
+        color: "white",
+      }}>
+        <div style={{
+          width: "60px",
+          height: "60px",
+          border: "4px solid rgba(139, 92, 246, 0.3)",
+          borderTopColor: "#8b5cf6",
+          borderRadius: "50%",
+          animation: "spin 1s linear infinite"
+        }} />
+        <p style={{ color: "#a78bfa", fontSize: "16px", fontWeight: 600 }}>
+          🔐 Verifying access...
+        </p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
-        }}
-      >
-        <div style={{ fontSize: 18, fontWeight: 600, color: "#ffffff", animation: "pulse 2s ease-in-out infinite" }}>
-          Loading profile...
-        </div>
+      <div style={{
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}>
+        <div style={{
+          width: "80px",
+          height: "80px",
+          borderRadius: "50%",
+          border: "4px solid rgba(139,92,246,0.3)",
+          borderTopColor: "#a78bfa",
+          animation: "spin 1s linear infinite",
+        }} />
       </div>
     );
   }
 
-  if (hasError || !snapshot) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
-          padding: 20,
-        }}
-      >
-        <div style={{ fontSize: 24, fontWeight: 700, color: "#ef4444", marginBottom: 16 }}>
-          Failed to Load Profile
-        </div>
-        <button
-          onClick={() => router.push("/")}
-          style={{
-            padding: "12px 24px",
-            borderRadius: 10,
-            border: "none",
-            background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-            color: "white",
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: "pointer",
-          }}
-        >
-          Back to Home
-        </button>
-      </div>
-    );
+  if (!profileData) {
+    return null;
   }
+
+  // Destructure data (DB-provided, no calculations)
+  const { profile, stats, credits, rankings, personal_bests, today_stats, month_stats, recent_history, chart_data, achievements, weekly_challenge } = profileData;
+  
+  const memberSince = new Date(profile.created_at).toLocaleDateString("en-US", {
+    month: "short",
+    year: "numeric",
+  });
+
+  const currentTier = stats.tier;
+  const tierProgress = stats.tier_progress;
+  
+  // ✅ GUARD: Prevent crash if chart_data is empty
+  const maxChartScore = chart_data.length 
+    ? Math.max(...chart_data.map(d => d.score))
+    : 1;
 
   return (
     <>
       <style jsx global>{`
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
-
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-          background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-          color: #ffffff;
-          overflow-x: hidden;
-        }
-
-        .vx-container {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 0 20px;
-        }
-
-        .vx-header {
-          position: sticky;
-          top: 0;
-          z-index: 100;
-          background: rgba(15, 23, 42, 0.95);
-          backdrop-filter: blur(12px);
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-          padding: 16px 0;
-        }
-
-        .vx-header-inner {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 16px;
-        }
-
-        .vx-header-right {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          flex-wrap: wrap;
-        }
-
-        .vx-hide-mobile {
-          display: flex;
-        }
+        * { box-sizing: border-box; }
+        body { overflow-x: hidden; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
+        @keyframes glow { 0%, 100% { box-shadow: 0 0 20px rgba(239,68,68,0.4); } 50% { box-shadow: 0 0 40px rgba(239,68,68,0.8); } }
+        @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
+        
+        .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+        .animate-glow { animation: glow 2s ease-in-out infinite; }
+        .animate-float { animation: float 3s ease-in-out infinite; }
 
         @media (max-width: 768px) {
-          .vx-header-inner {
-            flex-wrap: wrap;
-          }
-
-          .vx-header-right {
-            width: 100%;
-            justify-content: space-between;
-          }
-
-          .vx-hide-mobile {
-            display: none !important;
-          }
-        }
-
-        @keyframes pulse {
-          0%,
-          100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.5;
-          }
+          .mobile-hide { display: none !important; }
+          .mobile-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
+          .mobile-stack { flex-direction: column !important; }
+          button { min-height: 44px !important; }
         }
       `}</style>
 
-      <div style={{ minHeight: "100vh", position: "relative" }}>
-        {/* Header */}
-        <header className="vx-header">
-          <div className="vx-container">
-            <div className="vx-header-inner">
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <button
-                  onClick={() => router.push("/")}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    color: "#94a3b8",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                  }}
-                  aria-label="Back to home"
-                >
-                  <Home style={{ width: 18, height: 18 }} />
-                </button>
-
-                <Image
-                  src="/images/logo.png"
-                  alt="VibraXX Logo"
-                  width={40}
-                  height={40}
-                  style={{ borderRadius: 10 }}
-                />
-
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  <div
-                    style={{
-                      fontSize: 20,
-                      fontWeight: 800,
-                      color: "white",
-                      letterSpacing: "-0.02em",
-                      lineHeight: 1,
-                    }}
-                  >
-                    VibraXX
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 10,
-                      color: "#6b7280",
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.1em",
-                    }}
-                  >
-                    My Profile
-                  </div>
-                </div>
-              </div>
-
-              <div className="vx-header-right">
-                <button
-                  onClick={toggleMusic}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    color: isMusicPlaying ? "#22d3ee" : "#6b7280",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                  }}
-                  aria-label={isMusicPlaying ? "Mute music" : "Play music"}
-                >
-                  {isMusicPlaying ? (
-                    <Volume2 style={{ width: 18, height: 18 }} />
-                  ) : (
-                    <VolumeX style={{ width: 18, height: 18 }} />
-                  )}
-                </button>
-
-                <div
-                  className="vx-hide-mobile"
-                  style={{
-                    padding: "8px 16px",
-                    borderRadius: 10,
-                    border: "1px solid rgba(251, 191, 36, 0.3)",
-                    background: "rgba(251, 191, 36, 0.1)",
-                    color: "#fbbf24",
-                    fontSize: 13,
-                    fontWeight: 700,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  <Sparkles style={{ width: 14, height: 14 }} />
-                  {snapshot.credits.live_credits} Rounds
-                </div>
-
-                <button
-                  onClick={() => router.push("/leaderboard")}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: 10,
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    color: "#94a3b8",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  <BarChart3 style={{ width: 16, height: 16 }} />
-                  <span className="vx-hide-mobile">Leaderboard</span>
-                </button>
-
-                <button
-                  onClick={() => router.push("/buy")}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: 10,
-                    border: "none",
-                    background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-                    color: "white",
-                    fontSize: 14,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    transition: "transform 0.2s",
-                    boxShadow: "0 8px 16px rgba(124, 58, 237, 0.4)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  <ShoppingCart style={{ width: 16, height: 16 }} />
-                  <span className="vx-hide-mobile">Buy</span>
-                </button>
-
-                <button
-                  onClick={handleSignOut}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: 10,
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    color: "#94a3b8",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                  }}
-                  className="vx-hide-mobile"
-                >
-                  Sign Out
-                </button>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* Main Content */}
-        <main style={{ padding: "clamp(32px, 5vw, 48px) 0" }}>
-          <div className="vx-container">
-            {/* Profile Header */}
-            <div
-              style={{
-                padding: "clamp(24px, 5vw, 32px)",
-                borderRadius: 24,
-                background: tier.gradient,
-                marginBottom: 32,
-                position: "relative",
-                overflow: "hidden",
-              }}
-            >
-              <div
+      <div style={{
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 25%, #312e81 50%, #1e1b4b 75%, #0f172a 100%)",
+        backgroundSize: "400% 400%",
+        color: "white",
+        paddingBottom: "0",
+      }}>
+        
+        <div style={{ padding: "clamp(20px, 5vw, 40px) clamp(16px, 4vw, 24px)" }}>
+          
+          {/* HEADER */}
+          <header style={{
+            maxWidth: "1200px",
+            margin: "0 auto clamp(24px, 5vw, 40px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "16px",
+            flexWrap: "wrap",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <button
+                onClick={() => router.push("/")}
                 style={{
-                  position: "absolute",
-                  top: 0,
-                  right: 0,
-                  fontSize: "clamp(80px, 15vw, 120px)",
-                  opacity: 0.1,
-                }}
-              >
-                {tier.icon}
-              </div>
-
-              <div
-                style={{
-                  position: "relative",
-                  zIndex: 10,
                   display: "flex",
-                  flexDirection: "column",
-                  gap: 16,
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "10px 16px",
+                  borderRadius: "12px",
+                  border: "2px solid rgba(139,92,246,0.5)",
+                  background: "rgba(15,23,42,0.8)",
+                  color: "white",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  transition: "all 0.3s",
                 }}
-              >
-                <div style={{ display: "flex", alignItems: "start", justifyContent: "space-between", gap: 16 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-                      <h1
-                        style={{
-                          fontSize: "clamp(24px, 5vw, 36px)",
-                          fontWeight: 900,
-                          color: "white",
-                        }}
-                      >
-                        {snapshot.profile.full_name}
-                      </h1>
-                      <span style={{ fontSize: "clamp(24px, 5vw, 32px)" }}>{tier.icon}</span>
-                    </div>
-                    <div style={{ fontSize: "clamp(12px, 2.5vw, 14px)", color: "rgba(255,255,255,0.8)", marginBottom: 4 }}>
-                      {tier.name} Tier • Member since {formatDate(snapshot.profile.created_at)}
-                    </div>
-                    {snapshot.profile.country_code && (
-                      <div style={{ fontSize: "clamp(12px, 2.5vw, 14px)", color: "rgba(255,255,255,0.7)" }}>
-                        📍 {snapshot.profile.country_code}
-                      </div>
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#a78bfa";
+                  e.currentTarget.style.background = "rgba(139,92,246,0.2)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(139,92,246,0.5)";
+                  e.currentTarget.style.background = "rgba(15,23,42,0.8)";
+                }}>
+                <ChevronRight style={{ width: "18px", height: "18px", transform: "rotate(180deg)" }} />
+                <span>Back to Home</span>
+              </button>
+
+              {/* Music Button */}
+              <button
+                onClick={toggleMusic}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "10px",
+                  border: "2px solid rgba(139,92,246,0.5)",
+                  background: isMusicPlaying 
+                    ? "linear-gradient(135deg, rgba(139,92,246,0.95), rgba(124,58,237,0.95))"
+                    : "rgba(15,23,42,0.8)",
+                  cursor: "pointer",
+                  transition: "all 0.3s ease",
+                  boxShadow: isMusicPlaying ? "0 0 15px rgba(139,92,246,0.5)" : "none",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#a78bfa";
+                  e.currentTarget.style.transform = "scale(1.05)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(139,92,246,0.5)";
+                  e.currentTarget.style.transform = "scale(1)";
+                }}
+                title={isMusicPlaying ? "Mute Music" : "Play Music"}>
+                {isMusicPlaying ? (
+                  <Volume2 style={{ width: "18px", height: "18px", color: "white" }} />
+                ) : (
+                  <VolumeX style={{ width: "18px", height: "18px", color: "#94a3b8" }} />
+                )}
+              </button>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "10px 16px",
+                borderRadius: "12px",
+                border: "2px solid rgba(239,68,68,0.5)",
+                background: "rgba(15,23,42,0.8)",
+                color: "#fca5a5",
+                fontSize: "14px",
+                fontWeight: 700,
+                cursor: "pointer",
+                transition: "all 0.3s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "#ef4444";
+                e.currentTarget.style.background = "rgba(239,68,68,0.2)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "rgba(239,68,68,0.5)";
+                e.currentTarget.style.background = "rgba(15,23,42,0.8)";
+              }}>
+              <LogOut style={{ width: "18px", height: "18px" }} />
+              <span className="mobile-hide">Logout</span>
+            </button>
+          </header>
+
+          <main style={{ maxWidth: "1200px", margin: "0 auto" }}>
+            
+            {/* PROFILE CARD */}
+            <div style={{
+              padding: "clamp(24px, 5vw, 32px)",
+              borderRadius: "clamp(20px, 4vw, 24px)",
+              border: "2px solid rgba(139,92,246,0.5)",
+              background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(139,92,246,0.4)",
+              backdropFilter: "blur(20px)",
+              marginBottom: "clamp(20px, 4vw, 24px)",
+            }}>
+              
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "clamp(16px, 3vw, 20px)",
+                flexWrap: "wrap",
+                marginBottom: "clamp(20px, 4vw, 24px)",
+              }}>
+                
+                {/* Avatar */}
+                <div style={{
+                  position: "relative",
+                  width: "clamp(80px, 15vw, 100px)",
+                  height: "clamp(80px, 15vw, 100px)",
+                  borderRadius: "50%",
+                  padding: "4px",
+                  background: currentTier.gradient,
+                  boxShadow: `0 0 30px ${currentTier.color}60`,
+                }}>
+                  <div style={{
+                    width: "100%",
+                    height: "100%",
+                    borderRadius: "50%",
+                    background: "#020817",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    overflow: "hidden",
+                  }}>
+                    {profile.avatar_url ? (
+                      <Image
+                        src={profile.avatar_url}
+                        alt={profile.full_name}
+                        fill
+                        style={{ objectFit: "cover" }}
+                      />
+                    ) : (
+                      <User style={{ width: "50%", height: "50%", color: "#a78bfa" }} />
                     )}
                   </div>
+                </div>
 
+                {/* Name & Email */}
+                <div style={{ flex: 1, minWidth: "200px" }}>
+                  {isEditing ? (
+                    <>
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "12px" }}>
+                        <input
+                          type="text"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          style={{
+                            flex: 1,
+                            padding: "8px 12px",
+                            borderRadius: "8px",
+                            border: "2px solid rgba(139,92,246,0.5)",
+                            background: "rgba(15,23,42,0.9)",
+                            color: "white",
+                            fontSize: "16px",
+                            fontWeight: 700,
+                          }}
+                          placeholder="Enter your name"
+                        />
+                        <button
+                          onClick={handleSaveProfile}
+                          disabled={isSaving}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: "8px",
+                            border: "none",
+                            background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                            color: "white",
+                            cursor: isSaving ? "not-allowed" : "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                          }}>
+                          <Save style={{ width: "16px", height: "16px" }} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIsEditing(false);
+                            setEditName(profile.full_name);
+                            setEditCountry(profile.country);
+                          }}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: "8px",
+                            border: "none",
+                            background: "rgba(239,68,68,0.2)",
+                            color: "#fca5a5",
+                            cursor: "pointer",
+                          }}>
+                          <X style={{ width: "16px", height: "16px" }} />
+                        </button>
+                      </div>
+                      
+                      <div style={{ marginBottom: "8px" }}>
+                        <CountryPicker
+                          value={editCountry}
+                          onChange={setEditCountry}
+                          autoDetect={false}
+                          showSearch={true}
+                          
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      marginBottom: "8px",
+                    }}>
+                      <span style={{ fontSize: "clamp(32px, 6vw, 40px)" }}>
+                        {profile.country}
+                      </span>
+                      <h1 style={{
+                        fontSize: "clamp(20px, 4vw, 28px)",
+                        fontWeight: 900,
+                        background: "linear-gradient(90deg, #fbbf24, #f59e0b)",
+                        backgroundClip: "text",
+                        WebkitBackgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                      }}>
+                        {profile.full_name}
+                      </h1>
+                      <button
+                        onClick={() => setIsEditing(true)}
+                        style={{
+                          padding: "6px",
+                          borderRadius: "8px",
+                          border: "none",
+                          background: "rgba(139,92,246,0.2)",
+                          color: "#a78bfa",
+                          cursor: "pointer",
+                        }}>
+                        <Edit style={{ width: "16px", height: "16px" }} />
+                      </button>
+                    </div>
+                  )}
+                  
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    marginBottom: "4px",
+                  }}>
+                    <Mail style={{ width: "16px", height: "16px", color: "#94a3b8" }} />
+                    <span style={{ fontSize: "14px", color: "#cbd5e1" }}>{userEmail}</span>
+                  </div>
+
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}>
+                    <Calendar style={{ width: "16px", height: "16px", color: "#94a3b8" }} />
+                    <span style={{ fontSize: "14px", color: "#94a3b8" }}>
+                      Member since {memberSince}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Rounds Badge */}
+                <div style={{
+                  padding: "clamp(12px, 2.5vw, 16px) clamp(16px, 3vw, 20px)",
+                  borderRadius: "clamp(12px, 2.5vw, 16px)",
+                  background: credits.live_credits === 0 
+                    ? "linear-gradient(135deg, rgba(239,68,68,0.2), rgba(185,28,28,0.15))"
+                    : "linear-gradient(135deg, rgba(251,191,36,0.2), rgba(245,158,11,0.15))",
+                  border: `2px solid ${credits.live_credits === 0 ? "rgba(239,68,68,0.5)" : "rgba(251,191,36,0.5)"}`,
+                  textAlign: "center",
+                  ...(credits.live_credits === 0 ? { animation: "glow 2s ease-in-out infinite" } : {}),
+                }}>
+                  <Gift style={{
+                    width: "clamp(24px, 5vw, 32px)",
+                    height: "clamp(24px, 5vw, 32px)",
+                    color: credits.live_credits === 0 ? "#ef4444" : "#fbbf24",
+                    margin: "0 auto 4px",
+                  }} />
+                  <div style={{
+                    fontSize: "clamp(24px, 5vw, 32px)",
+                    fontWeight: 900,
+                    color: credits.live_credits === 0 ? "#ef4444" : "#fbbf24",
+                    lineHeight: 1,
+                  }}>
+                    {credits.live_credits}
+                  </div>
+                  <div style={{
+                    fontSize: "clamp(11px, 2.2vw, 12px)",
+                    color: credits.live_credits === 0 ? "#fca5a5" : "#fcd34d",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    marginTop: "4px",
+                  }}>
+                    Rounds Left
+                  </div>
+                </div>
+              </div>
+
+              {/* BUY ROUNDS CTA */}
+              {credits.live_credits === 0 && (
+                <div style={{
+                  padding: "20px",
+                  borderRadius: "16px",
+                  background: "linear-gradient(135deg, rgba(124,58,237,0.2), rgba(6,182,212,0.2))",
+                  border: "2px solid rgba(124,58,237,0.5)",
+                  marginBottom: "20px",
+                  textAlign: "center",
+                }}>
+                  <div style={{
+                    fontSize: "18px",
+                    fontWeight: 800,
+                    color: "#e5e7eb",
+                    marginBottom: "12px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                  }}>
+                    <AlertCircle style={{ width: "20px", height: "20px", color: "#fbbf24" }} />
+                    <span>No Rounds Available!</span>
+                  </div>
+                  <p style={{
+                    fontSize: "14px",
+                    color: "#cbd5e1",
+                    marginBottom: "16px",
+                  }}>
+                    Continue your journey towards the £1000 monthly prize.
+                  </p>
                   <button
-                    onClick={() => setIsEditing(true)}
+                    onClick={() => router.push("/buy")}
                     style={{
-                      padding: "10px 20px",
-                      borderRadius: 12,
-                      border: "1px solid rgba(255, 255, 255, 0.3)",
-                      background: "rgba(255, 255, 255, 0.15)",
+                      width: "100%",
+                      padding: "14px 24px",
+                      borderRadius: "12px",
+                      border: "none",
+                      background: "linear-gradient(135deg, #7c3aed, #d946ef)",
                       color: "white",
-                      fontSize: 14,
-                      fontWeight: 600,
+                      fontSize: "16px",
+                      fontWeight: 800,
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
-                      gap: 8,
-                      flexShrink: 0,
+                      justifyContent: "center",
+                      gap: "8px",
+                      transition: "all 0.3s",
+                      boxShadow: "0 0 30px rgba(124,58,237,0.6)",
                     }}
-                  >
-                    <Edit style={{ width: 16, height: 16 }} />
-                    <span className="vx-hide-mobile">Edit</span>
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "translateY(-2px) scale(1.02)";
+                      e.currentTarget.style.boxShadow = "0 0 40px rgba(124,58,237,0.8)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "translateY(0) scale(1)";
+                      e.currentTarget.style.boxShadow = "0 0 30px rgba(124,58,237,0.6)";
+                    }}>
+                    <ShoppingCart style={{ width: "20px", height: "20px" }} />
+                    <span>Purchase Rounds</span>
                   </button>
+                  <p style={{
+                    fontSize: "12px",
+                    color: "#94a3b8",
+                    marginTop: "8px",
+                  }}>
+                    Skill-based • UK regulated
+                  </p>
                 </div>
+              )}
 
-                {/* Tier Progress */}
-                {tier.name !== "Diamond" && (
-                  <div>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 12, color: "rgba(255,255,255,0.8)" }}>
-                      <span>Progress to {Object.values(TIERS).find((t) => t.min > snapshot.lifetime_stats.total_score)?.name}</span>
-                      <span>{snapshot.lifetime_stats.total_score.toLocaleString()} pts</span>
+              {/* TIER PROGRESS */}
+              <div style={{
+                padding: "20px",
+                borderRadius: "16px",
+                background: `linear-gradient(135deg, ${currentTier.color}20, rgba(15,23,42,0.5))`,
+                border: `2px solid ${currentTier.color}60`,
+              }}>
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: "12px",
+                  flexWrap: "wrap",
+                  gap: "8px",
+                }}>
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}>
+                    <span className="animate-float" style={{ fontSize: "28px" }}>{currentTier.icon}</span>
+                    <span style={{
+                      fontSize: "18px",
+                      fontWeight: 800,
+                      color: currentTier.color,
+                    }}>
+                      {currentTier.name} Tier
+                    </span>
+                  </div>
+                  {tierProgress.next_tier && (
+                    <div style={{
+                      fontSize: "14px",
+                      color: "#cbd5e1",
+                    }}>
+                      {tierProgress.points_needed.toLocaleString()} pts to {tierProgress.next_tier.icon} {tierProgress.next_tier.name}
                     </div>
-                    <div
-                      style={{
-                        width: "100%",
-                        height: 12,
-                        borderRadius: 999,
-                        background: "rgba(255, 255, 255, 0.2)",
-                        overflow: "hidden",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: `${(() => {
-                            const range = tier.max - tier.min;
-                            if (!isFinite(range)) return 100;  // Diamond tier protection
-                            return Math.min(
-                              ((snapshot.lifetime_stats.total_score - tier.min) / range) * 100,
-                              100
-                            );
-                          })()}%`,
-                          height: "100%",
-                          background: "rgba(255, 255, 255, 0.5)",
-                          transition: "width 0.3s",
-                        }}
-                      />
-                    </div>
+                  )}
+                </div>
+                
+                {tierProgress.next_tier && (
+                  <div style={{
+                    width: "100%",
+                    height: "12px",
+                    borderRadius: "999px",
+                    background: "rgba(15,23,42,0.8)",
+                    overflow: "hidden",
+                  }}>
+                    <div style={{
+                      width: `${tierProgress.progress}%`,
+                      height: "100%",
+                      background: tierProgress.next_tier.gradient,
+                      transition: "width 1s ease",
+                      boxShadow: `0 0 10px ${tierProgress.next_tier.color}60`,
+                    }} />
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Stats Grid */}
-            <div style={{ marginBottom: 48 }}>
-              <h2
-                style={{
-                  fontSize: "clamp(20px, 4vw, 24px)",
-                  fontWeight: 800,
-                  marginBottom: 24,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                }}
-              >
-                <BarChart3 style={{ width: 24, height: 24, color: "#8b5cf6" }} />
-                Statistics
-              </h2>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                  gap: 20,
-                  marginBottom: 32,
-                }}
-              >
-                <StatCard
-                  icon={Trophy}
-                  label="Total Score"
-                  value={snapshot.lifetime_stats.total_score.toLocaleString()}
-                  subtitle={`${snapshot.lifetime_stats.rounds_played} rounds played`}
-                  color="#fbbf24"
-                />
-                <StatCard
-                  icon={Target}
-                  label="Accuracy"
-                  value={`${Math.round(snapshot.lifetime_stats.accuracy_percentage)}%`}
-                  subtitle={`${snapshot.lifetime_stats.correct_answers} correct`}
-                  color="#22c55e"
-                />
-                <StatCard
-                  icon={Star}
-                  label="Best Score"
-                  value={snapshot.personal_bests.highest_score}
-                  subtitle={`${snapshot.personal_bests.perfect_rounds} perfect rounds`}
-                  color="#a78bfa"
-                />
-                <StatCard
-                  icon={Crown}
-                  label="Weekly Rank"
-                  value={snapshot.rankings.weekly_rank === 9999 ? "-" : snapshot.rankings.weekly_rank}
-                  subtitle="Current ranking"
-                  color="#06b6d4"
-                />
+            {/* MAIN STATS GRID */}
+            <div className="mobile-grid" style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: "clamp(12px, 3vw, 16px)",
+              marginBottom: "clamp(20px, 4vw, 24px)",
+            }}>
+              
+              {/* Total Score */}
+              <div style={{
+                padding: "clamp(16px, 3vw, 20px)",
+                borderRadius: "clamp(14px, 3vw, 16px)",
+                background: "linear-gradient(135deg, rgba(251,191,36,0.2), rgba(245,158,11,0.15))",
+                border: "2px solid rgba(251,191,36,0.5)",
+                boxShadow: "0 0 20px rgba(251,191,36,0.3)",
+                transition: "transform 0.3s",
+                cursor: "default",
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"}
+              onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
+                <Trophy style={{
+                  width: "clamp(24px, 5vw, 32px)",
+                  height: "clamp(24px, 5vw, 32px)",
+                  color: "#fbbf24",
+                  marginBottom: "8px",
+                }} />
+                <div style={{
+                  fontSize: "clamp(24px, 5vw, 32px)",
+                  fontWeight: 900,
+                  color: "#fbbf24",
+                  lineHeight: 1,
+                  marginBottom: "4px",
+                }}>
+                  {stats.total_score.toLocaleString()}
+                </div>
+                <div style={{
+                  fontSize: "clamp(11px, 2.2vw, 12px)",
+                  color: "#fcd34d",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                }}>
+                  Total Score
+                </div>
               </div>
 
-              {/* Period Stats */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-                  gap: 20,
-                }}
-              >
-                <div
-                  style={{
-                    padding: 24,
-                    borderRadius: 16,
-                    background: "linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(124, 58, 237, 0.05))",
-                    border: "1px solid rgba(139, 92, 246, 0.3)",
-                  }}
-                >
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#94a3b8", marginBottom: 12, textTransform: "uppercase" }}>
-                    Today
-                  </div>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: "white", marginBottom: 8 }}>
-                    {snapshot.today_stats.total_score}
-                  </div>
-                  <div style={{ fontSize: 12, color: "#6b7280" }}>
-                    {snapshot.today_stats.rounds_played} rounds •{" "}
-                    {Math.round(snapshot.today_stats.accuracy_percentage)}% acc
-                  </div>
+              {/* Accuracy */}
+              <div style={{
+                padding: "clamp(16px, 3vw, 20px)",
+                borderRadius: "clamp(14px, 3vw, 16px)",
+                background: "linear-gradient(135deg, rgba(139,92,246,0.2), rgba(124,58,237,0.15))",
+                border: "2px solid rgba(139,92,246,0.5)",
+                boxShadow: "0 0 20px rgba(139,92,246,0.3)",
+                transition: "transform 0.3s",
+                cursor: "default",
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"}
+              onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
+                <Target style={{
+                  width: "clamp(24px, 5vw, 32px)",
+                  height: "clamp(24px, 5vw, 32px)",
+                  color: "#a78bfa",
+                  marginBottom: "8px",
+                }} />
+                <div style={{
+                  fontSize: "clamp(24px, 5vw, 32px)",
+                  fontWeight: 900,
+                  color: "#a78bfa",
+                  lineHeight: 1,
+                  marginBottom: "4px",
+                }}>
+                  {stats.accuracy_percentage.toFixed(1)}%
                 </div>
-
-                <div
-                  style={{
-                    padding: 24,
-                    borderRadius: 16,
-                    background: "linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(6, 182, 212, 0.05))",
-                    border: "1px solid rgba(34, 211, 238, 0.3)",
-                  }}
-                >
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#94a3b8", marginBottom: 12, textTransform: "uppercase" }}>
-                    This Week
-                  </div>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: "white", marginBottom: 8 }}>
-                    {snapshot.week_stats.total_score}
-                  </div>
-                  <div style={{ fontSize: 12, color: "#6b7280" }}>
-                    {snapshot.week_stats.rounds_played} rounds •{" "}
-                    {Math.round(snapshot.week_stats.accuracy_percentage)}% acc
-                  </div>
+                <div style={{
+                  fontSize: "clamp(11px, 2.2vw, 12px)",
+                  color: "#c4b5fd",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                }}>
+                  Accuracy
                 </div>
+              </div>
 
-                <div
-                  style={{
-                    padding: 24,
-                    borderRadius: 16,
-                    background: "linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.05))",
-                    border: "1px solid rgba(251, 191, 36, 0.3)",
-                  }}
-                >
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#94a3b8", marginBottom: 12, textTransform: "uppercase" }}>
-                    This Month
-                  </div>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: "white", marginBottom: 8 }}>
-                    {snapshot.month_stats.total_score}
-                  </div>
-                  <div style={{ fontSize: 12, color: "#6b7280" }}>
-                    {snapshot.month_stats.rounds_played} rounds •{" "}
-                    {Math.round(snapshot.month_stats.accuracy_percentage)}% acc
-                  </div>
+              {/* Rounds Played */}
+              <div style={{
+                padding: "clamp(16px, 3vw, 20px)",
+                borderRadius: "clamp(14px, 3vw, 16px)",
+                background: "linear-gradient(135deg, rgba(34,197,94,0.2), rgba(21,128,61,0.15))",
+                border: "2px solid rgba(34,197,94,0.5)",
+                boxShadow: "0 0 20px rgba(34,197,94,0.3)",
+                transition: "transform 0.3s",
+                cursor: "default",
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"}
+              onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
+                <Zap style={{
+                  width: "clamp(24px, 5vw, 32px)",
+                  height: "clamp(24px, 5vw, 32px)",
+                  color: "#22c55e",
+                  marginBottom: "8px",
+                }} />
+                <div style={{
+                  fontSize: "clamp(24px, 5vw, 32px)",
+                  fontWeight: 900,
+                  color: "#22c55e",
+                  lineHeight: 1,
+                  marginBottom: "4px",
+                }}>
+                  {stats.rounds_played}
+                </div>
+                <div style={{
+                  fontSize: "clamp(11px, 2.2vw, 12px)",
+                  color: "#86efac",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                }}>
+                  Rounds Played
+                </div>
+              </div>
+
+              {/* Correct Answers */}
+              <div style={{
+                padding: "clamp(16px, 3vw, 20px)",
+                borderRadius: "clamp(14px, 3vw, 16px)",
+                background: "linear-gradient(135deg, rgba(56,189,248,0.2), rgba(14,165,233,0.15))",
+                border: "2px solid rgba(56,189,248,0.5)",
+                boxShadow: "0 0 20px rgba(56,189,248,0.3)",
+                transition: "transform 0.3s",
+                cursor: "default",
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"}
+              onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
+                <CheckCircle style={{
+                  width: "clamp(24px, 5vw, 32px)",
+                  height: "clamp(24px, 5vw, 32px)",
+                  color: "#38bdf8",
+                  marginBottom: "8px",
+                }} />
+                <div style={{
+                  fontSize: "clamp(24px, 5vw, 32px)",
+                  fontWeight: 900,
+                  color: "#38bdf8",
+                  lineHeight: 1,
+                  marginBottom: "4px",
+                }}>
+                  {stats.correct_answers}
+                </div>
+                <div style={{
+                  fontSize: "clamp(11px, 2.2vw, 12px)",
+                  color: "#7dd3fc",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                }}>
+                  Correct Answers
                 </div>
               </div>
             </div>
 
-            {/* Achievements */}
-            <div style={{ marginBottom: 48 }}>
-              <h2
-                style={{
-                  fontSize: "clamp(20px, 4vw, 24px)",
-                  fontWeight: 800,
-                  marginBottom: 24,
+            {/* PERFORMANCE CHART */}
+            {chart_data.length > 0 && (
+              <div style={{
+                padding: "clamp(20px, 4vw, 24px)",
+                borderRadius: "clamp(16px, 3vw, 20px)",
+                border: "2px solid rgba(56,189,248,0.5)",
+                background: "linear-gradient(135deg, rgba(8,47,73,0.98), rgba(6,8,20,0.98))",
+                boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(56,189,248,0.4)",
+                backdropFilter: "blur(20px)",
+                marginBottom: "clamp(20px, 4vw, 24px)",
+              }}>
+                <h2 style={{
+                  fontSize: "clamp(18px, 4vw, 22px)",
+                  fontWeight: 900,
+                  marginBottom: "clamp(16px, 3vw, 20px)",
                   display: "flex",
                   alignItems: "center",
-                  gap: 10,
-                }}
-              >
-                <Award style={{ width: 24, height: 24, color: "#8b5cf6" }} />
-                Achievements ({unlockedAchievements.length}/{achievements.length})
-              </h2>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                  gap: 16,
-                }}
-              >
-                {unlockedAchievements.map((achievement) => (
-                  <AchievementCard key={achievement.id} achievement={achievement} />
-                ))}
-                {lockedAchievements.map((achievement) => (
-                  <AchievementCard key={achievement.id} achievement={achievement} />
-                ))}
-              </div>
-            </div>
-
-            {/* Recent History */}
-            {snapshot.recent_history.length > 0 && (
-              <div style={{ marginBottom: 48 }}>
-                <h2
-                  style={{
-                    fontSize: "clamp(20px, 4vw, 24px)",
-                    fontWeight: 800,
-                    marginBottom: 24,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                  }}
-                >
-                  <Activity style={{ width: 24, height: 24, color: "#8b5cf6" }} />
-                  Recent Activity
+                  gap: "10px",
+                  color: "#7dd3fc",
+                }}>
+                  <BarChart3 style={{ width: "24px", height: "24px" }} />
+                  Performance Chart (Last 7 Days)
                 </h2>
 
-                <div
-                  style={{
-                    padding: "clamp(20px, 4vw, 32px)",
-                    borderRadius: 24,
-                    background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-                    border: "1px solid rgba(255, 255, 255, 0.05)",
-                  }}
-                >
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    {snapshot.recent_history.slice(0, 10).map((round, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          padding: 16,
-                          borderRadius: 12,
-                          background: "rgba(139, 92, 246, 0.05)",
-                          border: "1px solid rgba(139, 92, 246, 0.2)",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                          <div
-                            style={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: 10,
-                              background:
-                                round.score >= 80
-                                  ? "rgba(34, 197, 94, 0.2)"
-                                  : round.score >= 60
-                                  ? "rgba(251, 191, 36, 0.2)"
-                                  : "rgba(239, 68, 68, 0.2)",
-                              border:
-                                round.score >= 80
-                                  ? "1px solid rgba(34, 197, 94, 0.4)"
-                                  : round.score >= 60
-                                  ? "1px solid rgba(251, 191, 36, 0.4)"
-                                  : "1px solid rgba(239, 68, 68, 0.4)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: 18,
-                            }}
-                          >
-                            {round.score >= 80 ? "🔥" : round.score >= 60 ? "⭐" : "📊"}
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 14, fontWeight: 600, color: "white", marginBottom: 2 }}>
-                              Round #{round.round_id}
-                            </div>
-                            <div style={{ fontSize: 11, color: "#6b7280" }}>
-                              {formatRelativeTime(round.joined_at)}
-                            </div>
-                          </div>
+                <div style={{
+                  height: "clamp(180px, 35vw, 220px)",
+                  display: "flex",
+                  alignItems: "flex-end",
+                  gap: "clamp(6px, 2vw, 12px)",
+                  padding: "clamp(16px, 3vw, 20px) clamp(8px, 2vw, 10px)",
+                }}>
+                  {chart_data.map((day, index) => {
+                    const barHeight = (day.score / maxChartScore) * 160;
+                    return (
+                      <div key={index} style={{
+                        flex: 1,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}>
+                        <div style={{
+                          fontSize: "clamp(10px, 2vw, 12px)",
+                          fontWeight: 700,
+                          color: day.score > 0 ? "#7dd3fc" : "#64748b",
+                        }}>
+                          {day.score}
                         </div>
-
-                        <div style={{ textAlign: "right" }}>
-                          <div
-                            style={{
-                              fontSize: 20,
-                              fontWeight: 900,
-                              color:
-                                round.score >= 80 ? "#22c55e" : round.score >= 60 ? "#fbbf24" : "#ef4444",
-                              marginBottom: 2,
-                            }}
-                          >
-                            {round.score}
-                          </div>
-                          <div style={{ fontSize: 11, color: "#6b7280" }}>
-                            {round.correct_answers}/20
-                          </div>
+                        <div style={{
+                          width: "100%",
+                          height: `${barHeight}px`,
+                          background: day.score > 0 
+                            ? "linear-gradient(to top, #0ea5e9, #7dd3fc)"
+                            : "rgba(100,116,139,0.3)",
+                          borderRadius: "8px 8px 0 0",
+                          transition: "all 0.3s",
+                          cursor: "default",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = "scale(1.05)";
+                          e.currentTarget.style.boxShadow = "0 0 20px rgba(125,211,252,0.6)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "scale(1)";
+                          e.currentTarget.style.boxShadow = "none";
+                        }} />
+                        <div style={{
+                          fontSize: "clamp(9px, 1.8vw, 11px)",
+                          color: "#94a3b8",
+                          textAlign: "center",
+                        }}>
+                          {day.date}
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
-          </div>
-        </main>
 
-        {/* Edit Profile Modal */}
-        {isEditing && (
-          <EditProfileModal
-            currentName={snapshot.profile.full_name}
-            currentCountry={snapshot.profile.country_code}
-            onSave={handleSaveProfile}
-            onCancel={() => setIsEditing(false)}
-            isSaving={isSaving}
-          />
-        )}
+            {/* ACHIEVEMENTS */}
+            {achievements.length > 0 && (
+              <div style={{
+                padding: "clamp(20px, 4vw, 24px)",
+                borderRadius: "clamp(16px, 3vw, 20px)",
+                border: "2px solid rgba(251,191,36,0.5)",
+                background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)",
+                boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+                backdropFilter: "blur(20px)",
+                marginBottom: "clamp(20px, 4vw, 24px)",
+              }}>
+                <h2 style={{
+                  fontSize: "clamp(18px, 4vw, 22px)",
+                  fontWeight: 900,
+                  marginBottom: "clamp(16px, 3vw, 20px)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  color: "#fbbf24",
+                }}>
+                  <Sparkles style={{ width: "24px", height: "24px" }} />
+                  Achievements
+                </h2>
 
+                <div className="mobile-grid" style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                  gap: "clamp(12px, 3vw, 16px)",
+                }}>
+                  {achievements.map((achievement) => (
+                    <div key={achievement.id} style={{
+                      padding: "16px",
+                      borderRadius: "12px",
+                      background: achievement.unlocked 
+                        ? "linear-gradient(135deg, rgba(251,191,36,0.2), rgba(245,158,11,0.15))"
+                        : "rgba(15,23,42,0.5)",
+                      border: `2px solid ${achievement.unlocked ? "rgba(251,191,36,0.5)" : "rgba(71,85,105,0.5)"}`,
+                      textAlign: "center",
+                      opacity: achievement.unlocked ? 1 : 0.6,
+                      transition: "all 0.3s",
+                      cursor: "default",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "translateY(-4px)";
+                      e.currentTarget.style.opacity = "1";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.opacity = achievement.unlocked ? "1" : "0.6";
+                    }}>
+                      <div style={{
+                        fontSize: "32px",
+                        marginBottom: "8px",
+                        filter: achievement.unlocked ? "none" : "grayscale(100%)",
+                      }}>
+                        {achievement.icon}
+                      </div>
+                      <div style={{
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        color: achievement.unlocked ? "#fbbf24" : "#94a3b8",
+                        marginBottom: "4px",
+                      }}>
+                        {achievement.title}
+                      </div>
+                      <div style={{
+                        fontSize: "10px",
+                        color: "#94a3b8",
+                        marginBottom: "8px",
+                      }}>
+                        {achievement.description}
+                      </div>
+                      {achievement.progress !== undefined && achievement.target && (
+                        <>
+                          <div style={{
+                            width: "100%",
+                            height: "4px",
+                            borderRadius: "999px",
+                            background: "rgba(15,23,42,0.8)",
+                            overflow: "hidden",
+                            marginBottom: "4px",
+                          }}>
+                            <div style={{
+                              width: `${(achievement.progress / achievement.target) * 100}%`,
+                              height: "100%",
+                              background: achievement.unlocked ? "#fbbf24" : "#64748b",
+                              transition: "width 0.5s ease",
+                            }} />
+                          </div>
+                          <div style={{
+                            fontSize: "9px",
+                            color: "#64748b",
+                          }}>
+                            {achievement.progress}/{achievement.target}
+                          </div>
+                        </>
+                      )}
+                      {achievement.unlocked && (
+                        <div style={{
+                          marginTop: "8px",
+                          padding: "4px 8px",
+                          borderRadius: "6px",
+                          background: "rgba(34,197,94,0.2)",
+                          border: "1px solid rgba(34,197,94,0.5)",
+                          fontSize: "9px",
+                          fontWeight: 700,
+                          color: "#22c55e",
+                        }}>
+                          UNLOCKED
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* WEEKLY CHALLENGE */}
+            <div style={{
+              padding: "clamp(20px, 4vw, 24px)",
+              borderRadius: "clamp(16px, 3vw, 20px)",
+              border: "2px solid rgba(249,115,22,0.5)",
+              background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+              backdropFilter: "blur(20px)",
+              marginBottom: "clamp(20px, 4vw, 24px)",
+            }}>
+              <h2 style={{
+                fontSize: "clamp(18px, 4vw, 22px)",
+                fontWeight: 900,
+                marginBottom: "clamp(16px, 3vw, 20px)",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                color: "#fb923c",
+              }}>
+                <Flame style={{ width: "24px", height: "24px" }} />
+                Weekly Challenge
+              </h2>
+
+              <div style={{
+                padding: "20px",
+                borderRadius: "14px",
+                background: "linear-gradient(135deg, rgba(249,115,22,0.2), rgba(234,88,12,0.15))",
+                border: "2px solid rgba(249,115,22,0.5)",
+              }}>
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "12px",
+                }}>
+                  <span style={{
+                    fontSize: "16px",
+                    fontWeight: 700,
+                    color: "#e5e7eb",
+                  }}>
+                    Play 10 rounds this week
+                  </span>
+                  <span style={{
+                    fontSize: "20px",
+                    fontWeight: 900,
+                    color: "#fb923c",
+                  }}>
+                    {weekly_challenge.current}/{weekly_challenge.target}
+                  </span>
+                </div>
+
+                <div style={{
+                  width: "100%",
+                  height: "12px",
+                  borderRadius: "999px",
+                  background: "rgba(15,23,42,0.8)",
+                  overflow: "hidden",
+                  marginBottom: "12px",
+                }}>
+                  <div style={{
+                    width: `${(weekly_challenge.current / weekly_challenge.target) * 100}%`,
+                    height: "100%",
+                    background: "linear-gradient(90deg, #f97316, #fb923c)",
+                    transition: "width 1s ease",
+                    boxShadow: "0 0 10px rgba(251,146,60,0.6)",
+                  }} />
+                </div>
+
+                {weekly_challenge.completed ? (
+                  <div style={{
+                    padding: "12px",
+                    borderRadius: "10px",
+                    background: "rgba(34,197,94,0.2)",
+                    border: "1px solid rgba(34,197,94,0.5)",
+                    textAlign: "center",
+                  }}>
+                    <CheckCircle style={{
+                      width: "20px",
+                      height: "20px",
+                      color: "#22c55e",
+                      marginBottom: "4px",
+                      display: "inline-block",
+                    }} />
+                    <div style={{
+                      fontSize: "14px",
+                      fontWeight: 700,
+                      color: "#22c55e",
+                    }}>
+                      Challenge Complete! 🎉
+                    </div>
+                    <div style={{
+                      fontSize: "12px",
+                      color: "#86efac",
+                      marginTop: "4px",
+                    }}>
+                      Reward: +1 Free Round
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    fontSize: "12px",
+                    color: "#cbd5e1",
+                    textAlign: "center",
+                  }}>
+                    {weekly_challenge.target - weekly_challenge.current} more rounds to complete
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* PERSONAL BESTS & RANKINGS */}
+            <div className="mobile-grid" style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: "clamp(16px, 3vw, 20px)",
+              marginBottom: "clamp(20px, 4vw, 24px)",
+            }}>
+              
+              {/* Personal Bests */}
+              <div style={{
+                padding: "clamp(20px, 4vw, 24px)",
+                borderRadius: "clamp(16px, 3vw, 20px)",
+                border: "2px solid rgba(217,70,239,0.5)",
+                background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)",
+                boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+                backdropFilter: "blur(20px)",
+              }}>
+                <h3 style={{
+                  fontSize: "18px",
+                  fontWeight: 800,
+                  marginBottom: "16px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  color: "#e879f9",
+                }}>
+                  <Star style={{ width: "20px", height: "20px" }} />
+                  Personal Bests
+                </h3>
+
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "12px",
+                }}>
+                  <div>
+                    <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Highest Score</div>
+                    <div style={{ fontSize: "24px", fontWeight: 900, color: "#fbbf24" }}>
+                      {personal_bests.highest_score}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Best Accuracy</div>
+                    <div style={{ fontSize: "24px", fontWeight: 900, color: "#a78bfa" }}>
+                      {personal_bests.best_accuracy.toFixed(1)}%
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Perfect Rounds</div>
+                    <div style={{ fontSize: "24px", fontWeight: 900, color: "#22c55e" }}>
+                      {personal_bests.perfect_rounds}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Total Rounds</div>
+                    <div style={{ fontSize: "24px", fontWeight: 900, color: "#38bdf8" }}>
+                      {personal_bests.total_rounds}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rankings */}
+              <div style={{
+                padding: "clamp(20px, 4vw, 24px)",
+                borderRadius: "clamp(16px, 3vw, 20px)",
+                border: "2px solid rgba(139,92,246,0.5)",
+                background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)",
+                boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+                backdropFilter: "blur(20px)",
+              }}>
+                <h3 style={{
+                  fontSize: "18px",
+                  fontWeight: 800,
+                  marginBottom: "16px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  color: "#a78bfa",
+                }}>
+                  <Crown style={{ width: "20px", height: "20px" }} />
+                  Your Rankings
+                </h3>
+
+                <div style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                }}>
+                  <div style={{
+                    padding: "12px",
+                    borderRadius: "10px",
+                    background: "rgba(139,92,246,0.15)",
+                    border: "1px solid rgba(139,92,246,0.3)",
+                  }}>
+                    <div style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}>
+                      <span style={{ fontSize: "13px", color: "#cbd5e1" }}>Weekly Rank</span>
+                      <span style={{ fontSize: "20px", fontWeight: 900, color: "#a78bfa" }}>
+                        {rankings.weekly_rank ? `#${rankings.weekly_rank}` : "-"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    padding: "12px",
+                    borderRadius: "10px",
+                    background: "rgba(56,189,248,0.15)",
+                    border: "1px solid rgba(56,189,248,0.3)",
+                  }}>
+                    <div style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}>
+                      <span style={{ fontSize: "13px", color: "#cbd5e1" }}>Monthly Rank</span>
+                      <span style={{ fontSize: "20px", fontWeight: 900, color: "#38bdf8" }}>
+                        {rankings.monthly_rank ? `#${rankings.monthly_rank}` : "-"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    padding: "12px",
+                    borderRadius: "10px",
+                    background: "rgba(34,197,94,0.15)",
+                    border: "1px solid rgba(34,197,94,0.3)",
+                  }}>
+                    <div style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}>
+                      <span style={{ fontSize: "13px", color: "#cbd5e1" }}>Country</span>
+                      <span style={{ fontSize: "20px" }}>
+                        {profile.country}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* TODAY & MONTH STATS */}
+            {(today_stats || month_stats) && (
+              <div style={{
+                padding: "clamp(20px, 4vw, 24px)",
+                borderRadius: "clamp(16px, 3vw, 20px)",
+                border: "2px solid rgba(56,189,248,0.5)",
+                background: "linear-gradient(135deg, rgba(8,47,73,0.98), rgba(6,8,20,0.98))",
+                boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(56,189,248,0.4)",
+                backdropFilter: "blur(20px)",
+                marginBottom: "clamp(20px, 4vw, 24px)",
+              }}>
+                <h2 style={{
+                  fontSize: "clamp(18px, 4vw, 22px)",
+                  fontWeight: 900,
+                  marginBottom: "clamp(16px, 3vw, 20px)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  color: "#7dd3fc",
+                }}>
+                  <TrendingUp style={{ width: "24px", height: "24px" }} />
+                  Recent Statistics
+                </h2>
+
+                <div className="mobile-grid" style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                  gap: "clamp(16px, 3vw, 20px)",
+                }}>
+                  
+                  {/* Today */}
+                  {today_stats && (
+                    <div style={{
+                      padding: "clamp(16px, 3vw, 20px)",
+                      borderRadius: "14px",
+                      background: "rgba(34,197,94,0.15)",
+                      border: "2px solid rgba(34,197,94,0.5)",
+                    }}>
+                      <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        marginBottom: "12px",
+                      }}>
+                        <Clock style={{ width: "20px", height: "20px", color: "#22c55e" }} />
+                        <h3 style={{
+                          fontSize: "16px",
+                          fontWeight: 800,
+                          color: "#22c55e",
+                          textTransform: "uppercase",
+                        }}>
+                          Today
+                        </h3>
+                      </div>
+                      <div style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "12px",
+                      }}>
+                        <div>
+                          <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Rounds</div>
+                          <div style={{ fontSize: "20px", fontWeight: 900, color: "#fbbf24" }}>
+                            {today_stats.rounds_played}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Score</div>
+                          <div style={{ fontSize: "20px", fontWeight: 900, color: "#fbbf24" }}>
+                            {today_stats.total_score}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Correct</div>
+                          <div style={{ fontSize: "20px", fontWeight: 900, color: "#22c55e" }}>
+                            {today_stats.correct_answers}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Accuracy</div>
+                          <div style={{ fontSize: "20px", fontWeight: 900, color: "#a78bfa" }}>
+                            {today_stats.accuracy_percentage.toFixed(1)}%
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* This Month */}
+                  {month_stats && (
+                    <div style={{
+                      padding: "clamp(16px, 3vw, 20px)",
+                      borderRadius: "14px",
+                      background: "rgba(56,189,248,0.15)",
+                      border: "2px solid rgba(56,189,248,0.5)",
+                    }}>
+                      <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        marginBottom: "12px",
+                      }}>
+                        <Calendar style={{ width: "20px", height: "20px", color: "#7dd3fc" }} />
+                        <h3 style={{
+                          fontSize: "16px",
+                          fontWeight: 800,
+                          color: "#7dd3fc",
+                          textTransform: "uppercase",
+                        }}>
+                          This Month
+                        </h3>
+                      </div>
+                      <div style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "12px",
+                      }}>
+                        <div>
+                          <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Rounds</div>
+                          <div style={{ fontSize: "20px", fontWeight: 900, color: "#fbbf24" }}>
+                            {month_stats.rounds_played}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Score</div>
+                          <div style={{ fontSize: "20px", fontWeight: 900, color: "#fbbf24" }}>
+                            {month_stats.total_score}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Correct</div>
+                          <div style={{ fontSize: "20px", fontWeight: 900, color: "#22c55e" }}>
+                            {month_stats.correct_answers}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>Accuracy</div>
+                          <div style={{ fontSize: "20px", fontWeight: 900, color: "#a78bfa" }}>
+                            {month_stats.accuracy_percentage.toFixed(1)}%
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* QUIZ HISTORY */}
+            {recent_history.length > 0 && (
+              <div style={{
+                padding: "clamp(20px, 4vw, 24px)",
+                borderRadius: "clamp(16px, 3vw, 20px)",
+                border: "2px solid rgba(139,92,246,0.5)",
+                background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)",
+                boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+                backdropFilter: "blur(20px)",
+                marginBottom: "clamp(20px, 4vw, 24px)",
+              }}>
+                <h2 style={{
+                  fontSize: "clamp(18px, 4vw, 22px)",
+                  fontWeight: 900,
+                  marginBottom: "clamp(16px, 3vw, 20px)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                }}>
+                  <Activity style={{
+                    width: "24px",
+                    height: "24px",
+                    color: "#a78bfa",
+                  }} />
+                  Recent Quiz History
+                </h2>
+
+                <div style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                }}>
+                  {recent_history.map((round) => (
+                    <div
+                      key={round.id}
+                      style={{
+                        padding: "clamp(12px, 2.5vw, 16px)",
+                        borderRadius: "12px",
+                        background: "rgba(15,23,42,0.8)",
+                        border: "1px solid rgba(139,92,246,0.3)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "12px",
+                      }}>
+                      
+                      <div style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "12px",
+                        flexWrap: "wrap",
+                      }}>
+                        <div style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          padding: "6px 10px",
+                          borderRadius: "8px",
+                          background: "rgba(139,92,246,0.15)",
+                          border: "1px solid rgba(139,92,246,0.3)",
+                        }}>
+                          <Clock style={{ width: "14px", height: "14px", color: "#a78bfa" }} />
+                          <span style={{ fontSize: "clamp(10px, 2vw, 11px)", color: "#cbd5e1" }}>
+                            {new Date(round.created_at).toLocaleDateString("en-US", { 
+                              month: "short", 
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit"
+                            })}
+                          </span>
+                        </div>
+
+                        <div style={{
+                          padding: "6px 10px",
+                          borderRadius: "8px",
+                          background: round.source === "live" 
+                            ? "linear-gradient(90deg, rgba(251,191,36,0.2), rgba(245,158,11,0.15))"
+                            : "linear-gradient(90deg, rgba(56,189,248,0.2), rgba(14,165,233,0.15))",
+                          border: `1px solid ${round.source === "live" ? "rgba(251,191,36,0.5)" : "rgba(56,189,248,0.5)"}`,
+                        }}>
+                          <span style={{ 
+                            fontSize: "clamp(11px, 2.2vw, 12px)", 
+                            fontWeight: 700, 
+                            color: round.source === "live" ? "#fbbf24" : "#38bdf8",
+                            textTransform: "uppercase",
+                          }}>
+                            {round.source}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))",
+                        gap: "8px",
+                      }}>
+                        <div>
+                          <div style={{ fontSize: "clamp(14px, 3vw, 16px)", fontWeight: 900, color: "#fbbf24" }}>
+                            {round.score}
+                          </div>
+                          <div style={{ fontSize: "clamp(9px, 2vw, 10px)", color: "#94a3b8" }}>Score</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: "clamp(14px, 3vw, 16px)", fontWeight: 900, color: "#22c55e" }}>
+                            {round.correct_answers}
+                          </div>
+                          <div style={{ fontSize: "clamp(9px, 2vw, 10px)", color: "#94a3b8" }}>Correct</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: "clamp(14px, 3vw, 16px)", fontWeight: 900, color: "#ef4444" }}>
+                            {round.wrong_answers}
+                          </div>
+                          <div style={{ fontSize: "clamp(9px, 2vw, 10px)", color: "#94a3b8" }}>Wrong</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: "clamp(14px, 3vw, 16px)", fontWeight: 900, color: "#a78bfa" }}>
+                            {round.correct_answers + round.wrong_answers > 0 
+                              ? Math.round((round.correct_answers / (round.correct_answers + round.wrong_answers)) * 100)
+                              : 0}%
+                          </div>
+                          <div style={{ fontSize: "clamp(9px, 2vw, 10px)", color: "#94a3b8" }}>Accuracy</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* CONTACT SUPPORT */}
+            <div style={{
+              padding: "clamp(20px, 4vw, 24px)",
+              borderRadius: "clamp(16px, 3vw, 20px)",
+              border: "2px solid rgba(56,189,248,0.5)",
+              background: "linear-gradient(135deg, rgba(8,47,73,0.98), rgba(6,8,20,0.98))",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+              backdropFilter: "blur(20px)",
+              marginBottom: "clamp(20px, 4vw, 24px)",
+            }}>
+              <h2 style={{
+                fontSize: "clamp(18px, 4vw, 22px)",
+                fontWeight: 900,
+                marginBottom: "clamp(12px, 3vw, 16px)",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                color: "#7dd3fc",
+              }}>
+                <Send style={{ width: "24px", height: "24px" }} />
+                Need Help?
+              </h2>
+
+              <p style={{
+                fontSize: "14px",
+                color: "#cbd5e1",
+                marginBottom: "16px",
+              }}>
+                Have a question or need assistance? Our support team is here to help!
+              </p>
+
+              <div style={{
+                padding: "16px",
+                borderRadius: "12px",
+                background: "rgba(56,189,248,0.1)",
+                border: "1px solid rgba(56,189,248,0.3)",
+                marginBottom: "16px",
+              }}>
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "4px",
+                }}>
+                  <Mail style={{ width: "16px", height: "16px", color: "#7dd3fc" }} />
+                  <span style={{ fontSize: "14px", fontWeight: 700, color: "#7dd3fc" }}>
+                    team@vibraxx.com
+                  </span>
+                </div>
+                <p style={{ fontSize: "12px", color: "#94a3b8", marginLeft: "24px" }}>
+                  We typically respond within 24 hours
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowContactForm(true)}
+                style={{
+                  width: "100%",
+                  padding: "14px 24px",
+                  borderRadius: "12px",
+                  border: "none",
+                  background: "linear-gradient(135deg, #0ea5e9, #7dd3fc)",
+                  color: "white",
+                  fontSize: "15px",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  transition: "all 0.3s",
+                  boxShadow: "0 0 20px rgba(14,165,233,0.5)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = "0 0 30px rgba(14,165,233,0.7)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "0 0 20px rgba(14,165,233,0.5)";
+                }}>
+                <Send style={{ width: "18px", height: "18px" }} />
+                <span>Send Message</span>
+              </button>
+            </div>
+
+          </main>
+        </div>
+       
         <Footer />
       </div>
+
+      {/* CONTACT FORM MODAL */}
+      {showContactForm && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.85)",
+          backdropFilter: "blur(8px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 100,
+          padding: "clamp(12px, 3vw, 20px)",
+        }}
+        onClick={() => setShowContactForm(false)}>
+          <div style={{
+            width: "min(500px, 100%)",
+            maxHeight: "90vh",
+            overflowY: "auto",
+            padding: "clamp(20px, 4vw, 32px)",
+            borderRadius: "clamp(14px, 3vw, 20px)",
+            background: "linear-gradient(135deg, rgba(30,27,75,0.98), rgba(15,23,42,0.98))",
+            border: "2px solid rgba(139,92,246,0.5)",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.8), 0 0 40px rgba(139,92,246,0.4)",
+            backdropFilter: "blur(20px)",
+          }}
+          onClick={(e) => e.stopPropagation()}>
+            
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "20px",
+            }}>
+              <h3 style={{
+                fontSize: "clamp(18px, 4vw, 22px)",
+                fontWeight: 900,
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+              }}>
+                <Send style={{ width: "24px", height: "24px", color: "#7dd3fc" }} />
+                Contact Support
+              </h3>
+              <button
+                onClick={() => setShowContactForm(false)}
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: "rgba(239,68,68,0.2)",
+                  color: "#fca5a5",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}>
+                <X style={{ width: "20px", height: "20px" }} />
+              </button>
+            </div>
+
+            {emailStatus === "success" ? (
+              <div style={{
+                padding: "32px",
+                textAlign: "center",
+              }}>
+                <CheckCircle style={{
+                  width: "48px",
+                  height: "48px",
+                  color: "#22c55e",
+                  margin: "0 auto 16px",
+                }} />
+                <h4 style={{
+                  fontSize: "18px",
+                  fontWeight: 700,
+                  color: "#22c55e",
+                  marginBottom: "8px",
+                }}>
+                  Message Sent!
+                </h4>
+                <p style={{ fontSize: "14px", color: "#94a3b8" }}>
+                  We'll get back to you soon.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div style={{ marginBottom: "16px" }}>
+                  <label style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    color: "#cbd5e1",
+                    marginBottom: "8px",
+                  }}>
+                    Subject
+                  </label>
+                  <input
+                    type="text"
+                    value={contactSubject}
+                    onChange={(e) => setContactSubject(e.target.value)}
+                    placeholder="What can we help you with?"
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      borderRadius: "10px",
+                      border: "2px solid rgba(139,92,246,0.5)",
+                      background: "rgba(15,23,42,0.9)",
+                      color: "white",
+                      fontSize: "14px",
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: "20px" }}>
+                  <label style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    color: "#cbd5e1",
+                    marginBottom: "8px",
+                  }}>
+                    Message
+                  </label>
+                  <textarea
+                    value={contactMessage}
+                    onChange={(e) => setContactMessage(e.target.value)}
+                    placeholder="Tell us more..."
+                    rows={6}
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      borderRadius: "10px",
+                      border: "2px solid rgba(139,92,246,0.5)",
+                      background: "rgba(15,23,42,0.9)",
+                      color: "white",
+                      fontSize: "14px",
+                      resize: "vertical",
+                    }}
+                  />
+                </div>
+
+                {emailStatus === "error" && (
+                  <div style={{
+                    padding: "12px 14px",
+                    borderRadius: "10px",
+                    background: "rgba(239,68,68,0.15)",
+                    border: "1px solid rgba(239,68,68,0.4)",
+                    marginBottom: "16px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}>
+                    <XCircle style={{ width: "16px", height: "16px", color: "#ef4444" }} />
+                    <span style={{ fontSize: "13px", color: "#fca5a5" }}>
+                      Failed to send. Please try again or email us directly.
+                    </span>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleSendEmail}
+                  disabled={isSendingEmail || !contactSubject.trim() || !contactMessage.trim()}
+                  style={{
+                    width: "100%",
+                    padding: "14px",
+                    borderRadius: "12px",
+                    border: "none",
+                    background: (!contactSubject.trim() || !contactMessage.trim())
+                      ? "rgba(139,92,246,0.3)"
+                      : "linear-gradient(135deg, #7c3aed, #d946ef)",
+                    color: "white",
+                    fontSize: "15px",
+                    fontWeight: 800,
+                    cursor: (!contactSubject.trim() || !contactMessage.trim()) ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    transition: "all 0.3s",
+                  }}>
+                  {isSendingEmail ? (
+                    <>
+                      <div style={{
+                        width: "16px",
+                        height: "16px",
+                        borderRadius: "50%",
+                        border: "2px solid rgba(255,255,255,0.3)",
+                        borderTopColor: "white",
+                        animation: "spin 0.8s linear infinite",
+                      }} />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send style={{ width: "18px", height: "18px" }} />
+                      Send Message
+                    </>
+                  )}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }
