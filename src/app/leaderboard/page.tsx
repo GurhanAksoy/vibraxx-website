@@ -162,46 +162,11 @@ function PodiumCard({ player, place }: { player: Player; place: 1 | 2 | 3 }) {
 // STATIC JSON-LD (no re-render, no hydration risk)
 // ═══════════════════════════════════════════════════════════
 
-const STATIC_JSON_LD_EVENT = JSON.stringify({
-  '@context': 'https://schema.org',
-  '@type': 'SportsEvent',
-  name: 'VibraXX Leaderboard',
-  description: 'Global skill-based quiz leaderboard. Compete for prizes.',
-  url: 'https://vibraxx.com/leaderboard',
-  eventStatus: 'https://schema.org/EventScheduled',
-  eventAttendanceMode: 'https://schema.org/OnlineEventAttendanceMode',
-  organizer: {
-    '@type': 'Organization',
-    name: 'VibraXX',
-    url: 'https://vibraxx.com',
-    logo: 'https://vibraxx.com/images/logo.png',
-  },
-});
-
-const STATIC_JSON_LD_BREADCRUMB = JSON.stringify({
-  '@context': 'https://schema.org',
-  '@type': 'BreadcrumbList',
-  itemListElement: [
-    {
-      '@type': 'ListItem',
-      position: 1,
-      name: 'Home',
-      item: 'https://vibraxx.com',
-    },
-    {
-      '@type': 'ListItem',
-      position: 2,
-      name: 'Leaderboard',
-      item: 'https://vibraxx.com/leaderboard',
-    },
-  ],
-});
-
 // ═══════════════════════════════════════════════════════════
 // COMPONENT
 // ═══════════════════════════════════════════════════════════
 
-export default function LeaderboardPage() {
+function LeaderboardPage() {
   const [activeTab, setActiveTab] = useState<'weekly' | 'monthly'>('weekly');
   const [data, setData] = useState<LeaderboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -302,15 +267,7 @@ export default function LeaderboardPage() {
   return (
     <>
       {/* JSON-LD Structured Data - STATIC (no re-render, no hydration risk) */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: STATIC_JSON_LD_EVENT }}
-      />
-      
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: STATIC_JSON_LD_BREADCRUMB }}
-      />
+      {/* JSON-LD removed - causes React hydration crashes */}
 
       {/* Styles moved to globals.css to prevent DOM hydration issues */}
 
@@ -627,9 +584,9 @@ export default function LeaderboardPage() {
                 {/* TOP 3 PODIUM */}
                 <section aria-labelledby="podium-title" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "clamp(16px, 3vw, 24px)", marginBottom: "clamp(32px, 6vw, 48px)", alignItems: "end" }} className="mobile-stack">
                   <h2 id="podium-title" style={{ position: "absolute", left: "-9999px" }}>Top 3 Players</h2>
-                  {top3[1] && <PodiumCard player={top3[1]} place={2} />}
-                  {top3[0] && <PodiumCard player={top3[0]} place={1} />}
-                  {top3[2] && <PodiumCard player={top3[2]} place={3} />}
+                  {top3[1] && <PodiumCard key={top3[1].user_id} player={top3[1]} place={2} />}
+                  {top3[0] && <PodiumCard key={top3[0].user_id} player={top3[0]} place={1} />}
+                  {top3[2] && <PodiumCard key={top3[2].user_id} player={top3[2]} place={3} />}
                 </section>
 
                 {/* REST LIST */}
@@ -690,3 +647,12 @@ export default function LeaderboardPage() {
     </>
   );
 }
+
+// ═══════════════════════════════════════════════════════════
+// SSR DISABLED - Prevents hydration crashes
+// ═══════════════════════════════════════════════════════════
+import dynamic from "next/dynamic";
+
+export default dynamic(() => Promise.resolve(LeaderboardPage), {
+  ssr: false,
+});
