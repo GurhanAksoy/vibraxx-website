@@ -202,6 +202,8 @@ export default function LeaderboardPage() {
 
   // Music setup
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     const audio = new Audio("/sounds/vibraxx.mp3");
     audio.loop = true;
     audio.volume = 0.3;
@@ -220,30 +222,25 @@ export default function LeaderboardPage() {
     };
   }, []);
 
-  // Music interaction handler
+  // Music interaction - HER TIKLAMADA ÇALIŞ
   useEffect(() => {
-    if (!audioRef.current) return;
+    if (typeof window === 'undefined') return;
 
-    const handleInteraction = () => {
-      if (audioRef.current && isMusicPlaying && audioRef.current.paused) {
-        audioRef.current.play().catch(() => {
-          // Silent fail - browser might block autoplay
-        });
+    const playMusic = () => {
+      if (isMusicPlaying && audioRef.current && audioRef.current.paused) {
+        audioRef.current.play().catch(() => {});
       }
     };
 
-    const events = ["click", "touchstart", "keydown"];
-    
-    // Add listeners
-    events.forEach(event => {
-      document.addEventListener(event, handleInteraction, { passive: true });
-    });
+    // HER tıklamada çalıştır
+    document.addEventListener("click", playMusic);
+    document.addEventListener("touchstart", playMusic);
+    document.addEventListener("keydown", playMusic);
 
     return () => {
-      // Cleanup listeners
-      events.forEach(event => {
-        document.removeEventListener(event, handleInteraction);
-      });
+      document.removeEventListener("click", playMusic);
+      document.removeEventListener("touchstart", playMusic);
+      document.removeEventListener("keydown", playMusic);
     };
   }, [isMusicPlaying]);
 
@@ -385,25 +382,83 @@ export default function LeaderboardPage() {
         }
       `}</style>
 
-      <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 25%, #312e81 50%, #1e1b4b 75%, #0f172a 100%)", color: "white", paddingBottom: "0" }}>
+      <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 15%, #4c1d95 35%, #6b21a8 50%, #4c1d95 65%, #1e1b4b 85%, #0f172a 100%)", color: "white", paddingBottom: "0" }}>
         <div style={{ padding: "clamp(20px, 5vw, 40px) clamp(16px, 4vw, 24px)" }}>
           
           {/* HEADER */}
           <header role="banner" style={{ maxWidth: "1400px", margin: "0 auto clamp(24px, 5vw, 40px)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
             
-            {/* Logo */}
-            <div onClick={() => router.push("/")} role="button" tabIndex={0} aria-label="Go to homepage" style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "clamp(8px, 2vw, 12px)", padding: "8px", borderRadius: "12px", transition: "all 0.3s" }}
-              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(139,92,246,0.1)"}
-              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') router.push('/'); }}>
-              <Image 
-                src="/images/logo.png" 
-                alt="VibraXX Logo - Live Trivia Competition Platform" 
-                width={48} 
-                height={48}
-                style={{ width: "clamp(36px, 8vw, 48px)", height: "clamp(36px, 8vw, 48px)", borderRadius: "12px" }}
-                priority
-              />
+            {/* Logo (Lobby tarzı) + Leaderboard */}
+            <div style={{ display: "flex", alignItems: "center", gap: "clamp(12px, 2.5vw, 16px)" }}>
+              {/* Logo - Lobby ile AYNI */}
+              <div
+                onClick={() => router.push("/")}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') router.push('/'); }}
+                role="button"
+                tabIndex={0}
+                aria-label="Go to homepage"
+                style={{
+                  position: "relative",
+                  width: "clamp(48px, 13vw, 72px)",
+                  height: "clamp(48px, 13vw, 72px)",
+                  borderRadius: "9999px",
+                  padding: 4,
+                  background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)",
+                  boxShadow: "0 0 30px rgba(124,58,237,0.6)",
+                  flexShrink: 0,
+                  cursor: "pointer",
+                }}
+              >
+                {/* Glow effect */}
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: -5,
+                    borderRadius: "9999px",
+                    background: "radial-gradient(circle,#a855f7,transparent)",
+                    opacity: 0.4,
+                    filter: "blur(10px)",
+                    pointerEvents: "none",
+                  }}
+                />
+                {/* Logo container */}
+                <div
+                  style={{
+                    position: "relative",
+                    width: "100%",
+                    height: "100%",
+                    borderRadius: "9999px",
+                    backgroundColor: "#020817",
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Image
+                    src="/images/logo.png"
+                    alt="VibraXX"
+                    fill
+                    sizes="72px"
+                    style={{ objectFit: "contain", padding: "18%" }}
+                    priority
+                  />
+                </div>
+              </div>
+
+              {/* Leaderboard Text */}
+              <span style={{ 
+                fontSize: "clamp(20px, 4.5vw, 28px)", 
+                fontWeight: 900, 
+                background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #fbbf24 100%)", 
+                backgroundClip: "text", 
+                WebkitBackgroundClip: "text", 
+                WebkitTextFillColor: "transparent",
+                textShadow: "0 0 30px rgba(251,191,36,0.5)",
+                letterSpacing: "0.5px"
+              }}>
+                Leaderboard
+              </span>
             </div>
 
             {/* Nav Tabs */}
@@ -425,19 +480,42 @@ export default function LeaderboardPage() {
 
             {/* Live + Music */}
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <div role="status" aria-live="polite" aria-label="Leaderboard is live" style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "8px 16px", borderRadius: "999px", background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.5)" }}>
-                <div className="animate-pulse" style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#22c55e" }} />
-                <span style={{ fontSize: "12px", color: "#22c55e", fontWeight: 600 }}>Live</span>
+              <div role="status" aria-live="polite" aria-label="Leaderboard is live" style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "10px 18px", borderRadius: "999px", background: "linear-gradient(135deg, rgba(34,197,94,0.25), rgba(16,185,129,0.2))", border: "2px solid rgba(34,197,94,0.7)", boxShadow: "0 0 20px rgba(34,197,94,0.4)" }}>
+                <div className="animate-pulse" style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 10px #22c55e" }} />
+                <span style={{ fontSize: "13px", color: "#22c55e", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Live</span>
               </div>
               <button 
                 onClick={toggleMusic} 
                 aria-label={isMusicPlaying ? "Mute background music" : "Play background music"}
                 aria-pressed={isMusicPlaying}
-                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "40px", height: "40px", borderRadius: "10px", border: "2px solid rgba(139,92,246,0.5)", background: isMusicPlaying ? "linear-gradient(135deg, rgba(139,92,246,0.95), rgba(124,58,237,0.95))" : "rgba(15,23,42,0.8)", cursor: "pointer", transition: "all 0.3s ease", boxShadow: isMusicPlaying ? "0 0 15px rgba(139,92,246,0.5)" : "none" }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#a78bfa"; e.currentTarget.style.transform = "scale(1.05)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(139,92,246,0.5)"; e.currentTarget.style.transform = "scale(1)"; }}
+                style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center", 
+                  width: "44px", 
+                  height: "44px", 
+                  borderRadius: "12px", 
+                  border: "2px solid rgba(139,92,246,0.7)", 
+                  background: isMusicPlaying ? "linear-gradient(135deg, #8b5cf6, #d946ef)" : "rgba(15,23,42,0.9)", 
+                  cursor: "pointer", 
+                  transition: "all 0.3s ease", 
+                  boxShadow: isMusicPlaying ? "0 0 25px rgba(139,92,246,0.6), 0 4px 12px rgba(139,92,246,0.4)" : "0 2px 8px rgba(0,0,0,0.3)" 
+                }}
+                onMouseEnter={(e) => { 
+                  e.currentTarget.style.borderColor = "#a78bfa"; 
+                  e.currentTarget.style.transform = "scale(1.08)"; 
+                  e.currentTarget.style.boxShadow = isMusicPlaying ? "0 0 30px rgba(139,92,246,0.8)" : "0 4px 16px rgba(139,92,246,0.5)";
+                }}
+                onMouseLeave={(e) => { 
+                  e.currentTarget.style.borderColor = "rgba(139,92,246,0.7)"; 
+                  e.currentTarget.style.transform = "scale(1)"; 
+                  e.currentTarget.style.boxShadow = isMusicPlaying ? "0 0 25px rgba(139,92,246,0.6)" : "0 2px 8px rgba(0,0,0,0.3)";
+                }}
                 title={isMusicPlaying ? "Mute Music" : "Play Music"}>
-                {isMusicPlaying ? <Volume2 className="animate-pulse" style={{ width: "18px", height: "18px", color: "white" }} /> : <VolumeX style={{ width: "18px", height: "18px", color: "#94a3b8" }} />}
+                {isMusicPlaying ? 
+                  <Volume2 className="animate-pulse" style={{ width: "20px", height: "20px", color: "white" }} /> : 
+                  <VolumeX style={{ width: "20px", height: "20px", color: "#94a3b8" }} />
+                }
               </button>
             </div>
           </header>
@@ -445,7 +523,7 @@ export default function LeaderboardPage() {
           <main role="main" style={{ maxWidth: "1400px", margin: "0 auto" }}>
             
             {/* ═══ HERO SECTION ═══ */}
-            <div className="animate-slide-up" style={{ padding: "clamp(32px, 6vw, 48px) clamp(24px, 5vw, 40px)", borderRadius: "clamp(20px, 4vw, 28px)", border: "2px solid rgba(251,191,36,0.5)", background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)", boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(251,191,36,0.3)", backdropFilter: "blur(20px)", marginBottom: "clamp(24px, 5vw, 40px)", textAlign: "center" as const }}>
+            <div className="animate-slide-up" style={{ padding: "clamp(32px, 6vw, 48px) clamp(24px, 5vw, 40px)", borderRadius: "clamp(20px, 4vw, 28px)", border: "3px solid rgba(251,191,36,0.7)", background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)", boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 50px rgba(251,191,36,0.4), inset 0 0 30px rgba(251,191,36,0.1)", backdropFilter: "blur(20px)", marginBottom: "clamp(24px, 5vw, 40px)", textAlign: "center" as const, position: "relative", overflow: "hidden" }}>
               
               {/* Title */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px", marginBottom: "clamp(20px, 4vw, 32px)", flexWrap: "wrap" }}>
