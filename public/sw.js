@@ -5,7 +5,7 @@ const RUNTIME_CACHE = "vibraxx-runtime";
 const APP_SHELL = [
   "/",
   "/offline.html",
-  "/manifest.json",
+  // "/manifest.json", ❌ DO NOT CACHE MANIFEST
   "/images/logo.png",
   "/icons/manifest-icon-192.maskable.png",
   "/icons/manifest-icon-512.maskable.png",
@@ -17,7 +17,7 @@ const APP_SHELL = [
 // ═══════════════════════════════════════════════════════════
 self.addEventListener("install", (event) => {
   console.log("[SW] Install - Caching app shell");
-  
+
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(APP_SHELL).catch((err) => {
@@ -25,7 +25,7 @@ self.addEventListener("install", (event) => {
       });
     })
   );
-  
+
   // Skip waiting for faster activation
   self.skipWaiting();
 });
@@ -35,7 +35,7 @@ self.addEventListener("install", (event) => {
 // ═══════════════════════════════════════════════════════════
 self.addEventListener("activate", (event) => {
   console.log("[SW] Activate - Cleaning old caches");
-  
+
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -48,7 +48,7 @@ self.addEventListener("activate", (event) => {
       );
     })
   );
-  
+
   // Take control immediately
   return self.clients.claim();
 });
@@ -69,77 +69,87 @@ self.addEventListener("message", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
-  
+
   // Only handle GET requests
   if (request.method !== "GET") return;
-  
-  // Skip cross-origin requests except for same-origin API
+
+  // ❗ NEVER cache Next.js build chunks (prevents hydration crashes)
+  if (url.pathname.startsWith("/_next/")) {
+    return;
+  }
+
+  // ❗ NEVER cache manifest
+  if (url.pathname === "/manifest.json") {
+    return;
+  }
+
+  // Skip cross-origin requests except for allowed CDNs
   if (url.origin !== location.origin) {
-    // Allow Supabase, Google Fonts, CDN
-    if (!url.hostname.includes("supabase") && 
-        !url.hostname.includes("googleapis") &&
-        !url.hostname.includes("gstatic")) {
+    if (
+      !url.hostname.includes("supabase") &&
+      !url.hostname.includes("googleapis") &&
+      !url.hostname.includes("gstatic")
+    ) {
       return;
     }
   }
-  
+
   // ═══ STRATEGY 1: API / Supabase - Network only ═══
   if (url.pathname.startsWith("/api") || url.hostname.includes("supabase")) {
     event.respondWith(fetch(request));
     return;
   }
-  
+
   // ═══ STRATEGY 2: Navigation - Network first, fallback to offline ═══
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request)
-        .catch(() => {
-          return caches.match("/offline.html").then((response) => {
-            return response || new Response("Offline", { status: 503 });
-          });
-        })
+      fetch(request).catch(() => {
+        return caches.match("/offline.html").then((response) => {
+          return response || new Response("Offline", { status: 503 });
+        });
+      })
     );
     return;
   }
-  
+
   // ═══ STRATEGY 3: Static assets - Cache first, network fallback ═══
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       if (cachedResponse) {
         // Return cached, update in background
-        fetch(request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            caches.open(RUNTIME_CACHE).then((cache) => {
-              cache.put(request, networkResponse);
-            });
-          }
-        }).catch(() => {
-          // Fetch failed, cached version already returned
-        });
-        
+        fetch(request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              caches.open(RUNTIME_CACHE).then((cache) => {
+                cache.put(request, networkResponse.clone());
+              });
+            }
+          })
+          .catch(() => {});
+
         return cachedResponse;
       }
-      
+
       // Not in cache, fetch from network
-      return fetch(request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200) {
+      return fetch(request)
+        .then((networkResponse) => {
+          if (!networkResponse || networkResponse.status !== 200) {
+            return networkResponse;
+          }
+
+          const responseClone = networkResponse.clone();
+          caches.open(RUNTIME_CACHE).then((cache) => {
+            cache.put(request, responseClone);
+          });
+
           return networkResponse;
-        }
-        
-        // Clone and cache for next time
-        const responseClone = networkResponse.clone();
-        caches.open(RUNTIME_CACHE).then((cache) => {
-          cache.put(request, responseClone);
+        })
+        .catch(() => {
+          if (request.destination === "document") {
+            return caches.match("/offline.html");
+          }
+          return new Response("Network error", { status: 503 });
         });
-        
-        return networkResponse;
-      }).catch(() => {
-        // Network failed, return offline page for navigations
-        if (request.destination === "document") {
-          return caches.match("/offline.html");
-        }
-        return new Response("Network error", { status: 503 });
-      });
     })
   );
 });
