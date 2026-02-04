@@ -73,16 +73,20 @@ export default function RootLayout({
             `,
           }}
         />
-        {/* 🔧 SERVICE WORKER REGISTER */}
+        {/* 🔧 SERVICE WORKER + PWA INSTALL HANDLER */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
+              // ═══ SERVICE WORKER REGISTER ═══
               if ('serviceWorker' in navigator) {
                 window.addEventListener('load', () => {
-                  navigator.serviceWorker.register('/sw.js').then(reg => {
+                  navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(reg => {
+                    console.log('[PWA] Service Worker registered');
+                    
                     if (reg.waiting) {
                       reg.waiting.postMessage({ type: 'SKIP_WAITING' });
                     }
+                    
                     reg.addEventListener('updatefound', () => {
                       const newWorker = reg.installing;
                       if (newWorker) {
@@ -93,8 +97,44 @@ export default function RootLayout({
                         });
                       }
                     });
+                  }).catch(err => {
+                    console.error('[PWA] Service Worker registration failed:', err);
                   });
                 });
+              }
+              
+              // ═══ PWA INSTALL PROMPT (Android Chrome, Edge) ═══
+              let deferredPrompt = null;
+              
+              window.addEventListener('beforeinstallprompt', (e) => {
+                console.log('[PWA] Install prompt available');
+                e.preventDefault();
+                deferredPrompt = e;
+                
+                // Show install banner after 2 seconds
+                setTimeout(() => {
+                  if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.then((choiceResult) => {
+                      console.log('[PWA] User choice:', choiceResult.outcome);
+                      deferredPrompt = null;
+                    });
+                  }
+                }, 2000);
+              });
+              
+              // ═══ PWA INSTALL SUCCESS ═══
+              window.addEventListener('appinstalled', () => {
+                console.log('[PWA] App installed successfully');
+                deferredPrompt = null;
+              });
+              
+              // ═══ iOS DETECTION (Safari) ═══
+              const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+              const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+              
+              if (isIOS && !isStandalone) {
+                console.log('[PWA] iOS detected - Manual install: Share → Add to Home Screen');
               }
             `,
           }}

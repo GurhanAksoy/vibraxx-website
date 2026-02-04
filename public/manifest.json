@@ -1,7 +1,8 @@
 {
+  "id": "/",
   "name": "VibraXX - Live Quiz Arena",
   "short_name": "VibraXX",
-  "description": "Global skill-based live quiz arena. Compete for prizes 24/7.",
+  "description": "Global skill-based live quiz arena. Compete for prizes 24/7. Play trivia, climb the leaderboard, and win real rewards. Premium quiz experience with offline support.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -26,6 +27,14 @@
       "sizes": "180x180",
       "type": "image/png",
       "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/icons/manifest-icon-512.maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow"
     }
   ],
   "categories": ["games", "entertainment", "education"],
