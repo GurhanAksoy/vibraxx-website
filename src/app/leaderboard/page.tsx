@@ -1,52 +1,3 @@
-import { Metadata } from 'next';
-
-export const metadata: Metadata = {
-  title: 'VibraXX Leaderboard | Global Skill Arena',
-  description: 'Compete in VibraXX live skill-based quiz leaderboards. Track your ranking, accuracy, and compete against top players in real-time trivia challenges.',
-  keywords: ['leaderboard', 'trivia competition', 'quiz leaderboard', 'VibraXX rankings', 'live quiz', 'skill arena', 'global rankings'],
-  authors: [{ name: 'VibraXX' }],
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
-    },
-  },
-  openGraph: {
-    title: 'VibraXX Leaderboard | Global Skill Arena',
-    description: 'Track your ranking on the VibraXX leaderboard. Compete in live skill-based quiz challenges.',
-    url: 'https://vibraxx.com/leaderboard',
-    siteName: 'VibraXX',
-    locale: 'en_GB',
-    type: 'website',
-    images: [
-      {
-        url: 'https://vibraxx.com/images/og-leaderboard.jpg',
-        width: 1200,
-        height: 630,
-        alt: 'VibraXX Leaderboard - Global Skill Arena',
-      },
-    ],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'VibraXX Leaderboard | Global Skill Arena',
-    description: 'Track rankings and compete in live skill-based quiz challenges on VibraXX.',
-    images: ['https://vibraxx.com/images/twitter-leaderboard.jpg'],
-    creator: '@VibraXX',
-  },
-  alternates: {
-    canonical: 'https://vibraxx.com/leaderboard',
-  },
-  verification: {
-    google: 'your-google-verification-code',
-  },
-};
-
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -186,7 +137,52 @@ export default function LeaderboardPage() {
   const top3 = data?.players?.slice(0, 3) || [];
   const restPlayers = data?.players?.slice(3) || [];
 
-  // SEO - Dynamic title from DB data ONLY
+  // SEO - Dynamic meta tags injection (client-side)
+  useEffect(() => {
+    // Set initial meta tags on mount
+    const setMetaTags = () => {
+      // Title
+      document.title = 'VibraXX Leaderboard | Global Skill Arena';
+      
+      // Description
+      let metaDesc = document.querySelector('meta[name="description"]');
+      if (!metaDesc) {
+        metaDesc = document.createElement('meta');
+        metaDesc.setAttribute('name', 'description');
+        document.head.appendChild(metaDesc);
+      }
+      metaDesc.setAttribute('content', 'Compete in VibraXX live skill-based quiz leaderboards. Track your ranking, accuracy, and compete against top players.');
+      
+      // OG tags
+      const setOgTag = (property: string, content: string) => {
+        let tag = document.querySelector(`meta[property="${property}"]`);
+        if (!tag) {
+          tag = document.createElement('meta');
+          tag.setAttribute('property', property);
+          document.head.appendChild(tag);
+        }
+        tag.setAttribute('content', content);
+      };
+      
+      setOgTag('og:title', 'VibraXX Leaderboard | Global Skill Arena');
+      setOgTag('og:description', 'Track your ranking on the VibraXX leaderboard. Compete in live skill-based quiz challenges.');
+      setOgTag('og:url', 'https://vibraxx.com/leaderboard');
+      setOgTag('og:type', 'website');
+      
+      // Canonical
+      let canonical = document.querySelector('link[rel="canonical"]');
+      if (!canonical) {
+        canonical = document.createElement('link');
+        canonical.setAttribute('rel', 'canonical');
+        document.head.appendChild(canonical);
+      }
+      canonical.setAttribute('href', 'https://vibraxx.com/leaderboard');
+    };
+    
+    setMetaTags();
+  }, []);
+
+  // SEO - Dynamic title from DB data
   useEffect(() => {
     if (!data?.prize?.label) return;
     
