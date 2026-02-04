@@ -271,7 +271,7 @@ export default function LeaderboardPage() {
       if (audioRef.current) {
           audioRef.current.play().catch(() => {});
         }
-      }
+      
     };
 
     document.addEventListener("click", handleFirstClick, { once: true });
