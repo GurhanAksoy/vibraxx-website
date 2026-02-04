@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { 
   Crown, Trophy, Star, Target, Clock, Users,
-  Sparkles, Volume2, VolumeX, ChevronRight, Home
+  Sparkles, Volume2, VolumeX, ChevronRight
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import Footer from "@/components/Footer";
@@ -87,7 +87,14 @@ const PODIUM_CFG = {
 } as const;
 
 function PodiumCard({ player, place }: { player: Player; place: 1 | 2 | 3 }) {
+  const [imgError, setImgError] = useState(false);
   const c = PODIUM_CFG[place];
+  
+  // Reset imgError when player changes
+  useEffect(() => {
+    setImgError(false);
+  }, [player.avatar_url, player.user_id]);
+  
   return (
     <div className={`animate-slide-up podium-${place === 1 ? "1st" : place === 2 ? "2nd" : "3rd"}`} style={{ order: c.order, animationDelay: c.animDelay }}>
       <div className={c.glowClass || undefined} style={{ padding: c.card.pad, borderRadius: c.card.radius, border: c.card.border, background: c.card.bg, backdropFilter: `blur(${c.card.blur})`, textAlign: "center" as const, boxShadow: c.card.shadow, transition: "transform 0.3s", cursor: "default" }}
@@ -98,37 +105,33 @@ function PodiumCard({ player, place }: { player: Player; place: 1 | 2 | 3 }) {
         {/* Medal + Avatar */}
         <div style={{ position: "relative", width: c.medal.size, height: c.medal.size, margin: c.medal.margin, borderRadius: "50%", padding: c.medal.pad, background: c.medal.ring, boxShadow: c.medal.glow }}>
           {/* Avatar container */}
-          <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: "#1e293b", overflow: "hidden", position: "relative" }}>
-            {/* Try to load avatar if URL exists */}
-            {player.avatar_url && (
+          <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: "#1e293b", overflow: "hidden", position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            
+            {/* Try to load avatar if URL exists and no error */}
+            {player.avatar_url && !imgError && (
               <Image 
                 src={player.avatar_url} 
                 alt={player.full_name}
                 fill
                 sizes="120px"
                 style={{ objectFit: "cover" }}
-                onError={(e) => {
-                  // Hide broken image
-                  e.currentTarget.style.display = 'none';
-                }}
+                onError={() => setImgError(true)}
               />
             )}
-            {/* Emoji - always render as fallback */}
-            <div style={{ 
-              position: player.avatar_url ? 'absolute' : 'relative',
-              inset: 0,
-              display: "flex", 
-              alignItems: "center", 
-              justifyContent: "center", 
-              fontSize: c.medal.emojiSize,
-              zIndex: player.avatar_url ? 0 : 1
-            }}>
-              {c.medal.emoji}
-            </div>
+            
+            {/* Emoji fallback - show if no avatar OR error */}
+            {(!player.avatar_url || imgError) && (
+              <div style={{ 
+                fontSize: c.medal.emojiSize,
+                zIndex: 2
+              }}>
+                {c.medal.emoji}
+              </div>
+            )}
           </div>
           
           {/* Rank badge */}
-          <div style={{ position: "absolute", bottom: c.badge.bottom, left: "50%", transform: "translateX(-50%)", width: c.badge.size, height: c.badge.size, borderRadius: "50%", background: c.medal.ring, display: "flex", alignItems: "center", justifyContent: "center", border: c.badge.border, color: "#0f172a", fontWeight: 900, fontSize: c.badge.fontSize, zIndex: 2 }}>{place}</div>
+          <div style={{ position: "absolute", bottom: c.badge.bottom, left: "50%", transform: "translateX(-50%)", width: c.badge.size, height: c.badge.size, borderRadius: "50%", background: c.medal.ring, display: "flex", alignItems: "center", justifyContent: "center", border: c.badge.border, color: "#0f172a", fontWeight: 900, fontSize: c.badge.fontSize, zIndex: 3 }}>{place}</div>
         </div>
         <h2 style={{ fontSize: c.name.size, fontWeight: c.name.weight, marginBottom: c.name.mb, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{player.full_name}</h2>
         <div style={{ display: "inline-flex", alignItems: "center", gap: c.tier.gap, padding: c.tier.pad, borderRadius: "999px", background: `${player.tier_color}${place === 1 ? '25' : '20'}`, border: `${place === 1 ? '2px' : '1px'} solid ${player.tier_color}${place === 1 ? '' : '60'}`, marginBottom: c.tier.mb, fontSize: c.tier.fontSize }}>
@@ -173,11 +176,8 @@ export default function LeaderboardPage() {
 
   // SEO - Dynamic meta tags injection (client-side)
   useEffect(() => {
-    // Set initial meta tags on mount
+    // Set initial meta tags on mount (NO STATIC TITLE)
     const setMetaTags = () => {
-      // Title
-      document.title = 'VibraXX Leaderboard | Global Skill Arena';
-      
       // Description
       let metaDesc = document.querySelector('meta[name="description"]') as HTMLMetaElement;
       if (!metaDesc) {
@@ -220,7 +220,7 @@ export default function LeaderboardPage() {
     }
   }, []);
 
-  // SEO - Dynamic title from DB data
+  // SEO - Dynamic title from DB data (DB-FIRST ONLY)
   useEffect(() => {
     if (!data?.prize?.label) return;
     
@@ -243,6 +243,12 @@ export default function LeaderboardPage() {
     audio.volume = 0.3;
     audioRef.current = audio;
     
+    // Read user preference from localStorage
+    const saved = localStorage.getItem("vibraxx_music_enabled");
+    if (saved === "false") {
+      setIsMusicPlaying(false);
+    }
+    
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
@@ -254,10 +260,15 @@ export default function LeaderboardPage() {
   // CLICK ANYWHERE TO PLAY MUSIC (Lobby gibi)
   useEffect(() => {
     const handleFirstClick = () => {
-      if (!hasInteractedRef.current) {
-        hasInteractedRef.current = true;
-        setIsMusicPlaying(true);
-        if (audioRef.current) {
+      if (hasInteractedRef.current) return;
+      hasInteractedRef.current = true;
+      
+      // Check localStorage - don't autoplay if user muted before
+      const saved = localStorage.getItem("vibraxx_music_enabled");
+      if (saved === "false") return;
+      
+      setIsMusicPlaying(true);
+      if (audioRef.current) {
           audioRef.current.play().catch(() => {});
         }
       }
@@ -271,23 +282,12 @@ export default function LeaderboardPage() {
   }, []);
 
   // PLAY / PAUSE CONTROL (Lobby gibi)
-  useEffect(() => {
-    if (!audioRef.current) return;
-    if (isMusicPlaying) {
-      audioRef.current.play().catch(() => {});
-    } else {
-      audioRef.current.pause();
-    }
-  }, [isMusicPlaying]);
-
-  // Music play/pause
+  // PLAY / PAUSE CONTROL (Lobby gibi)
   useEffect(() => {
     if (!audioRef.current) return;
     
     if (isMusicPlaying) {
-      audioRef.current.play().catch(() => {
-        // Silent fail - browser autoplay policy
-      });
+      audioRef.current.play().catch(() => {});
       localStorage.setItem("vibraxx_music_enabled", "true");
     } else {
       audioRef.current.pause();
@@ -334,71 +334,74 @@ export default function LeaderboardPage() {
 
   return (
     <>
-      {/* JSON-LD Structured Data - DB data ONLY */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'SportsEvent',
-            name: 'VibraXX Leaderboard',
-            description: data?.prize?.label || 'VibraXX skill-based leaderboard competition',
-            url: `https://vibraxx.com/leaderboard?tab=${activeTab}`,
-            eventStatus: 'https://schema.org/EventScheduled',
-            eventAttendanceMode: 'https://schema.org/OnlineEventAttendanceMode',
-            organizer: {
-              '@type': 'Organization',
-              name: 'VibraXX',
-              url: 'https://vibraxx.com',
-              logo: 'https://vibraxx.com/images/logo.png',
-            },
-            offers: {
-              '@type': 'Offer',
-              price: data?.prize?.amount || '0',
-              priceCurrency: data?.prize?.type === 'money' ? 'GBP' : undefined,
-              availability: 'https://schema.org/InStock',
-              description: data?.prize?.label || 'Leaderboard reward',
-            },
-            competitor: data?.players?.map((player, idx) => ({
-              '@type': 'Person',
-              name: player.full_name,
-              identifier: `rank-${player.rank}`,
-              award: idx === 0 && data?.prize?.label ? data.prize.label : undefined,
-            })) || [],
-          }),
-        }}
-      />
+      {/* JSON-LD Structured Data - ONLY if data loaded (hydration fix) */}
+      {data && (
+        <>
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify({
+                '@context': 'https://schema.org',
+                '@type': 'SportsEvent',
+                name: 'VibraXX Leaderboard',
+                description: data.prize?.label || 'VibraXX skill-based leaderboard competition',
+                url: `https://vibraxx.com/leaderboard?tab=${activeTab}`,
+                eventStatus: 'https://schema.org/EventScheduled',
+                eventAttendanceMode: 'https://schema.org/OnlineEventAttendanceMode',
+                organizer: {
+                  '@type': 'Organization',
+                  name: 'VibraXX',
+                  url: 'https://vibraxx.com',
+                  logo: 'https://vibraxx.com/images/logo.png',
+                },
+                offers: {
+                  '@type': 'Offer',
+                  price: data.prize?.amount || '0',
+                  priceCurrency: data.prize?.type === 'money' ? 'GBP' : undefined,
+                  availability: 'https://schema.org/InStock',
+                  description: data.prize?.label || 'Leaderboard reward',
+                },
+                competitor: data.players?.map((player, idx) => ({
+                  '@type': 'Person',
+                  name: player.full_name,
+                  identifier: `rank-${player.rank}`,
+                  award: idx === 0 && data.prize?.label ? data.prize.label : undefined,
+                })) || [],
+              }),
+            }}
+          />
 
-      {/* Breadcrumb Structured Data - DB data ONLY */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'BreadcrumbList',
-            itemListElement: [
-              {
-                '@type': 'ListItem',
-                position: 1,
-                name: 'Home',
-                item: 'https://vibraxx.com',
-              },
-              {
-                '@type': 'ListItem',
-                position: 2,
-                name: 'Leaderboard',
-                item: 'https://vibraxx.com/leaderboard',
-              },
-              {
-                '@type': 'ListItem',
-                position: 3,
-                name: data?.prize?.label || 'Rankings',
-                item: `https://vibraxx.com/leaderboard?tab=${activeTab}`,
-              },
-            ],
-          }),
-        }}
-      />
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify({
+                '@context': 'https://schema.org',
+                '@type': 'BreadcrumbList',
+                itemListElement: [
+                  {
+                    '@type': 'ListItem',
+                    position: 1,
+                    name: 'Home',
+                    item: 'https://vibraxx.com',
+                  },
+                  {
+                    '@type': 'ListItem',
+                    position: 2,
+                    name: 'Leaderboard',
+                    item: 'https://vibraxx.com/leaderboard',
+                  },
+                  {
+                    '@type': 'ListItem',
+                    position: 3,
+                    name: data.prize?.label || 'Rankings',
+                    item: `https://vibraxx.com/leaderboard?tab=${activeTab}`,
+                  },
+                ],
+              }),
+            }}
+          />
+        </>
+      )}
 
       <style jsx global>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -436,20 +439,10 @@ export default function LeaderboardPage() {
             <div style={{ display: "flex", alignItems: "center", gap: "clamp(12px, 2.5vw, 16px)" }}>
               {/* Logo - Lobby ile AYNI */}
               <div
-                onClick={() => {
-                  try {
-                    router.push("/");
-                  } catch (error) {
-                    window.location.href = "/";
-                  }
-                }}
+                onClick={() => router.push("/")}
                 onKeyDown={(e) => { 
                   if (e.key === 'Enter' || e.key === ' ') {
-                    try {
-                      router.push('/');
-                    } catch (error) {
-                      window.location.href = "/";
-                    }
+                    router.push('/');
                   }
                 }}
                 role="button"
