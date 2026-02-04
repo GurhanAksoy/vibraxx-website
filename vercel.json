@@ -1,5 +1,21 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+
+  "routes": [
+    {
+      "src": "/manifest.json",
+      "dest": "/manifest.json"
+    },
+    {
+      "src": "/sw.js",
+      "dest": "/sw.js"
+    },
+    {
+      "src": "/offline.html",
+      "dest": "/offline.html"
+    }
+  ],
+
   "headers": [
     {
       "source": "/manifest.json",
@@ -60,6 +76,7 @@
         }
       ]
     },
+
     {
       "source": "/icons/(.*)",
       "headers": [
