@@ -145,7 +145,7 @@ export default function LeaderboardPage() {
       document.title = 'VibraXX Leaderboard | Global Skill Arena';
       
       // Description
-      let metaDesc = document.querySelector('meta[name="description"]');
+      let metaDesc = document.querySelector('meta[name="description"]') as HTMLMetaElement;
       if (!metaDesc) {
         metaDesc = document.createElement('meta');
         metaDesc.setAttribute('name', 'description');
@@ -155,7 +155,7 @@ export default function LeaderboardPage() {
       
       // OG tags
       const setOgTag = (property: string, content: string) => {
-        let tag = document.querySelector(`meta[property="${property}"]`);
+        let tag = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement;
         if (!tag) {
           tag = document.createElement('meta');
           tag.setAttribute('property', property);
@@ -170,7 +170,7 @@ export default function LeaderboardPage() {
       setOgTag('og:type', 'website');
       
       // Canonical
-      let canonical = document.querySelector('link[rel="canonical"]');
+      let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement;
       if (!canonical) {
         canonical = document.createElement('link');
         canonical.setAttribute('rel', 'canonical');
@@ -179,7 +179,11 @@ export default function LeaderboardPage() {
       canonical.setAttribute('href', 'https://vibraxx.com/leaderboard');
     };
     
-    setMetaTags();
+    try {
+      setMetaTags();
+    } catch (error) {
+      console.error('SEO meta tags error:', error);
+    }
   }, []);
 
   // SEO - Dynamic title from DB data
@@ -218,18 +222,26 @@ export default function LeaderboardPage() {
 
   // Music interaction handler
   useEffect(() => {
+    if (!audioRef.current) return;
+
     const handleInteraction = () => {
       if (audioRef.current && isMusicPlaying && audioRef.current.paused) {
-        audioRef.current.play().catch(err => console.log("Audio play failed:", err));
+        audioRef.current.play().catch(() => {
+          // Silent fail - browser might block autoplay
+        });
       }
     };
 
-    ["click", "touchstart", "keydown"].forEach(event => {
-      document.addEventListener(event, handleInteraction, { once: true, passive: true });
+    const events = ["click", "touchstart", "keydown"];
+    
+    // Add listeners
+    events.forEach(event => {
+      document.addEventListener(event, handleInteraction, { passive: true });
     });
 
     return () => {
-      ["click", "touchstart", "keydown"].forEach(event => {
+      // Cleanup listeners
+      events.forEach(event => {
         document.removeEventListener(event, handleInteraction);
       });
     };
@@ -240,7 +252,9 @@ export default function LeaderboardPage() {
     if (!audioRef.current) return;
     
     if (isMusicPlaying) {
-      audioRef.current.play().catch(err => console.log("Play error:", err));
+      audioRef.current.play().catch(() => {
+        // Silent fail - browser autoplay policy
+      });
       localStorage.setItem("vibraxx_music_enabled", "true");
     } else {
       audioRef.current.pause();
@@ -390,7 +404,6 @@ export default function LeaderboardPage() {
                 style={{ width: "clamp(36px, 8vw, 48px)", height: "clamp(36px, 8vw, 48px)", borderRadius: "12px" }}
                 priority
               />
-              <span style={{ fontSize: "clamp(18px, 4vw, 24px)", fontWeight: 900, background: "linear-gradient(90deg, #a78bfa, #f0abfc)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>VibraXX</span>
             </div>
 
             {/* Nav Tabs */}
