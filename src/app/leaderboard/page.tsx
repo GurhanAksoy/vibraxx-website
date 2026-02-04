@@ -17,6 +17,7 @@ interface Player {
   user_id: string;
   rank: number;
   full_name: string;
+  avatar_url?: string;
   total_score: number;
   correct_answers: number;
   wrong_answers: number;
@@ -93,8 +94,34 @@ function PodiumCard({ player, place }: { player: Player; place: 1 | 2 | 3 }) {
         onMouseEnter={(e) => (e.currentTarget.style.transform = `translateY(${c.hoverY})`)}
         onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}>
         {c.showCrown && <Crown className="animate-crown" style={{ width: "clamp(32px, 6vw, 48px)", height: "clamp(32px, 6vw, 48px)", color: "#fbbf24", margin: "0 auto clamp(12px, 2.5vw, 16px)" }} />}
+        
+        {/* Medal + Avatar */}
         <div style={{ position: "relative", width: c.medal.size, height: c.medal.size, margin: c.medal.margin, borderRadius: "50%", padding: c.medal.pad, background: c.medal.ring, boxShadow: c.medal.glow }}>
-          <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: "#1e293b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: c.medal.emojiSize }}>{c.medal.emoji}</div>
+          {/* Avatar veya emoji */}
+          {player.avatar_url ? (
+            <div style={{ width: "100%", height: "100%", borderRadius: "50%", overflow: "hidden", background: "#1e293b" }}>
+              <Image 
+                src={player.avatar_url} 
+                alt={player.full_name}
+                width={120}
+                height={120}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                onError={(e) => {
+                  // Fallback to emoji if image fails
+                  e.currentTarget.style.display = 'none';
+                  if (e.currentTarget.nextSibling) {
+                    (e.currentTarget.nextSibling as HTMLElement).style.display = 'flex';
+                  }
+                }}
+              />
+              {/* Emoji fallback (hidden by default) */}
+              <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: "#1e293b", display: "none", alignItems: "center", justifyContent: "center", fontSize: c.medal.emojiSize }}>{c.medal.emoji}</div>
+            </div>
+          ) : (
+            <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: "#1e293b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: c.medal.emojiSize }}>{c.medal.emoji}</div>
+          )}
+          
+          {/* Rank badge */}
           <div style={{ position: "absolute", bottom: c.badge.bottom, left: "50%", transform: "translateX(-50%)", width: c.badge.size, height: c.badge.size, borderRadius: "50%", background: c.medal.ring, display: "flex", alignItems: "center", justifyContent: "center", border: c.badge.border, color: "#0f172a", fontWeight: 900, fontSize: c.badge.fontSize }}>{place}</div>
         </div>
         <h2 style={{ fontSize: c.name.size, fontWeight: c.name.weight, marginBottom: c.name.mb, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{player.full_name}</h2>
@@ -129,6 +156,7 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const hasInteractedRef = useRef(false);
 
   // Helper - sıfır yerine tire
   const displayNum = (v?: number | null) =>
@@ -200,7 +228,7 @@ export default function LeaderboardPage() {
     }
   }, [data?.prize]);
 
-  // Music setup
+  // Music setup - Audio initialization
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
@@ -208,11 +236,6 @@ export default function LeaderboardPage() {
     audio.loop = true;
     audio.volume = 0.3;
     audioRef.current = audio;
-    
-    const musicEnabled = localStorage.getItem("vibraxx_music_enabled");
-    if (musicEnabled === "true") {
-      setIsMusicPlaying(true);
-    }
     
     return () => {
       if (audioRef.current) {
@@ -222,26 +245,33 @@ export default function LeaderboardPage() {
     };
   }, []);
 
-  // Music interaction - HER TIKLAMADA ÇALIŞ
+  // CLICK ANYWHERE TO PLAY MUSIC (Lobby gibi)
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const playMusic = () => {
-      if (isMusicPlaying && audioRef.current && audioRef.current.paused) {
-        audioRef.current.play().catch(() => {});
+    const handleFirstClick = () => {
+      if (!hasInteractedRef.current) {
+        hasInteractedRef.current = true;
+        setIsMusicPlaying(true);
+        if (audioRef.current) {
+          audioRef.current.play().catch(() => {});
+        }
       }
     };
 
-    // HER tıklamada çalıştır
-    document.addEventListener("click", playMusic);
-    document.addEventListener("touchstart", playMusic);
-    document.addEventListener("keydown", playMusic);
+    document.addEventListener("click", handleFirstClick, { once: true });
 
     return () => {
-      document.removeEventListener("click", playMusic);
-      document.removeEventListener("touchstart", playMusic);
-      document.removeEventListener("keydown", playMusic);
+      document.removeEventListener("click", handleFirstClick);
     };
+  }, []);
+
+  // PLAY / PAUSE CONTROL (Lobby gibi)
+  useEffect(() => {
+    if (!audioRef.current) return;
+    if (isMusicPlaying) {
+      audioRef.current.play().catch(() => {});
+    } else {
+      audioRef.current.pause();
+    }
   }, [isMusicPlaying]);
 
   // Music play/pause
