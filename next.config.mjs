@@ -48,16 +48,6 @@ const nextConfig = {
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],  // Icon sizes
   },
   
-  // ═══ KRİTİK FIX (korundu) ═══
-  async rewrites() {
-    return [
-      {
-        source: "/manifest.json",
-        destination: "/public/manifest.json",
-      },
-    ];
-  },
-  
   // ═══ OPTIMIZE: Production optimizations ═══
   compiler: {
     removeConsole: process.env.NODE_ENV === "production" 
@@ -91,6 +81,37 @@ const nextConfig = {
           {
             key: "Referrer-Policy",
             value: "origin-when-cross-origin",
+          },
+        ],
+      },
+      // PWA Files - Correct MIME types
+      {
+        source: "/manifest.json",
+        headers: [
+          {
+            key: "Content-Type",
+            value: "application/manifest+json",
+          },
+          {
+            key: "Cache-Control",
+            value: "public, max-age=0, must-revalidate",
+          },
+        ],
+      },
+      {
+        source: "/sw.js",
+        headers: [
+          {
+            key: "Content-Type",
+            value: "application/javascript; charset=utf-8",
+          },
+          {
+            key: "Cache-Control",
+            value: "public, max-age=0, must-revalidate",
+          },
+          {
+            key: "Service-Worker-Allowed",
+            value: "/",
           },
         ],
       },
