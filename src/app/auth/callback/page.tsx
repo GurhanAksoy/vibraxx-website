@@ -1,5 +1,8 @@
 ﻿"use client";
 
+export const runtime = "edge";
+export const dynamic = "force-dynamic";
+
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -23,9 +26,6 @@ function AuthCallbackInner() {
 
     const run = async () => {
       try {
-        /* ============================
-           STEP 1 – OAuth Error Check
-        ============================ */
         const error = searchParams.get("error");
         const errorDesc = searchParams.get("error_description");
 
@@ -36,9 +36,6 @@ function AuthCallbackInner() {
           return;
         }
 
-        /* ============================
-           STEP 2 – Validate Session
-        ============================ */
         const { data, error: sessionError } =
           await supabase.auth.getSession();
 
@@ -49,9 +46,6 @@ function AuthCallbackInner() {
           return;
         }
 
-        /* ============================
-           STEP 3 – Canonical Profile
-        ============================ */
         const { error: profileError } =
           await supabase.rpc("upsert_profile");
 
@@ -63,9 +57,6 @@ function AuthCallbackInner() {
           return;
         }
 
-        /* ============================
-           STEP 4 – Success Redirect
-        ============================ */
         setMessage("Welcome to VibraXX!");
         setSubMessage("Redirecting...");
         setTimeout(() => router.replace("/"), REDIRECT_DELAYS.SUCCESS);
@@ -82,7 +73,7 @@ function AuthCallbackInner() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white grid place-items-center">
-      <div className="relative z-10 flex flex-col items-center gap-4">
+      <div className="flex flex-col items-center gap-4">
         <svg
           className="animate-spin h-12 w-12 text-cyan-400"
           xmlns="http://www.w3.org/2000/svg"
@@ -104,10 +95,9 @@ function AuthCallbackInner() {
           />
         </svg>
 
-        <p className="text-xl font-semibold text-center">{message}</p>
-
+        <p className="text-xl font-semibold">{message}</p>
         {subMessage && (
-          <p className="text-sm text-gray-400 text-center max-w-md px-4">
+          <p className="text-sm text-gray-400 text-center max-w-md">
             {subMessage}
           </p>
         )}
