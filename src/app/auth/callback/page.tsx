@@ -1,7 +1,5 @@
 ﻿"use client";
 
-export const dynamic = "force-dynamic";
-
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -17,8 +15,12 @@ function AuthCallbackInner() {
 
   const [message, setMessage] = useState("Signing you in...");
   const [subMessage, setSubMessage] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
+    if (processing) return;
+    setProcessing(true);
+
     const run = async () => {
       try {
         /* ============================
@@ -37,7 +39,8 @@ function AuthCallbackInner() {
         /* ============================
            STEP 2 – Validate Session
         ============================ */
-        const { data, error: sessionError } = await supabase.auth.getSession();
+        const { data, error: sessionError } =
+          await supabase.auth.getSession();
 
         if (sessionError || !data.session?.user) {
           setMessage("Session error");
@@ -49,7 +52,8 @@ function AuthCallbackInner() {
         /* ============================
            STEP 3 – Canonical Profile
         ============================ */
-        const { error: profileError } = await supabase.rpc("upsert_profile");
+        const { error: profileError } =
+          await supabase.rpc("upsert_profile");
 
         if (profileError) {
           console.error("Profile RPC error:", profileError);
@@ -64,7 +68,6 @@ function AuthCallbackInner() {
         ============================ */
         setMessage("Welcome to VibraXX!");
         setSubMessage("Redirecting...");
-
         setTimeout(() => router.replace("/"), REDIRECT_DELAYS.SUCCESS);
       } catch (err) {
         console.error("Auth callback error:", err);
@@ -75,7 +78,7 @@ function AuthCallbackInner() {
     };
 
     run();
-  }, [router, searchParams]);
+  }, [processing, router, searchParams]);
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white grid place-items-center">
@@ -102,6 +105,7 @@ function AuthCallbackInner() {
         </svg>
 
         <p className="text-xl font-semibold text-center">{message}</p>
+
         {subMessage && (
           <p className="text-sm text-gray-400 text-center max-w-md px-4">
             {subMessage}
