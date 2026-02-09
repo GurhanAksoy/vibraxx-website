@@ -238,8 +238,13 @@ export default function ProfilePage() {
   // ═══════════════════════════════════════════════════════════
   // REALTIME SUBSCRIPTIONS (FULL OPTIMIZED)
   // ═══════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════
+  // REALTIME SUBSCRIPTIONS (DB-driven updates)
+  // ═══════════════════════════════════════════════════════════
   useEffect(() => {
-    if (!profileData?.profile?.id) return;
+    // ✅ STABLE: Extract userId to prevent re-renders
+    const userId = profileData?.profile?.id;
+    if (!userId) return;
 
     let refreshTimeout: NodeJS.Timeout;
 
@@ -250,7 +255,7 @@ export default function ProfilePage() {
         console.log("[Realtime] Refreshing profile data...");
         
         const { data, error } = await supabase.rpc("get_user_profile_data", {
-          p_user_id: profileData.profile.id,
+          p_user_id: userId,
         });
         
         if (!error && data) {
@@ -264,14 +269,14 @@ export default function ProfilePage() {
     // CHANNEL 1: SCORE LEDGER (game results)
     // ═══════════════════════════════════════════════════════════
     const scoreChannel = supabase
-      .channel(`profile-scores-${profileData.profile.id}`)
+      .channel(`profile-scores-${userId}`)
       .on(
         "postgres_changes",
         {
           event: "*", // INSERT, UPDATE, DELETE
           schema: "public",
           table: "score_ledger",
-          filter: `user_id=eq.${profileData.profile.id}`,
+          filter: `user_id=eq.${userId}`,
         },
         (payload) => {
           console.log("[Realtime] Score ledger changed:", payload);
@@ -284,14 +289,14 @@ export default function ProfilePage() {
     // CHANNEL 2: USER CREDITS (purchases, rewards)
     // ═══════════════════════════════════════════════════════════
     const creditsChannel = supabase
-      .channel(`profile-credits-${profileData.profile.id}`)
+      .channel(`profile-credits-${userId}`)
       .on(
         "postgres_changes",
         {
           event: "UPDATE", // Credits only update, never insert/delete
           schema: "public",
           table: "user_credits",
-          filter: `user_id=eq.${profileData.profile.id}`,
+          filter: `user_id=eq.${userId}`,
         },
         (payload) => {
           console.log("[Realtime] Credits changed:", payload);
@@ -304,14 +309,14 @@ export default function ProfilePage() {
     // CHANNEL 3: LEADERBOARDS (rank changes)
     // ═══════════════════════════════════════════════════════════
     const leaderboardChannel = supabase
-      .channel(`profile-leaderboard-${profileData.profile.id}`)
+      .channel(`profile-leaderboard-${userId}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "leaderboard_weekly",
-          filter: `user_id=eq.${profileData.profile.id}`,
+          filter: `user_id=eq.${userId}`,
         },
         (payload) => {
           console.log("[Realtime] Weekly leaderboard changed:", payload);
@@ -324,7 +329,7 @@ export default function ProfilePage() {
           event: "*",
           schema: "public",
           table: "leaderboard_monthly",
-          filter: `user_id=eq.${profileData.profile.id}`,
+          filter: `user_id=eq.${userId}`,
         },
         (payload) => {
           console.log("[Realtime] Monthly leaderboard changed:", payload);
@@ -333,7 +338,7 @@ export default function ProfilePage() {
       )
       .subscribe();
 
-    console.log("[Realtime] All channels subscribed for user:", profileData.profile.id);
+    console.log("[Realtime] All channels subscribed for user:", userId);
 
     // ✅ CLEANUP: Remove all channels on unmount
     return () => {
@@ -343,7 +348,7 @@ export default function ProfilePage() {
       supabase.removeChannel(leaderboardChannel);
       console.log("[Realtime] All channels unsubscribed");
     };
-  }, [profileData?.profile?.id]);
+  }, [profileData?.profile?.id]); // ✅ STABLE: Only re-run if userId changes
 
   // ═══════════════════════════════════════════════════════════
   // BACKGROUND MUSIC
@@ -381,10 +386,10 @@ export default function ProfilePage() {
       }
     };
 
-    document.addEventListener("click", handleFirstInteraction, { once: true });
-    return () => document.removeEventListener("click", handleFirstInteraction);
+    // ✅ FIXED: pointerdown instead of click
+    document.addEventListener("pointerdown", handleFirstInteraction, { once: true });
+    return () => document.removeEventListener("pointerdown", handleFirstInteraction);
   }, [hasInteracted]);
-
   useEffect(() => {
     if (!audioRef.current || !hasInteracted) return;
 
