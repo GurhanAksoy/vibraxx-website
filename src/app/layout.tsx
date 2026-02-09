@@ -35,14 +35,34 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="apple-touch-icon" href="/icons/apple-icon-180.png" />
+        {/* THEME */}
+        <meta name="theme-color" content="#020817" />
         <meta name="mobile-web-app-capable" content="yes" />
+
+        {/* ICONS */}
+        <link
+          rel="apple-touch-icon"
+          sizes="180x180"
+          href="/icons/apple-icon-180.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="32x32"
+          href="/icons/favicon-32.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="16x16"
+          href="/icons/favicon-16.png"
+        />
       </head>
 
       <body className={`${inter.className} bg-[#020817] text-white antialiased`}>
-        {/* 🔲 PRELOAD OVERLAY (KORUNDU) */}
+        {/* 🔲 PRELOAD OVERLAY (KANONİK) */}
         <div
           id="vibraxx-preload-bg"
           style={{
@@ -56,9 +76,10 @@ export default function RootLayout({
           }}
         />
 
+        {/* APP CONTENT */}
         {children}
 
-        {/* ✅ TÜM CLIENT LOGIC BURADA */}
+        {/* 🔧 TÜM CLIENT-SIDE LOGIC (SW, PWA, PRELOAD FADE, ETC.) */}
         <ClientScripts />
       </body>
     </html>

@@ -1,10 +1,18 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
-import CountryPicker from "@/components/CountryPicker";
+import dynamicImport from "next/dynamic";
+
+const CountryPicker = dynamicImport(
+  () => import("@/components/CountryPicker"),
+  { ssr: false }
+);
+
 import Footer from "@/components/Footer";
 import {
   User, Mail, Trophy, Target, Flame, TrendingUp, Calendar, Award, Crown,
@@ -557,26 +565,7 @@ export default function ProfilePage() {
 
   return (
     <>
-      <style jsx global>{`
-        * { box-sizing: border-box; }
-        body { overflow-x: hidden; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
-        @keyframes glow { 0%, 100% { box-shadow: 0 0 20px rgba(239,68,68,0.4); } 50% { box-shadow: 0 0 40px rgba(239,68,68,0.8); } }
-        @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
-        
-        .animate-pulse { animation: pulse 2s ease-in-out infinite; }
-        .animate-glow { animation: glow 2s ease-in-out infinite; }
-        .animate-float { animation: float 3s ease-in-out infinite; }
-
-        @media (max-width: 768px) {
-          .mobile-hide { display: none !important; }
-          .mobile-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
-          .mobile-stack { flex-direction: column !important; }
-          button { min-height: 44px !important; }
-        }
-      `}</style>
-
+      
       <div style={{
         minHeight: "100vh",
         background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 25%, #312e81 50%, #1e1b4b 75%, #0f172a 100%)",
@@ -731,7 +720,7 @@ export default function ProfilePage() {
                     justifyContent: "center",
                     overflow: "hidden",
                   }}>
-                    {profile.avatar_url ? (
+                    {profile.avatar_url && (
                       <Image
                         src={profile.avatar_url}
                         alt={profile.full_name}
