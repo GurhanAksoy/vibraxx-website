@@ -720,16 +720,17 @@ export default function ProfilePage() {
                     justifyContent: "center",
                     overflow: "hidden",
                   }}>
-                    {profile.avatar_url && (
+                    {profile.avatar_url ? (
                       <Image
                         src={profile.avatar_url}
                         alt={profile.full_name}
                         fill
-                        style={{ objectFit: "cover" }}
-                      />
-                    ) : (
-                      <User style={{ width: "50%", height: "50%", color: "#a78bfa" }} />
-                    )}
+                         style={{ objectFit: "cover" }}
+                       />
+                     ) : (
+                       <User style={{ width: "50%", height: "50%", color: "#a78bfa" }} />
+                     )}
+
                   </div>
                 </div>
 
