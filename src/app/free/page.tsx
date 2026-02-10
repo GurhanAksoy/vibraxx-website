@@ -16,6 +16,12 @@ import {
   AlertCircle,
 } from "lucide-react";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 🎖️ CANONICAL ARCHITECTURE - PHASE-DRIVEN QUIZ SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+// DATABASE = COMMANDER | FRONTEND = SOLDIER | PHASE = LAW
+// ═══════════════════════════════════════════════════════════════════════════
+
 // ============================================
 // CONSTANTS
 // ============================================
@@ -27,6 +33,14 @@ const INITIAL_COUNTDOWN = 6;
 
 type OptionId = "a" | "b" | "c" | "d";
 type AnswerStatus = "none" | "correct" | "wrong";
+
+// 🎯 CANONICAL PHASE MODEL (SINGLE SOURCE OF TRUTH)
+type QuizPhase = 
+  | "INIT"         // Security check + data fetch
+  | "COUNTDOWN"    // 6 → 1 countdown animation
+  | "QUESTION"     // Question display + tick sound
+  | "EXPLANATION"  // Answer reveal + explanation
+  | "FINAL";       // Score summary
 
 interface Question {
   id: number;
@@ -43,42 +57,40 @@ interface Question {
 export default function FreeQuizPage() {
   const router = useRouter();
 
-  // SECURITY & LOADING
-  const [isVerifying, setIsVerifying] = useState(true);
-  const [securityPassed, setSecurityPassed] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  // ============================================
+  // 🎯 PHASE SYSTEM (CANONICAL STATE)
+  // ============================================
+  const [phase, setPhase] = useState<QuizPhase>("INIT");
 
-  // INITIAL COUNTDOWN
-  const [showInitialCountdown, setShowInitialCountdown] = useState(false);
-  const [initialCountdown, setInitialCountdown] = useState(INITIAL_COUNTDOWN);
-
-  // QUIZ STATE
+  // ============================================
+  // CORE STATE
+  // ============================================
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(QUESTION_DURATION);
   const [selectedAnswer, setSelectedAnswer] = useState<OptionId | null>(null);
-  const [isAnswerLocked, setIsAnswerLocked] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
 
-  // EXPLANATION STATE
-  const [showExplanation, setShowExplanation] = useState(false);
-  const [explanationTimer, setExplanationTimer] = useState(EXPLANATION_DURATION);
-
-  // FINAL SCORE STATE
-  const [showFinalScore, setShowFinalScore] = useState(false);
-  const [finalCountdown, setFinalCountdown] = useState(FINAL_SCORE_DURATION);
-
-  // ANSWERS STATE
-  const [answers, setAnswers] = useState<AnswerStatus[]>(Array(TOTAL_QUESTIONS).fill("none"));
+  // COUNTERS
   const [correctCount, setCorrectCount] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
+  const [answers, setAnswers] = useState<AnswerStatus[]>(
+    Array(TOTAL_QUESTIONS).fill("none")
+  );
+
+  // TIMERS (DO NOT CONTROL UI - ONLY COUNT)
+  const [countdownTime, setCountdownTime] = useState(INITIAL_COUNTDOWN);
+  const [questionTime, setQuestionTime] = useState(QUESTION_DURATION);
+  const [explanationTime, setExplanationTime] = useState(EXPLANATION_DURATION);
+  const [finalTime, setFinalTime] = useState(FINAL_SCORE_DURATION);
 
   // UI STATE
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
-  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [showAlreadyPlayedModal, setShowAlreadyPlayedModal] = useState(false);
+  const [hasPlayedEntry, setHasPlayedEntry] = useState(false);
 
+  // ============================================
   // AUDIO REFS
+  // ============================================
   const correctSoundRef = useRef<HTMLAudioElement | null>(null);
   const wrongSoundRef = useRef<HTMLAudioElement | null>(null);
   const clickSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -86,6 +98,7 @@ export default function FreeQuizPage() {
   const whooshSoundRef = useRef<HTMLAudioElement | null>(null);
   const tickSoundRef = useRef<HTMLAudioElement | null>(null);
   const startSoundRef = useRef<HTMLAudioElement | null>(null);
+  const entrySoundRef = useRef<HTMLAudioElement | null>(null);
 
   const currentQ = questions[currentIndex];
 
@@ -96,170 +109,90 @@ export default function FreeQuizPage() {
     document.title = "Free Quiz Practice - VibraXX | Skill-Based Competition";
     const metaDesc = document.querySelector('meta[name="description"]');
     if (metaDesc) {
-      metaDesc.setAttribute("content", "Practice your knowledge with our free weekly quiz. 20 questions, instant feedback, and detailed explanations. Perfect preparation for live competitions!");
+      metaDesc.setAttribute(
+        "content",
+        "Practice your knowledge with our free weekly quiz. 20 questions, instant feedback, and detailed explanations. Perfect preparation for live competitions!"
+      );
     }
   }, []);
 
   // ============================================
-  // 🔐 KANONIK SECURITY CHECK & FETCH
+  // 🔐 INIT PHASE - SECURITY & DATA FETCH
   // ============================================
   useEffect(() => {
+    if (phase !== "INIT") return;
+
     const verifyAndFetchFreeQuiz = async () => {
       try {
-        console.log("🔐 [FREE QUIZ] Starting verification...");
+        console.log("🔐 [FREE QUIZ] Verifying eligibility...");
 
-        // CHECK 1: User authentication
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        
-        if (authError || !user) {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
           console.log("❌ [FREE QUIZ] Not authenticated");
-          router.push("/");
+          router.push("/login");
           return;
         }
 
-        console.log("✅ [FREE QUIZ] User authenticated:", user.id);
+        // ✅ CANONICAL: Check eligibility via RPC
+        const { data: eligibility, error: eligibilityError } = await supabase
+          .rpc("check_free_quiz_eligibility", { p_user_id: user.id });
 
-        // ============================================
-        // CHECK 2: KANONIK - Weekly free quiz check
-        // ============================================
-        const { data: credits, error: creditsError } = await supabase
-          .from("user_credits")
-          .select("free_quiz_used_this_week")
-          .eq("user_id", user.id)
-          .single();
-
-        if (creditsError) {
-          console.error("❌ [FREE QUIZ] Credits error:", creditsError);
+        if (eligibilityError) {
+          console.error("❌ [FREE QUIZ] Eligibility check error:", eligibilityError);
           setShowAlreadyPlayedModal(true);
-          setIsVerifying(false);
-          setIsLoading(false);
           return;
         }
 
-        if (credits.free_quiz_used_this_week) {
-          console.log("❌ [FREE QUIZ] Already used this week");
+        if (!eligibility?.eligible) {
+          console.log("⚠️ [FREE QUIZ] Already played this week");
           setShowAlreadyPlayedModal(true);
-          setIsVerifying(false);
-          setIsLoading(false);
           return;
         }
 
-        console.log("✅ [FREE QUIZ] Free quiz available!");
+        console.log("✅ [FREE QUIZ] Eligible to play");
 
-        // ============================================
-        // STEP 3: KANONIK - BALANCED QUESTION SELECTION
-        // ============================================
-        console.log("📝 [FREE QUIZ] Selecting balanced questions...");
-        
-        const selectedQuestions: Question[] = [];
-        const availableCategories: number[] = [];
+        // ✅ CANONICAL: Fetch questions from database (balanced & shuffled)
+        console.log("📊 [FREE QUIZ] Fetching questions from database...");
 
-        // ROUND 1: Try to get 1 question from each category (1-20)
-        for (let categoryId = 1; categoryId <= 20; categoryId++) {
-          const { data, error } = await supabase
-            .from("questions")
-            .select("id, category_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation")
-            .eq("category_id", categoryId)
-            .eq("is_active", true)
-            .eq("is_used", false)
-            .limit(100); // Get 100 to randomize client-side
+        const { data: fetchedQuestions, error: questionsError } = await supabase
+          .rpc("get_free_quiz_questions", { p_user_id: user.id });
 
-          if (!error && data && data.length > 0) {
-            // Random selection client-side
-            const randomQuestion = data[Math.floor(Math.random() * data.length)];
-            selectedQuestions.push(randomQuestion);
-            availableCategories.push(categoryId);
-            console.log(`✅ Category ${categoryId}: Selected question ${randomQuestion.id}`);
-          } else {
-            console.log(`⚠️ Category ${categoryId}: No questions available`);
-          }
-        }
-
-        console.log(`📊 Round 1: Selected ${selectedQuestions.length} questions from ${availableCategories.length} categories`);
-
-        // ROUND 2: If we need more questions, distribute equally across available categories
-        const needed = TOTAL_QUESTIONS - selectedQuestions.length;
-        
-        if (needed > 0 && availableCategories.length > 0) {
-          console.log(`📝 Need ${needed} more questions, distributing across ${availableCategories.length} categories`);
-          
-          const perCategory = Math.floor(needed / availableCategories.length);
-          let remaining = needed % availableCategories.length;
-          
-          const usedQuestionIds = selectedQuestions.map(q => q.id);
-
-          for (const categoryId of availableCategories) {
-            const extraNeeded = perCategory + (remaining > 0 ? 1 : 0);
-            if (remaining > 0) remaining--;
-            
-            if (extraNeeded === 0) continue;
-
-            const { data, error } = await supabase
-              .from("questions")
-              .select("id, category_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation")
-              .eq("category_id", categoryId)
-              .eq("is_active", true)
-              .eq("is_used", false)
-              .not("id", "in", `(${usedQuestionIds.join(",")})`)
-              .limit(extraNeeded * 5); // Get more for randomization
-
-            if (!error && data && data.length > 0) {
-              // Randomly select extraNeeded questions
-              const shuffled = data.sort(() => Math.random() - 0.5);
-              const selected = shuffled.slice(0, Math.min(extraNeeded, shuffled.length));
-              selectedQuestions.push(...selected);
-              usedQuestionIds.push(...selected.map(q => q.id));
-              console.log(`✅ Category ${categoryId}: Added ${selected.length} more questions`);
-            }
-          }
-        }
-
-        console.log(`✅ [FREE QUIZ] Total selected: ${selectedQuestions.length} questions`);
-
-        if (selectedQuestions.length < TOTAL_QUESTIONS) {
-          console.error(`❌ [FREE QUIZ] Not enough questions! Only ${selectedQuestions.length}/20`);
+        if (questionsError || !fetchedQuestions || fetchedQuestions.length < TOTAL_QUESTIONS) {
+          console.error("❌ [FREE QUIZ] Failed to fetch questions:", questionsError);
           setShowAlreadyPlayedModal(true);
-          setIsVerifying(false);
-          setIsLoading(false);
           return;
         }
 
-        // Shuffle final question order
-        const shuffledQuestions = selectedQuestions
-          .sort(() => Math.random() - 0.5)
-          .slice(0, TOTAL_QUESTIONS);
+        console.log(`✅ [FREE QUIZ] Loaded ${fetchedQuestions.length} questions`);
+        setQuestions(fetchedQuestions);
 
-        setQuestions(shuffledQuestions);
-        setSecurityPassed(true);
-        setIsVerifying(false);
-        setIsLoading(false);
-        setShowInitialCountdown(true);
-
-        console.log("✅ [FREE QUIZ] Ready to play!");
-
+        // 🎯 TRANSITION: INIT → COUNTDOWN
+        setPhase("COUNTDOWN");
       } catch (error: any) {
         console.error("❌ [FREE QUIZ] Verification error:", error);
         setShowAlreadyPlayedModal(true);
-        setIsVerifying(false);
-        setIsLoading(false);
       }
     };
 
     verifyAndFetchFreeQuiz();
-  }, [router]);
+  }, [phase, router]);
 
   // ============================================
-  // INITIAL COUNTDOWN (6→1→0 → START!)
+  // ⏰ COUNTDOWN PHASE TIMER
   // ============================================
   useEffect(() => {
-    if (!showInitialCountdown) return;
+    if (phase !== "COUNTDOWN") return;
 
     const interval = setInterval(() => {
-      setInitialCountdown((prev) => {
+      setCountdownTime((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
-          playSound(startSoundRef.current);
-          setShowInitialCountdown(false);
+          // 🎯 TRANSITION: COUNTDOWN → QUESTION
+          setPhase("QUESTION");
+          setHasPlayedEntry(true);
           return 0;
         }
         return prev - 1;
@@ -267,17 +200,180 @@ export default function FreeQuizPage() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [showInitialCountdown]);
+  }, [phase]);
+
+  // ============================================
+  // 🎯 QUESTION PHASE TIMER
+  // ============================================
+  useEffect(() => {
+    if (phase !== "QUESTION") return;
+
+    setQuestionTime(QUESTION_DURATION);
+
+    const interval = setInterval(() => {
+      setQuestionTime((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+
+          // Timeout: count as wrong if not answered
+          if (selectedAnswer === null) {
+            setWrongCount((w) => w + 1);
+            setAnswers((prev) => {
+              const copy = [...prev];
+              copy[currentIndex] = "wrong";
+              return copy;
+            });
+            setIsCorrect(false);
+          }
+
+          // Play whoosh sound
+          playSound(whooshSoundRef.current);
+
+          // 🎯 TRANSITION: QUESTION → EXPLANATION
+          setPhase("EXPLANATION");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [phase, selectedAnswer, currentIndex]);
+
+  // ============================================
+  // 📖 EXPLANATION PHASE TIMER
+  // ============================================
+  useEffect(() => {
+    if (phase !== "EXPLANATION") return;
+
+    setExplanationTime(EXPLANATION_DURATION);
+
+    const interval = setInterval(() => {
+      setExplanationTime((prev) => prev - 1);
+    }, 1000);
+
+    const timeout = setTimeout(() => {
+      clearInterval(interval);
+
+      if (currentIndex < TOTAL_QUESTIONS - 1) {
+        // Next question
+        setCurrentIndex((i) => i + 1);
+        setSelectedAnswer(null);
+        setIsCorrect(false);
+
+        // Play start sound
+        playSound(startSoundRef.current);
+
+        // 🎯 TRANSITION: EXPLANATION → QUESTION
+        setPhase("QUESTION");
+      } else {
+        // All questions done
+        // 🎯 TRANSITION: EXPLANATION → FINAL
+        setPhase("FINAL");
+      }
+    }, EXPLANATION_DURATION * 1000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [phase, currentIndex]);
+
+  // ============================================
+  // 🏁 FINAL PHASE TIMER & SUBMIT
+  // ============================================
+  useEffect(() => {
+    if (phase !== "FINAL") return;
+
+    // Stop tick sound
+    stopSound(tickSoundRef.current);
+
+    // Play gameover sound
+    playSound(gameoverSoundRef.current);
+
+    // ✅ CANONICAL: Submit result to database
+    const submitResult = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (user) {
+          console.log("📊 [FREE QUIZ] Submitting result...");
+
+          const { data, error } = await supabase
+            .rpc("submit_free_quiz_result", {
+              p_user_id: user.id,
+              p_correct_count: correctCount,
+              p_wrong_count: wrongCount,
+              p_total_questions: TOTAL_QUESTIONS,
+            });
+
+          if (error) {
+            console.error("❌ [FREE QUIZ] Submit error:", error);
+          } else {
+            console.log("✅ [FREE QUIZ] Result saved:", data);
+          }
+        }
+      } catch (error) {
+        console.error("❌ [FREE QUIZ] Submit error:", error);
+      }
+    };
+
+    submitResult();
+
+    // Countdown timer
+    setFinalTime(FINAL_SCORE_DURATION);
+    const interval = setInterval(() => {
+      setFinalTime((prev) => prev - 1);
+    }, 1000);
+
+    const timeout = setTimeout(() => {
+      clearInterval(interval);
+      router.push("/");
+    }, FINAL_SCORE_DURATION * 1000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [phase, router]);
+
+  // ============================================
+  // 🔊 TICK SOUND - PHASE-DRIVEN (CANONICAL)
+  // ============================================
+  useEffect(() => {
+    const tick = tickSoundRef.current;
+    if (!tick || !isSoundEnabled) return;
+
+    if (phase === "QUESTION") {
+      tick.loop = true;
+      tick.currentTime = 0;
+      tick.play().catch(() => {});
+    } else {
+      tick.pause();
+      tick.currentTime = 0;
+      tick.loop = false;
+    }
+  }, [phase, isSoundEnabled]);
+
+  // ============================================
+  // 🎵 ENTRY SOUND - PLAYS ONCE (COUNTDOWN → QUESTION)
+  // ============================================
+  useEffect(() => {
+    if (phase === "QUESTION" && !hasPlayedEntry) {
+      playSound(entrySoundRef.current);
+    }
+  }, [phase, hasPlayedEntry]);
 
   // ============================================
   // AUDIO HELPERS
   // ============================================
-  const playSound = (audio: HTMLAudioElement | null, options?: { loop?: boolean }) => {
+  const playSound = (audio: HTMLAudioElement | null) => {
     if (!isSoundEnabled || !audio) return;
     try {
-      audio.loop = !!options?.loop;
       audio.currentTime = 0;
-      audio.play();
+      audio.play().catch(() => {});
     } catch {}
   };
 
@@ -291,156 +387,23 @@ export default function FreeQuizPage() {
   const playClick = () => playSound(clickSoundRef.current);
 
   // ============================================
-  // TICK SOUND SYNC
-  // ============================================
-  useEffect(() => {
-    if (showInitialCountdown || showFinalScore || showExplanation || timeLeft <= 0) return;
-    playSound(tickSoundRef.current);
-  }, [timeLeft, showInitialCountdown, showFinalScore, showExplanation, isSoundEnabled]);
-
-  // ============================================
-  // MAIN TIMER (6 → 0)
-  // ============================================
-  useEffect(() => {
-    if (showInitialCountdown || showFinalScore || showExplanation) return;
-    if (timeLeft <= 0) return;
-
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => (prev <= 1 ? 0 : prev - 1));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [timeLeft, showExplanation, showFinalScore, showInitialCountdown]);
-
-  // ============================================
-  // TIMEOUT HANDLER
-  // ============================================
-  useEffect(() => {
-    if (showInitialCountdown || showFinalScore || showExplanation) return;
-    if (timeLeft !== 0) return;
-
-    if (!isAnswerLocked) {
-      setWrongCount((w) => w + 1);
-      setAnswers((prev) => {
-        const copy = [...prev];
-        copy[currentIndex] = "wrong";
-        return copy;
-      });
-      setIsCorrect(false);
-    }
-
-    setIsAnswerLocked(true);
-    playSound(whooshSoundRef.current);
-    setShowExplanation(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft, showExplanation, showFinalScore, showInitialCountdown]);
-
-  // ============================================
-  // EXPLANATION COUNTDOWN
-  // ============================================
-  useEffect(() => {
-    if (!showExplanation || showFinalScore) return;
-
-    let remaining = EXPLANATION_DURATION;
-    setExplanationTimer(remaining);
-
-    const interval = setInterval(() => {
-      remaining -= 1;
-      setExplanationTimer(remaining);
-    }, 1000);
-
-    const timeout = setTimeout(() => {
-      clearInterval(interval);
-
-      if (currentIndex < TOTAL_QUESTIONS - 1) {
-        const nextIndex = currentIndex + 1;
-        setCurrentIndex(nextIndex);
-        setTimeLeft(QUESTION_DURATION);
-        setSelectedAnswer(null);
-        setIsAnswerLocked(false);
-        setIsCorrect(false);
-        setShowExplanation(false);
-      } else {
-        setShowFinalScore(true);
-      }
-    }, EXPLANATION_DURATION * 1000);
-
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
-    };
-  }, [showExplanation, currentIndex, showFinalScore]);
-
-  // ============================================
-  // FINAL SCORE COUNTDOWN & KANONIK SUBMIT
-  // ============================================
-  useEffect(() => {
-    if (!showFinalScore) return;
-
-    stopSound(tickSoundRef.current);
-    playSound(gameoverSoundRef.current);
-
-    // ✅ KANONIK: Set free_quiz_used_this_week flag
-    const submitResult = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (user) {
-          console.log("📊 [FREE QUIZ] Marking as used...");
-          
-          const { error } = await supabase
-            .from("user_credits")
-            .update({
-              free_quiz_used_this_week: true,
-              free_quiz_last_used: new Date().toISOString()
-            })
-            .eq("user_id", user.id);
-
-          if (error) {
-            console.error("❌ [FREE QUIZ] Error marking as used:", error);
-          } else {
-            console.log("✅ [FREE QUIZ] Successfully marked as used");
-          }
-        }
-      } catch (error) {
-        console.error("❌ [FREE QUIZ] Submit error:", error);
-      }
-    };
-
-    submitResult();
-
-    let remaining = FINAL_SCORE_DURATION;
-    setFinalCountdown(remaining);
-
-    const interval = setInterval(() =>
-      setFinalCountdown((prev) => (prev > 0 ? prev - 1 : 0)),
-      1000
-    );
-
-    const timeout = setTimeout(() => {
-      clearInterval(interval);
-      router.push("/");
-    }, FINAL_SCORE_DURATION * 1000);
-
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
-    };
-  }, [showFinalScore, router]);
-
-  // ============================================
-  // ANSWER HANDLER
+  // 🎯 ANSWER HANDLER (CANONICAL PROTOCOL)
   // ============================================
   const handleAnswerClick = (optionId: OptionId) => {
-    if (isAnswerLocked || showExplanation || showFinalScore || !currentQ) return;
+    // GUARD: Only in QUESTION phase
+    if (phase !== "QUESTION") return;
+    if (selectedAnswer !== null) return; // Already answered
 
     playClick();
-    setSelectedAnswer(optionId);
-    setIsAnswerLocked(true);
 
+    // Lock answer
+    setSelectedAnswer(optionId);
+
+    // Check correctness
     const correct = optionId === currentQ.correct_option;
     setIsCorrect(correct);
 
+    // Update counters
     setAnswers((prev) => {
       const next = [...prev];
       next[currentIndex] = correct ? "correct" : "wrong";
@@ -454,46 +417,17 @@ export default function FreeQuizPage() {
       setWrongCount((w) => w + 1);
       playSound(wrongSoundRef.current);
     }
+
+    // Play whoosh sound
+    playSound(whooshSoundRef.current);
+
+    // 🎯 TRANSITION: QUESTION → EXPLANATION
+    setPhase("EXPLANATION");
   };
 
   // ============================================
-  // EXIT HANDLERS
+  // SOUND TOGGLE
   // ============================================
-  const handleExitClick = () => {
-    if (showFinalScore) return;
-    playClick();
-    setShowExitConfirm(true);
-  };
-
-  const handleExitConfirmYes = async () => {
-    playClick();
-    stopSound(tickSoundRef.current);
-    setShowExitConfirm(false);
-
-    // Mark as used before exit
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase
-          .from("user_credits")
-          .update({
-            free_quiz_used_this_week: true,
-            free_quiz_last_used: new Date().toISOString()
-          })
-          .eq("user_id", user.id);
-      }
-    } catch (error) {
-      console.error("❌ Exit submit error:", error);
-    }
-
-    setShowFinalScore(true);
-  };
-
-  const handleExitConfirmNo = () => {
-    playClick();
-    setShowExitConfirm(false);
-  };
-
   const handleSoundToggle = () => {
     if (isSoundEnabled) playClick();
     setIsSoundEnabled((prev) => !prev);
@@ -503,93 +437,23 @@ export default function FreeQuizPage() {
   // UTILITY FUNCTIONS
   // ============================================
   const getTimeColor = () => {
-    if (timeLeft > 4) return "#22c55e";
-    if (timeLeft > 2) return "#eab308";
+    if (questionTime > 4) return "#22c55e";
+    if (questionTime > 2) return "#eab308";
     return "#ef4444";
   };
 
-  const accuracy = TOTAL_QUESTIONS > 0 ? Math.round((correctCount / TOTAL_QUESTIONS) * 100) : 0;
+  const accuracy =
+    TOTAL_QUESTIONS > 0 ? Math.round((correctCount / TOTAL_QUESTIONS) * 100) : 0;
 
   // ============================================
-  // LOADING SCREEN
-  // ============================================
-  if (isVerifying || isLoading) {
-    return (
-      <>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "Quiz",
-              "name": "VibraXX Free Weekly Quiz",
-              "description": "Practice your knowledge with 20 free quiz questions. Instant feedback and detailed explanations.",
-              "educationalLevel": "All levels",
-              "assesses": "General knowledge",
-              "educationalUse": "Practice and skill assessment",
-              "interactivityType": "active",
-              "learningResourceType": "Quiz",
-              "isAccessibleForFree": true,
-              "hasPart": {
-                "@type": "Question",
-                "eduQuestionType": "Multiple choice"
-              },
-              "provider": {
-                "@type": "Organization",
-                "name": "VibraXX",
-                "url": "https://vibraxx.com"
-              }
-            })
-          }}
-        />
-
-        <div
-          style={{
-            minHeight: "100vh",
-            background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <div className="animate-pulse" style={{ textAlign: "center" }}>
-            <div
-              className="animate-spin"
-              style={{
-                width: "64px",
-                height: "64px",
-                margin: "0 auto 24px",
-                border: "4px solid rgba(139,92,246,0.3)",
-                borderTopColor: "#8b5cf6",
-                borderRadius: "50%",
-              }}
-            />
-            <p
-              style={{
-                fontSize: "18px",
-                fontWeight: 700,
-                color: "#f8fafc",
-                textTransform: "uppercase",
-                letterSpacing: "0.1em",
-              }}
-            >
-              {isVerifying ? "Verifying Access..." : "Loading Free Quiz..."}
-            </p>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  // ============================================
-  // ALREADY PLAYED MODAL
+  // 📺 RENDER: ALREADY PLAYED MODAL
   // ============================================
   if (showAlreadyPlayedModal) {
     return (
       <div
         style={{
           minHeight: "100vh",
-          background: "linear-gradient(to bottom right, #0a1628, #064e3b, #0f172a)",
+          background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -602,7 +466,8 @@ export default function FreeQuizPage() {
             width: "min(460px, 95vw)",
             padding: "32px 28px",
             borderRadius: 28,
-            background: "radial-gradient(circle at top, rgba(15,23,42,1), rgba(6,8,20,1))",
+            background:
+              "radial-gradient(circle at top, rgba(15,23,42,1), rgba(6,8,20,1))",
             border: "1px solid rgba(251,191,36,0.3)",
             boxShadow: "0 0 50px rgba(251,191,36,0.25)",
             textAlign: "center",
@@ -639,15 +504,30 @@ export default function FreeQuizPage() {
             Already Played This Week! 🎮
           </h2>
 
-          <p style={{ fontSize: 15, color: "#cbd5e1", lineHeight: 1.7, marginBottom: 8 }}>
+          <p
+            style={{
+              fontSize: 15,
+              color: "#cbd5e1",
+              lineHeight: 1.7,
+              marginBottom: 8,
+            }}
+          >
             You've completed your free quiz for this week.
           </p>
 
           <p style={{ fontSize: 14, color: "#94a3b8", marginBottom: 28 }}>
-            Come back next Monday for a new set of questions, or join our live competitions to keep playing! 🏆
+            Come back next Monday for a new set of questions, or join our live
+            competitions to keep playing! 🏆
           </p>
 
-          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 12,
+              justifyContent: "center",
+              flexWrap: "wrap",
+            }}
+          >
             <button
               onClick={() => router.push("/")}
               style={{
@@ -669,11 +549,13 @@ export default function FreeQuizPage() {
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = "0 0 30px rgba(124,58,237,0.7)";
+                e.currentTarget.style.boxShadow =
+                  "0 0 30px rgba(124,58,237,0.7)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "0 0 20px rgba(124,58,237,0.5)";
+                e.currentTarget.style.boxShadow =
+                  "0 0 20px rgba(124,58,237,0.5)";
               }}
             >
               Go Home
@@ -715,39 +597,102 @@ export default function FreeQuizPage() {
   }
 
   // ============================================
-  // INITIAL COUNTDOWN SCREEN (ŞIK TASARIM!)
+  // 📺 RENDER: INIT PHASE (Loading)
   // ============================================
-  if (showInitialCountdown) {
+  if (phase === "INIT") {
+    return (
+      <>
+        <style jsx global>{`
+          @keyframes spin {
+            to {
+              transform: rotate(360deg);
+            }
+          }
+        `}</style>
+        <div
+          style={{
+            minHeight: "100vh",
+            background:
+              "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "white",
+          }}
+        >
+          <div
+            style={{
+              width: 60,
+              height: 60,
+              border: "4px solid rgba(124,58,237,0.3)",
+              borderTop: "4px solid #7c3aed",
+              borderRadius: "50%",
+              animation: "spin 1s linear infinite",
+              marginBottom: 20,
+            }}
+          />
+          <div
+            style={{
+              fontSize: 18,
+              fontWeight: 700,
+              color: "#a78bfa",
+              letterSpacing: "0.1em",
+            }}
+          >
+            LOADING QUIZ...
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ============================================
+  // 📺 RENDER: COUNTDOWN PHASE
+  // ============================================
+  if (phase === "COUNTDOWN") {
     return (
       <>
         <style jsx global>{`
           @keyframes pulseGlow {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.8; transform: scale(1.05); }
-          }
-          @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+            0%,
+            100% {
+              opacity: 1;
+              transform: scale(1);
+            }
+            50% {
+              opacity: 0.8;
+              transform: scale(1.05);
+            }
           }
           @keyframes ripple {
-            0% { transform: scale(1); opacity: 1; }
-            100% { transform: scale(1.5); opacity: 0; }
+            0% {
+              transform: scale(1);
+              opacity: 1;
+            }
+            100% {
+              transform: scale(1.5);
+              opacity: 0;
+            }
           }
-          .animate-pulse-glow { animation: pulseGlow 2s ease-in-out infinite; }
-          .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+          .animate-pulse-glow {
+            animation: pulseGlow 2s ease-in-out infinite;
+          }
         `}</style>
 
         <div
           style={{
             minHeight: "100vh",
-            background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #7c3aed 100%)",
+            maxHeight: "100vh",
+            overflow: "hidden",
+            background:
+              "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #7c3aed 100%)",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
             padding: "20px",
             position: "relative",
-            overflow: "hidden",
           }}
         >
           {/* Animated Background Circles */}
@@ -760,7 +705,8 @@ export default function FreeQuizPage() {
               width: "300px",
               height: "300px",
               borderRadius: "50%",
-              background: "radial-gradient(circle, rgba(124,58,237,0.3), transparent 70%)",
+              background:
+                "radial-gradient(circle, rgba(124,58,237,0.3), transparent 70%)",
               animation: "ripple 3s ease-out infinite",
             }}
           />
@@ -773,7 +719,8 @@ export default function FreeQuizPage() {
               width: "300px",
               height: "300px",
               borderRadius: "50%",
-              background: "radial-gradient(circle, rgba(217,70,239,0.3), transparent 70%)",
+              background:
+                "radial-gradient(circle, rgba(217,70,239,0.3), transparent 70%)",
               animation: "ripple 3s ease-out infinite 1s",
             }}
           />
@@ -790,7 +737,8 @@ export default function FreeQuizPage() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              boxShadow: "0 0 80px rgba(124,58,237,0.9), inset 0 0 40px rgba(255,255,255,0.2)",
+              boxShadow:
+                "0 0 80px rgba(124,58,237,0.9), inset 0 0 40px rgba(255,255,255,0.2)",
               border: "4px solid rgba(255,255,255,0.3)",
               position: "relative",
               zIndex: 2,
@@ -799,132 +747,104 @@ export default function FreeQuizPage() {
             <Trophy style={{ width: 70, height: 70, color: "white" }} />
           </div>
 
-          {/* Quiz Starting Text */}
-          <h1
-            className="animate-fade-in"
-            style={{
-              fontSize: "clamp(28px, 5vw, 38px)",
-              fontWeight: 900,
-              marginBottom: "20px",
-              background: "linear-gradient(to right, #ffffff, #a855f7, #06b6d4)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              textAlign: "center",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              position: "relative",
-              zIndex: 2,
-              textShadow: "0 0 40px rgba(168,85,247,0.5)",
-            }}
-          >
-            🎮 Free Quiz Starting
-          </h1>
-
           {/* Countdown Number */}
           <div
-            className="animate-pulse-glow"
             style={{
-              fontSize: "clamp(80px, 15vw, 120px)",
+              fontSize: "clamp(80px, 20vw, 140px)",
               fontWeight: 900,
-              color: "#22c55e",
-              textShadow: "0 0 60px rgba(34,197,94,1), 0 0 100px rgba(34,197,94,0.5)",
-              marginTop: "30px",
+              background: "linear-gradient(135deg, #ffffff, #d946ef)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              lineHeight: 1,
+              marginBottom: "30px",
+              textShadow: "0 0 60px rgba(217,70,239,0.8)",
               position: "relative",
               zIndex: 2,
-              lineHeight: 1,
             }}
           >
-            {initialCountdown}
+            {countdownTime}
           </div>
 
           {/* Get Ready Text */}
-          <p
+          <div
             style={{
-              fontSize: "18px",
-              color: "#e0e7ff",
-              marginTop: "30px",
-              textAlign: "center",
-              textTransform: "uppercase",
-              letterSpacing: "0.2em",
+              fontSize: "clamp(20px, 4vw, 28px)",
               fontWeight: 700,
-              position: "relative",
-              zIndex: 2,
-            }}
-          >
-            ⚡ Get Ready! ⚡
-          </p>
-
-          {/* Info Text */}
-          <p
-            style={{
-              fontSize: "14px",
-              color: "#cbd5e1",
-              marginTop: "16px",
+              color: "#e5e7eb",
+              letterSpacing: "0.15em",
+              textTransform: "uppercase",
               textAlign: "center",
-              maxWidth: "400px",
-              lineHeight: 1.6,
               position: "relative",
               zIndex: 2,
             }}
           >
-            20 questions • 6 seconds each • Instant feedback
-          </p>
+            Get Ready! 🎯
+          </div>
         </div>
 
+        {/* Audio Elements */}
+        <audio ref={correctSoundRef} src="/sounds/correct.mp3" />
+        <audio ref={wrongSoundRef} src="/sounds/wrong.mp3" />
+        <audio ref={clickSoundRef} src="/sounds/click.mp3" />
+        <audio ref={gameoverSoundRef} src="/sounds/gameover.mp3" />
+        <audio ref={whooshSoundRef} src="/sounds/whoosh.mp3" />
+        <audio ref={tickSoundRef} src="/sounds/tick.mp3" />
         <audio ref={startSoundRef} src="/sounds/start.mp3" />
+        <audio ref={entrySoundRef} src="/sounds/entry.mp3" />
       </>
     );
   }
 
   // ============================================
-  // MAIN QUIZ UI
+  // 📺 RENDER: QUESTION, EXPLANATION, FINAL PHASES
   // ============================================
   return (
     <>
       <style jsx global>{`
         @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-10px); }
+          0%,
+          100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-20px);
+          }
         }
         @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
+          0%,
+          100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.6;
+          }
         }
         @keyframes slideUp {
-          from { transform: translateY(20px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
+          from {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
         @keyframes shine {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
+          from {
+            left: -100%;
+          }
+          to {
+            left: 200%;
+          }
         }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
+        .animate-float {
+          animation: float 4s ease-in-out infinite;
         }
-        .animate-float { animation: float 4s ease-in-out infinite; }
-        .animate-pulse { animation: pulse 1s ease-in-out infinite; }
-        .animate-slide-up { animation: slideUp 0.4s ease-out; }
-        .animate-spin { animation: spin 1s linear infinite; }
-        
-        @media (max-width: 768px) {
-          .header-wrap {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 10px;
-            height: auto !important;
-            padding: 10px 0 12px;
-          }
-          .header-center-text {
-            justify-content: flex-start !important;
-            width: 100%;
-          }
-          .header-right {
-            width: 100%;
-            justify-content: flex-end;
-          }
-          .question-grid {
-            grid-template-columns: 1fr !important;
-          }
+        .animate-pulse {
+          animation: pulse 1s ease-in-out infinite;
+        }
+        .animate-slide-up {
+          animation: slideUp 0.4s ease-out;
         }
       `}</style>
 
@@ -936,14 +856,18 @@ export default function FreeQuizPage() {
       <audio ref={whooshSoundRef} src="/sounds/whoosh.mp3" />
       <audio ref={tickSoundRef} src="/sounds/tick.mp3" />
       <audio ref={startSoundRef} src="/sounds/start.mp3" />
+      <audio ref={entrySoundRef} src="/sounds/entry.mp3" />
 
       <div
         style={{
           minHeight: "100vh",
+          maxHeight: "100vh",
+          overflow: "hidden",
           background: "linear-gradient(to bottom right, #0a1628, #064e3b, #0f172a)",
           color: "white",
           position: "relative",
-          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         {/* Background Glows */}
@@ -956,7 +880,8 @@ export default function FreeQuizPage() {
             width: "260px",
             height: "260px",
             borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(124,58,237,0.4), transparent 70%)",
+            background:
+              "radial-gradient(circle, rgba(124,58,237,0.4), transparent 70%)",
             filter: "blur(40px)",
             opacity: 0.5,
             pointerEvents: "none",
@@ -972,7 +897,8 @@ export default function FreeQuizPage() {
             width: "320px",
             height: "320px",
             borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(217,70,239,0.35), transparent 70%)",
+            background:
+              "radial-gradient(circle, rgba(217,70,239,0.35), transparent 70%)",
             filter: "blur(45px)",
             opacity: 0.45,
             pointerEvents: "none",
@@ -980,723 +906,530 @@ export default function FreeQuizPage() {
           }}
         />
 
-        {/* HEADER */}
-        <header
+        {/* MAIN CONTENT */}
+        <main
           style={{
+            flex: 1,
             position: "relative",
-            zIndex: 10,
-            borderBottom: "1px solid rgba(148,163,253,0.16)",
-            backdropFilter: "blur(18px)",
-            background: "rgba(6,8,20,0.94)",
+            zIndex: 1,
+            maxWidth: "900px",
+            margin: "0 auto",
+            padding: "clamp(16px, 3vw, 24px)",
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
           }}
         >
-          <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 16px" }}>
+          {/* ═══════════════════════════════════════════════════════════ */}
+          {/* 🏁 FINAL SCORE SCREEN */}
+          {/* ═══════════════════════════════════════════════════════════ */}
+          {phase === "FINAL" && (
             <div
-              className="header-wrap"
+              className="animate-slide-up"
               style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                height: "80px",
-                gap: "16px",
-                flexWrap: "wrap",
+                padding: "clamp(24px, 4vw, 36px) clamp(20px, 3vw, 28px)",
+                borderRadius: "clamp(20px, 3vw, 28px)",
+                background:
+                  "radial-gradient(circle at top, rgba(15,23,42,0.98), rgba(6,8,20,1))",
+                border: "1px solid rgba(124,58,237,0.4)",
+                boxShadow: "0 0 50px rgba(124,58,237,0.4)",
+                textAlign: "center",
               }}
             >
-              {/* Logo */}
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              {/* Trophy Icon */}
+              <div
+                style={{
+                  width: "clamp(80px, 15vw, 100px)",
+                  height: "clamp(80px, 15vw, 100px)",
+                  margin: "0 auto clamp(20px, 3vw, 28px)",
+                  borderRadius: "50%",
+                  background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 0 40px rgba(124,58,237,0.8)",
+                  border: "3px solid rgba(255,255,255,0.2)",
+                }}
+              >
+                <Trophy
+                  style={{
+                    width: "clamp(40px, 8vw, 50px)",
+                    height: "clamp(40px, 8vw, 50px)",
+                    color: "white",
+                  }}
+                />
+              </div>
+
+              {/* Title */}
+              <h1
+                style={{
+                  fontSize: "clamp(24px, 5vw, 32px)",
+                  fontWeight: 900,
+                  marginBottom: "clamp(12px, 2vw, 16px)",
+                  background: "linear-gradient(to right, #a78bfa, #d946ef)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                Quiz Complete! 🎉
+              </h1>
+
+              {/* Stats Grid */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: "clamp(10px, 2vw, 14px)",
+                  marginBottom: "clamp(20px, 3vw, 28px)",
+                }}
+              >
+                {/* Correct */}
                 <div
                   style={{
-                    width: "clamp(40px,6vw,52px)",
-                    height: "clamp(40px,6vw,52px)",
-                    borderRadius: "50%",
-                    background: "#020817",
-                    border: "2px solid rgba(168,85,247,0.9)",
-                    boxShadow: "0 0 14px rgba(168,85,247,0.7)",
+                    padding: "clamp(12px, 2.5vw, 16px)",
+                    borderRadius: "clamp(12px, 2.5vw, 16px)",
+                    background: "rgba(22,163,74,0.1)",
+                    border: "1px solid rgba(34,197,94,0.4)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "clamp(24px, 5vw, 32px)",
+                      fontWeight: 900,
+                      color: "#22c55e",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    {correctCount}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "clamp(10px, 2vw, 12px)",
+                      color: "#94a3b8",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.1em",
+                    }}
+                  >
+                    Correct
+                  </div>
+                </div>
+
+                {/* Wrong */}
+                <div
+                  style={{
+                    padding: "clamp(12px, 2.5vw, 16px)",
+                    borderRadius: "clamp(12px, 2.5vw, 16px)",
+                    background: "rgba(127,29,29,0.1)",
+                    border: "1px solid rgba(239,68,68,0.4)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "clamp(24px, 5vw, 32px)",
+                      fontWeight: 900,
+                      color: "#ef4444",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    {wrongCount}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "clamp(10px, 2vw, 12px)",
+                      color: "#94a3b8",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.1em",
+                    }}
+                  >
+                    Wrong
+                  </div>
+                </div>
+
+                {/* Accuracy */}
+                <div
+                  style={{
+                    padding: "clamp(12px, 2.5vw, 16px)",
+                    borderRadius: "clamp(12px, 2.5vw, 16px)",
+                    background: "rgba(124,58,237,0.1)",
+                    border: "1px solid rgba(168,85,247,0.4)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "clamp(24px, 5vw, 32px)",
+                      fontWeight: 900,
+                      color: "#a78bfa",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    {accuracy}%
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "clamp(10px, 2vw, 12px)",
+                      color: "#94a3b8",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.1em",
+                    }}
+                  >
+                    Accuracy
+                  </div>
+                </div>
+              </div>
+
+              {/* Message */}
+              <p
+                style={{
+                  fontSize: "clamp(14px, 2.5vw, 16px)",
+                  color: "#cbd5e1",
+                  lineHeight: 1.6,
+                  marginBottom: "clamp(8px, 1.5vw, 12px)",
+                }}
+              >
+                Great job! Come back next week for a new free quiz, or join our
+                live competitions to keep playing! 🏆
+              </p>
+
+              {/* Countdown */}
+              <div
+                style={{
+                  marginTop: "4px",
+                  fontSize: "clamp(11px, 2vw, 12px)",
+                  color: "#9ca3af",
+                }}
+              >
+                Returning to home in{" "}
+                <span style={{ color: "#10b981", fontWeight: 800 }}>
+                  {finalTime}
+                </span>{" "}
+                seconds...
+              </div>
+
+              {/* Home Button */}
+              <button
+                onClick={() => router.push("/")}
+                style={{
+                  marginTop: "clamp(20px, 3vw, 28px)",
+                  padding: "clamp(12px, 2.5vw, 14px) clamp(24px, 4vw, 32px)",
+                  borderRadius: 9999,
+                  border: "none",
+                  background: "linear-gradient(135deg, #7c3aed, #a855f7)",
+                  color: "white",
+                  fontSize: "clamp(12px, 2.5vw, 14px)",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  cursor: "pointer",
+                  boxShadow: "0 0 20px rgba(124,58,237,0.6)",
+                  transition: "all 0.3s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow =
+                    "0 0 30px rgba(124,58,237,0.8)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow =
+                    "0 0 20px rgba(124,58,237,0.6)";
+                }}
+              >
+                Go Home Now
+              </button>
+            </div>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════ */}
+          {/* 📝 QUESTION PHASE */}
+          {/* ═══════════════════════════════════════════════════════════ */}
+          {phase === "QUESTION" && currentQ && (
+            <>
+              {/* Timer & Sound Toggle */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: "clamp(12px, 2vw, 16px)",
+                  gap: "12px",
+                }}
+              >
+                {/* Timer */}
+                <div
+                  style={{
+                    flex: 1,
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
-                    overflow: "hidden",
+                    gap: "10px",
+                    padding: "clamp(10px, 2vw, 12px) clamp(16px, 3vw, 20px)",
+                    borderRadius: "clamp(12px, 2.5vw, 16px)",
+                    background: "rgba(6,8,20,0.9)",
+                    border: `2px solid ${getTimeColor()}`,
+                    boxShadow: `0 0 20px ${getTimeColor()}40`,
                   }}
                 >
-                  <img
-                    src="/images/logo.png"
-                    alt="Logo"
-                    style={{ width: "80%", height: "80%", objectFit: "contain" }}
+                  <Clock
+                    style={{
+                      width: "clamp(18px, 3.5vw, 22px)",
+                      height: "clamp(18px, 3.5vw, 22px)",
+                      color: getTimeColor(),
+                    }}
                   />
-                </div>
-                <div>
-                  <div
+                  <span
                     style={{
-                      fontSize: "11px",
-                      letterSpacing: "0.18em",
-                      textTransform: "uppercase",
-                      color: "#a78bfa",
+                      fontSize: "clamp(24px, 5vw, 32px)",
+                      fontWeight: 900,
+                      color: getTimeColor(),
                     }}
                   >
-                    Every question teaches you something new
-                  </div>
-                  <div style={{ fontSize: "13px", color: "#6b7280" }}>
-                    Learn & Play Quiz
-                  </div>
-                </div>
-              </div>
-
-              {/* Center: Question Counter */}
-              <div
-                className="header-center-text"
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  flex: 1,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "clamp(14px,3vw,18px)",
-                    fontWeight: 800,
-                    letterSpacing: "0.16em",
-                    textTransform: "uppercase",
-                    background: "linear-gradient(to right,#a78bfa,#d946ef,#22d3ee,#f0abfc)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    textAlign: "center",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  🎮 Practice {currentIndex + 1} / {TOTAL_QUESTIONS}
-                </div>
-              </div>
-
-              {/* Right: Score + Sound + Exit */}
-              <div
-                className="header-right"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  flexWrap: "wrap",
-                  justifyContent: "flex-end",
-                }}
-              >
-                {/* Correct / Wrong */}
-                <div style={{ display: "flex", gap: 6 }}>
-                  <div
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: 999,
-                      background: "rgba(22,163,74,0.1)",
-                      border: "1px solid rgba(22,163,74,0.5)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      fontSize: 11,
-                    }}
-                  >
-                    <CheckCircle style={{ width: 14, height: 14, color: "#22c55e" }} />
-                    <span style={{ fontWeight: 700, color: "#22c55e" }}>{correctCount}</span>
-                  </div>
-                  <div
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: 999,
-                      background: "rgba(239,68,68,0.1)",
-                      border: "1px solid rgba(239,68,68,0.5)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      fontSize: 11,
-                    }}
-                  >
-                    <XCircle style={{ width: 14, height: 14, color: "#ef4444" }} />
-                    <span style={{ fontWeight: 700, color: "#ef4444" }}>{wrongCount}</span>
-                  </div>
+                    {questionTime}s
+                  </span>
                 </div>
 
                 {/* Sound Toggle */}
                 <button
                   onClick={handleSoundToggle}
                   style={{
-                    width: "clamp(34px,6vw,40px)",
-                    height: "clamp(34px,6vw,40px)",
-                    borderRadius: "14px",
-                    border: "1px solid rgba(167,139,250,0.7)",
-                    background: isSoundEnabled
-                      ? "rgba(129,140,248,0.18)"
-                      : "rgba(15,23,42,0.9)",
+                    minWidth: "44px",
+                    minHeight: "44px",
+                    padding: "clamp(10px, 2vw, 12px)",
+                    borderRadius: "clamp(10px, 2vw, 12px)",
+                    border: "1px solid rgba(148,163,253,0.4)",
+                    background: "rgba(6,8,20,0.9)",
+                    color: "#a78bfa",
+                    cursor: "pointer",
+                    transition: "all 0.3s",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    cursor: "pointer",
-                    boxShadow: isSoundEnabled ? "0 0 10px rgba(129,140,248,0.7)" : "none",
-                    transition: "all 0.2s",
                   }}
                 >
                   {isSoundEnabled ? (
-                    <Volume2 style={{ width: 18, height: 18, color: "#a78bfa" }} />
+                    <Volume2 style={{ width: 20, height: 20 }} />
                   ) : (
-                    <VolumeX style={{ width: 18, height: 18, color: "#6b7280" }} />
+                    <VolumeX style={{ width: 20, height: 20 }} />
                   )}
                 </button>
-
-                {/* Exit Button */}
-                {!showFinalScore && (
-                  <button
-                    onClick={handleExitClick}
-                    style={{
-                      padding: "8px 16px",
-                      borderRadius: "9999px",
-                      border: "1px solid rgba(248,250,252,0.18)",
-                      background: "radial-gradient(circle at top, rgba(168,85,247,0.35), rgba(15,23,42,0.98))",
-                      color: "white",
-                      fontSize: "12px",
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.14em",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      cursor: "pointer",
-                      boxShadow: "0 0 16px rgba(168,85,247,0.7)",
-                      transition: "all 0.25s",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.boxShadow = "0 0 24px rgba(236,72,153,0.85)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = "0 0 16px rgba(168,85,247,0.7)";
-                    }}
-                  >
-                    <Zap style={{ width: 14, height: 14, color: "#f9fafb" }} />
-                    EXIT QUIZ
-                  </button>
-                )}
               </div>
-            </div>
-          </div>
-        </header>
 
-        {/* MAIN CONTENT */}
-        <main
-          style={{
-            position: "relative",
-            zIndex: 5,
-            maxWidth: "1200px",
-            margin: "0 auto",
-            padding: "24px 16px 32px",
-          }}
-        >
-          {/* CIRCULAR TIMER */}
-          {!showFinalScore && (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                marginBottom: 24,
-              }}
-            >
-              <div style={{ position: "relative", width: 86, height: 86 }}>
+              {/* Question Card */}
+              <div
+                className="animate-slide-up"
+                style={{
+                  marginBottom: "clamp(16px, 3vw, 20px)",
+                  padding: "clamp(18px, 3vw, 24px)",
+                  borderRadius: "clamp(20px, 3vw, 26px)",
+                  border: "1px solid rgba(129,140,248,0.35)",
+                  background:
+                    "radial-gradient(circle at top, rgba(17,24,39,0.98), rgba(6,8,20,1))",
+                  boxShadow: "0 0 32px rgba(79,70,229,0.3)",
+                }}
+              >
+                {/* Question Number */}
                 <div
                   style={{
-                    position: "absolute",
-                    inset: 0,
-                    borderRadius: "50%",
-                    border: `3px solid ${getTimeColor()}`,
-                    boxShadow: `0 0 18px ${getTimeColor()}`,
-                    opacity: 0.9,
-                    animation: "pulse 1.4s infinite",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "absolute",
-                    inset: 7,
-                    borderRadius: "50%",
-                    background: "rgba(6,8,20,0.98)",
                     display: "flex",
-                    flexDirection: "column",
                     alignItems: "center",
-                    justifyContent: "center",
-                    gap: 2,
+                    gap: 8,
+                    marginBottom: "clamp(10px, 2vw, 12px)",
                   }}
                 >
-                  <Clock style={{ width: 20, height: 20, color: getTimeColor() }} />
-                  <span style={{ fontSize: "24px", fontWeight: 900, color: getTimeColor() }}>
-                    {timeLeft}
+                  <Target
+                    style={{
+                      width: "clamp(16px, 3vw, 18px)",
+                      height: "clamp(16px, 3vw, 18px)",
+                      color: "#a78bfa",
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontSize: "clamp(11px, 2vw, 12px)",
+                      color: "#9ca3af",
+                      fontWeight: 600,
+                      letterSpacing: "0.16em",
+                    }}
+                  >
+                    QUESTION {currentIndex + 1} / {TOTAL_QUESTIONS}
                   </span>
                 </div>
-              </div>
-              <div
-                style={{
-                  marginTop: 6,
-                  fontSize: 10,
-                  letterSpacing: "0.14em",
-                  textTransform: "uppercase",
-                  color: "#9ca3af",
-                }}
-              >
-                SECONDS LEFT
-              </div>
-            </div>
-          )}
 
-          {/* FINAL SCORE */}
-          {showFinalScore ? (
-            <div
-              className="animate-slide-up"
-              style={{
-                marginTop: 24,
-                padding: "28px 20px 26px",
-                borderRadius: 26,
-                border: "1px solid rgba(148,163,253,0.25)",
-                background: "radial-gradient(circle at top, rgba(15,23,42,1), rgba(6,8,20,1))",
-                boxShadow: "0 0 40px rgba(79,70,229,0.35)",
-                textAlign: "center",
-              }}
-            >
-              <Trophy
-                style={{ width: 64, height: 64, color: "#facc15", marginBottom: 16 }}
-              />
-              <h1
-                style={{
-                  fontSize: 24,
-                  fontWeight: 900,
-                  marginBottom: 8,
-                  background: "linear-gradient(to right,#a78bfa,#f0abfc)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                }}
-              >
-                Practice Summary 🎮
-              </h1>
-              <p style={{ fontSize: 14, color: "#9ca3af", marginBottom: 22 }}>
-                Free practice mode • Ready for the real competition?
-              </p>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))",
-                  gap: 16,
-                  marginBottom: 20,
-                }}
-              >
-                <div
+                {/* Question Text */}
+                <h2
                   style={{
-                    padding: "16px 10px",
-                    borderRadius: 18,
-                    background: "rgba(22,163,74,0.12)",
-                    border: "1px solid rgba(22,163,74,0.5)",
-                  }}
-                >
-                  <CheckCircle
-                    style={{ width: 24, height: 24, color: "#22c55e", marginBottom: 6 }}
-                  />
-                  <div style={{ fontSize: 22, fontWeight: 900, color: "#22c55e" }}>
-                    {correctCount}
-                  </div>
-                  <div style={{ fontSize: 11, color: "#9ca3af" }}>Correct</div>
-                </div>
-
-                <div
-                  style={{
-                    padding: "16px 10px",
-                    borderRadius: 18,
-                    background: "rgba(239,68,68,0.12)",
-                    border: "1px solid rgba(239,68,68,0.5)",
-                  }}
-                >
-                  <XCircle
-                    style={{ width: 24, height: 24, color: "#ef4444", marginBottom: 6 }}
-                  />
-                  <div style={{ fontSize: 22, fontWeight: 900, color: "#ef4444" }}>
-                    {wrongCount}
-                  </div>
-                  <div style={{ fontSize: 11, color: "#9ca3af" }}>Wrong</div>
-                </div>
-
-                <div
-                  style={{
-                    padding: "16px 10px",
-                    borderRadius: 18,
-                    background: "rgba(79,70,229,0.16)",
-                    border: "1px solid rgba(129,140,248,0.6)",
-                  }}
-                >
-                  <Award
-                    style={{ width: 24, height: 24, color: "#a78bfa", marginBottom: 6 }}
-                  />
-                  <div style={{ fontSize: 22, fontWeight: 900, color: "#e5e7eb" }}>
-                    {accuracy}%
-                  </div>
-                  <div style={{ fontSize: 11, color: "#9ca3af" }}>Accuracy</div>
-                </div>
-              </div>
-
-              {/* CTA for Live Quiz */}
-              <div
-                style={{
-                  marginTop: 24,
-                  marginBottom: 16,
-                  padding: "20px 18px",
-                  borderRadius: 20,
-                  background: "linear-gradient(135deg, rgba(124,58,237,0.15), rgba(6,182,212,0.15))",
-                  border: "1px solid rgba(124,58,237,0.4)",
-                  boxShadow: "0 0 30px rgba(124,58,237,0.2)",
-                }}
-              >
-                <p
-                  style={{
-                    fontSize: 15,
-                    fontWeight: 700,
-                    color: "#e5e7eb",
-                    marginBottom: 14,
-                    textAlign: "center",
+                    fontSize: "clamp(16px, 3.5vw, 19px)",
                     lineHeight: 1.5,
+                    fontWeight: 700,
+                    marginBottom: "clamp(16px, 3vw, 18px)",
+                    color: "#e5e7eb",
                   }}
                 >
-                  Ready for the real challenge?<br />Join the Live Arena 🏆
-                </p>
-                
-                <button
-                  onClick={() => router.push("/lobby")}
-                  className="animate-shine"
-                  style={{
-                    width: "100%",
-                    padding: "14px 24px",
-                    borderRadius: 9999,
-                    border: "none",
-                    background: "linear-gradient(135deg, #7c3aed, #06b6d4)",
-                    color: "white",
-                    fontSize: 15,
-                    fontWeight: 800,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                    cursor: "pointer",
-                    boxShadow: "0 0 30px rgba(124,58,237,0.6), inset 0 1px 0 rgba(255,255,255,0.3)",
-                    transition: "all 0.3s",
-                    position: "relative",
-                    overflow: "hidden",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-2px) scale(1.02)";
-                    e.currentTarget.style.boxShadow = "0 0 40px rgba(124,58,237,0.8), inset 0 1px 0 rgba(255,255,255,0.3)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0) scale(1)";
-                    e.currentTarget.style.boxShadow = "0 0 30px rgba(124,58,237,0.6), inset 0 1px 0 rgba(255,255,255,0.3)";
-                  }}
-                >
-                  <span style={{ position: "relative", zIndex: 1 }}>
-                    Enter Live Arena
-                  </span>
-                </button>
-              </div>
+                  {currentQ.question_text}
+                </h2>
 
-              <div style={{ marginTop: 4, fontSize: 12, color: "#9ca3af" }}>
-                Returning to home in{" "}
-                <span style={{ color: "#10b981", fontWeight: 800 }}>{finalCountdown}</span>{" "}
-                seconds...
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* QUESTION CARD */}
-              {!showExplanation && currentQ ? (
+                {/* Options Grid */}
                 <div
-                  className="animate-slide-up"
                   style={{
-                    marginTop: 8,
-                    marginBottom: 16,
-                    padding: "24px 18px 24px",
-                    borderRadius: 26,
-                    border: "1px solid rgba(129,140,248,0.35)",
-                    background: "radial-gradient(circle at top, rgba(17,24,39,0.98), rgba(6,8,20,1))",
-                    boxShadow: "0 0 32px rgba(79,70,229,0.3)",
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fit, minmax(clamp(140px, 40vw, 200px), 1fr))",
+                    gap: "clamp(10px, 2vw, 12px)",
                   }}
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginBottom: 10,
-                    }}
-                  >
-                    <Target style={{ width: 18, height: 18, color: "#a78bfa" }} />
-                    <span
-                      style={{
-                        fontSize: 12,
-                        color: "#9ca3af",
-                        fontWeight: 600,
-                        letterSpacing: "0.16em",
-                      }}
-                    >
-                      QUESTION {currentIndex + 1}
-                    </span>
-                  </div>
+                  {(["a", "b", "c", "d"] as OptionId[]).map((optId) => {
+                    const optText = currentQ[
+                      `option_${optId}` as keyof Question
+                    ] as string;
+                    const isSelected = selectedAnswer === optId;
 
-                  <h2
-                    style={{
-                      fontSize: 19,
-                      lineHeight: 1.5,
-                      fontWeight: 700,
-                      marginBottom: 18,
-                      color: "#e5e7eb",
-                    }}
-                  >
-                    {currentQ.question_text}
-                  </h2>
+                    let borderColor = "rgba(129,140,248,0.6)";
+                    let boxShadow = "0 0 10px rgba(15,23,42,0.9)";
+                    let bg =
+                      "linear-gradient(135deg, rgba(9,9,18,0.98), rgba(15,23,42,0.98))";
 
-                  <div
-                    className="question-grid"
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(2,minmax(0,1fr))",
-                      gap: 12,
-                    }}
-                  >
-                    {(['a', 'b', 'c', 'd'] as OptionId[]).map((optId) => {
-                      const optText = currentQ[`option_${optId}` as keyof Question] as string;
-                      const isSelected = selectedAnswer === optId;
-                      const isCorrectOpt = optId === currentQ.correct_option;
-                      const locked = isAnswerLocked;
+                    if (isSelected) {
+                      borderColor = "#d946ef";
+                      boxShadow = "0 0 16px rgba(217,70,239,0.7)";
+                      bg =
+                        "linear-gradient(135deg, rgba(24,24,48,1), rgba(15,23,42,1))";
+                    }
 
-                      let borderColor = "rgba(129,140,248,0.6)";
-                      let boxShadow = "0 0 10px rgba(15,23,42,0.9)";
-                      let bg = "linear-gradient(135deg, rgba(9,9,18,0.98), rgba(15,23,42,0.98))";
-
-                      if (locked) {
-                        if (isCorrectOpt) {
-                          borderColor = "#22c55e";
-                          boxShadow = "0 0 16px rgba(34,197,94,0.7)";
-                          bg = "linear-gradient(135deg, rgba(22,163,74,0.16), rgba(6,8,20,1))";
-                        } else if (isSelected && !isCorrectOpt) {
-                          borderColor = "#ef4444";
-                          boxShadow = "0 0 16px rgba(239,68,68,0.7)";
-                          bg = "linear-gradient(135deg, rgba(127,29,29,0.2), rgba(6,8,20,1))";
-                        } else {
-                          borderColor = "rgba(75,85,99,0.5)";
-                          boxShadow = "none";
-                          bg = "linear-gradient(135deg, rgba(9,9,18,0.9), rgba(15,23,42,0.96))";
-                        }
-                      } else if (isSelected) {
-                        borderColor = "#d946ef";
-                        boxShadow = "0 0 16px rgba(217,70,239,0.7)";
-                        bg = "linear-gradient(135deg, rgba(24,24,48,1), rgba(15,23,42,1))";
-                      }
-
-                      return (
-                        <button
-                          key={optId}
-                          onClick={() => handleAnswerClick(optId)}
-                          disabled={locked}
+                    return (
+                      <button
+                        key={optId}
+                        onClick={() => handleAnswerClick(optId)}
+                        disabled={selectedAnswer !== null}
+                        style={{
+                          position: "relative",
+                          padding: "clamp(12px, 2.5vw, 14px)",
+                          borderRadius: "clamp(14px, 3vw, 18px)",
+                          border: `2px solid ${borderColor}`,
+                          background: bg,
+                          color: "#e5e7eb",
+                          textAlign: "left",
+                          cursor:
+                            selectedAnswer !== null ? "default" : "pointer",
+                          boxShadow,
+                          transition: "all 0.22s",
+                          overflow: "hidden",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (
+                            selectedAnswer === null &&
+                            window.innerWidth > 768
+                          ) {
+                            e.currentTarget.style.transform = "translateY(-2px)";
+                            e.currentTarget.style.boxShadow =
+                              "0 0 18px rgba(217,70,239,0.7)";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (
+                            selectedAnswer === null &&
+                            window.innerWidth > 768
+                          ) {
+                            e.currentTarget.style.transform = "translateY(0)";
+                            e.currentTarget.style.boxShadow = boxShadow;
+                          }
+                        }}
+                      >
+                        {/* Inner border */}
+                        <div
                           style={{
+                            position: "absolute",
+                            inset: 0,
+                            borderRadius: "clamp(14px, 3vw, 18px)",
+                            border: "1px solid rgba(129,140,248,0.16)",
+                            pointerEvents: "none",
+                          }}
+                        />
+
+                        {/* Shine effect */}
+                        {selectedAnswer === null && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              top: 0,
+                              left: "-100%",
+                              width: "40%",
+                              height: "100%",
+                              background:
+                                "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)",
+                              animation: "shine 2.4s infinite",
+                              pointerEvents: "none",
+                            }}
+                          />
+                        )}
+
+                        {/* Content */}
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "clamp(8px, 2vw, 10px)",
                             position: "relative",
-                            padding: "14px 12px",
-                            borderRadius: 18,
-                            border: `2px solid ${borderColor}`,
-                            background: bg,
-                            color: "#e5e7eb",
-                            textAlign: "left",
-                            cursor: locked ? "default" : "pointer",
-                            boxShadow,
-                            transition: "all 0.22s",
-                            overflow: "hidden",
-                            opacity: locked && !isSelected && !isCorrectOpt ? 0.45 : 1,
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!locked && window.innerWidth > 768) {
-                              e.currentTarget.style.transform = "translateY(-2px)";
-                              e.currentTarget.style.boxShadow = "0 0 18px rgba(217,70,239,0.7)";
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!locked && window.innerWidth > 768) {
-                              e.currentTarget.style.transform = "translateY(0)";
-                              e.currentTarget.style.boxShadow = boxShadow;
-                            }
+                            zIndex: 2,
                           }}
                         >
                           <div
                             style={{
-                              position: "absolute",
-                              inset: 0,
-                              borderRadius: 18,
-                              border: "1px solid rgba(129,140,248,0.16)",
-                              pointerEvents: "none",
-                            }}
-                          />
-                          {!locked && (
-                            <div
-                              style={{
-                                position: "absolute",
-                                top: 0,
-                                left: "-100%",
-                                width: "40%",
-                                height: "100%",
-                                background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)",
-                                animation: "shine 2.4s infinite",
-                                pointerEvents: "none",
-                              }}
-                            />
-                          )}
-
-                          <div
-                            style={{
+                              width: "clamp(28px, 5vw, 32px)",
+                              height: "clamp(28px, 5vw, 32px)",
+                              borderRadius: "clamp(8px, 2vw, 10px)",
+                              border: "1px solid rgba(148,163,253,0.4)",
                               display: "flex",
                               alignItems: "center",
-                              gap: 10,
-                              position: "relative",
-                              zIndex: 2,
+                              justifyContent: "center",
+                              fontSize: "clamp(12px, 2.5vw, 14px)",
+                              fontWeight: 800,
+                              background: "rgba(10,16,30,1)",
+                              boxShadow: "0 2px 8px rgba(15,23,42,0.9)",
+                              color: "#a78bfa",
+                              flexShrink: 0,
                             }}
                           >
-                            <div
-                              style={{
-                                width: 32,
-                                height: 32,
-                                borderRadius: 10,
-                                border: "1px solid rgba(148,163,253,0.4)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontSize: 14,
-                                fontWeight: 800,
-                                background: "rgba(10,16,30,1)",
-                                boxShadow: "0 2px 8px rgba(15,23,42,0.9)",
-                                color: isCorrectOpt && locked
-                                  ? "#22c55e"
-                                  : isSelected && locked && !isCorrectOpt
-                                  ? "#ef4444"
-                                  : "#a78bfa",
-                              }}
-                            >
-                              {optId.toUpperCase()}
-                            </div>
-                            <div style={{ fontSize: 13, fontWeight: 500, color: "#e5e7eb" }}>
-                              {optText}
-                            </div>
+                            {optId.toUpperCase()}
                           </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                          <div
+                            style={{
+                              fontSize: "clamp(12px, 2.5vw, 13px)",
+                              fontWeight: 500,
+                              color: "#e5e7eb",
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            {optText}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
-              ) : showExplanation && currentQ ? (
-                // EXPLANATION CARD
-                <div
-                  className="animate-slide-up"
-                  style={{
-                    marginTop: 12,
-                    marginBottom: 12,
-                    padding: "22px 18px 20px",
-                    borderRadius: 24,
-                    border: "1px solid rgba(56,189,248,0.4)",
-                    background: "linear-gradient(135deg, rgba(8,47,73,0.96), rgba(6,8,20,1))",
-                    boxShadow: "0 0 32px rgba(56,189,248,0.35)",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      marginBottom: 8,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <Award
-                      style={{
-                        width: 24,
-                        height: 24,
-                        color: isCorrect ? "#22c55e" : "#ef4444",
-                      }}
-                    />
-                    <span
-                      style={{
-                        fontSize: 18,
-                        fontWeight: 800,
-                        color: isCorrect ? "#22c55e" : "#ef4444",
-                      }}
-                    >
-                      {isCorrect ? "Correct!" : "Incorrect"}
-                    </span>
-                  </div>
-
-                  <div
-                    style={{
-                      fontSize: 13,
-                      color: "#bfdbfe",
-                      marginBottom: 6,
-                      fontWeight: 500,
-                    }}
-                  >
-                    Correct answer:{" "}
-                    <span style={{ color: "#22c55e", fontWeight: 800 }}>
-                      {currentQ.correct_option.toUpperCase()}
-                    </span>
-                  </div>
-                  <p
-                    style={{
-                      fontSize: 13,
-                      color: "#e5e7eb",
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    {currentQ.explanation}
-                  </p>
-                  <div
-                    style={{
-                      marginTop: 10,
-                      padding: "8px 10px",
-                      borderRadius: 12,
-                      background: "rgba(15,23,42,0.9)",
-                      textAlign: "center",
-                      fontSize: 11,
-                      color: "#9ca3af",
-                    }}
-                  >
-                    Next question in{" "}
-                    <span style={{ color: "#38bdf8", fontWeight: 800 }}>
-                      {explanationTimer}
-                    </span>{" "}
-                    seconds...
-                  </div>
-                </div>
-              ) : null}
+              </div>
 
               {/* Progress Dots */}
               <div
                 style={{
                   display: "flex",
-                  justifyContent: "center",
                   flexWrap: "wrap",
-                  gap: 4,
-                  marginTop: 6,
+                  gap: "clamp(6px, 1.5vw, 8px)",
+                  justifyContent: "center",
                 }}
               >
-                {Array.from({ length: TOTAL_QUESTIONS }).map((_, i) => {
-                  const st = answers[i];
-                  let bg = "rgba(75,85,99,0.5)";
-                  if (i === currentIndex) {
-                    bg = "#a78bfa";
-                  } else if (st === "correct") {
-                    bg = "#22c55e";
-                  } else if (st === "wrong") {
-                    bg = "#ef4444";
-                  }
+                {answers.map((st, i) => {
+                  let bg = "rgba(75,85,99,0.3)";
+                  if (st === "correct") bg = "#22c55e";
+                  else if (st === "wrong") bg = "#ef4444";
+                  else if (i === currentIndex) bg = "#a855f7";
+
                   return (
                     <div
                       key={i}
                       style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: "9999px",
+                        width: "clamp(8px, 2vw, 10px)",
+                        height: "clamp(8px, 2vw, 10px)",
+                        borderRadius: "50%",
                         background: bg,
                         boxShadow:
                           st === "correct"
@@ -1715,82 +1448,231 @@ export default function FreeQuizPage() {
             </>
           )}
 
-          {/* Exit Confirmation Modal */}
-          {showExitConfirm && (
-            <div
-              style={{
-                position: "fixed",
-                inset: 0,
-                background: "rgba(0,0,0,0.75)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 40,
-              }}
-            >
+          {/* ═══════════════════════════════════════════════════════════ */}
+          {/* 📖 EXPLANATION PHASE */}
+          {/* ═══════════════════════════════════════════════════════════ */}
+          {phase === "EXPLANATION" && currentQ && (
+            <>
+              {/* Explanation Timer */}
               <div
-                className="animate-slide-up"
                 style={{
-                  width: "min(320px,90vw)",
-                  padding: "22px 20px 18px",
-                  borderRadius: 22,
-                  background: "rgba(6,8,20,0.98)",
-                  border: "1px solid rgba(148,163,253,0.4)",
-                  boxShadow: "0 0 26px rgba(15,23,42,1)",
-                  textAlign: "center",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: "clamp(12px, 2vw, 16px)",
                 }}
               >
                 <div
                   style={{
-                    fontSize: 18,
-                    fontWeight: 800,
-                    color: "#e5e7eb",
-                    marginBottom: 16,
+                    padding: "clamp(8px, 1.5vw, 10px) clamp(16px, 3vw, 20px)",
+                    borderRadius: "clamp(12px, 2.5vw, 16px)",
+                    background: "rgba(6,8,20,0.9)",
+                    border: "2px solid rgba(56,189,248,0.5)",
+                    boxShadow: "0 0 20px rgba(56,189,248,0.3)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
                   }}
                 >
-                  Are you sure?
-                </div>
-                <div style={{ display: "flex", justifyContent: "center", gap: 10 }}>
-                  <button
-                    onClick={handleExitConfirmYes}
+                  <Clock
                     style={{
-                      flex: 1,
-                      padding: "10px 0",
-                      borderRadius: 9999,
-                      border: "none",
-                      background: "linear-gradient(to right,#ef4444,#b91c1c)",
-                      color: "white",
+                      width: "clamp(16px, 3vw, 18px)",
+                      height: "clamp(16px, 3vw, 18px)",
+                      color: "#38bdf8",
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontSize: "clamp(14px, 3vw, 16px)",
                       fontWeight: 700,
-                      fontSize: 12,
-                      cursor: "pointer",
-                      boxShadow: "0 0 18px rgba(239,68,68,0.8)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.12em",
+                      color: "#38bdf8",
                     }}
                   >
-                    Yes
-                  </button>
-                  <button
-                    onClick={handleExitConfirmNo}
-                    style={{
-                      flex: 1,
-                      padding: "10px 0",
-                      borderRadius: 9999,
-                      border: "1px solid rgba(148,163,253,0.6)",
-                      background: "transparent",
-                      color: "#e5e7eb",
-                      fontWeight: 700,
-                      fontSize: 12,
-                      cursor: "pointer",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.12em",
-                    }}
-                  >
-                    No
-                  </button>
+                    Next in {explanationTime}s
+                  </span>
                 </div>
               </div>
-            </div>
+
+              {/* Explanation Card */}
+              <div
+                className="animate-slide-up"
+                style={{
+                  marginBottom: "clamp(16px, 3vw, 20px)",
+                  padding: "clamp(18px, 3vw, 22px)",
+                  borderRadius: "clamp(20px, 3vw, 24px)",
+                  border: "1px solid rgba(56,189,248,0.4)",
+                  background:
+                    "linear-gradient(135deg, rgba(8,47,73,0.96), rgba(6,8,20,1))",
+                  boxShadow: "0 0 36px rgba(56,189,248,0.3)",
+                }}
+              >
+                {/* Result Badge */}
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "clamp(8px, 1.5vw, 10px) clamp(14px, 2.5vw, 18px)",
+                    borderRadius: 9999,
+                    background: isCorrect
+                      ? "rgba(22,163,74,0.2)"
+                      : "rgba(127,29,29,0.2)",
+                    border: isCorrect
+                      ? "1px solid #22c55e"
+                      : "1px solid #ef4444",
+                    marginBottom: "clamp(14px, 2.5vw, 18px)",
+                  }}
+                >
+                  {isCorrect ? (
+                    <CheckCircle
+                      style={{
+                        width: "clamp(16px, 3vw, 18px)",
+                        height: "clamp(16px, 3vw, 18px)",
+                        color: "#22c55e",
+                      }}
+                    />
+                  ) : (
+                    <XCircle
+                      style={{
+                        width: "clamp(16px, 3vw, 18px)",
+                        height: "clamp(16px, 3vw, 18px)",
+                        color: "#ef4444",
+                      }}
+                    />
+                  )}
+                  <span
+                    style={{
+                      fontSize: "clamp(12px, 2.5vw, 14px)",
+                      fontWeight: 800,
+                      color: isCorrect ? "#22c55e" : "#ef4444",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.1em",
+                    }}
+                  >
+                    {isCorrect ? "Correct!" : "Wrong"}
+                  </span>
+                </div>
+
+                {/* Correct Answer */}
+                <div style={{ marginBottom: "clamp(12px, 2vw, 16px)" }}>
+                  <div
+                    style={{
+                      fontSize: "clamp(11px, 2vw, 12px)",
+                      color: "#94a3b8",
+                      fontWeight: 600,
+                      letterSpacing: "0.12em",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    CORRECT ANSWER
+                  </div>
+                  <div
+                    style={{
+                      padding: "clamp(10px, 2vw, 12px)",
+                      borderRadius: "clamp(10px, 2vw, 12px)",
+                      background: "rgba(22,163,74,0.1)",
+                      border: "1px solid rgba(34,197,94,0.4)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "clamp(24px, 4vw, 28px)",
+                        height: "clamp(24px, 4vw, 28px)",
+                        borderRadius: "clamp(6px, 1.5vw, 8px)",
+                        background: "#22c55e",
+                        color: "white",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "clamp(11px, 2vw, 12px)",
+                        fontWeight: 800,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {currentQ.correct_option.toUpperCase()}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "clamp(13px, 2.5vw, 14px)",
+                        fontWeight: 600,
+                        color: "#e5e7eb",
+                      }}
+                    >
+                      {
+                        currentQ[
+                          `option_${currentQ.correct_option}` as keyof Question
+                        ] as string
+                      }
+                    </div>
+                  </div>
+                </div>
+
+                {/* Explanation */}
+                <div>
+                  <div
+                    style={{
+                      fontSize: "clamp(11px, 2vw, 12px)",
+                      color: "#94a3b8",
+                      fontWeight: 600,
+                      letterSpacing: "0.12em",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    EXPLANATION
+                  </div>
+                  <p
+                    style={{
+                      fontSize: "clamp(13px, 2.5vw, 14px)",
+                      lineHeight: 1.6,
+                      color: "#cbd5e1",
+                    }}
+                  >
+                    {currentQ.explanation}
+                  </p>
+                </div>
+              </div>
+
+              {/* Progress Dots */}
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "clamp(6px, 1.5vw, 8px)",
+                  justifyContent: "center",
+                }}
+              >
+                {answers.map((st, i) => {
+                  let bg = "rgba(75,85,99,0.3)";
+                  if (st === "correct") bg = "#22c55e";
+                  else if (st === "wrong") bg = "#ef4444";
+                  else if (i === currentIndex) bg = "#38bdf8";
+
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        width: "clamp(8px, 2vw, 10px)",
+                        height: "clamp(8px, 2vw, 10px)",
+                        borderRadius: "50%",
+                        background: bg,
+                        boxShadow:
+                          st === "correct"
+                            ? "0 0 6px rgba(34,197,94,0.8)"
+                            : st === "wrong"
+                            ? "0 0 6px rgba(239,68,68,0.8)"
+                            : i === currentIndex
+                            ? "0 0 6px rgba(56,189,248,0.8)"
+                            : "none",
+                        transition: "all 0.2s",
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </>
           )}
         </main>
       </div>
