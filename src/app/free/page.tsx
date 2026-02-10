@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import {
@@ -10,7 +10,6 @@ import {
   XCircle,
   Target,
   Award,
-  Zap,
   Volume2,
   VolumeX,
   AlertCircle,
@@ -18,7 +17,6 @@ import {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 🎖️ CANONICAL ARCHITECTURE - PHASE-DRIVEN QUIZ SYSTEM
-// ═══════════════════════════════════════════════════════════════════════════
 // DATABASE = COMMANDER | FRONTEND = SOLDIER | PHASE = LAW
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -35,12 +33,12 @@ type OptionId = "a" | "b" | "c" | "d";
 type AnswerStatus = "none" | "correct" | "wrong";
 
 // 🎯 CANONICAL PHASE MODEL (SINGLE SOURCE OF TRUTH)
-type QuizPhase = 
-  | "INIT"         // Security check + data fetch
-  | "COUNTDOWN"    // 6 → 1 countdown animation
-  | "QUESTION"     // Question display + tick sound
-  | "EXPLANATION"  // Answer reveal + explanation
-  | "FINAL";       // Score summary
+type QuizPhase =
+  | "INIT" // Security check + data fetch
+  | "COUNTDOWN" // 6 → 1 countdown animation
+  | "QUESTION" // Question display + tick sound
+  | "EXPLANATION" // Answer reveal + explanation
+  | "FINAL"; // Score summary
 
 interface Question {
   id: number;
@@ -77,7 +75,7 @@ export default function FreeQuizPage() {
     Array(TOTAL_QUESTIONS).fill("none")
   );
 
-  // TIMERS (DO NOT CONTROL UI - ONLY COUNT)
+  // TIMERS (ONLY COUNT)
   const [countdownTime, setCountdownTime] = useState(INITIAL_COUNTDOWN);
   const [questionTime, setQuestionTime] = useState(QUESTION_DURATION);
   const [explanationTime, setExplanationTime] = useState(EXPLANATION_DURATION);
@@ -86,7 +84,6 @@ export default function FreeQuizPage() {
   // UI STATE
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const [showAlreadyPlayedModal, setShowAlreadyPlayedModal] = useState(false);
-  const [hasPlayedEntry, setHasPlayedEntry] = useState(false);
 
   // ============================================
   // AUDIO REFS
@@ -99,6 +96,12 @@ export default function FreeQuizPage() {
   const tickSoundRef = useRef<HTMLAudioElement | null>(null);
   const startSoundRef = useRef<HTMLAudioElement | null>(null);
   const entrySoundRef = useRef<HTMLAudioElement | null>(null);
+
+  // CANONICAL: ensure entry plays ONCE
+  const entryPlayedRef = useRef(false);
+
+  // CANONICAL: ensure whoosh plays ONCE per transition into EXPLANATION
+  const lastPhaseRef = useRef<QuizPhase>("INIT");
 
   const currentQ = questions[currentIndex];
 
@@ -117,6 +120,32 @@ export default function FreeQuizPage() {
   }, []);
 
   // ============================================
+  // AUDIO HELPERS (SAFE)
+  // ============================================
+  const playSound = useCallback(
+    (audio: HTMLAudioElement | null, options?: { loop?: boolean }) => {
+      if (!isSoundEnabled || !audio) return;
+      try {
+        audio.loop = !!options?.loop;
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      } catch {}
+    },
+    [isSoundEnabled]
+  );
+
+  const stopSound = useCallback((audio: HTMLAudioElement | null) => {
+    if (!audio) return;
+    audio.pause();
+    audio.currentTime = 0;
+    audio.loop = false;
+  }, []);
+
+  const playClick = useCallback(() => {
+    playSound(clickSoundRef.current);
+  }, [playSound]);
+
+  // ============================================
   // 🔐 INIT PHASE - SECURITY & DATA FETCH
   // ============================================
   useEffect(() => {
@@ -124,55 +153,52 @@ export default function FreeQuizPage() {
 
     const verifyAndFetchFreeQuiz = async () => {
       try {
-        console.log("🔐 [FREE QUIZ] Verifying eligibility...");
-
         const {
           data: { user },
         } = await supabase.auth.getUser();
 
         if (!user) {
-          console.log("❌ [FREE QUIZ] Not authenticated");
           router.push("/login");
           return;
         }
 
         // ✅ CANONICAL: Check eligibility via RPC
-        const { data: eligibility, error: eligibilityError } = await supabase
-          .rpc("check_free_quiz_eligibility", { p_user_id: user.id });
+        const { data: eligibility, error: eligibilityError } = await supabase.rpc(
+          "check_free_quiz_eligibility",
+          { p_user_id: user.id }
+        );
 
-        if (eligibilityError) {
-          console.error("❌ [FREE QUIZ] Eligibility check error:", eligibilityError);
+        if (eligibilityError || !eligibility?.eligible) {
           setShowAlreadyPlayedModal(true);
           return;
         }
 
-        if (!eligibility?.eligible) {
-          console.log("⚠️ [FREE QUIZ] Already played this week");
-          setShowAlreadyPlayedModal(true);
-          return;
-        }
-
-        console.log("✅ [FREE QUIZ] Eligible to play");
-
-        // ✅ CANONICAL: Fetch questions from database (balanced & shuffled)
-        console.log("📊 [FREE QUIZ] Fetching questions from database...");
-
-        const { data: fetchedQuestions, error: questionsError } = await supabase
-          .rpc("get_free_quiz_questions", { p_user_id: user.id });
+        // ✅ CANONICAL: Fetch questions
+        const { data: fetchedQuestions, error: questionsError } = await supabase.rpc(
+          "get_free_quiz_questions",
+          { p_user_id: user.id }
+        );
 
         if (questionsError || !fetchedQuestions || fetchedQuestions.length < TOTAL_QUESTIONS) {
-          console.error("❌ [FREE QUIZ] Failed to fetch questions:", questionsError);
           setShowAlreadyPlayedModal(true);
           return;
         }
 
-        console.log(`✅ [FREE QUIZ] Loaded ${fetchedQuestions.length} questions`);
         setQuestions(fetchedQuestions);
+        setCurrentIndex(0);
+        setSelectedAnswer(null);
+        setIsCorrect(false);
+        setCorrectCount(0);
+        setWrongCount(0);
+        setAnswers(Array(TOTAL_QUESTIONS).fill("none"));
 
-        // 🎯 TRANSITION: INIT → COUNTDOWN
+        // RESET audio guards
+        entryPlayedRef.current = false;
+        lastPhaseRef.current = "INIT";
+
+        // INIT → COUNTDOWN
         setPhase("COUNTDOWN");
-      } catch (error: any) {
-        console.error("❌ [FREE QUIZ] Verification error:", error);
+      } catch {
         setShowAlreadyPlayedModal(true);
       }
     };
@@ -181,29 +207,31 @@ export default function FreeQuizPage() {
   }, [phase, router]);
 
   // ============================================
-  // ⏰ COUNTDOWN PHASE TIMER
+  // ⏰ COUNTDOWN PHASE TIMER (6 → 0)
   // ============================================
   useEffect(() => {
     if (phase !== "COUNTDOWN") return;
 
+    setCountdownTime(INITIAL_COUNTDOWN);
+
     const interval = setInterval(() => {
-      setCountdownTime((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          // 🎯 TRANSITION: COUNTDOWN → QUESTION
-          setPhase("QUESTION");
-          setHasPlayedEntry(true);
-          return 0;
-        }
-        return prev - 1;
-      });
+      setCountdownTime((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
 
-    return () => clearInterval(interval);
+    const timeout = setTimeout(() => {
+      setPhase("QUESTION");
+    }, INITIAL_COUNTDOWN * 1000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
   }, [phase]);
 
   // ============================================
-  // 🎯 QUESTION PHASE TIMER
+  // 🎯 QUESTION PHASE TIMER (6 → 0)
+  // IMPORTANT: Answer DOES NOT switch to EXPLANATION early.
+  // It only LOCKS. EXPLANATION opens ONLY when timer ends.
   // ============================================
   useEffect(() => {
     if (phase !== "QUESTION") return;
@@ -211,37 +239,33 @@ export default function FreeQuizPage() {
     setQuestionTime(QUESTION_DURATION);
 
     const interval = setInterval(() => {
-      setQuestionTime((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-
-          // Timeout: count as wrong if not answered
-          if (selectedAnswer === null) {
-            setWrongCount((w) => w + 1);
-            setAnswers((prev) => {
-              const copy = [...prev];
-              copy[currentIndex] = "wrong";
-              return copy;
-            });
-            setIsCorrect(false);
-          }
-
-          // Play whoosh sound
-          playSound(whooshSoundRef.current);
-
-          // 🎯 TRANSITION: QUESTION → EXPLANATION
-          setPhase("EXPLANATION");
-          return 0;
-        }
-        return prev - 1;
-      });
+      setQuestionTime((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
 
-    return () => clearInterval(interval);
-  }, [phase, selectedAnswer, currentIndex]);
+    const timeout = setTimeout(() => {
+      // If no answer selected → auto wrong
+      if (selectedAnswer === null) {
+        setWrongCount((w) => w + 1);
+        setAnswers((prev) => {
+          const copy = [...prev];
+          copy[currentIndex] = "wrong";
+          return copy;
+        });
+        setIsCorrect(false);
+      }
+
+      // QUESTION → EXPLANATION
+      setPhase("EXPLANATION");
+    }, QUESTION_DURATION * 1000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [phase, currentIndex, selectedAnswer]);
 
   // ============================================
-  // 📖 EXPLANATION PHASE TIMER
+  // 📖 EXPLANATION PHASE TIMER (6s)
   // ============================================
   useEffect(() => {
     if (phase !== "EXPLANATION") return;
@@ -249,26 +273,18 @@ export default function FreeQuizPage() {
     setExplanationTime(EXPLANATION_DURATION);
 
     const interval = setInterval(() => {
-      setExplanationTime((prev) => prev - 1);
+      setExplanationTime((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
 
     const timeout = setTimeout(() => {
-      clearInterval(interval);
-
       if (currentIndex < TOTAL_QUESTIONS - 1) {
-        // Next question
         setCurrentIndex((i) => i + 1);
         setSelectedAnswer(null);
         setIsCorrect(false);
 
-        // Play start sound
-        playSound(startSoundRef.current);
-
-        // 🎯 TRANSITION: EXPLANATION → QUESTION
+        // EXPLANATION → QUESTION
         setPhase("QUESTION");
       } else {
-        // All questions done
-        // 🎯 TRANSITION: EXPLANATION → FINAL
         setPhase("FINAL");
       }
     }, EXPLANATION_DURATION * 1000);
@@ -285,51 +301,35 @@ export default function FreeQuizPage() {
   useEffect(() => {
     if (phase !== "FINAL") return;
 
-    // Stop tick sound
     stopSound(tickSoundRef.current);
-
-    // Play gameover sound
     playSound(gameoverSoundRef.current);
 
-    // ✅ CANONICAL: Submit result to database
     const submitResult = async () => {
       try {
         const {
           data: { user },
         } = await supabase.auth.getUser();
 
-        if (user) {
-          console.log("📊 [FREE QUIZ] Submitting result...");
+        if (!user) return;
 
-          const { data, error } = await supabase
-            .rpc("submit_free_quiz_result", {
-              p_user_id: user.id,
-              p_correct_count: correctCount,
-              p_wrong_count: wrongCount,
-              p_total_questions: TOTAL_QUESTIONS,
-            });
-
-          if (error) {
-            console.error("❌ [FREE QUIZ] Submit error:", error);
-          } else {
-            console.log("✅ [FREE QUIZ] Result saved:", data);
-          }
-        }
-      } catch (error) {
-        console.error("❌ [FREE QUIZ] Submit error:", error);
-      }
+        await supabase.rpc("submit_free_quiz_result", {
+          p_user_id: user.id,
+          p_correct_count: correctCount,
+          p_wrong_count: wrongCount,
+          p_total_questions: TOTAL_QUESTIONS,
+        });
+      } catch {}
     };
 
     submitResult();
 
-    // Countdown timer
     setFinalTime(FINAL_SCORE_DURATION);
+
     const interval = setInterval(() => {
-      setFinalTime((prev) => prev - 1);
+      setFinalTime((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
 
     const timeout = setTimeout(() => {
-      clearInterval(interval);
       router.push("/");
     }, FINAL_SCORE_DURATION * 1000);
 
@@ -337,73 +337,53 @@ export default function FreeQuizPage() {
       clearInterval(interval);
       clearTimeout(timeout);
     };
-  }, [phase, router]);
+  }, [phase, router, correctCount, wrongCount, playSound, stopSound]);
 
   // ============================================
-  // 🔊 TICK SOUND - PHASE-DRIVEN (CANONICAL)
+  // 🔊 CANONICAL AUDIO ROUTER (PHASE-DRIVEN)
   // ============================================
   useEffect(() => {
-    const tick = tickSoundRef.current;
-    if (!tick || !isSoundEnabled) return;
+    const prev = lastPhaseRef.current;
+    const next = phase;
+    lastPhaseRef.current = next;
 
-    if (phase === "QUESTION") {
-      tick.loop = true;
-      tick.currentTime = 0;
-      tick.play().catch(() => {});
+    // Tick loop only in QUESTION
+    if (next === "QUESTION") {
+      playSound(tickSoundRef.current, { loop: true });
+
+      // Entry only once, first QUESTION entry
+      if (!entryPlayedRef.current) {
+        entryPlayedRef.current = true;
+        playSound(entrySoundRef.current);
+      } else {
+        // Start at every new question
+        playSound(startSoundRef.current);
+      }
     } else {
-      tick.pause();
-      tick.currentTime = 0;
-      tick.loop = false;
+      stopSound(tickSoundRef.current);
     }
-  }, [phase, isSoundEnabled]);
 
-  // ============================================
-  // 🎵 ENTRY SOUND - PLAYS ONCE (COUNTDOWN → QUESTION)
-  // ============================================
-  useEffect(() => {
-    if (phase === "QUESTION" && !hasPlayedEntry) {
-      playSound(entrySoundRef.current);
+    // Whoosh only when entering EXPLANATION
+    if (prev !== "EXPLANATION" && next === "EXPLANATION") {
+      playSound(whooshSoundRef.current);
     }
-  }, [phase, hasPlayedEntry]);
+  }, [phase, currentIndex, playSound, stopSound]);
 
   // ============================================
-  // AUDIO HELPERS
-  // ============================================
-  const playSound = (audio: HTMLAudioElement | null) => {
-    if (!isSoundEnabled || !audio) return;
-    try {
-      audio.currentTime = 0;
-      audio.play().catch(() => {});
-    } catch {}
-  };
-
-  const stopSound = (audio: HTMLAudioElement | null) => {
-    if (!audio) return;
-    audio.pause();
-    audio.currentTime = 0;
-    audio.loop = false;
-  };
-
-  const playClick = () => playSound(clickSoundRef.current);
-
-  // ============================================
-  // 🎯 ANSWER HANDLER (CANONICAL PROTOCOL)
+  // 🎯 ANSWER HANDLER (LOCK ONLY)
   // ============================================
   const handleAnswerClick = (optionId: OptionId) => {
-    // GUARD: Only in QUESTION phase
     if (phase !== "QUESTION") return;
-    if (selectedAnswer !== null) return; // Already answered
+    if (!currentQ) return;
+    if (selectedAnswer !== null) return; // already locked
 
     playClick();
 
-    // Lock answer
     setSelectedAnswer(optionId);
 
-    // Check correctness
     const correct = optionId === currentQ.correct_option;
     setIsCorrect(correct);
 
-    // Update counters
     setAnswers((prev) => {
       const next = [...prev];
       next[currentIndex] = correct ? "correct" : "wrong";
@@ -418,11 +398,8 @@ export default function FreeQuizPage() {
       playSound(wrongSoundRef.current);
     }
 
-    // Play whoosh sound
-    playSound(whooshSoundRef.current);
-
-    // 🎯 TRANSITION: QUESTION → EXPLANATION
-    setPhase("EXPLANATION");
+    // IMPORTANT: do NOT set phase here.
+    // Explanation will open when 6s ends (timer).
   };
 
   // ============================================
@@ -443,7 +420,9 @@ export default function FreeQuizPage() {
   };
 
   const accuracy =
-    TOTAL_QUESTIONS > 0 ? Math.round((correctCount / TOTAL_QUESTIONS) * 100) : 0;
+    TOTAL_QUESTIONS > 0
+      ? Math.round((correctCount / TOTAL_QUESTIONS) * 100)
+      : 0;
 
   // ============================================
   // 📺 RENDER: ALREADY PLAYED MODAL
@@ -453,7 +432,8 @@ export default function FreeQuizPage() {
       <div
         style={{
           minHeight: "100vh",
-          background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
+          background:
+            "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -529,7 +509,10 @@ export default function FreeQuizPage() {
             }}
           >
             <button
-              onClick={() => router.push("/")}
+              onClick={() => {
+                playClick();
+                router.push("/");
+              }}
               style={{
                 flex: 1,
                 minWidth: 140,
@@ -547,22 +530,15 @@ export default function FreeQuizPage() {
                 boxShadow: "0 0 20px rgba(124,58,237,0.5)",
                 transition: "all 0.3s",
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow =
-                  "0 0 30px rgba(124,58,237,0.7)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow =
-                  "0 0 20px rgba(124,58,237,0.5)";
-              }}
             >
               Go Home
             </button>
 
             <button
-              onClick={() => router.push("/lobby")}
+              onClick={() => {
+                playClick();
+                router.push("/lobby");
+              }}
               style={{
                 flex: 1,
                 minWidth: 140,
@@ -579,19 +555,21 @@ export default function FreeQuizPage() {
                 cursor: "pointer",
                 transition: "all 0.3s",
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(124,58,237,0.1)";
-                e.currentTarget.style.borderColor = "#a78bfa";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.borderColor = "rgba(167,139,250,0.6)";
-              }}
             >
               Live Quiz
             </button>
           </div>
         </div>
+
+        {/* Audio Elements */}
+        <audio ref={correctSoundRef} src="/sounds/correct.mp3" />
+        <audio ref={wrongSoundRef} src="/sounds/wrong.mp3" />
+        <audio ref={clickSoundRef} src="/sounds/click.mp3" />
+        <audio ref={gameoverSoundRef} src="/sounds/gameover.mp3" />
+        <audio ref={whooshSoundRef} src="/sounds/whoosh.mp3" />
+        <audio ref={tickSoundRef} src="/sounds/tick.mp3" />
+        <audio ref={startSoundRef} src="/sounds/start.mp3" />
+        <audio ref={entrySoundRef} src="/sounds/entry.mp3" />
       </div>
     );
   }
@@ -643,6 +621,16 @@ export default function FreeQuizPage() {
             LOADING QUIZ...
           </div>
         </div>
+
+        {/* Audio Elements */}
+        <audio ref={correctSoundRef} src="/sounds/correct.mp3" />
+        <audio ref={wrongSoundRef} src="/sounds/wrong.mp3" />
+        <audio ref={clickSoundRef} src="/sounds/click.mp3" />
+        <audio ref={gameoverSoundRef} src="/sounds/gameover.mp3" />
+        <audio ref={whooshSoundRef} src="/sounds/whoosh.mp3" />
+        <audio ref={tickSoundRef} src="/sounds/tick.mp3" />
+        <audio ref={startSoundRef} src="/sounds/start.mp3" />
+        <audio ref={entrySoundRef} src="/sounds/entry.mp3" />
       </>
     );
   }
@@ -1109,7 +1097,10 @@ export default function FreeQuizPage() {
 
               {/* Home Button */}
               <button
-                onClick={() => router.push("/")}
+                onClick={() => {
+                  playClick();
+                  router.push("/");
+                }}
                 style={{
                   marginTop: "clamp(20px, 3vw, 28px)",
                   padding: "clamp(12px, 2.5vw, 14px) clamp(24px, 4vw, 32px)",
@@ -1124,16 +1115,6 @@ export default function FreeQuizPage() {
                   cursor: "pointer",
                   boxShadow: "0 0 20px rgba(124,58,237,0.6)",
                   transition: "all 0.3s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                  e.currentTarget.style.boxShadow =
-                    "0 0 30px rgba(124,58,237,0.8)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow =
-                    "0 0 20px rgba(124,58,237,0.6)";
                 }}
               >
                 Go Home Now
@@ -1281,6 +1262,8 @@ export default function FreeQuizPage() {
                     const optText = currentQ[
                       `option_${optId}` as keyof Question
                     ] as string;
+
+                    const locked = selectedAnswer !== null;
                     const isSelected = selectedAnswer === optId;
 
                     let borderColor = "rgba(129,140,248,0.6)";
@@ -1299,7 +1282,7 @@ export default function FreeQuizPage() {
                       <button
                         key={optId}
                         onClick={() => handleAnswerClick(optId)}
-                        disabled={selectedAnswer !== null}
+                        disabled={locked}
                         style={{
                           position: "relative",
                           padding: "clamp(12px, 2.5vw, 14px)",
@@ -1308,27 +1291,21 @@ export default function FreeQuizPage() {
                           background: bg,
                           color: "#e5e7eb",
                           textAlign: "left",
-                          cursor:
-                            selectedAnswer !== null ? "default" : "pointer",
+                          cursor: locked ? "default" : "pointer",
                           boxShadow,
                           transition: "all 0.22s",
                           overflow: "hidden",
+                          opacity: locked && !isSelected ? 0.9 : 1,
                         }}
                         onMouseEnter={(e) => {
-                          if (
-                            selectedAnswer === null &&
-                            window.innerWidth > 768
-                          ) {
+                          if (!locked && window.innerWidth > 768) {
                             e.currentTarget.style.transform = "translateY(-2px)";
                             e.currentTarget.style.boxShadow =
                               "0 0 18px rgba(217,70,239,0.7)";
                           }
                         }}
                         onMouseLeave={(e) => {
-                          if (
-                            selectedAnswer === null &&
-                            window.innerWidth > 768
-                          ) {
+                          if (!locked && window.innerWidth > 768) {
                             e.currentTarget.style.transform = "translateY(0)";
                             e.currentTarget.style.boxShadow = boxShadow;
                           }
@@ -1346,7 +1323,7 @@ export default function FreeQuizPage() {
                         />
 
                         {/* Shine effect */}
-                        {selectedAnswer === null && (
+                        {!locked && (
                           <div
                             style={{
                               position: "absolute",
@@ -1512,14 +1489,13 @@ export default function FreeQuizPage() {
                     display: "inline-flex",
                     alignItems: "center",
                     gap: "8px",
-                    padding: "clamp(8px, 1.5vw, 10px) clamp(14px, 2.5vw, 18px)",
+                    padding:
+                      "clamp(8px, 1.5vw, 10px) clamp(14px, 2.5vw, 18px)",
                     borderRadius: 9999,
                     background: isCorrect
                       ? "rgba(22,163,74,0.2)"
                       : "rgba(127,29,29,0.2)",
-                    border: isCorrect
-                      ? "1px solid #22c55e"
-                      : "1px solid #ef4444",
+                    border: isCorrect ? "1px solid #22c55e" : "1px solid #ef4444",
                     marginBottom: "clamp(14px, 2.5vw, 18px)",
                   }}
                 >
