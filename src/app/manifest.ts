@@ -1,0 +1,27 @@
+// app/manifest.ts
+import type { MetadataRoute } from "next";
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: "VibraXX",
+    short_name: "VibraXX",
+    start_url: "/",
+    display: "standalone",
+    background_color: "#020817",
+    theme_color: "#020817",
+    icons: [
+      {
+        src: "/icons/manifest-icon-192.maskable.png",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any maskable",
+      },
+      {
+        src: "/icons/manifest-icon-512.maskable.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any maskable",
+      },
+    ],
+  };
+}
