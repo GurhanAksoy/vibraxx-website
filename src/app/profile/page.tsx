@@ -2038,6 +2038,7 @@ export default function ProfilePage() {
         </p>
 
         
+         <a
           href="mailto:team@vibraxx.com"
           style={{
             display: "inline-block",
