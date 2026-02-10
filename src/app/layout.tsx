@@ -37,11 +37,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* THEME */}
+        {/* ✅ THEME */}
         <meta name="theme-color" content="#020817" />
         <meta name="mobile-web-app-capable" content="yes" />
 
-        {/* ICONS */}
+        {/* ✅ ICONS - Using existing maskable icons */}
         <link
           rel="apple-touch-icon"
           sizes="180x180"
@@ -50,19 +50,19 @@ export default function RootLayout({
         <link
           rel="icon"
           type="image/png"
-          sizes="32x32"
-          href="/icons/favicon-32.png"
+          sizes="192x192"
+          href="/icons/manifest-icon-192.maskable.png"
         />
         <link
           rel="icon"
           type="image/png"
-          sizes="16x16"
-          href="/icons/favicon-16.png"
+          sizes="512x512"
+          href="/icons/manifest-icon-512.maskable.png"
         />
       </head>
 
       <body className={`${inter.className} bg-[#020817] text-white antialiased`}>
-        {/* 🔲 PRELOAD OVERLAY (KANONİK) */}
+        {/* ✅ PRELOAD OVERLAY (CANONICAL - DB controls fade timing) */}
         <div
           id="vibraxx-preload-bg"
           style={{
@@ -76,10 +76,10 @@ export default function RootLayout({
           }}
         />
 
-        {/* APP CONTENT */}
+        {/* ✅ APP CONTENT */}
         {children}
 
-        {/* 🔧 TÜM CLIENT-SIDE LOGIC (SW, PWA, PRELOAD FADE, ETC.) */}
+        {/* ✅ CLIENT-SIDE LOGIC (SW, PWA, PRELOAD FADE) */}
         <ClientScripts />
       </body>
     </html>

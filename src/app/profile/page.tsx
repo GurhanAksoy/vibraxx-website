@@ -146,11 +146,7 @@ export default function ProfilePage() {
   
   // Contact Form
   const [showContactForm, setShowContactForm] = useState(false);
-  const [contactMessage, setContactMessage] = useState("");
-  const [contactSubject, setContactSubject] = useState("");
-  const [isSendingEmail, setIsSendingEmail] = useState(false);
-  const [emailStatus, setEmailStatus] = useState<"idle" | "success" | "error">("idle");
-
+  
   // ═══════════════════════════════════════════════════════════
   // SECURITY CHECK
   // ═══════════════════════════════════════════════════════════
@@ -266,20 +262,20 @@ export default function ProfilePage() {
     };
 
     // ═══════════════════════════════════════════════════════════
-    // CHANNEL 1: SCORE LEDGER (game results)
+    // CHANNEL 1: ROUND PARTICIPANTS (game results)
     // ═══════════════════════════════════════════════════════════
     const scoreChannel = supabase
-      .channel(`profile-scores-${userId}`)
+      .channel(`profile-participants-${userId}`)
       .on(
         "postgres_changes",
         {
           event: "*", // INSERT, UPDATE, DELETE
           schema: "public",
-          table: "score_ledger",
+          table: "round_participants",
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          console.log("[Realtime] Score ledger changed:", payload);
+          console.log("[Realtime] Round participants changed:", payload);
           debouncedRefresh();
         }
       )
@@ -403,6 +399,7 @@ export default function ProfilePage() {
   }, [isMusicPlaying, hasInteracted]);
 
   const toggleMusic = useCallback(() => {
+    setHasInteracted(true);  // ✅ FIX: Music icon click counts as first interaction
     setIsMusicPlaying(prev => !prev);
   }, []);
 
@@ -447,47 +444,6 @@ export default function ProfilePage() {
       setIsSaving(false);
     }
   }, [profileData, editName, editCountry]);
-
-  // ═══════════════════════════════════════════════════════════
-  // SEND CONTACT EMAIL
-  // ═══════════════════════════════════════════════════════════
-  const handleSendEmail = useCallback(async () => {
-    if (!profileData || !contactSubject.trim() || !contactMessage.trim()) return;
-
-    setIsSendingEmail(true);
-    setEmailStatus("idle");
-
-    try {
-      const response = await fetch("/api/contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from_email: userEmail,
-          from_name: profileData.profile.full_name,
-          subject: contactSubject,
-          message: contactMessage,
-          user_id: profileData.profile.id,
-        }),
-      });
-
-      if (response.ok) {
-        setEmailStatus("success");
-        setContactMessage("");
-        setContactSubject("");
-        setTimeout(() => {
-          setShowContactForm(false);
-          setEmailStatus("idle");
-        }, 2000);
-      } else {
-        setEmailStatus("error");
-      }
-    } catch (err) {
-      console.error("Error sending email:", err);
-      setEmailStatus("error");
-    } finally {
-      setIsSendingEmail(false);
-    }
-  }, [profileData, userEmail, contactSubject, contactMessage]);
 
   // ═══════════════════════════════════════════════════════════
   // LOGOUT
@@ -2004,210 +1960,117 @@ export default function ProfilePage() {
         <Footer />
       </div>
 
-      {/* CONTACT FORM MODAL */}
-      {showContactForm && (
-        <div style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(0,0,0,0.85)",
-          backdropFilter: "blur(8px)",
+      {/* ✅ CONTACT EMAIL - Simple display */}
+{showContactForm && (
+  <div style={{
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.8)",
+    backdropFilter: "blur(8px)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+    padding: "20px",
+  }}
+  onClick={() => setShowContactForm(false)}>
+    <div style={{
+      background: "linear-gradient(135deg, rgba(15,23,42,0.95), rgba(30,41,59,0.95))",
+      borderRadius: "20px",
+      border: "2px solid rgba(56,189,248,0.3)",
+      maxWidth: "500px",
+      width: "100%",
+      padding: "32px",
+      boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)",
+    }}
+    onClick={(e) => e.stopPropagation()}>
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: "24px",
+      }}>
+        <h3 style={{
+          fontSize: "clamp(18px, 4vw, 22px)",
+          fontWeight: 900,
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
-          zIndex: 100,
-          padding: "clamp(12px, 3vw, 20px)",
-        }}
-        onClick={() => setShowContactForm(false)}>
-          <div style={{
-            width: "min(500px, 100%)",
-            maxHeight: "90vh",
-            overflowY: "auto",
-            padding: "clamp(20px, 4vw, 32px)",
-            borderRadius: "clamp(14px, 3vw, 20px)",
-            background: "linear-gradient(135deg, rgba(30,27,75,0.98), rgba(15,23,42,0.98))",
-            border: "2px solid rgba(139,92,246,0.5)",
-            boxShadow: "0 20px 60px rgba(0,0,0,0.8), 0 0 40px rgba(139,92,246,0.4)",
-            backdropFilter: "blur(20px)",
+          gap: "10px",
+        }}>
+          <Send style={{ width: "24px", height: "24px", color: "#7dd3fc" }} />
+          Contact Support
+        </h3>
+        <button
+          onClick={() => setShowContactForm(false)}
+          style={{
+            width: "36px",
+            height: "36px",
+            borderRadius: "8px",
+            border: "none",
+            background: "rgba(239,68,68,0.2)",
+            color: "#fca5a5",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}>
+          <X style={{ width: "20px", height: "20px" }} />
+        </button>
+      </div>
+
+      <div style={{
+        textAlign: "center",
+        padding: "24px 0",
+      }}>
+        <Mail style={{
+          width: "64px",
+          height: "64px",
+          color: "#38bdf8",
+          margin: "0 auto 20px",
+        }} />
+        
+        <p style={{
+          fontSize: "16px",
+          color: "#94a3b8",
+          marginBottom: "16px",
+        }}>
+          Need help? Contact our support team:
+        </p>
+
+        
+          href="mailto:team@vibraxx.com"
+          style={{
+            display: "inline-block",
+            fontSize: "20px",
+            fontWeight: 700,
+            color: "#38bdf8",
+            textDecoration: "none",
+            padding: "12px 24px",
+            background: "rgba(56,189,248,0.1)",
+            borderRadius: "12px",
+            border: "2px solid rgba(56,189,248,0.3)",
+            transition: "all 0.3s",
           }}
-          onClick={(e) => e.stopPropagation()}>
-            
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: "20px",
-            }}>
-              <h3 style={{
-                fontSize: "clamp(18px, 4vw, 22px)",
-                fontWeight: 900,
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-              }}>
-                <Send style={{ width: "24px", height: "24px", color: "#7dd3fc" }} />
-                Contact Support
-              </h3>
-              <button
-                onClick={() => setShowContactForm(false)}
-                style={{
-                  width: "36px",
-                  height: "36px",
-                  borderRadius: "8px",
-                  border: "none",
-                  background: "rgba(239,68,68,0.2)",
-                  color: "#fca5a5",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}>
-                <X style={{ width: "20px", height: "20px" }} />
-              </button>
-            </div>
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(56,189,248,0.2)";
+            e.currentTarget.style.transform = "scale(1.05)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "rgba(56,189,248,0.1)";
+            e.currentTarget.style.transform = "scale(1)";
+          }}
+        >
+          team@vibraxx.com
+        </a>
 
-            {emailStatus === "success" ? (
-              <div style={{
-                padding: "32px",
-                textAlign: "center",
-              }}>
-                <CheckCircle style={{
-                  width: "48px",
-                  height: "48px",
-                  color: "#22c55e",
-                  margin: "0 auto 16px",
-                }} />
-                <h4 style={{
-                  fontSize: "18px",
-                  fontWeight: 700,
-                  color: "#22c55e",
-                  marginBottom: "8px",
-                }}>
-                  Message Sent!
-                </h4>
-                <p style={{ fontSize: "14px", color: "#94a3b8" }}>
-                  We'll get back to you soon.
-                </p>
-              </div>
-            ) : (
-              <>
-                <div style={{ marginBottom: "16px" }}>
-                  <label style={{
-                    display: "block",
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    color: "#cbd5e1",
-                    marginBottom: "8px",
-                  }}>
-                    Subject
-                  </label>
-                  <input
-                    type="text"
-                    value={contactSubject}
-                    onChange={(e) => setContactSubject(e.target.value)}
-                    placeholder="What can we help you with?"
-                    style={{
-                      width: "100%",
-                      padding: "12px 14px",
-                      borderRadius: "10px",
-                      border: "2px solid rgba(139,92,246,0.5)",
-                      background: "rgba(15,23,42,0.9)",
-                      color: "white",
-                      fontSize: "14px",
-                    }}
-                  />
-                </div>
-
-                <div style={{ marginBottom: "20px" }}>
-                  <label style={{
-                    display: "block",
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    color: "#cbd5e1",
-                    marginBottom: "8px",
-                  }}>
-                    Message
-                  </label>
-                  <textarea
-                    value={contactMessage}
-                    onChange={(e) => setContactMessage(e.target.value)}
-                    placeholder="Tell us more..."
-                    rows={6}
-                    style={{
-                      width: "100%",
-                      padding: "12px 14px",
-                      borderRadius: "10px",
-                      border: "2px solid rgba(139,92,246,0.5)",
-                      background: "rgba(15,23,42,0.9)",
-                      color: "white",
-                      fontSize: "14px",
-                      resize: "vertical",
-                    }}
-                  />
-                </div>
-
-                {emailStatus === "error" && (
-                  <div style={{
-                    padding: "12px 14px",
-                    borderRadius: "10px",
-                    background: "rgba(239,68,68,0.15)",
-                    border: "1px solid rgba(239,68,68,0.4)",
-                    marginBottom: "16px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                  }}>
-                    <XCircle style={{ width: "16px", height: "16px", color: "#ef4444" }} />
-                    <span style={{ fontSize: "13px", color: "#fca5a5" }}>
-                      Failed to send. Please try again or email us directly.
-                    </span>
-                  </div>
-                )}
-
-                <button
-                  onClick={handleSendEmail}
-                  disabled={isSendingEmail || !contactSubject.trim() || !contactMessage.trim()}
-                  style={{
-                    width: "100%",
-                    padding: "14px",
-                    borderRadius: "12px",
-                    border: "none",
-                    background: (!contactSubject.trim() || !contactMessage.trim())
-                      ? "rgba(139,92,246,0.3)"
-                      : "linear-gradient(135deg, #7c3aed, #d946ef)",
-                    color: "white",
-                    fontSize: "15px",
-                    fontWeight: 800,
-                    cursor: (!contactSubject.trim() || !contactMessage.trim()) ? "not-allowed" : "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
-                    transition: "all 0.3s",
-                  }}>
-                  {isSendingEmail ? (
-                    <>
-                      <div style={{
-                        width: "16px",
-                        height: "16px",
-                        borderRadius: "50%",
-                        border: "2px solid rgba(255,255,255,0.3)",
-                        borderTopColor: "white",
-                        animation: "spin 0.8s linear infinite",
-                      }} />
-                      Sending...
-                    </>
-                  ) : (
-                    <>
-                      <Send style={{ width: "18px", height: "18px" }} />
-                      Send Message
-                    </>
-                  )}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
+        <p style={{
+          fontSize: "14px",
+          color: "#64748b",
+          marginTop: "20px",
+        }}>
+          We typically respond within 24 hours
+        </p>
+      </div>
+    </div>
+  </div>
+)}
