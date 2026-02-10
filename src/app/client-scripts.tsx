@@ -4,18 +4,6 @@ import { useEffect } from "react";
 
 export default function ClientScripts() {
   useEffect(() => {
-    // 🔻 PRELOAD FADE-OUT (ARTIK REACT SAFE)
-    const el = document.getElementById("vibraxx-preload-bg");
-    if (el) {
-      el.style.opacity = "0";
-      const t = setTimeout(() => {
-        el.remove();
-      }, 600);
-      return () => clearTimeout(t);
-    }
-  }, []);
-
-  useEffect(() => {
     // ═══ SERVICE WORKER REGISTER ═══
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
@@ -34,14 +22,16 @@ export default function ClientScripts() {
       deferredPrompt = e;
     };
 
-    window.addEventListener("beforeinstallprompt", beforeInstall);
-
-    window.addEventListener("appinstalled", () => {
+    const onInstalled = () => {
       deferredPrompt = null;
-    });
+    };
+
+    window.addEventListener("beforeinstallprompt", beforeInstall);
+    window.addEventListener("appinstalled", onInstalled);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", beforeInstall);
+      window.removeEventListener("appinstalled", onInstalled);
     };
   }, []);
 

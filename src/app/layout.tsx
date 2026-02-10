@@ -2,6 +2,7 @@
 import "./globals.css";
 import { Inter } from "next/font/google";
 import ClientScripts from "./client-scripts";
+import PreloadOverlay from "@/components/PreloadOverlay";
 
 export const metadata: Metadata = {
   title: "VIBRAXX - 24/7 Quiz Arena",
@@ -35,13 +36,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <head>
-        {/* ✅ THEME */}
+        {/* THEME */}
         <meta name="theme-color" content="#020817" />
         <meta name="mobile-web-app-capable" content="yes" />
 
-        {/* ✅ ICONS - Using existing maskable icons */}
+        {/* ICONS */}
         <link
           rel="apple-touch-icon"
           sizes="180x180"
@@ -61,25 +62,16 @@ export default function RootLayout({
         />
       </head>
 
-      <body className={`${inter.className} bg-[#020817] text-white antialiased`}>
-        {/* ✅ PRELOAD OVERLAY (CANONICAL - DB controls fade timing) */}
-        <div
-          id="vibraxx-preload-bg"
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "#020817",
-            zIndex: 9999,
-            opacity: 1,
-            transition: "opacity 0.5s ease",
-            pointerEvents: "none",
-          }}
-        />
+      <body
+        className={`${inter.className} bg-[#020817] text-white antialiased`}
+      >
+        {/* ✅ REACT-CONTROLLED PRELOAD (SAFE) */}
+        <PreloadOverlay />
 
-        {/* ✅ APP CONTENT */}
+        {/* APP */}
         {children}
 
-        {/* ✅ CLIENT-SIDE LOGIC (SW, PWA, PRELOAD FADE) */}
+        {/* CLIENT ONLY LOGIC */}
         <ClientScripts />
       </body>
     </html>
