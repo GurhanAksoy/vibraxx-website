@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import {
@@ -9,7 +9,6 @@ import {
   CheckCircle,
   XCircle,
   Target,
-  Award,
   Volume2,
   VolumeX,
   AlertCircle,
@@ -17,12 +16,10 @@ import {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 🎖️ CANONICAL ARCHITECTURE - PHASE-DRIVEN QUIZ SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
 // DATABASE = COMMANDER | FRONTEND = SOLDIER | PHASE = LAW
 // ═══════════════════════════════════════════════════════════════════════════
 
-// ============================================
-// CONSTANTS
-// ============================================
 const TOTAL_QUESTIONS = 20;
 const QUESTION_DURATION = 6;
 const EXPLANATION_DURATION = 6;
@@ -32,33 +29,35 @@ const INITIAL_COUNTDOWN = 6;
 type OptionId = "a" | "b" | "c" | "d";
 type AnswerStatus = "none" | "correct" | "wrong";
 
-// 🎯 CANONICAL PHASE MODEL (SINGLE SOURCE OF TRUTH)
-type QuizPhase =
-  | "INIT" // Security check + data fetch
-  | "COUNTDOWN" // 6 → 1 countdown animation
-  | "QUESTION" // Question display + tick sound (6s)
-  | "EXPLANATION" // Explanation (6s)
-  | "FINAL"; // Score summary
+type QuizPhase = "INIT" | "COUNTDOWN" | "QUESTION" | "EXPLANATION" | "FINAL";
 
 interface Question {
   id: number;
   category_id: number;
   question_text: string;
-  option_a: string;
-  option_b: string;
-  option_c: string;
-  option_d: string;
+  option_a: string | null;
+  option_b: string | null;
+  option_c: string | null;
+  option_d: string | null;
   correct_option: OptionId;
   explanation: string;
 }
 
-// RPC return types
-type EligibilityResp = {
-  eligible: boolean;
-  has_played_this_week: boolean;
-  last_played: string | null;
-  current_week: number;
-  current_year: number;
+type BootstrapStatus = "already_played" | "resume" | "new";
+
+type BootstrapResponse = {
+  status: BootstrapStatus;
+  eligibility?: any;
+  session?: {
+    week_start_utc: string;
+    phase: QuizPhase | string;
+    current_index: number;
+    answers: Record<string, any>;
+    correct_count: number;
+    wrong_count: number;
+    question_ids: number[];
+  };
+  questions?: Question[];
 };
 
 export default function FreeQuizPage() {
@@ -74,11 +73,8 @@ export default function FreeQuizPage() {
   // ============================================
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-
-  // Answer / lock
   const [selectedAnswer, setSelectedAnswer] = useState<OptionId | null>(null);
   const [isCorrect, setIsCorrect] = useState(false);
-  const [isAnswerLocked, setIsAnswerLocked] = useState(false);
 
   // COUNTERS
   const [correctCount, setCorrectCount] = useState(0);
@@ -87,7 +83,7 @@ export default function FreeQuizPage() {
     Array(TOTAL_QUESTIONS).fill("none")
   );
 
-  // TIMERS (DO NOT CONTROL UI - ONLY COUNT)
+  // TIMERS (UI doesn’t control phase; phase controls timer)
   const [countdownTime, setCountdownTime] = useState(INITIAL_COUNTDOWN);
   const [questionTime, setQuestionTime] = useState(QUESTION_DURATION);
   const [explanationTime, setExplanationTime] = useState(EXPLANATION_DURATION);
@@ -96,13 +92,11 @@ export default function FreeQuizPage() {
   // UI STATE
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const [showAlreadyPlayedModal, setShowAlreadyPlayedModal] = useState(false);
+  const [systemError, setSystemError] = useState<string | null>(null);
 
-  // ✅ NEW: system error modal (RPC failure vs already played)
-  const [showSystemErrorModal, setShowSystemErrorModal] = useState(false);
-  const [systemErrorText, setSystemErrorText] = useState<string>("");
-
-  // ✅ Entry only once at quiz start
-  const [hasPlayedEntry, setHasPlayedEntry] = useState(false);
+  // Session / Security
+  const [weekStartUtc, setWeekStartUtc] = useState<string | null>(null);
+  const [bootstrapDone, setBootstrapDone] = useState(false);
 
   // ============================================
   // AUDIO REFS
@@ -115,6 +109,40 @@ export default function FreeQuizPage() {
   const tickSoundRef = useRef<HTMLAudioElement | null>(null);
   const startSoundRef = useRef<HTMLAudioElement | null>(null);
   const entrySoundRef = useRef<HTMLAudioElement | null>(null);
+
+  // ============================================
+  // REFS for canonical safety (avoid stale closures)
+  // ============================================
+  const phaseRef = useRef<QuizPhase>("INIT");
+  const currentIndexRef = useRef(0);
+  const selectedAnswerRef = useRef<OptionId | null>(null);
+  const correctCountRef = useRef(0);
+  const wrongCountRef = useRef(0);
+  const answersRef = useRef<AnswerStatus[]>(Array(TOTAL_QUESTIONS).fill("none"));
+
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
+
+  useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  }, [currentIndex]);
+
+  useEffect(() => {
+    selectedAnswerRef.current = selectedAnswer;
+  }, [selectedAnswer]);
+
+  useEffect(() => {
+    correctCountRef.current = correctCount;
+  }, [correctCount]);
+
+  useEffect(() => {
+    wrongCountRef.current = wrongCount;
+  }, [wrongCount]);
+
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
 
   const currentQ = questions[currentIndex];
 
@@ -133,12 +161,11 @@ export default function FreeQuizPage() {
   }, []);
 
   // ============================================
-  // AUDIO HELPERS (CANONICAL)
+  // AUDIO HELPERS
   // ============================================
-  const playSound = (audio: HTMLAudioElement | null, opts?: { loop?: boolean }) => {
+  const playSound = (audio: HTMLAudioElement | null) => {
     if (!isSoundEnabled || !audio) return;
     try {
-      audio.loop = !!opts?.loop;
       audio.currentTime = 0;
       audio.play().catch(() => {});
     } catch {}
@@ -146,112 +173,166 @@ export default function FreeQuizPage() {
 
   const stopSound = (audio: HTMLAudioElement | null) => {
     if (!audio) return;
-    try {
-      audio.pause();
-      audio.currentTime = 0;
-      audio.loop = false;
-    } catch {}
+    audio.pause();
+    audio.currentTime = 0;
+    audio.loop = false;
   };
 
   const playClick = () => playSound(clickSoundRef.current);
 
   // ============================================
-  // 🔐 INIT PHASE - SECURITY & DATA FETCH
+  // CANONICAL: Persist progress to DB (soldier reports to commander)
+  // ============================================
+  const persistProgress = async (
+    nextPhase: QuizPhase,
+    nextIndex: number,
+    nextAnswersObj: Record<string, any>,
+    nextCorrect: number,
+    nextWrong: number
+  ) => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      await supabase.rpc("free_quiz_update_progress", {
+        p_user_id: user.id,
+        p_phase: nextPhase,
+        p_current_index: nextIndex,
+        p_answers: nextAnswersObj,
+        p_correct_count: nextCorrect,
+        p_wrong_count: nextWrong,
+      });
+    } catch {
+      // silent fail: UX should not freeze
+    }
+  };
+
+  // answers array -> jsonb object
+  const buildAnswersJson = (base?: Record<string, any>) => {
+    const obj = base ? { ...base } : {};
+    return obj;
+  };
+
+  // ============================================
+  // 🔐 INIT PHASE - BOOTSTRAP (single canonical call)
   // ============================================
   useEffect(() => {
     if (phase !== "INIT") return;
 
-    const run = async () => {
+    const bootstrap = async () => {
       try {
+        setSystemError(null);
+        console.log("🔐 [FREE QUIZ] Bootstrap starting...");
+
         const {
           data: { user },
-          error: userErr,
         } = await supabase.auth.getUser();
 
-        if (userErr || !user) {
+        if (!user) {
           router.push("/login");
           return;
         }
 
-        // 1) Eligibility
-        const { data: eligibility, error: eligibilityError } = await supabase.rpc(
-          "check_free_quiz_eligibility",
-          { p_user_id: user.id }
-        );
+        const { data, error } = await supabase.rpc("free_quiz_bootstrap", {
+          p_user_id: user.id,
+        });
 
-        if (eligibilityError) {
-          // ✅ ERROR ≠ Already Played
-          setSystemErrorText(
-            `Eligibility RPC error: ${eligibilityError.message ?? "unknown"}`
+        if (error) {
+          console.error("❌ [FREE QUIZ] Bootstrap RPC error:", error);
+          setSystemError(
+            `Free quiz service currently can’t start. Please try again.\n\nBootstrap error: ${error.message}`
           );
-          setShowSystemErrorModal(true);
           return;
         }
 
-        const e = eligibility as EligibilityResp | null;
+        const res = data as BootstrapResponse;
+        console.log("✅ [FREE QUIZ] Bootstrap response:", res);
 
-        if (!e?.eligible) {
+        if (res.status === "already_played") {
           setShowAlreadyPlayedModal(true);
           return;
         }
 
-        // 2) Questions
-        const { data: qData, error: qError } = await supabase.rpc(
-          "get_free_quiz_questions",
-          { p_user_id: user.id }
-        );
+        const sess = res.session!;
+        const qs = (res.questions || []) as any[];
 
-        if (qError) {
-          setSystemErrorText(`Questions RPC error: ${qError.message ?? "unknown"}`);
-          setShowSystemErrorModal(true);
-          return;
-        }
+        // Normalize questions array if Supabase returns {value:{...}}
+        const normalized: Question[] = qs.map((x: any) => (x?.value ? x.value : x));
 
-        // Supabase JSONB array sometimes comes as "any"
-        const parsed = Array.isArray(qData) ? qData : [];
-        if (parsed.length < TOTAL_QUESTIONS) {
-          setSystemErrorText(
-            `Question set invalid. Expected ${TOTAL_QUESTIONS}, got ${parsed.length}.`
+        if (!normalized || normalized.length < TOTAL_QUESTIONS) {
+          setSystemError(
+            "Free quiz service currently can’t start. Please try again.\n\nQuestions payload invalid or less than 20."
           );
-          setShowSystemErrorModal(true);
           return;
         }
 
-        setQuestions(parsed as Question[]);
+        setWeekStartUtc(sess.week_start_utc || null);
+        setQuestions(normalized);
 
-        // Reset runtime state (canonical)
-        setCurrentIndex(0);
+        // Resume state if needed
+        const resumePhase = (sess.phase as QuizPhase) || "COUNTDOWN";
+        const resumeIndex = Number(sess.current_index || 0);
+
+        // hydrate answers/counters
+        const hydratedAnswers = Array(TOTAL_QUESTIONS).fill("none") as AnswerStatus[];
+        const answersObj = sess.answers || {};
+
+        for (let i = 0; i < TOTAL_QUESTIONS; i++) {
+          const a = answersObj[String(i)];
+          if (a?.correct === true) hydratedAnswers[i] = "correct";
+          else if (a?.correct === false && a?.selected) hydratedAnswers[i] = "wrong";
+        }
+
+        setAnswers(hydratedAnswers);
+        setCorrectCount(Number(sess.correct_count || 0));
+        setWrongCount(Number(sess.wrong_count || 0));
+        setCurrentIndex(Math.min(Math.max(resumeIndex, 0), TOTAL_QUESTIONS - 1));
+
+        // SelectedAnswer cannot be reliably resumed mid-question without storing exact selection.
+        // Canonical rule: resume at phase boundary.
+        // If session says QUESTION/EXPLANATION mid-way, we resume safely:
+        // - QUESTION: start QUESTION fresh but same index
+        // - EXPLANATION: show EXPLANATION (requires isCorrect), we recompute from answersObj if possible
         setSelectedAnswer(null);
         setIsCorrect(false);
-        setIsAnswerLocked(false);
-        setCorrectCount(0);
-        setWrongCount(0);
-        setAnswers(Array(TOTAL_QUESTIONS).fill("none"));
-        setHasPlayedEntry(false);
-        setCountdownTime(INITIAL_COUNTDOWN);
 
-        setPhase("COUNTDOWN");
-      } catch (err: any) {
-        setSystemErrorText(`INIT error: ${err?.message ?? "unknown"}`);
-        setShowSystemErrorModal(true);
+        setBootstrapDone(true);
+
+        // INIT → target phase
+        if (resumePhase === "FINAL") setPhase("FINAL");
+        else if (resumePhase === "EXPLANATION") setPhase("EXPLANATION");
+        else if (resumePhase === "QUESTION") setPhase("QUESTION");
+        else setPhase("COUNTDOWN");
+      } catch (e: any) {
+        console.error("❌ [FREE QUIZ] Bootstrap error:", e);
+        setSystemError(
+          "Free quiz service currently can’t start. Please try again.\n\nUnexpected error."
+        );
       }
     };
 
-    run();
+    bootstrap();
   }, [phase, router]);
 
   // ============================================
-  // ⏰ COUNTDOWN PHASE TIMER (6 → 1)
+  // ⏰ COUNTDOWN PHASE TIMER (single authority)
   // ============================================
   useEffect(() => {
     if (phase !== "COUNTDOWN") return;
+
+    setCountdownTime(INITIAL_COUNTDOWN);
 
     const interval = setInterval(() => {
       setCountdownTime((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
 
-          // ✅ QUIZ START: entry plays ONCE, first question appears
+          // CANON: transition function controls audio timing
+          // Start sound should hit as question appears
+          playSound(entrySoundRef.current);
+          playSound(startSoundRef.current);
           setPhase("QUESTION");
           return 0;
         }
@@ -263,41 +344,13 @@ export default function FreeQuizPage() {
   }, [phase]);
 
   // ============================================
-  // 🎵 ENTRY SOUND (ONCE): when first QUESTION starts
-  // (Spec: quiz starts -> entry 1 time)
+  // 🎯 QUESTION PHASE TIMER (NO dependency on selectedAnswer!)
   // ============================================
   useEffect(() => {
     if (phase !== "QUESTION") return;
 
-    if (!hasPlayedEntry) {
-      playSound(entrySoundRef.current);
-      setHasPlayedEntry(true);
-    }
-  }, [phase, hasPlayedEntry]);
-
-  // ============================================
-  // 🔊 TICK SOUND (ONLY during QUESTION, loop for 6s, stop at transition)
-  // ============================================
-  useEffect(() => {
-    const tick = tickSoundRef.current;
-    if (!tick) return;
-
-    if (phase === "QUESTION" && isSoundEnabled) {
-      // loop tick for question window
-      playSound(tick, { loop: true });
-    } else {
-      stopSound(tick);
-    }
-  }, [phase, isSoundEnabled]);
-
-  // ============================================
-  // 🎯 QUESTION PHASE TIMER (ALWAYS FULL 6s)
-  // IMPORTANT: Explanation MUST NOT open early.
-  // If user answers early -> lock answer but stay in QUESTION until timer ends.
-  // ============================================
-  useEffect(() => {
-    if (phase !== "QUESTION") return;
-
+    // when question begins: tick must start immediately after start sound
+    // start sound already played at transition; here we only ensure tick loop
     setQuestionTime(QUESTION_DURATION);
 
     const interval = setInterval(() => {
@@ -305,23 +358,38 @@ export default function FreeQuizPage() {
         if (prev <= 1) {
           clearInterval(interval);
 
-          // At TIMEOUT: if not answered -> mark wrong
-          if (!isAnswerLocked || selectedAnswer === null) {
+          // TIMEOUT PATH
+          if (selectedAnswerRef.current === null) {
+            // mark wrong
             setWrongCount((w) => w + 1);
-            setAnswers((prevAns) => {
-              const copy = [...prevAns];
-              copy[currentIndex] = "wrong";
+            setAnswers((prevArr) => {
+              const copy = [...prevArr];
+              copy[currentIndexRef.current] = "wrong";
               return copy;
             });
             setIsCorrect(false);
-            setIsAnswerLocked(true);
+
+            // persist answer to DB (timeout = wrong)
+            (async () => {
+              try {
+                const idx = currentIndexRef.current;
+                const obj = buildAnswersJson();
+                // use local computed based on refs
+                const currentAnswersObj: Record<string, any> = {};
+                // we don’t have full db answers json here; keep minimal, DB already stores previous.
+                currentAnswersObj[String(idx)] = { selected: null, correct: false, timeout: true };
+                await persistProgress(
+                  "EXPLANATION",
+                  idx,
+                  currentAnswersObj,
+                  correctCountRef.current,
+                  wrongCountRef.current + 1
+                );
+              } catch {}
+            })();
           }
 
-          // Stop tick, play whoosh once, open explanation
-          stopSound(tickSoundRef.current);
           playSound(whooshSoundRef.current);
-
-          setExplanationTime(EXPLANATION_DURATION);
           setPhase("EXPLANATION");
           return 0;
         }
@@ -330,11 +398,10 @@ export default function FreeQuizPage() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [phase, currentIndex, isAnswerLocked, selectedAnswer]);
+  }, [phase]);
 
   // ============================================
-  // 📖 EXPLANATION PHASE TIMER (6s) then Next Question or Final
-  // Spec: explanation 6s, then next question opens with START sound.
+  // 📖 EXPLANATION PHASE TIMER (single authority)
   // ============================================
   useEffect(() => {
     if (phase !== "EXPLANATION") return;
@@ -342,23 +409,35 @@ export default function FreeQuizPage() {
     setExplanationTime(EXPLANATION_DURATION);
 
     const interval = setInterval(() => {
-      setExplanationTime((prev) => (prev > 0 ? prev - 1 : 0));
+      setExplanationTime((prev) => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
 
     const timeout = setTimeout(() => {
       clearInterval(interval);
 
-      if (currentIndex < TOTAL_QUESTIONS - 1) {
-        // Next question
-        setCurrentIndex((i) => i + 1);
-        setSelectedAnswer(null);
-        setIsCorrect(false);
-        setIsAnswerLocked(false);
+      if (currentIndexRef.current < TOTAL_QUESTIONS - 1) {
+        const nextIndex = currentIndexRef.current + 1;
 
-        // Spec: After first question, subsequent question starts with START sound
+        // transition: EXPLANATION → QUESTION
+        // audio must fire BEFORE phase flip
         playSound(startSoundRef.current);
 
+        setCurrentIndex(nextIndex);
+        setSelectedAnswer(null);
+        setIsCorrect(false);
         setPhase("QUESTION");
+
+        // persist progress
+        (async () => {
+          const obj = {}; // minimal delta (full answers is already stored progressively)
+          await persistProgress(
+            "QUESTION",
+            nextIndex,
+            obj,
+            correctCountRef.current,
+            wrongCountRef.current
+          );
+        })();
       } else {
         setPhase("FINAL");
       }
@@ -368,50 +447,41 @@ export default function FreeQuizPage() {
       clearInterval(interval);
       clearTimeout(timeout);
     };
-  }, [phase, currentIndex]);
+  }, [phase]);
 
   // ============================================
-  // 🏁 FINAL PHASE TIMER & SUBMIT
+  // 🏁 FINAL PHASE TIMER & SUBMIT (canonical)
   // ============================================
   useEffect(() => {
     if (phase !== "FINAL") return;
 
-    // stop any running sounds
     stopSound(tickSoundRef.current);
-
-    // play gameover once
     playSound(gameoverSoundRef.current);
 
-    const submitResult = async () => {
+    const submit = async () => {
       try {
         const {
           data: { user },
         } = await supabase.auth.getUser();
-
         if (!user) return;
 
-        const { error } = await supabase.rpc("submit_free_quiz_result", {
+        await supabase.rpc("free_quiz_finish_and_submit", {
           p_user_id: user.id,
-          p_correct_count: correctCount,
-          p_wrong_count: wrongCount,
+          p_correct_count: correctCountRef.current,
+          p_wrong_count: wrongCountRef.current,
           p_total_questions: TOTAL_QUESTIONS,
         });
-
-        // IMPORTANT: submit error should NOT break UI loop
-        if (error) {
-          console.error("[FREE QUIZ] submit_free_quiz_result error:", error);
-        }
-      } catch (e) {
-        console.error("[FREE QUIZ] submit error:", e);
+      } catch (e: any) {
+        // ignore: user still sees final
+        console.error("❌ [FREE QUIZ] Submit error:", e?.message || e);
       }
     };
 
-    submitResult();
+    submit();
 
     setFinalTime(FINAL_SCORE_DURATION);
-
     const interval = setInterval(() => {
-      setFinalTime((prev) => (prev > 0 ? prev - 1 : 0));
+      setFinalTime((prev) => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
 
     const timeout = setTimeout(() => {
@@ -423,32 +493,45 @@ export default function FreeQuizPage() {
       clearInterval(interval);
       clearTimeout(timeout);
     };
-  }, [phase, router, correctCount, wrongCount]);
+  }, [phase, router]);
 
   // ============================================
-  // 🎯 ANSWER HANDLER (CANONICAL)
-  // Spec:
-  // - click sound 1x
-  // - correct/wrong sound 1x immediately
-  // - DO NOT open explanation early
-  // - lock options instantly
+  // 🔊 TICK SOUND - PHASE DRIVEN ONLY
+  // ============================================
+  useEffect(() => {
+    const tick = tickSoundRef.current;
+    if (!tick) return;
+
+    if (phase === "QUESTION" && isSoundEnabled) {
+      tick.loop = true;
+      tick.currentTime = 0;
+      tick.play().catch(() => {});
+    } else {
+      tick.pause();
+      tick.currentTime = 0;
+      tick.loop = false;
+    }
+  }, [phase, isSoundEnabled]);
+
+  // ============================================
+  // 🎯 ANSWER HANDLER (canonical protocol)
   // ============================================
   const handleAnswerClick = (optionId: OptionId) => {
-    if (phase !== "QUESTION") return;
+    // GUARD: Only in QUESTION phase
+    if (phaseRef.current !== "QUESTION") return;
+    if (selectedAnswerRef.current !== null) return;
     if (!currentQ) return;
-    if (isAnswerLocked) return;
 
     playClick();
 
     setSelectedAnswer(optionId);
-    setIsAnswerLocked(true);
 
     const correct = optionId === currentQ.correct_option;
     setIsCorrect(correct);
 
     setAnswers((prev) => {
       const next = [...prev];
-      next[currentIndex] = correct ? "correct" : "wrong";
+      next[currentIndexRef.current] = correct ? "correct" : "wrong";
       return next;
     });
 
@@ -460,24 +543,52 @@ export default function FreeQuizPage() {
       playSound(wrongSoundRef.current);
     }
 
-    // ✅ DO NOT transition to EXPLANATION here.
-    // Explanation opens at question timer end (6s).
+    playSound(whooshSoundRef.current);
+
+    // persist progress (delta)
+    (async () => {
+      const idx = currentIndexRef.current;
+      const delta: Record<string, any> = {};
+      delta[String(idx)] = { selected: optionId, correct };
+      await persistProgress(
+        "EXPLANATION",
+        idx,
+        delta,
+        correct ? correctCountRef.current + 1 : correctCountRef.current,
+        correct ? wrongCountRef.current : wrongCountRef.current + 1
+      );
+    })();
+
+    // transition
+    setPhase("EXPLANATION");
   };
 
   // ============================================
   // SOUND TOGGLE
   // ============================================
   const handleSoundToggle = () => {
-    // If turning off -> stop all immediately
-    if (isSoundEnabled) {
-      playClick();
-      stopSound(tickSoundRef.current);
-    }
+    if (isSoundEnabled) playClick();
     setIsSoundEnabled((prev) => !prev);
   };
 
   // ============================================
-  // UTILITY FUNCTIONS
+  // QUIT (no header, but safe exit)
+  // ============================================
+  const handleQuit = async () => {
+    try {
+      playClick();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.rpc("free_quiz_abort", { p_user_id: user.id });
+      }
+    } catch {}
+    router.push("/");
+  };
+
+  // ============================================
+  // UTILITY
   // ============================================
   const getTimeColor = () => {
     if (questionTime > 4) return "#22c55e";
@@ -489,9 +600,9 @@ export default function FreeQuizPage() {
     TOTAL_QUESTIONS > 0 ? Math.round((correctCount / TOTAL_QUESTIONS) * 100) : 0;
 
   // ============================================
-  // 📺 RENDER: SYSTEM ERROR MODAL
+  // 📺 RENDER: SYSTEM ERROR
   // ============================================
-  if (showSystemErrorModal) {
+  if (systemError) {
     return (
       <div
         style={{
@@ -502,97 +613,100 @@ export default function FreeQuizPage() {
           alignItems: "center",
           justifyContent: "center",
           padding: "20px",
-          color: "white",
         }}
       >
         <div
+          className="animate-slide-up"
           style={{
             width: "min(520px, 95vw)",
-            padding: "28px 24px",
-            borderRadius: 22,
-            background: "rgba(6,8,20,0.98)",
+            padding: "32px 28px",
+            borderRadius: 28,
+            background:
+              "radial-gradient(circle at top, rgba(15,23,42,1), rgba(6,8,20,1))",
             border: "1px solid rgba(239,68,68,0.35)",
-            boxShadow: "0 0 40px rgba(239,68,68,0.25)",
+            boxShadow: "0 0 50px rgba(239,68,68,0.18)",
             textAlign: "center",
           }}
         >
           <div
             style={{
-              width: 70,
-              height: 70,
-              margin: "0 auto 16px",
+              width: 80,
+              height: 80,
+              margin: "0 auto 24px",
               borderRadius: "50%",
               background: "rgba(239,68,68,0.12)",
               border: "2px solid rgba(239,68,68,0.35)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              boxShadow: "0 0 30px rgba(239,68,68,0.18)",
             }}
           >
-            <AlertCircle style={{ width: 40, height: 40, color: "#ef4444" }} />
+            <AlertCircle style={{ width: 44, height: 44, color: "#ef4444" }} />
           </div>
-          <h2 style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>
+
+          <h2
+            style={{
+              fontSize: 22,
+              fontWeight: 900,
+              marginBottom: 10,
+              color: "#fee2e2",
+              letterSpacing: "0.02em",
+            }}
+          >
             System Error
           </h2>
-          <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.6 }}>
-            Free quiz service currently can’t start. Please try again.
-          </p>
+
           <pre
             style={{
-              marginTop: 14,
-              padding: 12,
-              borderRadius: 14,
-              background: "rgba(15,23,42,0.8)",
-              color: "#94a3b8",
-              textAlign: "left",
-              fontSize: 11,
-              overflowX: "auto",
               whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
+              textAlign: "left",
+              fontSize: 13,
+              lineHeight: 1.6,
+              color: "#cbd5e1",
+              background: "rgba(0,0,0,0.25)",
+              borderRadius: 14,
+              padding: 14,
+              border: "1px solid rgba(148,163,184,0.15)",
+              marginBottom: 18,
             }}
           >
-            {systemErrorText || "Unknown error"}
+            {systemError}
           </pre>
 
-          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
             <button
               onClick={() => {
-                playClick();
-                setShowSystemErrorModal(false);
+                setSystemError(null);
                 setPhase("INIT");
               }}
               style={{
-                flex: 1,
-                padding: "12px 16px",
+                padding: "12px 18px",
                 borderRadius: 9999,
                 border: "none",
                 background: "linear-gradient(135deg, #7c3aed, #a855f7)",
                 color: "white",
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: 800,
-                textTransform: "uppercase",
-                letterSpacing: "0.12em",
+                letterSpacing: "0.08em",
                 cursor: "pointer",
+                boxShadow: "0 0 18px rgba(124,58,237,0.5)",
               }}
             >
               Retry
             </button>
+
             <button
-              onClick={() => {
-                playClick();
-                router.push("/");
-              }}
+              onClick={() => router.push("/")}
               style={{
-                flex: 1,
-                padding: "12px 16px",
+                padding: "12px 18px",
                 borderRadius: 9999,
-                border: "1px solid rgba(148,163,253,0.5)",
+                border: "1px solid rgba(148,163,184,0.35)",
                 background: "transparent",
                 color: "#e5e7eb",
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: 800,
-                textTransform: "uppercase",
-                letterSpacing: "0.12em",
+                letterSpacing: "0.08em",
                 cursor: "pointer",
               }}
             >
@@ -601,8 +715,15 @@ export default function FreeQuizPage() {
           </div>
         </div>
 
-        {/* Audio */}
+        {/* Audio Elements */}
+        <audio ref={correctSoundRef} src="/sounds/correct.mp3" />
+        <audio ref={wrongSoundRef} src="/sounds/wrong.mp3" />
         <audio ref={clickSoundRef} src="/sounds/click.mp3" />
+        <audio ref={gameoverSoundRef} src="/sounds/gameover.mp3" />
+        <audio ref={whooshSoundRef} src="/sounds/whoosh.mp3" />
+        <audio ref={tickSoundRef} src="/sounds/tick.mp3" />
+        <audio ref={startSoundRef} src="/sounds/start.mp3" />
+        <audio ref={entrySoundRef} src="/sounds/entry.mp3" />
       </div>
     );
   }
@@ -667,15 +788,30 @@ export default function FreeQuizPage() {
             Already Played This Week! 🎮
           </h2>
 
-          <p style={{ fontSize: 15, color: "#cbd5e1", lineHeight: 1.7, marginBottom: 8 }}>
+          <p
+            style={{
+              fontSize: 15,
+              color: "#cbd5e1",
+              lineHeight: 1.7,
+              marginBottom: 8,
+            }}
+          >
             You've completed your free quiz for this week.
           </p>
 
           <p style={{ fontSize: 14, color: "#94a3b8", marginBottom: 28 }}>
-            Come back next Monday for a new set of questions, or join our live competitions to keep playing! 🏆
+            Come back next Monday for a new set of questions, or join our live
+            competitions to keep playing! 🏆
           </p>
 
-          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 12,
+              justifyContent: "center",
+              flexWrap: "wrap",
+            }}
+          >
             <button
               onClick={() => router.push("/")}
               style={{
@@ -727,7 +863,7 @@ export default function FreeQuizPage() {
   }
 
   // ============================================
-  // 📺 RENDER: INIT PHASE (Loading)
+  // 📺 RENDER: INIT (Loading)
   // ============================================
   if (phase === "INIT") {
     return (
@@ -742,7 +878,8 @@ export default function FreeQuizPage() {
         <div
           style={{
             minHeight: "100vh",
-            background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
+            background:
+              "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -777,7 +914,7 @@ export default function FreeQuizPage() {
   }
 
   // ============================================
-  // 📺 RENDER: COUNTDOWN PHASE
+  // 📺 RENDER: COUNTDOWN
   // ============================================
   if (phase === "COUNTDOWN") {
     return (
@@ -809,12 +946,35 @@ export default function FreeQuizPage() {
           }
         `}</style>
 
+        {/* Quit (no header, but safe exit) */}
+        <button
+          onClick={handleQuit}
+          style={{
+            position: "fixed",
+            top: 14,
+            right: 14,
+            zIndex: 50,
+            width: 44,
+            height: 44,
+            borderRadius: 14,
+            border: "1px solid rgba(148,163,184,0.35)",
+            background: "rgba(6,8,20,0.6)",
+            color: "#e5e7eb",
+            cursor: "pointer",
+            opacity: 0.8,
+          }}
+          title="Exit"
+        >
+          ✕
+        </button>
+
         <div
           style={{
             minHeight: "100vh",
             maxHeight: "100vh",
             overflow: "hidden",
-            background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #7c3aed 100%)",
+            background:
+              "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #7c3aed 100%)",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -832,7 +992,8 @@ export default function FreeQuizPage() {
               width: "300px",
               height: "300px",
               borderRadius: "50%",
-              background: "radial-gradient(circle, rgba(124,58,237,0.3), transparent 70%)",
+              background:
+                "radial-gradient(circle, rgba(124,58,237,0.3), transparent 70%)",
               animation: "ripple 3s ease-out infinite",
             }}
           />
@@ -845,7 +1006,8 @@ export default function FreeQuizPage() {
               width: "300px",
               height: "300px",
               borderRadius: "50%",
-              background: "radial-gradient(circle, rgba(217,70,239,0.3), transparent 70%)",
+              background:
+                "radial-gradient(circle, rgba(217,70,239,0.3), transparent 70%)",
               animation: "ripple 3s ease-out infinite 1s",
             }}
           />
@@ -904,7 +1066,7 @@ export default function FreeQuizPage() {
           </div>
         </div>
 
-        {/* Audio */}
+        {/* Audio Elements */}
         <audio ref={correctSoundRef} src="/sounds/correct.mp3" />
         <audio ref={wrongSoundRef} src="/sounds/wrong.mp3" />
         <audio ref={clickSoundRef} src="/sounds/click.mp3" />
@@ -918,8 +1080,7 @@ export default function FreeQuizPage() {
   }
 
   // ============================================
-  // 📺 RENDER: QUESTION / EXPLANATION / FINAL
-  // (UI blocks preserved)
+  // RENDER: QUESTION / EXPLANATION / FINAL (your design preserved)
   // ============================================
   return (
     <>
@@ -971,7 +1132,7 @@ export default function FreeQuizPage() {
         }
       `}</style>
 
-      {/* Audio */}
+      {/* Audio Elements */}
       <audio ref={correctSoundRef} src="/sounds/correct.mp3" />
       <audio ref={wrongSoundRef} src="/sounds/wrong.mp3" />
       <audio ref={clickSoundRef} src="/sounds/click.mp3" />
@@ -980,6 +1141,28 @@ export default function FreeQuizPage() {
       <audio ref={tickSoundRef} src="/sounds/tick.mp3" />
       <audio ref={startSoundRef} src="/sounds/start.mp3" />
       <audio ref={entrySoundRef} src="/sounds/entry.mp3" />
+
+      {/* Quit (no header) */}
+      <button
+        onClick={handleQuit}
+        style={{
+          position: "fixed",
+          top: 14,
+          right: 14,
+          zIndex: 50,
+          width: 44,
+          height: 44,
+          borderRadius: 14,
+          border: "1px solid rgba(148,163,184,0.35)",
+          background: "rgba(6,8,20,0.6)",
+          color: "#e5e7eb",
+          cursor: "pointer",
+          opacity: 0.8,
+        }}
+        title="Exit"
+      >
+        ✕
+      </button>
 
       <div
         style={{
@@ -1003,7 +1186,8 @@ export default function FreeQuizPage() {
             width: "260px",
             height: "260px",
             borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(124,58,237,0.4), transparent 70%)",
+            background:
+              "radial-gradient(circle, rgba(124,58,237,0.4), transparent 70%)",
             filter: "blur(40px)",
             opacity: 0.5,
             pointerEvents: "none",
@@ -1019,7 +1203,8 @@ export default function FreeQuizPage() {
             width: "320px",
             height: "320px",
             borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(217,70,239,0.35), transparent 70%)",
+            background:
+              "radial-gradient(circle, rgba(217,70,239,0.35), transparent 70%)",
             filter: "blur(45px)",
             opacity: 0.45,
             pointerEvents: "none",
@@ -1108,10 +1293,24 @@ export default function FreeQuizPage() {
                     border: "1px solid rgba(34,197,94,0.4)",
                   }}
                 >
-                  <div style={{ fontSize: "clamp(24px, 5vw, 32px)", fontWeight: 900, color: "#22c55e", marginBottom: 4 }}>
+                  <div
+                    style={{
+                      fontSize: "clamp(24px, 5vw, 32px)",
+                      fontWeight: 900,
+                      color: "#22c55e",
+                      marginBottom: "4px",
+                    }}
+                  >
                     {correctCount}
                   </div>
-                  <div style={{ fontSize: "clamp(10px, 2vw, 12px)", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                  <div
+                    style={{
+                      fontSize: "clamp(10px, 2vw, 12px)",
+                      color: "#94a3b8",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.1em",
+                    }}
+                  >
                     Correct
                   </div>
                 </div>
@@ -1124,10 +1323,24 @@ export default function FreeQuizPage() {
                     border: "1px solid rgba(239,68,68,0.4)",
                   }}
                 >
-                  <div style={{ fontSize: "clamp(24px, 5vw, 32px)", fontWeight: 900, color: "#ef4444", marginBottom: 4 }}>
+                  <div
+                    style={{
+                      fontSize: "clamp(24px, 5vw, 32px)",
+                      fontWeight: 900,
+                      color: "#ef4444",
+                      marginBottom: "4px",
+                    }}
+                  >
                     {wrongCount}
                   </div>
-                  <div style={{ fontSize: "clamp(10px, 2vw, 12px)", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                  <div
+                    style={{
+                      fontSize: "clamp(10px, 2vw, 12px)",
+                      color: "#94a3b8",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.1em",
+                    }}
+                  >
                     Wrong
                   </div>
                 </div>
@@ -1140,10 +1353,24 @@ export default function FreeQuizPage() {
                     border: "1px solid rgba(168,85,247,0.4)",
                   }}
                 >
-                  <div style={{ fontSize: "clamp(24px, 5vw, 32px)", fontWeight: 900, color: "#a78bfa", marginBottom: 4 }}>
+                  <div
+                    style={{
+                      fontSize: "clamp(24px, 5vw, 32px)",
+                      fontWeight: 900,
+                      color: "#a78bfa",
+                      marginBottom: "4px",
+                    }}
+                  >
                     {accuracy}%
                   </div>
-                  <div style={{ fontSize: "clamp(10px, 2vw, 12px)", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                  <div
+                    style={{
+                      fontSize: "clamp(10px, 2vw, 12px)",
+                      color: "#94a3b8",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.1em",
+                    }}
+                  >
                     Accuracy
                   </div>
                 </div>
@@ -1157,12 +1384,22 @@ export default function FreeQuizPage() {
                   marginBottom: "clamp(8px, 1.5vw, 12px)",
                 }}
               >
-                Great job! Come back next week for a new free quiz, or join our live competitions to keep playing! 🏆
+                Great job! Come back next week for a new free quiz, or join our
+                live competitions to keep playing! 🏆
               </p>
 
-              <div style={{ marginTop: 4, fontSize: "clamp(11px, 2vw, 12px)", color: "#9ca3af" }}>
+              <div
+                style={{
+                  marginTop: "4px",
+                  fontSize: "clamp(11px, 2vw, 12px)",
+                  color: "#9ca3af",
+                }}
+              >
                 Returning to home in{" "}
-                <span style={{ color: "#10b981", fontWeight: 800 }}>{finalTime}</span> seconds...
+                <span style={{ color: "#10b981", fontWeight: 800 }}>
+                  {finalTime}
+                </span>{" "}
+                seconds...
               </div>
 
               <button
@@ -1268,9 +1505,29 @@ export default function FreeQuizPage() {
                   boxShadow: "0 0 32px rgba(79,70,229,0.3)",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "clamp(10px, 2vw, 12px)" }}>
-                  <Target style={{ width: "clamp(16px, 3vw, 18px)", height: "clamp(16px, 3vw, 18px)", color: "#a78bfa" }} />
-                  <span style={{ fontSize: "clamp(11px, 2vw, 12px)", color: "#9ca3af", fontWeight: 600, letterSpacing: "0.16em" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: "clamp(10px, 2vw, 12px)",
+                  }}
+                >
+                  <Target
+                    style={{
+                      width: "clamp(16px, 3vw, 18px)",
+                      height: "clamp(16px, 3vw, 18px)",
+                      color: "#a78bfa",
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontSize: "clamp(11px, 2vw, 12px)",
+                      color: "#9ca3af",
+                      fontWeight: 600,
+                      letterSpacing: "0.16em",
+                    }}
+                  >
                     QUESTION {currentIndex + 1} / {TOTAL_QUESTIONS}
                   </span>
                 </div>
@@ -1296,41 +1553,28 @@ export default function FreeQuizPage() {
                   }}
                 >
                   {(["a", "b", "c", "d"] as OptionId[]).map((optId) => {
-                    const optText = currentQ[`option_${optId}` as keyof Question] as string;
+                    const optText = (currentQ as any)[`option_${optId}`] as
+                      | string
+                      | null;
                     const isSelected = selectedAnswer === optId;
-                    const isCorrectOpt = optId === currentQ.correct_option;
 
                     let borderColor = "rgba(129,140,248,0.6)";
                     let boxShadow = "0 0 10px rgba(15,23,42,0.9)";
                     let bg =
                       "linear-gradient(135deg, rgba(9,9,18,0.98), rgba(15,23,42,0.98))";
 
-                    // lock visuals (keeps design, adds correctness highlight)
-                    if (isAnswerLocked) {
-                      if (isCorrectOpt) {
-                        borderColor = "#22c55e";
-                        boxShadow = "0 0 16px rgba(34,197,94,0.7)";
-                        bg = "linear-gradient(135deg, rgba(22,163,74,0.16), rgba(6,8,20,1))";
-                      } else if (isSelected && !isCorrectOpt) {
-                        borderColor = "#ef4444";
-                        boxShadow = "0 0 16px rgba(239,68,68,0.7)";
-                        bg = "linear-gradient(135deg, rgba(127,29,29,0.2), rgba(6,8,20,1))";
-                      } else {
-                        borderColor = "rgba(75,85,99,0.5)";
-                        boxShadow = "none";
-                        bg = "linear-gradient(135deg, rgba(9,9,18,0.9), rgba(15,23,42,0.96))";
-                      }
-                    } else if (isSelected) {
+                    if (isSelected) {
                       borderColor = "#d946ef";
                       boxShadow = "0 0 16px rgba(217,70,239,0.7)";
-                      bg = "linear-gradient(135deg, rgba(24,24,48,1), rgba(15,23,42,1))";
+                      bg =
+                        "linear-gradient(135deg, rgba(24,24,48,1), rgba(15,23,42,1))";
                     }
 
                     return (
                       <button
                         key={optId}
                         onClick={() => handleAnswerClick(optId)}
-                        disabled={isAnswerLocked}
+                        disabled={selectedAnswer !== null}
                         style={{
                           position: "relative",
                           padding: "clamp(12px, 2.5vw, 14px)",
@@ -1339,11 +1583,10 @@ export default function FreeQuizPage() {
                           background: bg,
                           color: "#e5e7eb",
                           textAlign: "left",
-                          cursor: isAnswerLocked ? "default" : "pointer",
+                          cursor: selectedAnswer !== null ? "default" : "pointer",
                           boxShadow,
                           transition: "all 0.22s",
                           overflow: "hidden",
-                          opacity: isAnswerLocked && !isSelected && !isCorrectOpt ? 0.6 : 1,
                         }}
                       >
                         <div
@@ -1355,7 +1598,8 @@ export default function FreeQuizPage() {
                             pointerEvents: "none",
                           }}
                         />
-                        {!isAnswerLocked && (
+
+                        {selectedAnswer === null && (
                           <div
                             style={{
                               position: "absolute",
@@ -1393,18 +1637,12 @@ export default function FreeQuizPage() {
                               fontWeight: 800,
                               background: "rgba(10,16,30,1)",
                               boxShadow: "0 2px 8px rgba(15,23,42,0.9)",
-                              color:
-                                isAnswerLocked && isCorrectOpt
-                                  ? "#22c55e"
-                                  : isAnswerLocked && isSelected && !isCorrectOpt
-                                  ? "#ef4444"
-                                  : "#a78bfa",
+                              color: "#a78bfa",
                               flexShrink: 0,
                             }}
                           >
                             {optId.toUpperCase()}
                           </div>
-
                           <div
                             style={{
                               fontSize: "clamp(12px, 2.5vw, 13px)",
@@ -1413,7 +1651,7 @@ export default function FreeQuizPage() {
                               lineHeight: 1.4,
                             }}
                           >
-                            {optText}
+                            {optText ?? ""}
                           </div>
                         </div>
                       </button>
@@ -1422,7 +1660,6 @@ export default function FreeQuizPage() {
                 </div>
               </div>
 
-              {/* Progress Dots */}
               <div
                 style={{
                   display: "flex",
@@ -1465,7 +1702,14 @@ export default function FreeQuizPage() {
           {/* EXPLANATION */}
           {phase === "EXPLANATION" && currentQ && (
             <>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "clamp(12px, 2vw, 16px)" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: "clamp(12px, 2vw, 16px)",
+                }}
+              >
                 <div
                   style={{
                     padding: "clamp(8px, 1.5vw, 10px) clamp(16px, 3vw, 20px)",
@@ -1478,8 +1722,20 @@ export default function FreeQuizPage() {
                     gap: "10px",
                   }}
                 >
-                  <Clock style={{ width: "clamp(16px, 3vw, 18px)", height: "clamp(16px, 3vw, 18px)", color: "#38bdf8" }} />
-                  <span style={{ fontSize: "clamp(14px, 3vw, 16px)", fontWeight: 700, color: "#38bdf8" }}>
+                  <Clock
+                    style={{
+                      width: "clamp(16px, 3vw, 18px)",
+                      height: "clamp(16px, 3vw, 18px)",
+                      color: "#38bdf8",
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontSize: "clamp(14px, 3vw, 16px)",
+                      fontWeight: 700,
+                      color: "#38bdf8",
+                    }}
+                  >
                     Next in {explanationTime}s
                   </span>
                 </div>
@@ -1492,7 +1748,8 @@ export default function FreeQuizPage() {
                   padding: "clamp(18px, 3vw, 22px)",
                   borderRadius: "clamp(20px, 3vw, 24px)",
                   border: "1px solid rgba(56,189,248,0.4)",
-                  background: "linear-gradient(135deg, rgba(8,47,73,0.96), rgba(6,8,20,1))",
+                  background:
+                    "linear-gradient(135deg, rgba(8,47,73,0.96), rgba(6,8,20,1))",
                   boxShadow: "0 0 36px rgba(56,189,248,0.3)",
                 }}
               >
@@ -1503,15 +1760,31 @@ export default function FreeQuizPage() {
                     gap: "8px",
                     padding: "clamp(8px, 1.5vw, 10px) clamp(14px, 2.5vw, 18px)",
                     borderRadius: 9999,
-                    background: isCorrect ? "rgba(22,163,74,0.2)" : "rgba(127,29,29,0.2)",
-                    border: isCorrect ? "1px solid #22c55e" : "1px solid #ef4444",
+                    background: isCorrect
+                      ? "rgba(22,163,74,0.2)"
+                      : "rgba(127,29,29,0.2)",
+                    border: isCorrect
+                      ? "1px solid #22c55e"
+                      : "1px solid #ef4444",
                     marginBottom: "clamp(14px, 2.5vw, 18px)",
                   }}
                 >
                   {isCorrect ? (
-                    <CheckCircle style={{ width: "clamp(16px, 3vw, 18px)", height: "clamp(16px, 3vw, 18px)", color: "#22c55e" }} />
+                    <CheckCircle
+                      style={{
+                        width: "clamp(16px, 3vw, 18px)",
+                        height: "clamp(16px, 3vw, 18px)",
+                        color: "#22c55e",
+                      }}
+                    />
                   ) : (
-                    <XCircle style={{ width: "clamp(16px, 3vw, 18px)", height: "clamp(16px, 3vw, 18px)", color: "#ef4444" }} />
+                    <XCircle
+                      style={{
+                        width: "clamp(16px, 3vw, 18px)",
+                        height: "clamp(16px, 3vw, 18px)",
+                        color: "#ef4444",
+                      }}
+                    />
                   )}
                   <span
                     style={{
@@ -1527,7 +1800,15 @@ export default function FreeQuizPage() {
                 </div>
 
                 <div style={{ marginBottom: "clamp(12px, 2vw, 16px)" }}>
-                  <div style={{ fontSize: "clamp(11px, 2vw, 12px)", color: "#94a3b8", fontWeight: 600, letterSpacing: "0.12em", marginBottom: 6 }}>
+                  <div
+                    style={{
+                      fontSize: "clamp(11px, 2vw, 12px)",
+                      color: "#94a3b8",
+                      fontWeight: 600,
+                      letterSpacing: "0.12em",
+                      marginBottom: "6px",
+                    }}
+                  >
                     CORRECT ANSWER
                   </div>
                   <div
@@ -1558,24 +1839,50 @@ export default function FreeQuizPage() {
                     >
                       {currentQ.correct_option.toUpperCase()}
                     </div>
-
-                    <div style={{ fontSize: "clamp(13px, 2.5vw, 14px)", fontWeight: 600, color: "#e5e7eb" }}>
-                      {currentQ[`option_${currentQ.correct_option}` as keyof Question] as string}
+                    <div
+                      style={{
+                        fontSize: "clamp(13px, 2.5vw, 14px)",
+                        fontWeight: 600,
+                        color: "#e5e7eb",
+                      }}
+                    >
+                      {(currentQ as any)[`option_${currentQ.correct_option}`] ?? ""}
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <div style={{ fontSize: "clamp(11px, 2vw, 12px)", color: "#94a3b8", fontWeight: 600, letterSpacing: "0.12em", marginBottom: 8 }}>
+                  <div
+                    style={{
+                      fontSize: "clamp(11px, 2vw, 12px)",
+                      color: "#94a3b8",
+                      fontWeight: 600,
+                      letterSpacing: "0.12em",
+                      marginBottom: "8px",
+                    }}
+                  >
                     EXPLANATION
                   </div>
-                  <p style={{ fontSize: "clamp(13px, 2.5vw, 14px)", lineHeight: 1.6, color: "#cbd5e1" }}>
+                  <p
+                    style={{
+                      fontSize: "clamp(13px, 2.5vw, 14px)",
+                      lineHeight: 1.6,
+                      color: "#cbd5e1",
+                    }}
+                  >
                     {currentQ.explanation}
                   </p>
                 </div>
               </div>
 
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "clamp(6px, 1.5vw, 8px)", justifyContent: "center" }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "clamp(6px, 1.5vw, 8px)",
+                  justifyContent: "center",
+                }}
+              >
                 {answers.map((st, i) => {
                   let bg = "rgba(75,85,99,0.3)";
                   if (st === "correct") bg = "#22c55e";
