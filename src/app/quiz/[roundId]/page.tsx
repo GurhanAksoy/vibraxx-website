@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
-import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import ShareButtons from "@/components/ShareButtons";
 import {
@@ -19,11 +18,10 @@ import {
 } from "lucide-react";
 
 // === CONFIGURATION ===
-const TOTAL_QUESTIONS = 20; // ✅ KANONIK: 20 questions
 const QUESTION_DURATION = 6; // seconds
-const FINAL_SCORE_DURATION = 15; // ✅ KANONIK: 15 seconds premium // seconds - 10 seconds for user to see results and choose action
+const FINAL_SCORE_DURATION = 15; // seconds
 
-type OptionId = "a" | "b" | "c" | "d"; // ✅ KANONIK: lowercase
+type OptionId = "a" | "b" | "c" | "d";
 type AnswerStatus = "none" | "correct" | "wrong";
 
 interface Question {
@@ -47,7 +45,8 @@ export default function QuizGamePage() {
   const params = useParams();
   
   // ✅ PROFESSIONAL: RoundId from URL (NO MAGIC!)
-  const roundId = params?.roundId ? parseInt(params.roundId as string) : null;
+  const roundIdParam = params?.roundId ? parseInt(params.roundId as string) : null;
+  const roundId = roundIdParam && Number.isFinite(roundIdParam) ? roundIdParam : null;
 
   // 🔐 === SECURITY STATE ===
   const [isVerifying, setIsVerifying] = useState(true);
@@ -55,45 +54,38 @@ export default function QuizGamePage() {
 
   // === STATE ===
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [totalQuestions, setTotalQuestions] = useState(TOTAL_QUESTIONS);
   const [isLoading, setIsLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(QUESTION_DURATION);
   const [selectedAnswer, setSelectedAnswer] = useState<OptionId | null>(null);
   const [isAnswerLocked, setIsAnswerLocked] = useState(false);
-  const [isCorrect, setIsCorrect] = useState(false);
 
-  // ✅ KANONIK: Store explanation data from submit_answer
+  // DB-driven scores (no local increment)
+  const [totalScore, setTotalScore] = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [wrongCount, setWrongCount] = useState(0);
+
+  // Current question feedback from submit_answer
   const [currentCorrectOption, setCurrentCorrectOption] = useState<OptionId | null>(null);
   const [currentExplanation, setCurrentExplanation] = useState<string>("");
+  const [isCorrect, setIsCorrect] = useState(false);
 
   const [showExplanation, setShowExplanation] = useState(false);
-
   const [showFinalScore, setShowFinalScore] = useState(false);
   const [finalCountdown, setFinalCountdown] = useState(FINAL_SCORE_DURATION);
 
   const [answers, setAnswers] = useState<AnswerStatus[]>([]);
-
-  const [correctCount, setCorrectCount] = useState(0);
-  const [wrongCount, setWrongCount] = useState(0);
-  const [streak, setStreak] = useState(0);
-  const [maxStreak, setMaxStreak] = useState(0);
-
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
-  const [userRounds, setUserRounds] = useState(0);
-  const [user, setUser] = useState<any>(null); // User state for share buttons
+  const [user, setUser] = useState<any>(null);
 
-  // 🔥 NEW: Live sync state variables
-  const [phase, setPhase] = useState<string>("READY");
-  // ❌ REMOVED: roundId state - Now from URL params!
+  // Final results from DB
+  const [finalRank, setFinalRank] = useState<number | null>(null);
+  const [finalTotalPlayers, setFinalTotalPlayers] = useState<number | null>(null);
   
-  // Stats only once guard
-  const statsSavedRef = useRef(false);
-  
-  // ✅ FIXED: Timeout double-trigger protection
+  // Timeout guard
   const timeoutTriggeredRef = useRef(false);
-  const answerSubmittedRef = useRef<Set<number>>(new Set()); // ✅ KANONIK: Track submitted answers
+  const answerSubmittedRef = useRef<Set<number>>(new Set());
 
   // === AUDIO REFS ===
   const correctSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -110,6 +102,20 @@ export default function QuizGamePage() {
     const verifyAccess = async () => {
       try {
         console.log("🔐 Starting security verification...");
+
+        // ✅ BROWSER ACCESS GUARD: Block direct URL access
+        // Quiz can only be accessed from lobby redirect
+        const navigationEntry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming;
+        if (navigationEntry && navigationEntry.type === "navigate") {
+          const referrer = document.referrer;
+          const isFromLobby = referrer && referrer.includes("/lobby");
+          
+          if (!isFromLobby && !referrer.includes("/quiz/")) {
+            console.log("❌ Quiz Security: Direct browser access blocked");
+            router.push("/lobby");
+            return;
+          }
+        }
 
         const {
           data: { user },
@@ -138,12 +144,12 @@ export default function QuizGamePage() {
   }, [router]);
 
   // ============================================
-  // 🔐 KANONIK SECURITY + QUESTIONS (NO MAGIC!)
+  // 🔐 KANONIK: LOAD QUIZ DATA (DB = COMMANDER)
   // ============================================
   useEffect(() => {
     const loadQuizData = async () => {
       try {
-        // ✅ CHECK 0: roundId from URL must exist
+        // Check: roundId from URL must exist
         if (!roundId) {
           console.log("❌ [QUIZ] No roundId in URL");
           router.push("/lobby");
@@ -152,46 +158,18 @@ export default function QuizGamePage() {
 
         if (!securityPassed) return;
 
-        console.log("📝 [QUIZ] Loading questions for round:", roundId);
+        console.log("📝 [QUIZ] Loading quiz for round:", roundId);
 
-        // ✅ CHECK 1: Verify round exists and is live
-        const { data: round, error: roundError } = await supabase
-          .from("rounds")
-          .select("id, status, scheduled_start")
-          .eq("id", roundId)
-          .single();
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser();
 
-        if (roundError || !round) {
-          console.error("❌ [QUIZ] Round not found:", roundError);
+        if (!authUser) {
           router.push("/lobby");
           return;
         }
 
-        if (round.status !== "live") {
-          console.error("❌ [QUIZ] Round not active:", round.status);
-          router.push("/lobby");
-          return;
-        }
-
-        console.log("✅ [QUIZ] Round verified:", round.id);
-
-        // ✅ CHECK 2: Verify participation
-        const { data: participant } = await supabase
-          .from("round_participants")
-          .select("round_id")
-          .eq("round_id", roundId)
-          .eq("user_id", user?.id)
-          .maybeSingle();
-
-        if (!participant) {
-          console.error("❌ [QUIZ] Not a participant");
-          router.push("/lobby");
-          return;
-        }
-
-        console.log("✅ [QUIZ] Participant verified");
-
-        // ✅ STEP 3: Get questions via KANONIK RPC
+        // ✅ STEP 1: Get questions (DB checks everything)
         const { data: questionsData, error: questionsError } = await supabase
           .rpc("get_round_questions", {
             p_round_id: roundId
@@ -205,12 +183,41 @@ export default function QuizGamePage() {
 
         console.log(`✅ [QUIZ] Loaded ${questionsData.length} questions`);
 
-        // ✅ Format questions (keep as-is from RPC)
+        // ✅ STEP 2: Get round progress (comprehensive restore)
+        const { data: progress, error: progressError } = await supabase
+          .rpc("get_round_progress", {
+            p_round_id: roundId
+          });
+
+        let normalizedAnswers = Array(questionsData.length).fill("none");
+
+        if (!progressError && progress) {
+          console.log(`✅ [QUIZ] Progress restored:`, progress);
+          
+          // Restore all state from DB
+          setCurrentIndex(progress.current_index || 0);
+          setCorrectCount(progress.correct_count || 0);
+          setWrongCount(progress.wrong_count || 0);
+          setTotalScore(progress.total_score || 0);
+          
+          // ✅ Normalize answers array (copy up to min length)
+          if (progress.answers_array && Array.isArray(progress.answers_array)) {
+            const copyLength = Math.min(progress.answers_array.length, questionsData.length);
+            for (let i = 0; i < copyLength; i++) {
+              normalizedAnswers[i] = progress.answers_array[i] || "none";
+            }
+          }
+        } else {
+          // Fresh start
+          setCurrentIndex(0);
+          setCorrectCount(0);
+          setWrongCount(0);
+          setTotalScore(0);
+        }
+
+        // Set normalized answers and questions
+        setAnswers(normalizedAnswers);
         setQuestions(questionsData);
-        setTotalQuestions(questionsData.length);
-        setAnswers(Array(questionsData.length).fill("none"));
-        setPhase("QUESTION");
-        setCurrentIndex(0);
         setTimeLeft(QUESTION_DURATION);
         timeoutTriggeredRef.current = false;
         setIsLoading(false);
@@ -222,46 +229,9 @@ export default function QuizGamePage() {
     };
 
     loadQuizData();
-  }, [securityPassed, roundId, router, user]);
+  }, [securityPassed, roundId, router]);
 
-  // === FETCH USER ROUNDS ===
-  useEffect(() => {
-    const fetchUserRounds = async () => {
-      try {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        
-        if (!authUser) {
-          setUserRounds(0);
-          return;
-        }
-
-        const { data: credits, error } = await supabase
-          .from("user_credits")
-          .select("live_credits")
-          .eq("user_id", authUser.id)
-          .single();
-
-        if (error) {
-          console.error("Error fetching user credits:", error);
-          setUserRounds(0);
-          return;
-        }
-
-        setUserRounds(credits?.live_credits || 0);
-      } catch (err) {
-        console.error("Error fetching user credits:", err);
-        setUserRounds(0);
-      }
-    };
-
-    fetchUserRounds();
-  }, []);
-
-  // === SUBMIT ROUND RESULT (replaces saveAnswer, updateUserStats, saveStatsOnce) ===
-  // ❌ REMOVED: submitRoundResult - Using incremental submit_answer instead
-  // Each answer is submitted immediately via submit_answer RPC
-
-  // === SOUND HELPERS ===
+  // === SIMPLE QUESTION TIMER ===
   const playSound = (
     audio: HTMLAudioElement | null,
     options?: { loop?: boolean }
@@ -287,50 +257,66 @@ export default function QuizGamePage() {
   const startTick = () => playSound(tickSoundRef.current, { loop: true });
   const stopTick = () => stopSound(tickSoundRef.current);
 
-  // === SIMPLE QUESTION TIMER (replaces realtime sync) ===
+  // === FLASH FEEDBACK (Screen Pulse) ===
+  const flashScreen = (color: string) => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position: fixed;
+      inset: 0;
+      background: ${color};
+      opacity: 0.15;
+      pointer-events: none;
+      z-index: 9999;
+      animation: flashFade 200ms ease-out;
+    `;
+    document.body.appendChild(overlay);
+    setTimeout(() => overlay.remove(), 200);
+  };
+
+  // === SIMPLE QUESTION TIMER ===
   useEffect(() => {
-    if (isLoading || showExplanation || showFinalScore || !currentQ || phase !== "QUESTION") return;
+    if (isLoading || showExplanation || showFinalScore || !currentQ) return;
 
     if (timeLeft > 0 && !isAnswerLocked) {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
       return () => clearTimeout(timer);
     } else if (timeLeft === 0 && !isAnswerLocked && !timeoutTriggeredRef.current) {
-      // Time's up - auto submit wrong answer
+      // Time's up - auto submit
       console.log("⏱️ Time expired, auto-submitting...");
       timeoutTriggeredRef.current = true;
       handleTimeout();
     }
-  }, [timeLeft, isLoading, showExplanation, showFinalScore, isAnswerLocked, currentQ, phase]);
+  }, [timeLeft, isLoading, showExplanation, showFinalScore, isAnswerLocked, currentQ]);
 
   // Start/stop tick by UI state
   useEffect(() => {
     if (
-      phase === "QUESTION" &&
       !isAnswerLocked &&
       isSoundEnabled &&
       !showFinalScore &&
       !showExplanation &&
-      timeLeft > 0
+      timeLeft > 0 &&
+      !isLoading
     ) {
       startTick();
     } else {
       stopTick();
     }
   }, [
-    phase,
     isAnswerLocked,
     isSoundEnabled,
     showFinalScore,
     showExplanation,
     timeLeft,
+    isLoading,
   ]);
 
   // === EXPLANATION TIMER (5 seconds) ===
   useEffect(() => {
     if (showExplanation && !showFinalScore) {
-      const timer = setTimeout(() => {
+      const timer = setTimeout(async () => {
         // Move to next question or finish quiz
-        if (currentIndex < totalQuestions - 1) {
+        if (currentIndex < questions.length - 1) {
           playSound(whooshSoundRef.current);
           setCurrentIndex(currentIndex + 1);
           setTimeLeft(QUESTION_DURATION);
@@ -339,17 +325,39 @@ export default function QuizGamePage() {
           setIsAnswerLocked(false);
           setShowExplanation(false);
           setCurrentCorrectOption(null);
-          setCurrentExplanation("");         
+          setCurrentExplanation("");
         } else {
-          // Quiz finished - submit results
-          // ✅ No need - answers already submitted incrementally
+          // Quiz finished - load results from DB
+          await loadFinalResults();
           setShowFinalScore(true);
         }
       }, 5000); // 5 seconds explanation
 
       return () => clearTimeout(timer);
     }
-  }, [showExplanation, showFinalScore, currentIndex, totalQuestions]);
+  }, [showExplanation, showFinalScore, currentIndex, questions.length, roundId]);
+
+  // === LOAD FINAL RESULTS FROM DB ===
+  const loadFinalResults = async () => {
+    if (!roundId) return;
+
+    try {
+      const { data, error } = await supabase.rpc("get_round_result", {
+        p_round_id: roundId
+      });
+
+      if (!error && data) {
+        console.log("✅ Final results loaded:", data);
+        setTotalScore(data.total_score || 0);
+        setCorrectCount(data.correct_count || 0);
+        setWrongCount(data.wrong_count || 0);
+        setFinalRank(data.rank || null);
+        setFinalTotalPlayers(data.total_players || null);
+      }
+    } catch (err) {
+      console.error("❌ Error loading final results:", err);
+    }
+  };
 
 
   // ✅ FIXED: Stabilized final score countdown
@@ -389,10 +397,10 @@ export default function QuizGamePage() {
       stopTick();
       return;
     }
-    if (phase === "QUESTION" && timeLeft > 0) {
+    if (timeLeft > 0 && !isLoading && !showExplanation) {
       startTick();
     }
-  }, [isSoundEnabled, phase, timeLeft]);
+  }, [isSoundEnabled, timeLeft, isLoading, showExplanation]);
 
   // Stop tick safety
   useEffect(() => {
@@ -438,8 +446,21 @@ export default function QuizGamePage() {
         setCurrentCorrectOption(data.correct_option);
         setCurrentExplanation(data.explanation || "");
 
+        // ✅ KANONIK: Update from DB (no local increment)
+        setTotalScore(data.current_total_score || 0);
+        setCorrectCount(data.correct_count || 0);
+        setWrongCount(data.wrong_count || 0);
+
+        // ✅ Check if round finished (from backend)
+        if (data.round_finished) {
+          console.log("🏁 Round finished by DB");
+          await loadFinalResults();
+          setShowFinalScore(true);
+          return;
+        }
+
         setAnswers((prev) => {
-          const next = prev.length ? [...prev] : Array(totalQuestions).fill("none");
+          const next = prev.length ? [...prev] : Array(questions.length).fill("none");
           if (currentIndex >= 0 && currentIndex < next.length) {
             next[currentIndex] = correctFlag ? "correct" : "wrong";
           }
@@ -447,15 +468,11 @@ export default function QuizGamePage() {
         });
 
         if (correctFlag) {
-          setCorrectCount((c) => c + 1);
-          const newStreak = streak + 1;
-          setStreak(newStreak);
-          setMaxStreak((max) => Math.max(max, newStreak));
           playSound(correctSoundRef.current);
+          flashScreen('rgba(34, 197, 94, 1)'); // Green flash
         } else {
-          setWrongCount((w) => w + 1);
-          setStreak(0);
           playSound(wrongSoundRef.current);
+          flashScreen('rgba(239, 68, 68, 1)'); // Red flash
         }
       }
     } catch (err) {
@@ -475,12 +492,12 @@ export default function QuizGamePage() {
     answerSubmittedRef.current.add(currentQ.question_id);
 
     try {
-      // ✅ KANONIK: submit_answer with timeout
+      // ✅ KANONIK: submit_answer with null (timeout)
       const { data, error } = await supabase.rpc("submit_answer", {
         p_round_id: roundId,
         p_question_id: currentQ.question_id,
-        p_selected_option: "a", // Default timeout answer
-        p_answer_time_ms: 6000
+        p_selected_option: null,
+        p_answer_time_ms: QUESTION_DURATION * 1000
       });
 
       if (!error && data) {
@@ -488,11 +505,13 @@ export default function QuizGamePage() {
         setCurrentCorrectOption(data.correct_option);
         setCurrentExplanation(data.explanation || "");
         
-        setWrongCount((w) => w + 1);
-        setStreak(0);
+        // ✅ KANONIK: Update from DB
+        setTotalScore(data.current_total_score || 0);
+        setCorrectCount(data.correct_count || 0);
+        setWrongCount(data.wrong_count || 0);
 
         setAnswers((prev) => {
-          const next = prev.length ? [...prev] : Array(totalQuestions).fill("none");
+          const next = prev.length ? [...prev] : Array(questions.length).fill("none");
           if (currentIndex >= 0 && currentIndex < next.length) {
             next[currentIndex] = "wrong";
           }
@@ -500,6 +519,7 @@ export default function QuizGamePage() {
         });
 
         playSound(wrongSoundRef.current);
+        flashScreen('rgba(239, 68, 68, 1)'); // Red flash for timeout
       }
     } catch (err) {
       console.error("❌ Timeout submit error:", err);
@@ -519,8 +539,22 @@ export default function QuizGamePage() {
     playClick();
     stopTick();
     setShowExitConfirm(false);
-    // ✅ No need - answers already submitted incrementally
-    setShowFinalScore(true);
+
+    if (!roundId) return;
+
+    try {
+      // ✅ KANONIK: Force finish round (auto-submit remaining)
+      await supabase.rpc("force_finish_user_round", {
+        p_round_id: roundId
+      });
+
+      // Load final results
+      await loadFinalResults();
+      setShowFinalScore(true);
+    } catch (err) {
+      console.error("❌ Exit error:", err);
+      setShowFinalScore(true);
+    }
   };
 
   const handleExitConfirmNo = () => {
@@ -541,11 +575,9 @@ export default function QuizGamePage() {
     return "#ef4444";
   };
 
-  const accuracy =
-    totalQuestions > 0
-      ? Math.round((correctCount / totalQuestions) * 100)
-      : 0;
-  const score = correctCount * 2;
+  const accuracy = questions.length > 0
+    ? Math.round((correctCount / questions.length) * 100)
+    : 0;
 
   // 🔐 === SECURITY VERIFICATION SCREEN ===
   if (isVerifying) {
@@ -733,6 +765,15 @@ export default function QuizGamePage() {
           }
         }
 
+        @keyframes flashFade {
+          0% {
+            opacity: 0.15;
+          }
+          100% {
+            opacity: 0;
+          }
+        }
+
         @keyframes shine {
           0% {
             transform: translateX(-150%) skewX(-25deg);
@@ -806,25 +847,6 @@ export default function QuizGamePage() {
         @media (min-width: 769px) {
           .brand-text {
             display: block !important;
-          }
-        }
-
-        @media (max-width: 768px) {
-          .brand-text {
-            display: block !important;
-          }
-          .header-wrap {
-            grid-template-columns: 1fr !important;
-            gap: 12px !important;
-          }
-          .header-center {
-            order: -1;
-          }
-          .header-right {
-            justify-content: space-between;
-          }
-          .question-grid {
-            grid-template-columns: 1fr !important;
           }
         }
 
@@ -924,344 +946,9 @@ export default function QuizGamePage() {
           }}
         />
 
-        {/* HEADER */}
-        <header
-          style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 30,
-            borderBottom: "2px solid rgba(139,92,246,0.2)",
-            backdropFilter: "blur(20px) saturate(180%)",
-            background: "rgba(15,23,42,0.85)",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
-          }}
-        >
-          <div
-            style={{
-              maxWidth: "1400px",
-              margin: "0 auto",
-              padding: "0 clamp(16px, 4vw, 24px)",
-            }}
-          >
-            <div
-              className="header-wrap"
-              style={{
-                display: "grid",
-                gridTemplateColumns: "auto 1fr auto",
-                alignItems: "center",
-                minHeight: "clamp(70px, 15vw, 80px)",
-                gap: "clamp(12px, 3vw, 16px)",
-                padding: "clamp(8px, 2vw, 12px) 0",
-              }}
-            >
-              {/* Logo & Brand */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "clamp(10px, 2.5vw, 12px)",
-                  flexShrink: 0,
-                }}
-              >
-                <div
-                  style={{
-                    position: "relative",
-                    width: "clamp(62px, 13vw, 78px)",
-                    height: "clamp(62px, 13vw, 78px)",
-                    borderRadius: "50%",
-                    padding: 2,
-                    background:
-                      "linear-gradient(135deg, #7c3aed, #d946ef)",
-                    boxShadow: "0 0 20px rgba(124, 58, 237, 0.7)",
-                    flexShrink: 0,
-                  }}
-                >
-                  <div
-                    style={{
-                      position: "relative",
-                      width: "100%",
-                      height: "100%",
-                      borderRadius: "50%",
-                      backgroundColor: "#020817",
-                      overflow: "hidden",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Image
-                      src="/images/logo.png"
-                      alt="VibraXX"
-                      fill
-                      sizes="78px"
-                      style={{ objectFit: "contain", padding: "4px" }}
-                      priority
-                    />
-                  </div>
-                </div>
-
-                <div
-                  className="brand-text"
-                  style={{
-                    display: "none",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: "clamp(10px, 2.2vw, 13px)",
-                      letterSpacing: "0.2em",
-                      textTransform: "uppercase",
-                      fontWeight: 900,
-                      background:
-                        "linear-gradient(90deg, #a78bfa, #d946ef, #22d3ee)",
-                      backgroundSize: "200% auto",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      animation: "shimmer 3s linear infinite",
-                    }}
-                  >
-                    LIVE QUIZ
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "clamp(9px, 2vw, 11px)",
-                      color: "#94a3b8",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Global Championship
-                  </div>
-                </div>
-              </div>
-
-              {/* Center: Question Progress */}
-              <div
-                className="header-center"
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: "clamp(4px, 1.5vw, 6px)",
-                  justifySelf: "center",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "clamp(14px, 3.5vw, 20px)",
-                    fontWeight: 900,
-                    letterSpacing: "0.15em",
-                    textTransform: "uppercase",
-                    background:
-                      "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)",
-                    backgroundSize: "200% auto",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    animation: "shimmer 2s linear infinite",
-                    textAlign: "center",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Q {currentIndex + 1}/{totalQuestions}
-                </div>
-                {streak > 1 && (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                      padding: "3px 8px",
-                      borderRadius: "999px",
-                      background:
-                        "linear-gradient(90deg, rgba(239,68,68,0.2), rgba(249,115,22,0.2))",
-                      border: "1px solid rgba(239,68,68,0.5)",
-                    }}
-                  >
-                    <Flame
-                      style={{
-                        width: "12px",
-                        height: "12px",
-                        color: "#fb923c",
-                      }}
-                    />
-                    <span
-                      style={{
-                        fontSize: "10px",
-                        fontWeight: 800,
-                        color: "#fbbf24",
-                      }}
-                    >
-                      {streak}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Right: Stats & Controls */}
-              <div
-                className="header-right"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "clamp(6px, 2vw, 10px)",
-                  flexShrink: 0,
-                }}
-              >
-                <div
-                  className="score-pills"
-                  style={{ display: "flex", gap: "clamp(4px, 1.5vw, 6px)" }}
-                >
-                  <div
-                    style={{
-                      padding:
-                        "clamp(4px, 1.5vw, 6px) clamp(8px, 2.5vw, 12px)",
-                      borderRadius: "999px",
-                      background:
-                        "linear-gradient(135deg, rgba(22,163,74,0.15), rgba(21,128,61,0.15))",
-                      border: "2px solid rgba(34,197,94,0.5)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                      boxShadow: "0 0 15px rgba(34,197,94,0.3)",
-                    }}
-                  >
-                    <CheckCircle
-                      style={{
-                        width: "clamp(12px, 3vw, 16px)",
-                        height: "clamp(12px, 3vw, 16px)",
-                        color: "#22c55e",
-                      }}
-                    />
-                    <span
-                      style={{
-                        fontSize: "clamp(11px, 2.5vw, 13px)",
-                        fontWeight: 900,
-                        color: "#22c55e",
-                      }}
-                    >
-                      {correctCount}
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      padding:
-                        "clamp(4px, 1.5vw, 6px) clamp(8px, 2.5vw, 12px)",
-                      borderRadius: "999px",
-                      background:
-                        "linear-gradient(135deg, rgba(220,38,38,0.15), rgba(185,28,28,0.15))",
-                      border: "2px solid rgba(239,68,68,0.5)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                      boxShadow: "0 0 15px rgba(239,68,68,0.3)",
-                    }}
-                  >
-                    <XCircle
-                      style={{
-                        width: "clamp(12px, 3vw, 16px)",
-                        height: "clamp(12px, 3vw, 16px)",
-                        color: "#ef4444",
-                      }}
-                    />
-                    <span
-                      style={{
-                        fontSize: "clamp(11px, 2.5vw, 13px)",
-                        fontWeight: 900,
-                        color: "#ef4444",
-                      }}
-                    >
-                      {wrongCount}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Sound Toggle */}
-                <button
-                  onClick={handleSoundToggle}
-                  className={isSoundEnabled ? "neon-border" : ""}
-                  style={{
-                    width: "clamp(36px, 10vw, 44px)",
-                    height: "clamp(36px, 10vw, 44px)",
-                    borderRadius: "12px",
-                    border: "2px solid rgba(167,139,250,0.6)",
-                    background: isSoundEnabled
-                      ? "linear-gradient(135deg, rgba(124,58,237,0.3), rgba(79,70,229,0.2))"
-                      : "rgba(30,27,75,0.5)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    transition:
-                      "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                    flexShrink: 0,
-                  }}
-                >
-                  {isSoundEnabled ? (
-                    <Volume2
-                      style={{
-                        width: "clamp(16px, 4vw, 20px)",
-                        height: "clamp(16px, 4vw, 20px)",
-                        color: "#a78bfa",
-                      }}
-                    />
-                  ) : (
-                    <VolumeX
-                      style={{
-                        width: "clamp(16px, 4vw, 20px)",
-                        height: "clamp(16px, 4vw, 20px)",
-                        color: "#6b7280",
-                      }}
-                    />
-                  )}
-                </button>
-
-                {!showFinalScore && (
-                  <button
-                    onClick={handleExitClick}
-                    className="neon-border"
-                    style={{
-                      padding:
-                        "clamp(8px, 2.5vw, 10px) clamp(12px, 4vw, 20px)",
-                      borderRadius: "999px",
-                      border: "2px solid rgba(239,68,68,0.6)",
-                      background:
-                        "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))",
-                      color: "white",
-                      fontSize: "clamp(10px, 2.5vw, 12px)",
-                      fontWeight: 800,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.1em",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      cursor: "pointer",
-                      transition:
-                        "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                      flexShrink: 0,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform =
-                        "translateY(-2px)";
-                      e.currentTarget.style.boxShadow =
-                        "0 0 30px rgba(239,68,68,0.6)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = "none";
-                    }}
-                  >
-                    <Zap
-                      style={{
-                        width: "clamp(12px, 3vw, 16px)",
-                        height: "clamp(12px, 3vw, 16px)",
-                      }}
-                    />
-                    <span>Exit</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </header>
+        {/* ═══════════════════════════════════════════════════════════ */}
+        {/* MINIMAL CONTROLS: Sound + Exit (No Header/Footer) */}
+        {/* ═══════════════════════════════════════════════════════════ */}
 
         {/* MAIN CONTENT */}
         <main
@@ -1273,6 +960,130 @@ export default function QuizGamePage() {
             padding: "clamp(20px, 5vw, 40px) clamp(16px, 4vw, 24px)",
           }}
         >
+          {/* ═══════════════════════════════════════════════════════════ */}
+          {/* FLOATING CONTROLS - Top Right */}
+          {/* ═══════════════════════════════════════════════════════════ */}
+          {!showFinalScore && (
+            <div
+              style={{
+                position: "fixed",
+                top: "clamp(16px, 4vw, 24px)",
+                right: "clamp(16px, 4vw, 24px)",
+                display: "flex",
+                gap: "clamp(8px, 2vw, 12px)",
+                zIndex: 50,
+              }}
+            >
+              {/* Sound Toggle */}
+              <button
+                onClick={handleSoundToggle}
+                style={{
+                  minWidth: "44px",
+                  minHeight: "44px",
+                  padding: "clamp(10px, 2vw, 12px)",
+                  borderRadius: "clamp(12px, 3vw, 14px)",
+                  border: `2px solid ${isSoundEnabled ? "rgba(167,139,250,0.6)" : "rgba(107,114,128,0.4)"}`,
+                  background: isSoundEnabled
+                    ? "linear-gradient(135deg, rgba(124,58,237,0.4), rgba(79,70,229,0.3))"
+                    : "rgba(30,27,75,0.7)",
+                  backdropFilter: "blur(10px)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  transition: "all 0.3s",
+                  boxShadow: isSoundEnabled
+                    ? "0 0 20px rgba(124,58,237,0.4)"
+                    : "0 4px 12px rgba(0,0,0,0.3)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "scale(1.05)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
+                }}
+              >
+                {isSoundEnabled ? (
+                  <Volume2
+                    style={{
+                      width: "clamp(20px, 4vw, 24px)",
+                      height: "clamp(20px, 4vw, 24px)",
+                      color: "#a78bfa",
+                    }}
+                  />
+                ) : (
+                  <VolumeX
+                    style={{
+                      width: "clamp(20px, 4vw, 24px)",
+                      height: "clamp(20px, 4vw, 24px)",
+                      color: "#6b7280",
+                    }}
+                  />
+                )}
+              </button>
+
+              {/* Exit Button */}
+              <button
+                onClick={handleExitClick}
+                style={{
+                  minWidth: "44px",
+                  minHeight: "44px",
+                  padding: "clamp(10px, 2vw, 12px) clamp(16px, 3vw, 20px)",
+                  borderRadius: "clamp(12px, 3vw, 14px)",
+                  border: "2px solid rgba(239,68,68,0.5)",
+                  background: "linear-gradient(135deg, rgba(220,38,38,0.4), rgba(185,28,28,0.3))",
+                  backdropFilter: "blur(10px)",
+                  color: "white",
+                  fontSize: "clamp(12px, 2.5vw, 14px)",
+                  fontWeight: 800,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  cursor: "pointer",
+                  transition: "all 0.3s",
+                  boxShadow: "0 0 20px rgba(239,68,68,0.3)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "scale(1.05)";
+                  e.currentTarget.style.boxShadow = "0 0 30px rgba(239,68,68,0.5)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
+                  e.currentTarget.style.boxShadow = "0 0 20px rgba(239,68,68,0.3)";
+                }}
+              >
+                <XCircle
+                  style={{
+                    width: "clamp(16px, 3vw, 18px)",
+                    height: "clamp(16px, 3vw, 18px)",
+                  }}
+                />
+                <span>Exit</span>
+              </button>
+            </div>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════ */}
+          {/* 🎖️ ROUND HEADER - Global Arena Feel */}
+          {/* ═══════════════════════════════════════════════════════════ */}
+          {!showFinalScore && (
+            <div
+              style={{
+                textAlign: "center",
+                marginBottom: "clamp(16px, 3vw, 20px)",
+                fontSize: "clamp(11px, 2.5vw, 13px)",
+                fontWeight: 900,
+                letterSpacing: "0.15em",
+                color: "#64748b",
+                textTransform: "uppercase",
+              }}
+            >
+              Round {roundId} • Question {currentIndex + 1}/{questions.length}
+            </div>
+          )}
+
           {/* CIRCULAR TIMER */}
           {!showFinalScore && (
             <div
@@ -1296,7 +1107,7 @@ export default function QuizGamePage() {
                     inset: 0,
                     borderRadius: "50%",
                     border: `4px solid ${getTimeColor()}`,
-                    boxShadow: `0 0 30px ${getTimeColor()}, inset 0 0 20px ${getTimeColor()}`,
+                    boxShadow: `0 0 20px ${getTimeColor()}, inset 0 0 15px ${getTimeColor()}`,
                     opacity: 0.8,
                   }}
                 />
@@ -1351,75 +1162,193 @@ export default function QuizGamePage() {
             </div>
           )}
 
-          {/* FINAL SCORE SCREEN */}
+          {/* ═══════════════════════════════════════════════════════════ */}
+          {/* 🎖️ LIVE SCORE - Mini Display */}
+          {/* ═══════════════════════════════════════════════════════════ */}
+          {!showFinalScore && (
+            <div
+              style={{
+                textAlign: "center",
+                marginTop: "clamp(-8px, -2vw, -4px)",
+                marginBottom: "clamp(20px, 4vw, 28px)",
+                fontSize: "clamp(12px, 2.8vw, 14px)",
+                fontWeight: 700,
+              }}
+            >
+              <span
+                style={{
+                  color: "#64748b",
+                  fontSize: "clamp(10px, 2.2vw, 11px)",
+                  fontWeight: 600,
+                  marginRight: "6px",
+                  letterSpacing: "0.1em",
+                }}
+              >
+                SCORE
+              </span>
+              <span
+                style={{
+                  color: "#a78bfa",
+                  fontSize: "clamp(14px, 3.2vw, 16px)",
+                  fontWeight: 900,
+                }}
+              >
+                {totalScore}
+              </span>
+              <span
+                style={{
+                  color: "#64748b",
+                  fontSize: "clamp(10px, 2.2vw, 11px)",
+                  marginLeft: "3px",
+                }}
+              >
+                pts
+              </span>
+            </div>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════ */}
+          {/* 🏆 ULTRA-PREMIUM FINAL SCORE CARD */}
+          {/* ═══════════════════════════════════════════════════════════ */}
           {showFinalScore ? (
             <article
               className="animate-slide-up"
               style={{
-                padding: "clamp(24px, 5vw, 32px)",
-                borderRadius: "clamp(20px, 4vw, 24px)",
-                border: "2px solid rgba(139,92,246,0.5)",
+                maxWidth: "min(480px, 95vw)",
+                margin: "0 auto",
+                padding: "clamp(32px, 6vw, 40px) clamp(24px, 5vw, 32px)",
+                borderRadius: "clamp(24px, 5vw, 32px)",
+                border: "2px solid rgba(251,191,36,0.4)",
                 background:
-                  "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)",
+                  "radial-gradient(circle at top, rgba(30,27,75,1), rgba(15,23,42,1))",
                 boxShadow:
-                  "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(139,92,246,0.4)",
+                  "0 30px 80px rgba(0,0,0,0.8), 0 0 40px rgba(251,191,36,0.2)",
                 textAlign: "center",
-                backdropFilter: "blur(20px)",
                 position: "relative",
                 overflow: "hidden",
               }}
             >
+              {/* Trophy Icon */}
               <div
                 style={{
-                  display: "inline-block",
-                  marginBottom: "clamp(16px, 3vw, 20px)",
+                  width: "clamp(80px, 16vw, 100px)",
+                  height: "clamp(80px, 16vw, 100px)",
+                  margin: "0 auto clamp(20px, 4vw, 24px)",
+                  borderRadius: "50%",
+                  background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow:
+                    "0 0 30px rgba(251,191,36,0.4), inset 0 0 20px rgba(255,255,255,0.2)",
+                  border: "3px solid rgba(255,255,255,0.3)",
                 }}
               >
                 <Trophy
                   style={{
-                    width: "clamp(48px, 10vw, 64px)",
-                    height: "clamp(48px, 10vw, 64px)",
-                    color: "#fbbf24",
-                    filter: "drop-shadow(0 0 20px #fbbf24)",
+                    width: "clamp(40px, 8vw, 50px)",
+                    height: "clamp(40px, 8vw, 50px)",
+                    color: "white",
                   }}
                 />
               </div>
 
+              {/* Title */}
               <h1
                 style={{
-                  fontSize: "clamp(20px, 4.5vw, 28px)",
+                  fontSize: "clamp(24px, 5.5vw, 32px)",
                   fontWeight: 900,
-                  marginBottom: "clamp(20px, 4vw, 28px)",
-                  backgroundImage:
-                    "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)",
+                  marginBottom: "clamp(8px, 2vw, 12px)",
+                  background: "linear-gradient(to right, #fbbf24, #f59e0b, #fbbf24)",
                   backgroundSize: "200% auto",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                  animation: "shimmer 3s linear infinite",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
+                  letterSpacing: "0.02em",
                 }}
               >
-                Round Complete!
+                Round Complete! 🎉
               </h1>
 
+              {/* Rank Display (if available) */}
+              {finalRank && finalTotalPlayers && (
+                <div
+                  style={{
+                    fontSize: "clamp(14px, 3vw, 16px)",
+                    color: "#cbd5e1",
+                    marginBottom: "clamp(20px, 4vw, 24px)",
+                    fontWeight: 600,
+                  }}
+                >
+                  Ranked <span style={{ color: "#fbbf24", fontWeight: 900 }}>#{finalRank}</span> of{" "}
+                  <span style={{ color: "#a78bfa" }}>{finalTotalPlayers}</span> players
+                </div>
+              )}
+
+              {/* Score Display - MEGA */}
+              <div
+                style={{
+                  padding: "clamp(20px, 4vw, 28px)",
+                  borderRadius: "clamp(20px, 4vw, 24px)",
+                  background: "linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.2))",
+                  border: "2px solid rgba(168,85,247,0.5)",
+                  boxShadow: "0 0 40px rgba(168,85,247,0.4)",
+                  marginBottom: "clamp(24px, 5vw, 32px)",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "clamp(12px, 2.5vw, 14px)",
+                    color: "#a78bfa",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.1em",
+                    marginBottom: "clamp(8px, 2vw, 12px)",
+                  }}
+                >
+                  Your Score
+                </div>
+                <div
+                  style={{
+                    fontSize: "clamp(56px, 12vw, 80px)",
+                    fontWeight: 900,
+                    background: "linear-gradient(135deg, #a78bfa, #d946ef)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    lineHeight: 1,
+                    textShadow: "0 0 40px rgba(168,85,247,0.8)",
+                  }}
+                >
+                  {totalScore}
+                </div>
+                <div
+                  style={{
+                    fontSize: "clamp(12px, 2.5vw, 14px)",
+                    color: "#cbd5e1",
+                    fontWeight: 600,
+                    marginTop: "clamp(4px, 1vw, 6px)",
+                  }}
+                >
+                  {accuracy}% Accuracy
+                </div>
+              </div>
+
+              {/* Stats Grid */}
               <div
                 style={{
                   display: "grid",
                   gridTemplateColumns: "repeat(2, 1fr)",
                   gap: "clamp(12px, 3vw, 16px)",
-                  marginBottom: "clamp(20px, 4vw, 24px)",
+                  marginBottom: "clamp(24px, 5vw, 32px)",
                 }}
               >
+                {/* Correct */}
                 <div
                   style={{
                     padding: "clamp(16px, 3.5vw, 20px)",
-                    borderRadius: "clamp(14px, 3vw, 16px)",
-                    background:
-                      "linear-gradient(135deg, rgba(22,163,74,0.2), rgba(21,128,61,0.15))",
-                    border: "2px solid rgba(34,197,94,0.5)",
-                    boxShadow: "0 0 20px rgba(34,197,94,0.3)",
+                    borderRadius: "clamp(16px, 3vw, 20px)",
+                    background: "rgba(22,163,74,0.15)",
+                    border: "2px solid rgba(34,197,94,0.4)",
+                    boxShadow: "0 0 20px rgba(34,197,94,0.2)",
                   }}
                 >
                   <CheckCircle
@@ -1427,19 +1356,16 @@ export default function QuizGamePage() {
                       width: "clamp(28px, 6vw, 36px)",
                       height: "clamp(28px, 6vw, 36px)",
                       color: "#22c55e",
-                      marginBottom: "clamp(6px, 1.5vw, 8px)",
-                      filter: "drop-shadow(0 0 10px #22c55e)",
+                      marginBottom: "clamp(8px, 2vw, 12px)",
                     }}
                   />
                   <div
                     style={{
-                      fontSize: "clamp(32px, 7vw, 48px)",
+                      fontSize: "clamp(36px, 8vw, 48px)",
                       fontWeight: 900,
                       color: "#22c55e",
                       lineHeight: 1,
                       marginBottom: "clamp(4px, 1vw, 6px)",
-                      textShadow:
-                        "0 0 15px rgba(34,197,94,0.6)",
                     }}
                   >
                     {correctCount}
@@ -1457,14 +1383,14 @@ export default function QuizGamePage() {
                   </div>
                 </div>
 
+                {/* Wrong */}
                 <div
                   style={{
                     padding: "clamp(16px, 3.5vw, 20px)",
-                    borderRadius: "clamp(14px, 3vw, 16px)",
-                    background:
-                      "linear-gradient(135deg, rgba(220,38,38,0.2), rgba(185,28,28,0.15))",
-                    border: "2px solid rgba(239,68,68,0.5)",
-                    boxShadow: "0 0 20px rgba(239,68,68,0.3)",
+                    borderRadius: "clamp(16px, 3vw, 20px)",
+                    background: "rgba(220,38,38,0.15)",
+                    border: "2px solid rgba(239,68,68,0.4)",
+                    boxShadow: "0 0 20px rgba(239,68,68,0.2)",
                   }}
                 >
                   <XCircle
@@ -1472,19 +1398,16 @@ export default function QuizGamePage() {
                       width: "clamp(28px, 6vw, 36px)",
                       height: "clamp(28px, 6vw, 36px)",
                       color: "#ef4444",
-                      marginBottom: "clamp(6px, 1.5vw, 8px)",
-                      filter: "drop-shadow(0 0 10px #ef4444)",
+                      marginBottom: "clamp(8px, 2vw, 12px)",
                     }}
                   />
                   <div
                     style={{
-                      fontSize: "clamp(32px, 7vw, 48px)",
+                      fontSize: "clamp(36px, 8vw, 48px)",
                       fontWeight: 900,
                       color: "#ef4444",
                       lineHeight: 1,
                       marginBottom: "clamp(4px, 1vw, 6px)",
-                      textShadow:
-                        "0 0 15px rgba(239,68,68,0.6)",
                     }}
                   >
                     {wrongCount}
@@ -1503,15 +1426,15 @@ export default function QuizGamePage() {
                 </div>
               </div>
 
-              {/* ✨ SHARE YOUR SCORE */}
-              <div style={{ marginTop: 'clamp(20px, 4vw, 24px)', marginBottom: 'clamp(20px, 4vw, 24px)', width: '100%' }}>
+              {/* Share Buttons */}
+              <div style={{ marginBottom: "clamp(20px, 4vw, 24px)" }}>
                 <ShareButtons
                   scoreData={{
-                    score: correctCount * 2,
+                    score: totalScore,
                     correct: correctCount,
                     wrong: wrongCount,
-                    accuracy: Math.round((correctCount / totalQuestions) * 100),
-                    userName: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Anonymous',
+                    accuracy,
+                    userName: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Player',
                     userCountry: user?.user_metadata?.country || '🌍',
                     roundId: roundId ?? undefined,
                   }}
@@ -1519,197 +1442,51 @@ export default function QuizGamePage() {
                 />
               </div>
 
+              {/* Auto-redirect countdown */}
               <div
                 style={{
-                  padding:
-                    "clamp(12px, 2.5vw, 14px) clamp(16px, 3.5vw, 20px)",
-                  borderRadius: "clamp(12px, 2.5vw, 14px)",
-                  background: "rgba(124,58,237,0.15)",
-                  border: "1px solid rgba(139,92,246,0.4)",
-                  marginBottom: "clamp(20px, 4vw, 24px)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
+                  fontSize: "clamp(12px, 2.5vw, 14px)",
+                  color: "#94a3b8",
+                  marginBottom: "clamp(16px, 3vw, 20px)",
                 }}
               >
-                <span
-                  style={{
-                    fontSize: "clamp(13px, 3vw, 15px)",
-                    color: "#cbd5e1",
-                    fontWeight: 600,
-                  }}
-                >
-                  You have
-                </span>
-                <span
-                  style={{
-                    fontSize: "clamp(18px, 4vw, 22px)",
-                    fontWeight: 900,
-                    color: "#a78bfa",
-                    textShadow:
-                      "0 0 10px rgba(167,139,250,0.6)",
-                  }}
-                >
-                  {userRounds}
-                </span>
-                <span
-                  style={{
-                    fontSize: "clamp(13px, 3vw, 15px)",
-                    color: "#cbd5e1",
-                    fontWeight: 600,
-                  }}
-                >
-                  rounds left
+                Returning home in{" "}
+                <span style={{ color: "#22c55e", fontWeight: 700 }}>
+                  {finalCountdown}s
                 </span>
               </div>
 
-              <div
+              {/* Action Button */}
+              <button
+                onClick={() => router.push("/")}
                 style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "clamp(10px, 2.5vw, 12px)",
-                  marginBottom: "clamp(16px, 3.5vw, 20px)",
+                  width: "100%",
+                  padding: "clamp(14px, 3vw, 16px) clamp(24px, 5vw, 32px)",
+                  borderRadius: "clamp(12px, 3vw, 16px)",
+                  border: "none",
+                  background: "linear-gradient(135deg, #7c3aed, #a855f7)",
+                  color: "white",
+                  fontSize: "clamp(14px, 3vw, 16px)",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  cursor: "pointer",
+                  boxShadow: "0 0 30px rgba(124,58,237,0.6)",
+                  transition: "all 0.3s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = "0 0 40px rgba(124,58,237,0.8)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "0 0 30px rgba(124,58,237,0.6)";
                 }}
               >
-                <button
-                  onClick={() => {
-                    playClick();
-                    router.push(userRounds > 0 ? "/lobby" : "/buy");
-                  }}
-                  style={{
-                    width: "100%",
-                    padding:
-                      "clamp(12px, 3vw, 14px) clamp(20px, 4vw, 24px)",
-                    borderRadius: "clamp(12px, 2.5vw, 14px)",
-                    border: "none",
-                    background:
-                      userRounds > 0
-                        ? "linear-gradient(135deg, #7c3aed, #d946ef)"
-                        : "linear-gradient(135deg, #f59e0b, #fbbf24)",
-                    color: "white",
-                    fontSize:
-                      "clamp(14px, 3.2vw, 16px)",
-                    fontWeight: 800,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
-                    boxShadow:
-                      userRounds > 0
-                        ? "0 8px 25px rgba(139,92,246,0.4)"
-                        : "0 8px 25px rgba(251,191,36,0.4)",
-                    transition: "all 0.3s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform =
-                      "translateY(-2px)";
-                    e.currentTarget.style.boxShadow =
-                      userRounds > 0
-                        ? "0 12px 35px rgba(139,92,246,0.6)"
-                        : "0 12px 35px rgba(251,191,36,0.6)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow =
-                      userRounds > 0
-                        ? "0 8px 25px rgba(139,92,246,0.4)"
-                        : "0 8px 25px rgba(251,191,36,0.4)";
-                  }}
-                >
-                  {userRounds > 0 ? (
-                    <>
-                      <Zap style={{ width: "18px", height: "18px" }} />
-                      New Round
-                    </>
-                  ) : (
-                    <>
-                      <Star style={{ width: "18px", height: "18px" }} />
-                      Buy Rounds
-                    </>
-                  )}
-                </button>
-
-                <button
-                  onClick={() => {
-                    playClick();
-                    router.push("/");
-                  }}
-                  style={{
-                    width: "100%",
-                    padding:
-                      "clamp(12px, 3vw, 14px) clamp(20px, 4vw, 24px)",
-                    borderRadius: "clamp(12px, 2.5vw, 14px)",
-                    border: "2px solid rgba(148,163,253,0.4)",
-                    background: "rgba(15,23,42,0.6)",
-                    color: "white",
-                    fontSize:
-                      "clamp(14px, 3.2vw, 16px)",
-                    fontWeight: 800,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
-                    transition: "all 0.3s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform =
-                      "translateY(-2px)";
-                    e.currentTarget.style.borderColor =
-                      "rgba(139,92,246,0.6)";
-                    e.currentTarget.style.background =
-                      "rgba(139,92,246,0.15)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.borderColor =
-                      "rgba(148,163,253,0.4)";
-                    e.currentTarget.style.background =
-                      "rgba(15,23,42,0.6)";
-                  }}
-                >
-                  <Star style={{ width: "18px", height: "18px" }} />
-                  Exit Quiz
-                </button>
-              </div>
-
-              <div
-                style={{
-                  padding:
-                    "clamp(10px, 2vw, 12px) clamp(14px, 3vw, 16px)",
-                  borderRadius: "clamp(10px, 2vw, 12px)",
-                  background: "rgba(139,92,246,0.1)",
-                  border: "1px solid rgba(139,92,246,0.3)",
-                }}
-              >
-                <p
-                  style={{
-                    fontSize: "clamp(11px, 2.5vw, 13px)",
-                    color: "#94a3b8",
-                    fontWeight: 600,
-                  }}
-                >
-                  Redirecting to home in{" "}
-                  <span
-                    style={{
-                      color: "#a78bfa",
-                      fontWeight: 900,
-                      fontSize:
-                        "clamp(13px, 3vw, 16px)",
-                    }}
-                  >
-                    {finalCountdown}
-                  </span>
-                  s
-                </p>
-              </div>
+                Go Home Now
+              </button>
             </article>
+
           ) : (
             <>
               {!showExplanation ? (
@@ -1777,7 +1554,7 @@ export default function QuizGamePage() {
                     style={{
                       display: "grid",
                       gridTemplateColumns: "repeat(2, 1fr)",
-                      gap: "14px",
+                      gap: "clamp(12px, 3vw, 16px)",
                     }}
                   >
                     {(["a", "b", "c", "d"] as OptionId[]).map((optId) => {
@@ -2043,9 +1820,7 @@ export default function QuizGamePage() {
                         fontWeight: 600,
                       }}
                     >
-                      {phase === "INTERMISSION"
-                        ? "⏳ Waiting for next question..."
-                        : "Next question starting..."}
+                      Next question starting...
                     </p>
                   </div>
                 </article>
@@ -2060,7 +1835,7 @@ export default function QuizGamePage() {
                   padding: "0 16px",
                 }}
               >
-                {Array.from({ length: totalQuestions }).map(
+                {Array.from({ length: questions.length }).map(
                   (_, i) => {
                     const st = answers[i];
                     let bg =
