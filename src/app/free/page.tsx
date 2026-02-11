@@ -289,69 +289,91 @@ export default function FreeQuizPage() {
     }
   };
 
-  // ============================================
-  // INIT: DB ELIGIBILITY IS LAW
-  // ============================================
-  useEffect(() => {
-    if (phase !== "INIT") return;
-    if (bootstrapOnceRef.current) return;
-    bootstrapOnceRef.current = true;
+ // ============================================
+// INIT: DB = COMMANDER (BOOTSTRAP ONLY)
+// ============================================
+useEffect(() => {
+  if (phase !== "INIT") return;
+  if (bootstrapOnceRef.current) return;
+  bootstrapOnceRef.current = true;
 
-    const run = async () => {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+  const run = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-        if (!user) {
-          router.push("/login");
-          return;
-        }
+      if (!user) {
+        router.push("/login");
+        return;
+      }
 
-        // ✅ DB is the only authority
-        const { data: eligibility, error: eligibilityError } = await supabase.rpc(
-          "check_free_quiz_eligibility",
-          { p_user_id: user.id }
-        );
+      // ✅ CANONICAL: single authority
+      const { data: bootstrapData, error } = await supabase.rpc(
+        "free_quiz_bootstrap",
+        { p_user_id: user.id }
+      );
 
-        if (eligibilityError || !eligibility?.eligible) {
-          localStorage.removeItem(FREE_QUIZ_STATE_KEY);
-          setShowAlreadyPlayedModal(true);
-          return;
-        }
+      if (error || !bootstrapData) {
+        localStorage.removeItem(FREE_QUIZ_STATE_KEY);
+        setShowAlreadyPlayedModal(true);
+        return;
+      }
 
-        // eligible: restore if exists
-        const restored = restoreFromStorage();
-        if (restored) return;
+      // DB says already played
+      if (bootstrapData.status === "already_played") {
+        localStorage.removeItem(FREE_QUIZ_STATE_KEY);
+        setShowAlreadyPlayedModal(true);
+        return;
+      }
 
-        const { data: fetchedQuestions, error: qErr } = await supabase.rpc(
-          "get_free_quiz_questions",
-          { p_user_id: user.id }
-        );
+      // Resume support (future-proof)
+      if (bootstrapData.status === "resume" && bootstrapData.session) {
+        setQuestions(bootstrapData.questions || []);
+        setCurrentIndex(bootstrapData.session.current_index || 0);
+        setCorrectCount(bootstrapData.session.correct_count || 0);
+        setWrongCount(bootstrapData.session.wrong_count || 0);
 
-        if (qErr || !fetchedQuestions || fetchedQuestions.length < TOTAL_QUESTIONS) {
-          setShowAlreadyPlayedModal(true);
-          return;
-        }
-
-        setQuestions(fetchedQuestions);
-        setCountdownTime(INITIAL_COUNTDOWN);
         countdownStartedAtRef.current = Date.now();
 
-        // reset guards for new run
         entryPlayedRef.current = false;
         whooshPlayedRef.current = false;
         gameoverPlayedRef.current = false;
         lockedRef.current = false;
 
         setPhase("COUNTDOWN");
-      } catch {
-        setShowAlreadyPlayedModal(true);
+        return;
       }
-    };
 
-    run();
-  }, [phase, router]);
+      // New session
+      if (
+        bootstrapData.status === "new" &&
+        bootstrapData.questions &&
+        bootstrapData.questions.length >= TOTAL_QUESTIONS
+      ) {
+        setQuestions(bootstrapData.questions);
+        setCountdownTime(INITIAL_COUNTDOWN);
+        countdownStartedAtRef.current = Date.now();
+
+        entryPlayedRef.current = false;
+        whooshPlayedRef.current = false;
+        gameoverPlayedRef.current = false;
+        lockedRef.current = false;
+
+        setPhase("COUNTDOWN");
+        return;
+      }
+
+      // Any unexpected state → safe fallback
+      setShowAlreadyPlayedModal(true);
+    } catch {
+      setShowAlreadyPlayedModal(true);
+    }
+  };
+
+  run();
+}, [phase, router]);
+
 
   // ============================================
   // COUNTDOWN TIMER + countdown.mp3 (LOOP)
