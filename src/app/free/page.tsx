@@ -19,17 +19,6 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ============================================
-// UTILITY FUNCTIONS
-// ============================================
-// Monday (UTC) for weekly lock key
-function getWeekKeyUTC() {
-  const d = new Date();
-  const day = d.getUTCDay() || 7; // Sunday=7
-  d.setUTCDate(d.getUTCDate() - day + 1);
-  return d.toISOString().slice(0, 10); // YYYY-MM-DD
-}
-
-// ============================================
 // CONSTANTS
 // ============================================
 const TOTAL_QUESTIONS = 20;
@@ -38,7 +27,6 @@ const EXPLANATION_DURATION = 6;
 const FINAL_SCORE_DURATION = 30;
 const INITIAL_COUNTDOWN = 6;
 
-const FREE_QUIZ_LOCK_KEY = "vibraxx_free_quiz_week_lock";
 const FREE_QUIZ_STATE_KEY = "vibraxx_free_quiz_state";
 
 type OptionId = "a" | "b" | "c" | "d";
@@ -76,7 +64,6 @@ type PersistedState = {
   // audio guards
   entryPlayed: boolean;
   whooshPlayed: boolean;
-  feedbackPlayed: boolean;
   gameoverPlayed: boolean;
 };
 
@@ -120,7 +107,6 @@ export default function FreeQuizPage() {
 
   const entryPlayedRef = useRef(false);
   const whooshPlayedRef = useRef(false);
-  const feedbackPlayedRef = useRef(false);
   const gameoverPlayedRef = useRef(false);
 
   // lock visual (question end)
@@ -208,7 +194,6 @@ export default function FreeQuizPage() {
       explanationStartedAt: explanationStartedAtRef.current,
       entryPlayed: entryPlayedRef.current,
       whooshPlayed: whooshPlayedRef.current,
-      feedbackPlayed: feedbackPlayedRef.current,
       gameoverPlayed: gameoverPlayedRef.current,
     };
 
@@ -244,6 +229,12 @@ export default function FreeQuizPage() {
 
       // minimal sanity
       if (!s.phase) return false;
+
+      // Don't restore FINAL phase (quiz already completed)
+      if (s.phase === "FINAL") {
+        localStorage.removeItem(FREE_QUIZ_STATE_KEY);
+        return false;
+      }
 
       setPhase(s.phase);
       setQuestions(Array.isArray(s.questions) ? s.questions : []);
@@ -286,7 +277,6 @@ export default function FreeQuizPage() {
 
       entryPlayedRef.current = !!s.entryPlayed;
       whooshPlayedRef.current = !!s.whooshPlayed;
-      feedbackPlayedRef.current = !!s.feedbackPlayed;
       gameoverPlayedRef.current = !!s.gameoverPlayed;
 
       // locked visual if question ended
@@ -334,9 +324,6 @@ export default function FreeQuizPage() {
         const restored = restoreFromStorage();
         if (restored) return;
 
-        // set weekly lock once you ENTER flow
-        localStorage.setItem(FREE_QUIZ_LOCK_KEY, getWeekKeyUTC());
-
         const { data: fetchedQuestions, error: qErr } = await supabase.rpc(
           "get_free_quiz_questions",
           { p_user_id: user.id }
@@ -354,9 +341,7 @@ export default function FreeQuizPage() {
         // reset guards for new run
         entryPlayedRef.current = false;
         whooshPlayedRef.current = false;
-        feedbackPlayedRef.current = false;
         gameoverPlayedRef.current = false;
-        feedbackPlayedRef.current = false;
         lockedRef.current = false;
 
         setPhase("COUNTDOWN");
@@ -421,7 +406,6 @@ export default function FreeQuizPage() {
 
     lockedRef.current = false;
     whooshPlayedRef.current = false; // next EXPLANATION should whoosh
-    feedbackPlayedRef.current = false;
 
     // refresh-safe question start
     if (!questionStartedAtRef.current) questionStartedAtRef.current = Date.now();
@@ -528,7 +512,6 @@ export default function FreeQuizPage() {
     // IMPORTANT:
     // correct/wrong already played at QUESTION END.
     // Do not replay here. (avoid overlap)
-    // feedbackPlayedRef.current not needed anymore but kept for persisted safety.
 
     if (!explanationStartedAtRef.current) explanationStartedAtRef.current = Date.now();
 
@@ -607,8 +590,6 @@ export default function FreeQuizPage() {
           p_total_questions: TOTAL_QUESTIONS,
         });
 
-        // front lock
-        localStorage.setItem(FREE_QUIZ_LOCK_KEY, getWeekKeyUTC());
         // clear state: user finished
         localStorage.removeItem(FREE_QUIZ_STATE_KEY);
       } catch {
@@ -766,11 +747,11 @@ export default function FreeQuizPage() {
               letterSpacing: "0.02em",
             }}
           >
-            Already Played This Week! 🎮
+            Quiz Unavailable 🎮
           </h2>
 
           <p style={{ fontSize: 15, color: "#cbd5e1", lineHeight: 1.7, marginBottom: 8 }}>
-            You've completed your free quiz for this week.
+            The free quiz is currently unavailable. This could be because you've already played this week or there's a temporary issue.
           </p>
 
           <p style={{ fontSize: 14, color: "#94a3b8", marginBottom: 28 }}>
@@ -1042,15 +1023,6 @@ export default function FreeQuizPage() {
             Get Ready! 🎯
           </div>
         </div>
-
-        {/* Audio Elements (NO START.MP3 DEAD CODE) */}
-        <audio ref={entryRef} src="/sounds/entry.mp3" preload="auto" />
-        <audio ref={countdownRef} src="/sounds/countdown.mp3" preload="auto" />
-        <audio ref={tickRef} src="/sounds/tick.mp3" preload="auto" />
-        <audio ref={whooshRef} src="/sounds/whoosh.mp3" preload="auto" />
-        <audio ref={correctRef} src="/sounds/correct.mp3" preload="auto" />
-        <audio ref={wrongRef} src="/sounds/wrong.mp3" preload="auto" />
-        <audio ref={gameoverRef} src="/sounds/gameover.mp3" preload="auto" />
       </>
     );
   }
@@ -1436,9 +1408,7 @@ export default function FreeQuizPage() {
 
                 <button
                   onClick={() => {
-                    // user exits => weekly lock applies (entered already)
                     localStorage.removeItem(FREE_QUIZ_STATE_KEY);
-                    localStorage.setItem(FREE_QUIZ_LOCK_KEY, getWeekKeyUTC());
                     router.push("/");
                   }}
                   style={{
@@ -1502,8 +1472,7 @@ export default function FreeQuizPage() {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns:
-                      "repeat(auto-fit, minmax(clamp(140px, 40vw, 200px), 1fr))",
+                    gridTemplateColumns: "repeat(2, 1fr)",
                     gap: "clamp(10px, 2vw, 12px)",
                   }}
                 >
@@ -1711,7 +1680,6 @@ export default function FreeQuizPage() {
                 <button
                   onClick={() => {
                     localStorage.removeItem(FREE_QUIZ_STATE_KEY);
-                    localStorage.setItem(FREE_QUIZ_LOCK_KEY, getWeekKeyUTC());
                     router.push("/");
                   }}
                   style={{
