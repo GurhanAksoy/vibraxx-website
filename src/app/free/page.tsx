@@ -309,38 +309,18 @@ useEffect(() => {
     if (phase !== "COUNTDOWN") return;
     if (!isSoundEnabled) return;
 
-    let alive = true;
-    let unlockHandler: (() => void) | null = null;
-
-    // stop others
-    stopAudio(entryRef.current);
-    stopAudio(tickRef.current);
-    stopAudio(whooshRef.current);
-    stopAudio(correctRef.current);
-    stopAudio(wrongRef.current);
-    stopAudio(gameoverRef.current);
-
     const c = countdownRef.current;
-    if (c) {
-      // IMPORTANT: set loop BEFORE play
-      c.loop = true;
-      try { c.currentTime = 0; } catch {}
+    if (!c) return;
 
-      const tryStart = () => {
-        if (!alive) return;
-        c.play().catch(() => {
-          // Autoplay blocked -> wait first gesture ONCE
-          if (!unlockHandler) {
-            unlockHandler = () => {
-              c.play().catch(() => {});
-            };
-            window.addEventListener("pointerdown", unlockHandler, { once: true });
-          }
-        });
-      };
+    // Simple and reliable
+    c.loop = true;
+    c.currentTime = 0;
 
-      tryStart();
-    }
+    const start = () => {
+      c.play().catch(() => {});
+    };
+
+    start();
 
     if (!countdownStartedAtRef.current) countdownStartedAtRef.current = Date.now();
 
@@ -366,9 +346,7 @@ useEffect(() => {
     }, 200);
 
     return () => {
-      alive = false;
       clearInterval(interval);
-      if (unlockHandler) window.removeEventListener("pointerdown", unlockHandler);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, isSoundEnabled]);
