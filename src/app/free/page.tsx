@@ -217,79 +217,6 @@ export default function FreeQuizPage() {
     isCorrect,
   ]);
 
-  // ============================================
-  // RESTORE (BEFORE RUN TIMERS)
-  // ============================================
-  const restoreFromStorage = () => {
-    const raw = localStorage.getItem(FREE_QUIZ_STATE_KEY);
-    if (!raw) return false;
-
-    try {
-      const s = JSON.parse(raw) as PersistedState;
-
-      // minimal sanity
-      if (!s.phase) return false;
-
-      // Don't restore FINAL phase (quiz already completed)
-      if (s.phase === "FINAL") {
-        localStorage.removeItem(FREE_QUIZ_STATE_KEY);
-        return false;
-      }
-
-      setPhase(s.phase);
-      setQuestions(Array.isArray(s.questions) ? s.questions : []);
-      setCurrentIndex(typeof s.currentIndex === "number" ? s.currentIndex : 0);
-
-      setQuestionTime(
-        typeof s.questionTime === "number" ? s.questionTime : QUESTION_DURATION
-      );
-      setExplanationTime(
-        typeof s.explanationTime === "number"
-          ? s.explanationTime
-          : EXPLANATION_DURATION
-      );
-      setCountdownTime(
-        typeof s.countdownTime === "number" ? s.countdownTime : INITIAL_COUNTDOWN
-      );
-
-      setCorrectCount(typeof s.correctCount === "number" ? s.correctCount : 0);
-      setWrongCount(typeof s.wrongCount === "number" ? s.wrongCount : 0);
-
-      setAnswers(Array.isArray(s.answers) ? s.answers : defaultAnswers);
-      setSelectedAnswer(
-        s.selectedAnswer === "a" ||
-          s.selectedAnswer === "b" ||
-          s.selectedAnswer === "c" ||
-          s.selectedAnswer === "d"
-          ? s.selectedAnswer
-          : null
-      );
-      setIsCorrect(!!s.isCorrect);
-
-      countdownStartedAtRef.current =
-        typeof s.countdownStartedAt === "number" ? s.countdownStartedAt : null;
-      questionStartedAtRef.current =
-        typeof s.questionStartedAt === "number" ? s.questionStartedAt : null;
-      explanationStartedAtRef.current =
-        typeof s.explanationStartedAt === "number"
-          ? s.explanationStartedAt
-          : null;
-
-      entryPlayedRef.current = !!s.entryPlayed;
-      whooshPlayedRef.current = !!s.whooshPlayed;
-      gameoverPlayedRef.current = !!s.gameoverPlayed;
-
-      // locked visual if question ended
-      lockedRef.current = s.phase !== "QUESTION";
-
-      return true;
-    } catch {
-      localStorage.removeItem(FREE_QUIZ_STATE_KEY);
-      return false;
-    }
-  };
-
- // ============================================
 // INIT: DB = COMMANDER (BOOTSTRAP ONLY)
 // ============================================
 useEffect(() => {
@@ -380,8 +307,12 @@ useEffect(() => {
   // ============================================
   useEffect(() => {
     if (phase !== "COUNTDOWN") return;
+    if (!isSoundEnabled) return;
 
-    // start countdown sound loop (ANAYASA)
+    let alive = true;
+    let unlockHandler: (() => void) | null = null;
+
+    // stop others
     stopAudio(entryRef.current);
     stopAudio(tickRef.current);
     stopAudio(whooshRef.current);
@@ -389,13 +320,28 @@ useEffect(() => {
     stopAudio(wrongRef.current);
     stopAudio(gameoverRef.current);
 
-    // loop countdown.mp3
-    if (countdownRef.current) {
-      countdownRef.current.currentTime = 0;
-    }
-    playLoop(countdownRef.current);
+    const c = countdownRef.current;
+    if (c) {
+      // IMPORTANT: set loop BEFORE play
+      c.loop = true;
+      try { c.currentTime = 0; } catch {}
 
-    // refresh-safe start timestamp
+      const tryStart = () => {
+        if (!alive) return;
+        c.play().catch(() => {
+          // Autoplay blocked -> wait first gesture ONCE
+          if (!unlockHandler) {
+            unlockHandler = () => {
+              c.play().catch(() => {});
+            };
+            window.addEventListener("pointerdown", unlockHandler, { once: true });
+          }
+        });
+      };
+
+      tryStart();
+    }
+
     if (!countdownStartedAtRef.current) countdownStartedAtRef.current = Date.now();
 
     const interval = setInterval(() => {
@@ -408,15 +354,22 @@ useEffect(() => {
       if (remaining <= 0) {
         clearInterval(interval);
 
-        // stop countdown sound BEFORE question
         stopAudio(countdownRef.current);
 
-        // transition
+        if (!entryPlayedRef.current) {
+          playOnce(entryRef.current);
+          entryPlayedRef.current = true;
+        }
+
         setPhase("QUESTION");
       }
     }, 200);
 
-    return () => clearInterval(interval);
+    return () => {
+      alive = false;
+      clearInterval(interval);
+      if (unlockHandler) window.removeEventListener("pointerdown", unlockHandler);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, isSoundEnabled]);
 
@@ -434,12 +387,6 @@ useEffect(() => {
 
     // Stop countdown if any residue
     stopAudio(countdownRef.current);
-
-    // ✅ entry.mp3 should play ONCE when quiz actually starts (first question shown)
-    if (!entryPlayedRef.current) {
-      playOnce(entryRef.current);
-      entryPlayedRef.current = true;
-    }
 
     // ✅ tick.mp3 loops during question
     if (tickRef.current) {
@@ -848,11 +795,27 @@ useEffect(() => {
   }
 
   // ============================================
+  // 🎵 AUDIO LAYER - Mounted in ALL phases
+  // ============================================
+  const AudioLayer = (
+    <>
+      <audio ref={entryRef} src="/sounds/entry.mp3" preload="auto" />
+      <audio ref={countdownRef} src="/sounds/countdown.mp3" preload="auto" />
+      <audio ref={tickRef} src="/sounds/tick.mp3" preload="auto" />
+      <audio ref={whooshRef} src="/sounds/whoosh.mp3" preload="auto" />
+      <audio ref={correctRef} src="/sounds/correct.mp3" preload="auto" />
+      <audio ref={wrongRef} src="/sounds/wrong.mp3" preload="auto" />
+      <audio ref={gameoverRef} src="/sounds/gameover.mp3" preload="auto" />
+    </>
+  );
+
+  // ============================================
   // INIT (loading)
   // ============================================
   if (phase === "INIT") {
     return (
       <>
+        {AudioLayer}
         <style jsx global>{`
           @keyframes spin {
             to {
@@ -896,6 +859,7 @@ useEffect(() => {
   if (phase === "COUNTDOWN") {
     return (
       <>
+        {AudioLayer}
         <style jsx global>{`
           @keyframes pulseGlow {
             0%,
@@ -924,21 +888,6 @@ useEffect(() => {
         `}</style>
 
         <div
-          onClick={() => {
-            // unlock audio by user gesture (doesn't affect design)
-            // just try to play/pause countdown quickly
-            if (!isSoundEnabled) return;
-            const c = countdownRef.current;
-            if (!c) return;
-            c.volume = 0;
-            c.play()
-              .then(() => {
-                c.pause();
-                c.currentTime = 0;
-                c.volume = 1;
-              })
-              .catch(() => {});
-          }}
           style={{
             minHeight: "100vh",
             maxHeight: "100vh",
@@ -950,7 +899,6 @@ useEffect(() => {
             justifyContent: "center",
             padding: "20px",
             position: "relative",
-            cursor: "pointer",
           }}
         >
           {/* Animated Background Circles */}
@@ -1102,14 +1050,7 @@ useEffect(() => {
         }
       `}</style>
 
-      {/* Audio Elements (single place, always mounted) */}
-      <audio ref={entryRef} src="/sounds/entry.mp3" preload="auto" />
-      <audio ref={countdownRef} src="/sounds/countdown.mp3" preload="auto" />
-      <audio ref={tickRef} src="/sounds/tick.mp3" preload="auto" />
-      <audio ref={whooshRef} src="/sounds/whoosh.mp3" preload="auto" />
-      <audio ref={correctRef} src="/sounds/correct.mp3" preload="auto" />
-      <audio ref={wrongRef} src="/sounds/wrong.mp3" preload="auto" />
-      <audio ref={gameoverRef} src="/sounds/gameover.mp3" preload="auto" />
+      {AudioLayer}
 
       <div
         style={{
@@ -1228,7 +1169,7 @@ useEffect(() => {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
                   gap: "clamp(10px, 2vw, 14px)",
                   marginBottom: "clamp(20px, 3vw, 28px)",
                 }}
@@ -1465,6 +1406,19 @@ useEffect(() => {
                   boxShadow: "0 0 32px rgba(79,70,229,0.3)",
                 }}
               >
+                {/* 🎖️ COCKPIT: Context header */}
+                <div style={{ 
+                  fontSize: "clamp(9px, 1.8vw, 10px)", 
+                  color: "#64748b", 
+                  fontWeight: 900, 
+                  letterSpacing: "0.2em",
+                  textTransform: "uppercase",
+                  marginBottom: "clamp(6px, 1.5vw, 8px)",
+                  textAlign: "center"
+                }}>
+                  Free Practice Mode
+                </div>
+
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "clamp(10px, 2vw, 12px)" }}>
                   <Target style={{ width: "clamp(16px, 3vw, 18px)", height: "clamp(16px, 3vw, 18px)", color: "#a78bfa" }} />
                   <span
@@ -1527,7 +1481,7 @@ useEffect(() => {
                         disabled={selectedAnswer !== null || lockedRef.current}
                         style={{
                           position: "relative",
-                          padding: "clamp(12px, 2.5vw, 14px)",
+                          padding: "clamp(14px, 3vw, 18px)",
                           borderRadius: "clamp(14px, 3vw, 18px)",
                           border: `2px solid ${borderColor}`,
                           background: bg,
