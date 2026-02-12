@@ -217,6 +217,34 @@ export default function FreeQuizPage() {
     isCorrect,
   ]);
 
+  // ============================================
+  // 🔊 GLOBAL AUDIO UNLOCK (Mobile Autoplay Fix)
+  // ============================================
+  useEffect(() => {
+    const unlock = () => {
+      // Unlock ALL audio elements on first interaction
+      [
+        entryRef.current,
+        countdownRef.current,
+        tickRef.current,
+        whooshRef.current,
+        correctRef.current,
+        wrongRef.current,
+        gameoverRef.current,
+      ].forEach(a => {
+        if (!a) return;
+        a.volume = 0;
+        a.play().then(() => {
+          a.pause();
+          a.currentTime = 0;
+          a.volume = 1;
+        }).catch(() => {});
+      });
+    };
+
+    window.addEventListener("pointerdown", unlock, { once: true });
+  }, []);
+
 // INIT: DB = COMMANDER (BOOTSTRAP ONLY)
 // ============================================
 useEffect(() => {
@@ -307,7 +335,11 @@ useEffect(() => {
   // ============================================
   useEffect(() => {
     if (phase !== "COUNTDOWN") return;
-    if (!isSoundEnabled) return;
+
+    if (!isSoundEnabled) {
+      stopAudio(countdownRef.current);
+      return;
+    }
 
     const c = countdownRef.current;
     if (!c) return;
@@ -336,11 +368,6 @@ useEffect(() => {
 
         stopAudio(countdownRef.current);
 
-        if (!entryPlayedRef.current) {
-          playOnce(entryRef.current);
-          entryPlayedRef.current = true;
-        }
-
         setPhase("QUESTION");
       }
     }, 200);
@@ -356,6 +383,12 @@ useEffect(() => {
   // ============================================
   useEffect(() => {
     if (phase !== "QUESTION") return;
+
+    // 🎯 Entry plays ONCE when first question card opens
+    if (!entryPlayedRef.current) {
+      playOnce(entryRef.current);
+      entryPlayedRef.current = true;
+    }
 
     lockedRef.current = false;
     whooshPlayedRef.current = false; // next EXPLANATION should whoosh
