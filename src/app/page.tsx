@@ -459,8 +459,18 @@ export default function HomePage() {
   // 🎯 FETCH HOMEPAGE STATE (KANONİK - TEK RPC)
   // ============================================
   const fetchHomepageState = useCallback(async () => {
-    try {
-      const { data, error } = await supabase.rpc("get_homepage_state");
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    const { data, error } = await supabase.rpc(
+      "get_homepage_state",
+      { p_user_id: user.id }
+    );
+
       if (error || !data) {
         console.error("[Homepage] RPC error:", error);
         return;
