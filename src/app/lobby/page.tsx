@@ -128,63 +128,38 @@ export default function LobbyPage() {
   }, [isPlaying]);
 
   // ============================================
-  // FETCH LOBBY STATE — tek source (canonical)
+  // FETCH LOBBY STATE — Ana sayfa ile AYNI mantık!
   // ============================================
   const fetchLobbyState = useCallback(async () => {
     try {
-      const { data, error } = await supabase.rpc("get_lobby_state");
+      // ✅ ANA SAYFA İLE AYNI RPC KULLAN
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user || !mountedRef.current) return;
+
+      const { data, error } = await supabase.rpc("get_homepage_state", {
+        p_user_id: user.user.id
+      });
+      
       if (error || !data || !mountedRef.current) return;
 
-      const state = data as LobbyStateData;
-
       // Auth guard → home
-      if (state.error === 'not_authenticated') {
+      if (!user.user) {
         router.push("/");
         return;
       }
 
-      // No round → home
-      if (state.status === 'no_live_round') {
-        router.push("/");
-        return;
+      // ✅ ANA SAYFA İLE AYNI COUNTDOWN (next_round_in_seconds)
+      if (data.next_round_in_seconds != null) {
+        setLocalSeconds(Math.max(0, data.next_round_in_seconds));
       }
 
-      // No credits + not joined → buy
-      if (state.credits !== undefined && state.credits <= 0 && !state.is_participant) {
-        router.push("/buy");
-        return;
-      }
-
-      // isNewRound → ref UPDATE'DEN ÖNCE hesaplanacak
-      const isNewRound = lastRoundIdRef.current === null || lastRoundIdRef.current !== state.round_id;
-
-      // Round changed → reset UI
-      if (lastRoundIdRef.current !== null && lastRoundIdRef.current !== state.round_id) {
-        setShowWarning(false);
-        setIsRedirecting(false);
-        isRedirectingRef.current = false;
-        alarmFiredRef.current = false;
-      }
-
-      // Ref SONRA update
-      lastRoundIdRef.current = state.round_id || null;
-
-      setLobbyState(state);
-
-      // localSeconds sadece ilk kez veya round değişince sıfırlanır
-      // polling her 5s gelir ama localSeconds overwrite etmez
-      if (isNewRound && state.remaining_seconds !== undefined) {
-        setLocalSeconds(state.remaining_seconds);
+      // Credits
+      if (data.live_credits !== undefined) {
+        // User'ın kredisi var
       }
 
       setIsLoading(false);
 
-      // ✅ KANONİK: DB KARAR VERİR - Frontend sadece uygular
-      if (state.should_redirect_to_quiz && state.round_id && !isRedirectingRef.current) {
-        isRedirectingRef.current = true;
-        setIsRedirecting(true);
-        router.push(`/quiz/${state.round_id}`);
-      }
     } catch (err) {
       console.error("[Lobby] RPC error:", err);
     }
@@ -236,27 +211,14 @@ export default function LobbyPage() {
     }
   }, [localSeconds, isPlaying]);
 
-  // === AUTO-JOIN + REDIRECT — countdown 0 ===
+  // === COUNTDOWN 0 OLUNCA GÖSTER ===
+  // Join mantığı yok, sadece "Round starting!" göster
   useEffect(() => {
-    if (localSeconds !== 0 || isRedirecting || !lobbyState) return;
-
-    const joinAndGo = async () => {
-      setIsRedirecting(true);
-
-      // Zaten joined ise sadece redirect — RPC çağırma
-      if (!lobbyState.is_participant) {
-        try {
-          await supabase.rpc("join_live_round", { p_round_id: lobbyState.round_id });
-        } catch (e) {
-          console.error("[Lobby] join_live_round failed:", e);
-        }
-      }
-
-      router.push(`/quiz/${lobbyState.round_id}`);
-    };
-
-    joinAndGo();
-  }, [localSeconds, isRedirecting, lobbyState, router]);
+    if (localSeconds === 0 && !isRedirecting) {
+      // UI'da göster: Round başlıyor!
+      setShowWarning(true);
+    }
+  }, [localSeconds, isRedirecting]);
 
   // === WARNING HELPERS ===
   const getWarningMessage = () => {
