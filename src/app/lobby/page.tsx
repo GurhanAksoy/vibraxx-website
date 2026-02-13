@@ -27,15 +27,16 @@ interface LobbyPlayer {
 // LOBBY STATE — get_lobby_state RPC shape
 // ============================================
 interface LobbyStateData {
-  requires_auth: boolean;
-  no_round: boolean;
-  round_id: number;
-  seconds_to_start: number;
-  user_joined: boolean;
-  join_block_reason: string | null;
-  should_redirect_to_quiz: boolean;
-  participants_count: number;
-  recent_players: LobbyPlayer[];
+  error?: string;
+  status?: string; // 'no_live_round' | 'live'
+  credits?: number;
+  next_round_in_seconds?: number;
+  round_id?: number;
+  started_at?: string;
+  duration_seconds?: number;
+  remaining_seconds?: number;
+  is_participant?: boolean;
+  participant_count?: number;
 }
 
 export default function LobbyPage() {
@@ -135,24 +136,24 @@ export default function LobbyPage() {
       const state = data as LobbyStateData;
 
       // Auth guard → home
-      if (state.requires_auth) {
+      if (state.error === 'not_authenticated') {
         router.push("/");
         return;
       }
 
       // No round → home
-      if (state.no_round) {
+      if (state.status === 'no_live_round') {
         router.push("/");
         return;
       }
 
       // No credits + not joined → buy
-      if (state.join_block_reason === "no_credits" && !state.user_joined) {
+      if (state.credits !== undefined && state.credits <= 0 && !state.is_participant) {
         router.push("/buy");
         return;
       }
 
-      // isNewRound → ref UPDATE'DEN ÖNCE hesaplana
+      // isNewRound → ref UPDATE'DEN ÖNCE hesaplanacak
       const isNewRound = lastRoundIdRef.current === null || lastRoundIdRef.current !== state.round_id;
 
       // Round changed → reset UI
@@ -164,20 +165,20 @@ export default function LobbyPage() {
       }
 
       // Ref SONRA update
-      lastRoundIdRef.current = state.round_id;
+      lastRoundIdRef.current = state.round_id || null;
 
       setLobbyState(state);
 
       // localSeconds sadece ilk kez veya round değişince sıfırlanır
       // polling her 5s gelir ama localSeconds overwrite etmez
-      if (isNewRound) {
-        setLocalSeconds(state.seconds_to_start);
+      if (isNewRound && state.remaining_seconds !== undefined) {
+        setLocalSeconds(state.remaining_seconds);
       }
 
       setIsLoading(false);
 
-      // Round started + user joined → quiz
-      if (state.should_redirect_to_quiz && !isRedirectingRef.current) {
+      // Round started (remaining = 0) + user joined → quiz
+      if (state.remaining_seconds === 0 && state.is_participant && !isRedirectingRef.current) {
         isRedirectingRef.current = true;
         setIsRedirecting(true);
         router.push("/quiz");
@@ -240,7 +241,7 @@ export default function LobbyPage() {
       setIsRedirecting(true);
 
       // Zaten joined ise sadece redirect — RPC çağırma
-      if (!lobbyState.user_joined) {
+      if (!lobbyState.is_participant) {
         try {
           await supabase.rpc("join_live_round", { p_round_id: lobbyState.round_id });
         } catch (e) {
@@ -1306,7 +1307,7 @@ export default function LobbyPage() {
                     boxShadow: "0 0 15px rgba(139, 92, 246, 0.3)",
                   }}
                 >
-                  {lobbyState?.participants_count ?? 0}
+                  {lobbyState?.participant_count ?? 0}
                 </div>
               </div>
 
@@ -1320,8 +1321,15 @@ export default function LobbyPage() {
                   paddingRight: "8px",
                 }}
               >
-                {lobbyState?.recent_players && lobbyState.recent_players.length > 0 ? (
-                  lobbyState.recent_players.map((player, idx) => (
+                {/* Recent players removed - not in new RPC */}
+                <div style={{
+                  padding: "20px",
+                  textAlign: "center",
+                  color: "#94a3b8",
+                  fontSize: "14px",
+                }}>
+                  {lobbyState?.participant_count ? `${lobbyState.participant_count} players in lobby` : 'Waiting for players...'}
+                </div>
                     <div
                       key={player.user_id}
                       className="animate-slide-in"
@@ -1426,21 +1434,6 @@ export default function LobbyPage() {
                           🏆 {(player.total_score ?? 0).toLocaleString()} points
                         </div>
                       </div>
-                    </div>
-                  ))
-                ) : (
-                  <div
-                    style={{
-                      padding: "clamp(21px, 4.5vw, 30px)",
-                      textAlign: "center",
-                      color: "#64748b",
-                      fontSize: "clamp(12px, 2.4vw, 14px)",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Waiting for players to join...
-                  </div>
-                )}
               </div>
 
             </div>
