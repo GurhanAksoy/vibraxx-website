@@ -128,37 +128,39 @@ export default function LobbyPage() {
   }, [isPlaying]);
 
   // ============================================
-  // FETCH LOBBY STATE — Ana sayfa ile AYNI mantık!
+  // FETCH LOBBY STATE — KANONİK (DB = KOMUTAN)
   // ============================================
   const fetchLobbyState = useCallback(async () => {
     try {
-      // ✅ ANA SAYFA İLE AYNI RPC KULLAN
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user || !mountedRef.current) return;
-
-      const { data, error } = await supabase.rpc("get_homepage_state", {
-        p_user_id: user.user.id
-      });
+      // ✅ TEK RPC: get_lobby_state
+      const { data, error } = await supabase.rpc("get_lobby_state");
       
       if (error || !data || !mountedRef.current) return;
 
       // Auth guard → home
-      if (!user.user) {
+      if (data.error === 'not_authenticated') {
         router.push("/");
         return;
       }
 
-      // ✅ ANA SAYFA İLE AYNI COUNTDOWN (next_round_in_seconds)
+      // ✅ ANA SAYFA İLE AYNI COUNTDOWN
       if (data.next_round_in_seconds != null) {
         setLocalSeconds(Math.max(0, data.next_round_in_seconds));
       }
 
-      // Credits
-      if (data.live_credits !== undefined) {
-        // User'ın kredisi var
-      }
-
       setIsLoading(false);
+
+      // ✅ KANONİK: DB KARAR VERDİ Mİ? → UYGULA!
+      if (data.should_redirect_to_quiz && data.round_id && !isRedirectingRef.current) {
+        isRedirectingRef.current = true;
+        setIsRedirecting(true);
+        
+        // Join (DB kredi düşürecek round start'ta)
+        await supabase.rpc('join_live_round', { p_round_id: data.round_id });
+        
+        // Quiz'e git
+        router.push(`/quiz/${data.round_id}`);
+      }
 
     } catch (err) {
       console.error("[Lobby] RPC error:", err);
@@ -211,14 +213,12 @@ export default function LobbyPage() {
     }
   }, [localSeconds, isPlaying]);
 
-  // === COUNTDOWN 0 OLUNCA GÖSTER ===
-  // Join mantığı yok, sadece "Round starting!" göster
-  useEffect(() => {
-    if (localSeconds === 0 && !isRedirecting) {
-      // UI'da göster: Round başlıyor!
-      setShowWarning(true);
-    }
-  }, [localSeconds, isRedirecting]);
+  // ============================================
+  // 🎯 KANONİK: Sayaç 0 mantığı RPC'de!
+  // Frontend sadece polling yapar, karar vermez
+  // ============================================
+  // (Local countdown 0 check kaldırıldı - DB karar verir)
+
 
   // === WARNING HELPERS ===
   const getWarningMessage = () => {
