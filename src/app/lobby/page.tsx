@@ -38,6 +38,7 @@ interface LobbyStateData {
   remaining_seconds?: number;
   is_participant?: boolean;
   participant_count?: number;
+  should_redirect_to_quiz?: boolean; // ✅ DB KARAR VERİR
 }
 
 export default function LobbyPage() {
@@ -178,11 +179,11 @@ export default function LobbyPage() {
 
       setIsLoading(false);
 
-      // Round started (remaining = 0) + user joined → quiz
-      if (state.remaining_seconds === 0 && state.is_participant && !isRedirectingRef.current) {
+      // ✅ KANONİK: DB KARAR VERİR - Frontend sadece uygular
+      if (state.should_redirect_to_quiz && state.round_id && !isRedirectingRef.current) {
         isRedirectingRef.current = true;
         setIsRedirecting(true);
-        router.push("/quiz");
+        router.push(`/quiz/${state.round_id}`);
       }
     } catch (err) {
       console.error("[Lobby] RPC error:", err);
@@ -250,7 +251,7 @@ export default function LobbyPage() {
         }
       }
 
-      router.push("/quiz");
+      router.push(`/quiz/${lobbyState.round_id}`);
     };
 
     joinAndGo();
