@@ -198,8 +198,9 @@ export default function LobbyPage() {
   }, [fetchLobbyState]);
 
   // ============================================
-  // LOCAL TICK (1s) — ana sayfa ile aynı pattern
-  // Bağımsız interval, RPC gelince setLocalSeconds overwrite eder
+  // 🎯 COUNTDOWN TICK - Ana sayfa ile AYNI mantık!
+  // RPC her 5s → initial value
+  // Local tick her 1s → decrement
   // ============================================
   useEffect(() => {
     const tick = setInterval(() => {
@@ -207,7 +208,7 @@ export default function LobbyPage() {
       setLocalSeconds((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
     }, 1000);
     return () => clearInterval(tick);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // === WARNING & SOUND EFFECTS ===
   useEffect(() => {
