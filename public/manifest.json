@@ -1,10 +1,12 @@
 {
-  "name": "VibraXX",
+  "name": "VibraXX - Live Quiz Competition",
   "short_name": "VibraXX",
+  "description": "Compete in live quiz competitions for real prizes every 5 minutes",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#020817",
-  "theme_color": "#020817",
+  "theme_color": "#7c3aed",
   "icons": [
     {
       "src": "/icons/manifest-icon-192.maskable.png",
@@ -15,6 +17,24 @@
     {
       "src": "/icons/manifest-icon-512.maskable.png",
       "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/manifest-icon-192.maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/manifest-icon-512.maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/apple-icon-180.png",
+      "sizes": "180x180",
       "type": "image/png",
       "purpose": "any"
     }
