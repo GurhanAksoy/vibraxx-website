@@ -467,47 +467,49 @@ useEffect(() => {
         lockedRef.current = true;
         stopAudio(tickRef.current); // stop tick immediately
 
-        // Timeout => submit to DB as null answer
-        if (selectedAnswer === null) {
-          if (sessionId && currentQ) {
-            try {
-              const { data, error } = await supabase.rpc("submit_free_quiz_answer", {
-                p_session_id: sessionId,
-                p_question_id: currentQ.id,
-                p_selected_option: null,
-                p_answer_time_ms: QUESTION_DURATION * 1000,
-              });
+        // Timeout => submit to DB as null answer (async wrapper)
+        (async () => {
+          if (selectedAnswer === null) {
+            if (sessionId && currentQ) {
+              try {
+                const { data, error } = await supabase.rpc("submit_free_quiz_answer", {
+                  p_session_id: sessionId,
+                  p_question_id: currentQ.id,
+                  p_selected_option: null,
+                  p_answer_time_ms: QUESTION_DURATION * 1000,
+                });
 
-              if (!error && data) {
-                setCorrectCount(data.correct_count || correctCount);
-                setWrongCount(data.wrong_count || wrongCount);
-              }
-            } catch {}
+                if (!error && data) {
+                  setCorrectCount(data.correct_count || correctCount);
+                  setWrongCount(data.wrong_count || wrongCount);
+                }
+              } catch {}
+            }
+
+            setWrongCount((w) => w + 1);
+            setAnswers((prev) => {
+              const copy = [...prev];
+              copy[currentIndex] = "wrong";
+              return copy;
+            });
+            setIsCorrect(false);
+
+            // feedback sound must play at end of question
+            playOnce(wrongRef.current);
+          } else {
+            // already answered -> play correct/wrong now at question end
+            playOnce(isCorrect ? correctRef.current : wrongRef.current);
           }
 
-          setWrongCount((w) => w + 1);
-          setAnswers((prev) => {
-            const copy = [...prev];
-            copy[currentIndex] = "wrong";
-            return copy;
-          });
-          setIsCorrect(false);
+          // phase transition
+          questionStartedAtRef.current = null;
+          explanationStartedAtRef.current = Date.now();
+          setPhase("EXPLANATION");
 
-          // feedback sound must play at end of question
-          playOnce(wrongRef.current);
-        } else {
-          // already answered -> play correct/wrong now at question end
-          playOnce(isCorrect ? correctRef.current : wrongRef.current);
-        }
-
-        // phase transition
-        questionStartedAtRef.current = null;
-        explanationStartedAtRef.current = Date.now();
-        setPhase("EXPLANATION");
-
-        setTimeout(() => {
-          advancingRef.current = false;
-        }, 80);
+          setTimeout(() => {
+            advancingRef.current = false;
+          }, 80);
+        })();
       }
     }, 120);
 
