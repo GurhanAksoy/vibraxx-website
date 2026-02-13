@@ -10,6 +10,7 @@ import {
   VolumeX,
   Home,
   Shield,
+  Trophy,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
