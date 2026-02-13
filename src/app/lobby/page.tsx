@@ -1321,119 +1321,108 @@ export default function LobbyPage() {
                   paddingRight: "8px",
                 }}
               >
-                {/* Recent players removed - not in new RPC */}
+                {/* Player count */}
                 <div style={{
                   padding: "20px",
                   textAlign: "center",
                   color: "#94a3b8",
                   fontSize: "14px",
+                  marginBottom: "20px",
                 }}>
                   {lobbyState?.participant_count ? `${lobbyState.participant_count} players in lobby` : 'Waiting for players...'}
                 </div>
-                    <div
-                      key={player.user_id}
-                      className="animate-slide-in"
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "clamp(10px, 2.6vw, 13px)",
-                        padding: "clamp(10px, 2.6vw, 15px)",
-                        borderRadius: "18px",
-                        border: "1px solid rgba(255, 255, 255, 0.12)",
-                        background: "rgba(255, 255, 255, 0.04)",
-                        transition: "all 0.3s",
-                        animationDelay: `${idx * 0.1}s`,
-                        boxShadow: "0 0 15px rgba(0, 0, 0, 0.2)",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "rgba(139, 92, 246, 0.1)";
-                        e.currentTarget.style.transform = "translateX(4px)";
-                        e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.4)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)";
-                        e.currentTarget.style.transform = "translateX(0)";
-                        e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)";
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: "clamp(33px, 8.25vw, 40px)",
-                          height: "clamp(33px, 8.25vw, 40px)",
-                          borderRadius: "50%",
-                          border: "3px solid rgba(139, 92, 246, 0.6)",
-                          overflow: "hidden",
-                          flexShrink: 0,
-                          position: "relative",
-                          boxShadow: "0 0 15px rgba(139, 92, 246, 0.4)",
-                        }}
-                      >
-                        <Image
-                          src={player.avatar_url || "/images/logo.png"}
-                          alt={player.full_name}
-                          fill
-                          sizes="40px"
-                          style={{ objectFit: "cover" }}
-                        />
-                      </div>
 
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            marginBottom: "5px",
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: "clamp(13px, 2.6vw, 15px)",
-                              fontWeight: 700,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {player.full_name || "Anonymous"}
-                          </span>
-                          {player.streak >= 10 && (
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "5px",
-                                padding: "3px 10px",
-                                borderRadius: "8px",
-                                background: "rgba(239, 68, 68, 0.25)",
-                                border: "1px solid rgba(239, 68, 68, 0.4)",
-                                boxShadow: "0 0 10px rgba(239, 68, 68, 0.3)",
-                              }}
-                            >
-                              <Flame style={{ width: 13, height: 13, color: "#fca5a5" }} />
-                              <span
-                                style={{
-                                  fontSize: "11px",
-                                  fontWeight: 800,
-                                  color: "#fca5a5",
-                                }}
-                              >
-                                {player.streak ?? 0}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "clamp(10px, 2.1vw, 12px)",
-                            color: "#94a3b8",
-                            fontWeight: 600,
-                          }}
-                        >
-                          🏆 {(player.total_score ?? 0).toLocaleString()} points
-                        </div>
+                {/* Prize Information - Subtle Premium */}
+                <div style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                  padding: "20px",
+                  borderRadius: "16px",
+                  background: "rgba(15,23,42,0.6)",
+                  border: "1px solid rgba(148,163,184,0.15)",
+                  backdropFilter: "blur(10px)",
+                }}>
+                  {/* Weekly */}
+                  <div style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "12px",
+                  }}>
+                    <Trophy style={{ 
+                      width: 18, 
+                      height: 18, 
+                      color: "#a78bfa",
+                      flexShrink: 0,
+                      marginTop: "2px",
+                    }} />
+                    <div>
+                      <div style={{
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        color: "#e2e8f0",
+                        marginBottom: "4px",
+                      }}>
+                        Weekly Reward
                       </div>
+                      <div style={{
+                        fontSize: "12px",
+                        color: "#94a3b8",
+                        lineHeight: 1.5,
+                      }}>
+                        15 Free Rounds for the highest weekly score.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div style={{
+                    height: "1px",
+                    background: "rgba(148,163,184,0.1)",
+                  }} />
+
+                  {/* Monthly */}
+                  <div style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "12px",
+                  }}>
+                    <Trophy style={{ 
+                      width: 18, 
+                      height: 18, 
+                      color: "#fbbf24",
+                      flexShrink: 0,
+                      marginTop: "2px",
+                    }} />
+                    <div>
+                      <div style={{
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        color: "#e2e8f0",
+                        marginBottom: "4px",
+                      }}>
+                        Monthly Grand Prize
+                      </div>
+                      <div style={{
+                        fontSize: "12px",
+                        color: "#94a3b8",
+                        lineHeight: 1.5,
+                      }}>
+                        £1,000 awarded to the highest monthly score.*
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Terms */}
+                  <div style={{
+                    fontSize: "10px",
+                    color: "#64748b",
+                    marginTop: "8px",
+                    lineHeight: 1.4,
+                  }}>
+                    *Subject to monthly participation threshold. See Prize Terms.
+                  </div>
+                </div>
               </div>
 
             </div>
