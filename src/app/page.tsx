@@ -542,12 +542,10 @@ export default function HomePage() {
       e.preventDefault();
       deferredPromptRef.current = e;
       
-      // Show PWA install button after 10 seconds (if not already installed)
-      setTimeout(() => {
-        if (deferredPromptRef.current && mountedRef.current) {
-          setShowPWAPrompt(true);
-        }
-      }, 10000);
+      // Show immediately - no delay!
+      if (deferredPromptRef.current && mountedRef.current) {
+        setShowPWAPrompt(true);
+      }
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -1501,36 +1499,77 @@ export default function HomePage() {
                   )}
                 </button>
 
-                {/* PWA Install Button */}
+                {/* PWA Install Button - ULTRA PREMIUM */}
                 {showPWAPrompt && (
                   <button
                     onClick={handlePWAInstall}
                     aria-label="Install App"
                     className="vx-hide-mobile"
                     style={{
-                      padding: "8px 14px",
-                      borderRadius: 12,
-                      border: "1px solid rgba(139,92,246,0.3)",
-                      background: "linear-gradient(135deg, rgba(139,92,246,0.08), rgba(124,58,237,0.05))",
-                      color: "#a78bfa",
+                      padding: "10px 20px",
+                      borderRadius: 16,
+                      border: "2px solid transparent",
+                      backgroundImage: `
+                        linear-gradient(rgba(15,23,42,0.95), rgba(15,23,42,0.95)),
+                        linear-gradient(135deg, #7c3aed, #a855f7, #c084fc, #7c3aed)
+                      `,
+                      backgroundOrigin: "border-box",
+                      backgroundClip: "padding-box, border-box",
+                      color: "white",
                       fontSize: 13,
-                      fontWeight: 600,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
                       cursor: "pointer",
                       display: "inline-flex",
                       alignItems: "center",
-                      gap: 6,
-                      transition: "all 0.2s",
+                      gap: 8,
+                      transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+                      position: "relative",
+                      overflow: "hidden",
+                      boxShadow: `
+                        0 0 20px rgba(124,58,237,0.4),
+                        0 4px 16px rgba(0,0,0,0.3),
+                        inset 0 1px 0 rgba(255,255,255,0.1)
+                      `,
+                      animation: "pulse-glow 3s ease-in-out infinite",
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "linear-gradient(135deg, rgba(139,92,246,0.15), rgba(124,58,237,0.1))";
-                      e.currentTarget.style.borderColor = "rgba(139,92,246,0.5)";
+                      e.currentTarget.style.transform = "translateY(-2px) scale(1.02)";
+                      e.currentTarget.style.boxShadow = `
+                        0 0 30px rgba(124,58,237,0.6),
+                        0 8px 24px rgba(124,58,237,0.3),
+                        inset 0 1px 0 rgba(255,255,255,0.2)
+                      `;
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "linear-gradient(135deg, rgba(139,92,246,0.08), rgba(124,58,237,0.05))";
-                      e.currentTarget.style.borderColor = "rgba(139,92,246,0.3)";
+                      e.currentTarget.style.transform = "translateY(0) scale(1)";
+                      e.currentTarget.style.boxShadow = `
+                        0 0 20px rgba(124,58,237,0.4),
+                        0 4px 16px rgba(0,0,0,0.3),
+                        inset 0 1px 0 rgba(255,255,255,0.1)
+                      `;
                     }}
                   >
-                    Install
+                    <span style={{
+                      background: "linear-gradient(135deg, #e9d5ff, #c4b5fd, #a78bfa)",
+                      backgroundSize: "200% 200%",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      animation: "shimmer 3s ease infinite",
+                      fontWeight: 800,
+                    }}>
+                      Install App
+                    </span>
+                    <div style={{
+                      position: "absolute",
+                      top: 0,
+                      left: "-100%",
+                      width: "100%",
+                      height: "100%",
+                      background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)",
+                      animation: "slide-shine 3s ease infinite",
+                    }} />
                   </button>
                 )}
 
