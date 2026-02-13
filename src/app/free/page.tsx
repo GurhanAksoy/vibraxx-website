@@ -47,6 +47,7 @@ interface Question {
 
 type PersistedState = {
   phase: QuizPhase;
+  sessionId: number;
   questions: Question[];
   currentIndex: number;
   questionTime: number;
@@ -76,6 +77,7 @@ export default function FreeQuizPage() {
   // CANONICAL STATE
   // ============================================
   const [phase, setPhase] = useState<QuizPhase>("INIT");
+  const [sessionId, setSessionId] = useState<number | null>(null);
 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -175,10 +177,11 @@ export default function FreeQuizPage() {
   // PERSIST (REFRESH SAFE)
   // ============================================
   const persist = () => {
-    if (phase === "INIT") return;
+    if (phase === "INIT" || !sessionId) return;
 
     const payload: PersistedState = {
       phase,
+      sessionId,
       questions,
       currentIndex,
       questionTime,
@@ -205,6 +208,7 @@ export default function FreeQuizPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     phase,
+    sessionId,
     questions,
     currentIndex,
     questionTime,
@@ -263,50 +267,78 @@ useEffect(() => {
         return;
       }
 
-      // ✅ CANONICAL: single authority
-      const { data: bootstrapData, error } = await supabase.rpc(
-        "free_quiz_bootstrap",
-        { p_user_id: user.id }
+      // 1️⃣ Check eligibility (DB = KOMUTAN)
+      const { data: eligibilityData, error: eligibilityError } = await supabase.rpc(
+        "check_free_quiz_eligibility"
       );
 
-      if (error || !bootstrapData) {
+      if (eligibilityError || !eligibilityData) {
+        setShowAlreadyPlayedModal(true);
+        return;
+      }
+
+      // Already played this week
+      if (!eligibilityData.can_play) {
         localStorage.removeItem(FREE_QUIZ_STATE_KEY);
         setShowAlreadyPlayedModal(true);
         return;
       }
 
-      // DB says already played
-      if (bootstrapData.status === "already_played") {
-        localStorage.removeItem(FREE_QUIZ_STATE_KEY);
-        setShowAlreadyPlayedModal(true);
-        return;
+      // 2️⃣ Check for persisted state (refresh recovery)
+      const savedState = localStorage.getItem(FREE_QUIZ_STATE_KEY);
+      if (savedState) {
+        try {
+          const parsed: PersistedState = JSON.parse(savedState);
+          
+          // Validate session still exists
+          const { data: sessionCheck } = await supabase
+            .from("free_quiz_sessions")
+            .select("id")
+            .eq("id", parsed.sessionId)
+            .single();
+
+          if (sessionCheck) {
+            // Restore state
+            setSessionId(parsed.sessionId);
+            setQuestions(parsed.questions);
+            setCurrentIndex(parsed.currentIndex);
+            setCorrectCount(parsed.correctCount);
+            setWrongCount(parsed.wrongCount);
+            setAnswers(parsed.answers);
+            setSelectedAnswer(parsed.selectedAnswer);
+            setIsCorrect(parsed.isCorrect);
+
+            countdownStartedAtRef.current = parsed.countdownStartedAt;
+            questionStartedAtRef.current = parsed.questionStartedAt;
+            explanationStartedAtRef.current = parsed.explanationStartedAt;
+            entryPlayedRef.current = parsed.entryPlayed;
+            whooshPlayedRef.current = parsed.whooshPlayed;
+            gameoverPlayedRef.current = parsed.gameoverPlayed;
+
+            setPhase(parsed.phase);
+            return;
+          }
+        } catch {}
       }
 
-      // Resume support (future-proof)
-      if (bootstrapData.status === "resume" && bootstrapData.session) {
-        setQuestions(bootstrapData.questions || []);
-        setCurrentIndex(bootstrapData.session.current_index || 0);
-        setCorrectCount(bootstrapData.session.correct_count || 0);
-        setWrongCount(bootstrapData.session.wrong_count || 0);
+      // 3️⃣ Start new quiz (DB creates session + selects questions)
+      const { data: startData, error: startError } = await supabase.rpc(
+        "start_free_quiz"
+      );
 
-        countdownStartedAtRef.current = Date.now();
-
-        entryPlayedRef.current = false;
-        whooshPlayedRef.current = false;
-        gameoverPlayedRef.current = false;
-        lockedRef.current = false;
-
-        setPhase("COUNTDOWN");
+      if (startError || !startData || startData.error) {
+        setShowAlreadyPlayedModal(true);
         return;
       }
 
       // New session
       if (
-        bootstrapData.status === "new" &&
-        bootstrapData.questions &&
-        bootstrapData.questions.length >= TOTAL_QUESTIONS
+        startData.session_id &&
+        startData.questions &&
+        startData.questions.length >= TOTAL_QUESTIONS
       ) {
-        setQuestions(bootstrapData.questions);
+        setSessionId(startData.session_id);
+        setQuestions(startData.questions);
         setCountdownTime(INITIAL_COUNTDOWN);
         countdownStartedAtRef.current = Date.now();
 
@@ -435,8 +467,24 @@ useEffect(() => {
         lockedRef.current = true;
         stopAudio(tickRef.current); // stop tick immediately
 
-        // Timeout => wrong
+        // Timeout => submit to DB as null answer
         if (selectedAnswer === null) {
+          if (sessionId && currentQ) {
+            try {
+              const { data, error } = await supabase.rpc("submit_free_quiz_answer", {
+                p_session_id: sessionId,
+                p_question_id: currentQ.id,
+                p_selected_option: null,
+                p_answer_time_ms: QUESTION_DURATION * 1000,
+              });
+
+              if (!error && data) {
+                setCorrectCount(data.correct_count || correctCount);
+                setWrongCount(data.wrong_count || wrongCount);
+              }
+            } catch {}
+          }
+
           setWrongCount((w) => w + 1);
           setAnswers((prev) => {
             const copy = [...prev];
@@ -554,30 +602,8 @@ useEffect(() => {
       gameoverPlayedRef.current = true;
     }
 
-    // submit result once
-    const submit = async () => {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (!user) return;
-
-        await supabase.rpc("submit_free_quiz_result", {
-          p_user_id: user.id,
-          p_correct_count: correctCount,
-          p_wrong_count: wrongCount,
-          p_total_questions: TOTAL_QUESTIONS,
-        });
-
-        // clear state: user finished
-        localStorage.removeItem(FREE_QUIZ_STATE_KEY);
-      } catch {
-        // even if submit fails, keep UI stable
-      }
-    };
-
-    submit();
+    // Clear persisted state - quiz finished (DB already has all answers)
+    localStorage.removeItem(FREE_QUIZ_STATE_KEY);
 
     setFinalTime(FINAL_SCORE_DURATION);
     const interval = setInterval(() => {
@@ -593,28 +619,47 @@ useEffect(() => {
       clearInterval(interval);
       clearTimeout(timeout);
     };
-  }, [phase, router, correctCount, wrongCount]);
+  }, [phase, router]);
 
   // ============================================
-  // ANSWER HANDLER (NO SOUND, NO LOCK)
+  // ANSWER HANDLER (DB = KOMUTAN)
   // ============================================
-  const handleAnswerClick = (optionId: OptionId) => {
+  const handleAnswerClick = async (optionId: OptionId) => {
     if (phase !== "QUESTION") return;
     if (selectedAnswer !== null) return;
+    if (!sessionId || !currentQ) return;
 
     setSelectedAnswer(optionId);
 
-    const correct = optionId === currentQ.correct_option;
-    setIsCorrect(correct);
+    const answerTimeMs = Math.floor(
+      QUESTION_DURATION * 1000 - questionTime * 1000
+    );
 
-    setAnswers((prev) => {
-      const next = [...prev];
-      next[currentIndex] = correct ? "correct" : "wrong";
-      return next;
-    });
+    try {
+      // Submit to DB (DB calculates everything)
+      const { data, error } = await supabase.rpc("submit_free_quiz_answer", {
+        p_session_id: sessionId,
+        p_question_id: currentQ.id,
+        p_selected_option: optionId,
+        p_answer_time_ms: answerTimeMs,
+      });
 
-    if (correct) setCorrectCount((c) => c + 1);
-    else setWrongCount((w) => w + 1);
+      if (error || !data) return;
+
+      // DB is the source of truth
+      const isCorrectFromDB = data.is_correct;
+
+      setIsCorrect(isCorrectFromDB);
+
+      setAnswers((prev) => {
+        const next = [...prev];
+        next[currentIndex] = isCorrectFromDB ? "correct" : "wrong";
+        return next;
+      });
+
+      setCorrectCount(data.correct_count || correctCount);
+      setWrongCount(data.wrong_count || wrongCount);
+    } catch {}
 
     // NOTE:
     // feedback sound & lock happens at question end (ANAYASA)
