@@ -446,6 +446,10 @@ export default function HomePage() {
   const [totalRounds, setTotalRounds] = useState(0);
   const [totalParticipants, setTotalParticipants] = useState(0);
 
+  // ✅ PWA Install
+  const [showPWAPrompt, setShowPWAPrompt] = useState(false);
+  const deferredPromptRef = useRef<any>(null);
+
   const countdownPauseUntilRef = useRef<number>(0);
   const mountedRef = useRef<boolean>(false);
   const resumeIntentHandledRef = useRef<boolean>(false);
@@ -529,6 +533,47 @@ export default function HomePage() {
       clearTimeout(timer);
     };
   }, []);
+
+  // ============================================
+  // PWA INSTALL PROMPT LISTENER
+  // ============================================
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      deferredPromptRef.current = e;
+      
+      // Show PWA install button after 10 seconds (if not already installed)
+      setTimeout(() => {
+        if (deferredPromptRef.current && mountedRef.current) {
+          setShowPWAPrompt(true);
+        }
+      }, 10000);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Check if already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setShowPWAPrompt(false);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handlePWAInstall = async () => {
+    if (!deferredPromptRef.current) return;
+
+    deferredPromptRef.current.prompt();
+    const { outcome } = await deferredPromptRef.current.userChoice;
+
+    if (outcome === 'accepted') {
+      setShowPWAPrompt(false);
+    }
+
+    deferredPromptRef.current = null;
+  };
 
   useEffect(() => {
     if (!isInitialLoad) {
@@ -1455,6 +1500,40 @@ export default function HomePage() {
                     <VolumeX style={{ width: 18, height: 18, color: "#6b7280" }} />
                   )}
                 </button>
+
+                {/* PWA Install Button */}
+                {showPWAPrompt && (
+                  <button
+                    onClick={handlePWAInstall}
+                    aria-label="Install App"
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: 12,
+                      border: "1px solid rgba(124,58,237,0.4)",
+                      background: "linear-gradient(135deg, rgba(124,58,237,0.15), rgba(168,85,247,0.15))",
+                      color: "#a855f7",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      transition: "all 0.2s",
+                      animation: "pulse-slow 3s ease-in-out infinite",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "linear-gradient(135deg, rgba(124,58,237,0.25), rgba(168,85,247,0.25))";
+                      e.currentTarget.style.borderColor = "rgba(124,58,237,0.6)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "linear-gradient(135deg, rgba(124,58,237,0.15), rgba(168,85,247,0.15))";
+                      e.currentTarget.style.borderColor = "rgba(124,58,237,0.4)";
+                    }}
+                  >
+                    <Gift style={{ width: 14, height: 14 }} />
+                    Install App
+                  </button>
+                )}
 
                 {/* Buy Round Button */}
                 <button
