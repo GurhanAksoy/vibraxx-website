@@ -1507,31 +1507,46 @@ export default function HomePage() {
                     onClick={handlePWAInstall}
                     aria-label="Install App"
                     style={{
-                      padding: "8px 16px",
+                      padding: "9px 18px",
                       borderRadius: 12,
-                      border: "1px solid rgba(124,58,237,0.4)",
-                      background: "linear-gradient(135deg, rgba(124,58,237,0.15), rgba(168,85,247,0.15))",
-                      color: "#a855f7",
-                      fontSize: 13,
-                      fontWeight: 600,
+                      border: "2px solid #7c3aed",
+                      background: "linear-gradient(135deg, rgba(124,58,237,0.25), rgba(139,92,246,0.2))",
+                      color: "#e9d5ff",
+                      fontSize: 14,
+                      fontWeight: 700,
                       cursor: "pointer",
                       display: "inline-flex",
                       alignItems: "center",
-                      gap: 6,
-                      transition: "all 0.2s",
-                      animation: "pulse-slow 3s ease-in-out infinite",
+                      gap: 8,
+                      transition: "all 0.3s ease",
+                      boxShadow: "0 4px 20px rgba(124,58,237,0.3), inset 0 1px 0 rgba(255,255,255,0.1)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      position: "relative",
+                      overflow: "hidden",
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "linear-gradient(135deg, rgba(124,58,237,0.25), rgba(168,85,247,0.25))";
-                      e.currentTarget.style.borderColor = "rgba(124,58,237,0.6)";
+                      e.currentTarget.style.background = "linear-gradient(135deg, rgba(124,58,237,0.4), rgba(139,92,246,0.35))";
+                      e.currentTarget.style.borderColor = "#8b5cf6";
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.boxShadow = "0 6px 25px rgba(124,58,237,0.5), inset 0 1px 0 rgba(255,255,255,0.15)";
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "linear-gradient(135deg, rgba(124,58,237,0.15), rgba(168,85,247,0.15))";
-                      e.currentTarget.style.borderColor = "rgba(124,58,237,0.4)";
+                      e.currentTarget.style.background = "linear-gradient(135deg, rgba(124,58,237,0.25), rgba(139,92,246,0.2))";
+                      e.currentTarget.style.borderColor = "#7c3aed";
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "0 4px 20px rgba(124,58,237,0.3), inset 0 1px 0 rgba(255,255,255,0.1)";
                     }}
                   >
-                    <Gift style={{ width: 14, height: 14 }} />
-                    Install App
+                    <Gift style={{ width: 16, height: 16, color: "#c4b5fd" }} />
+                    <span style={{ 
+                      background: "linear-gradient(135deg, #e9d5ff, #c4b5fd)",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      fontWeight: 800,
+                    }}>
+                      Install App
+                    </span>
                   </button>
                 )}
 
