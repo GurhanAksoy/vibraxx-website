@@ -16,6 +16,44 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Image from "next/image";
 
+// ============================================
+// 🎯 PRESENCE TRACKING HOOK (KANONİK)
+// ============================================
+function usePresence(pageType: string) {
+  const sessionIdRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (!sessionIdRef.current) {
+      const stored = sessionStorage.getItem('presence_session_id');
+      if (stored) {
+        sessionIdRef.current = stored;
+      } else {
+        sessionIdRef.current = crypto.randomUUID();
+        sessionStorage.setItem('presence_session_id', sessionIdRef.current);
+      }
+    }
+
+    const sendHeartbeat = async () => {
+      try {
+        await supabase.rpc('update_presence', {
+          p_session_id: sessionIdRef.current,
+          p_page_type: pageType,
+          p_round_id: null
+        });
+      } catch (err) {
+        console.error('Presence heartbeat failed:', err);
+      }
+    };
+
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 30000);
+
+    return () => clearInterval(interval);
+  }, [pageType]);
+}
+
 interface LobbyPlayer {
   user_id: string;
   full_name: string;
@@ -43,6 +81,9 @@ interface LobbyStateData {
 
 export default function LobbyPage() {
   const router = useRouter();
+
+  // ✅ PRESENCE TRACKING
+  usePresence('lobby');
 
   // ─── Canonical State (get_lobby_state) ───
   const [lobbyState, setLobbyState] = useState<LobbyStateData | null>(null);
@@ -155,10 +196,20 @@ export default function LobbyPage() {
         isRedirectingRef.current = true;
         setIsRedirecting(true);
         
-        // Join (DB kredi düşürecek round start'ta)
-        await supabase.rpc('join_live_round', { p_round_id: data.round_id });
+        // ✅ EMNİYET KEMERİ: Join başarısızsa push yapma!
+        const { data: joinResult, error: joinError } = await supabase.rpc('join_live_round', { 
+          p_round_id: data.round_id 
+        });
         
-        // Quiz'e git
+        if (joinError || joinResult?.error) {
+          // Join başarısız (round_not_live vb.) → Lobby'de kal
+          console.log('[Lobby] Join failed, staying in lobby:', joinError || joinResult?.error);
+          isRedirectingRef.current = false;
+          setIsRedirecting(false);
+          return;
+        }
+        
+        // Join başarılı → Quiz'e git
         router.push(`/quiz/${data.round_id}`);
       }
 
