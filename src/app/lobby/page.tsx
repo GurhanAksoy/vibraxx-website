@@ -103,6 +103,7 @@ export default function LobbyPage() {
   const hasInteractedRef = useRef(false);
   const alarmFiredRef = useRef(false);
   const mountedRef = useRef(true);
+  const countdownPauseUntilRef = useRef<number>(0);  // ✅ Ana sayfa ile aynı
 
   // ─── Round change detection ───
   const lastRoundIdRef = useRef<number | null>(null);
@@ -226,16 +227,15 @@ export default function LobbyPage() {
   }, [fetchLobbyState]);
 
   // ============================================
-  // 🎯 COUNTDOWN TICK - Ana sayfa ile AYNI mantık!
-  // RPC her 5s → initial value
-  // Local tick her 1s → decrement
+  // 🎯 COUNTDOWN TICK - Ana sayfa ile TAM AYNI!
   // ============================================
   useEffect(() => {
-    const tick = setInterval(() => {
-      if (!mountedRef.current) return;
-      setLocalSeconds((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
+    const countdownInterval = setInterval(() => {
+      const now = Date.now();
+      if (now < countdownPauseUntilRef.current) return;
+      setLocalSeconds((prev) => (prev && prev > 0 ? prev - 1 : prev));
     }, 1000);
-    return () => clearInterval(tick);
+    return () => clearInterval(countdownInterval);
   }, []);
 
   // === WARNING & SOUND EFFECTS ===
