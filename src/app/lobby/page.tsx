@@ -34,6 +34,7 @@ interface LobbyState {
   is_participant: boolean;
   participant_count: number;
   should_redirect_to_quiz: boolean;
+  players: LobbyPlayer[];
 }
 
 export default function LobbyPage() {
@@ -160,11 +161,9 @@ export default function LobbyPage() {
       setLobbyState(data);
       setIsLoading(false);
 
-      // Player listesini güncelle
-      if (data.round_id) {
-        fetchLobbyPlayersById(data.round_id);
-        fetchTotalParticipantsById(data.round_id);
-      }
+      // Players ve count doğrudan get_lobby_state'den gelir
+      setPlayers(data.players ?? []);
+      setTotalPlayers(data.participant_count ?? 0);
 
       // Redirect logic
       if (data.should_redirect_to_quiz && data.round_id && !isRedirectingRef.current) {
@@ -195,38 +194,12 @@ export default function LobbyPage() {
     }
   }, []); // stable — router via ref
 
-  // === FETCH LOBBY PLAYERS ===
-  const fetchLobbyPlayersById = useCallback(async (roundId: string) => {
-    try {
-      const { data, error } = await supabase.rpc("get_lobby_participants", {
-        p_round_id: roundId,
-      });
-      if (error) { console.error("[Lobby] Fetch players error:", error); return; }
-      if (data) setPlayers(data);
-    } catch (err) {
-      console.error("[Lobby] Fetch players error:", err);
-    }
-  }, []);
-
-  // === FETCH TOTAL PARTICIPANTS ===
-  const fetchTotalParticipantsById = useCallback(async (roundId: string) => {
-    try {
-      const { data, error } = await supabase.rpc("get_round_participant_count", {
-        p_round_id: roundId,
-      });
-      if (error) { console.error("[Lobby] Fetch count error:", error); return; }
-      if (typeof data === "number") setTotalPlayers(data);
-    } catch (err) {
-      console.error("[Lobby] Fetch total error:", err);
-    }
-  }, []);
-
   // === POLLING ===
   useEffect(() => {
     fetchLobbyState();
-    const interval = setInterval(fetchLobbyState, 5000);
+    const interval = setInterval(() => { fetchLobbyState(); }, 5000);
     return () => clearInterval(interval);
-  }, [fetchLobbyState]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // === COUNTDOWN TICK ===
   useEffect(() => {
