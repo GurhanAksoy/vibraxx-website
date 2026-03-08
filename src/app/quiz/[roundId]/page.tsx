@@ -103,20 +103,6 @@ export default function QuizGamePage() {
       try {
         console.log("🔐 Starting security verification...");
 
-        // ✅ BROWSER ACCESS GUARD: Block direct URL access
-        // Quiz can only be accessed from lobby redirect
-        const navigationEntry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming;
-        if (navigationEntry && navigationEntry.type === "navigate") {
-          const referrer = document.referrer;
-          const isFromLobby = referrer && referrer.includes("/lobby");
-          
-          if (!isFromLobby && !referrer.includes("/quiz/")) {
-            console.log("❌ Quiz Security: Direct browser access blocked");
-            router.push("/lobby");
-            return;
-          }
-        }
-
         const {
           data: { user },
           error: authError,
