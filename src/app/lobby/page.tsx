@@ -17,52 +17,6 @@ import { supabase } from "@/lib/supabaseClient";
 import Image from "next/image";
 
 // ============================================
-// 🎯 PRESENCE TRACKING HOOK (KANONİK)
-// ============================================
-function usePresence(pageType: string) {
-  const sessionIdRef = useRef<string | undefined>(undefined);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    if (!sessionIdRef.current) {
-      const stored = sessionStorage.getItem('presence_session_id');
-      if (stored) {
-        sessionIdRef.current = stored;
-      } else {
-        sessionIdRef.current = crypto.randomUUID();
-        sessionStorage.setItem('presence_session_id', sessionIdRef.current);
-      }
-    }
-
-    const sendHeartbeat = async () => {
-      try {
-        await supabase.rpc('update_presence', {
-          p_session_id: sessionIdRef.current,
-          p_page_type: pageType,
-          p_round_id: null
-        });
-      } catch (err) {
-        console.error('Presence heartbeat failed:', err);
-      }
-    };
-
-    sendHeartbeat();
-    const interval = setInterval(sendHeartbeat, 30000);
-
-    return () => clearInterval(interval);
-  }, [pageType]);
-}
-
-interface LobbyPlayer {
-  user_id: string;
-  full_name: string;
-  avatar_url: string;
-  total_score: number;
-  streak: number;
-}
-
-// ============================================
 // LOBBY STATE — get_lobby_state RPC shape
 // ============================================
 interface LobbyStateData {
@@ -70,9 +24,8 @@ interface LobbyStateData {
   status?: string; // 'no_live_round' | 'live'
   credits?: number;
   next_round_in_seconds?: number;
-  round_id?: number;
+  round_id?: string; // ✅ UUID
   started_at?: string;
-  duration_seconds?: number;
   remaining_seconds?: number;
   is_participant?: boolean;
   participant_count?: number;
@@ -81,9 +34,6 @@ interface LobbyStateData {
 
 export default function LobbyPage() {
   const router = useRouter();
-
-  // ✅ PRESENCE TRACKING
-  usePresence('lobby');
 
   // ─── Canonical State (get_lobby_state) ───
   const [lobbyState, setLobbyState] = useState<LobbyStateData | null>(null);
@@ -106,7 +56,7 @@ export default function LobbyPage() {
   const countdownPauseUntilRef = useRef<number>(0);  // ✅ Ana sayfa ile aynı
 
   // ─── Round change detection ───
-  const lastRoundIdRef = useRef<number | null>(null);
+  const lastRoundIdRef = useRef<string | null>(null);
 
   // ─── Derived ───
   const isUrgent = localSeconds !== null && localSeconds <= 10 && localSeconds > 0;
@@ -174,9 +124,19 @@ export default function LobbyPage() {
   // ============================================
   const fetchLobbyState = useCallback(async () => {
     try {
-      // ✅ TEK RPC: get_lobby_state
-      const { data, error } = await supabase.rpc("get_lobby_state");
-      
+      // ✅ getSession — cache'den okur, network isteği atmaz
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        router.push("/");
+        return;
+      }
+      const userId = session.user.id;
+
+      // ✅ TEK RPC: get_lobby_state — p_user_id geç
+      const { data, error } = await supabase.rpc("get_lobby_state", {
+        p_user_id: userId
+      });
+
       if (error || !data || !mountedRef.current) return;
 
       // Auth guard → home
@@ -185,31 +145,38 @@ export default function LobbyPage() {
         return;
       }
 
+      // ✅ Round değişince isRedirectingRef reset et
+      if (data.round_id && data.round_id !== lastRoundIdRef.current) {
+        lastRoundIdRef.current = data.round_id;
+        isRedirectingRef.current = false;
+      }
+
       // ✅ ANA SAYFA İLE AYNI COUNTDOWN
-      if (data.next_round_in_seconds != null) {
+      // Live round varsa remaining_seconds, yoksa next_round_in_seconds
+      if (data.status === 'live' && data.remaining_seconds != null) {
+        setLocalSeconds(Math.max(0, data.remaining_seconds));
+      } else if (data.next_round_in_seconds != null) {
         setLocalSeconds(Math.max(0, data.next_round_in_seconds));
       }
 
+      setLobbyState(data);
       setIsLoading(false);
-
-      // ✅ KANONİK: DB KARAR VERDİ Mİ? → UYGULA!
       if (data.should_redirect_to_quiz && data.round_id && !isRedirectingRef.current) {
         isRedirectingRef.current = true;
         setIsRedirecting(true);
-        
+
         // ✅ EMNİYET KEMERİ: Join başarısızsa push yapma!
-        const { data: joinResult, error: joinError } = await supabase.rpc('join_live_round', { 
-          p_round_id: data.round_id 
+        const { data: joinResult, error: joinError } = await supabase.rpc('join_live_round', {
+          p_round_id: data.round_id
         });
-        
+
         if (joinError || joinResult?.error) {
-          // Join başarısız (round_not_live vb.) → Lobby'de kal
           console.log('[Lobby] Join failed, staying in lobby:', joinError || joinResult?.error);
           isRedirectingRef.current = false;
           setIsRedirecting(false);
           return;
         }
-        
+
         // Join başarılı → Quiz'e git
         router.push(`/quiz/${data.round_id}`);
       }
@@ -456,6 +423,10 @@ export default function LobbyPage() {
           animation: float 6s ease-in-out infinite;
         }
 
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+
         * {
           box-sizing: border-box;
           margin: 0;
@@ -526,6 +497,83 @@ export default function LobbyPage() {
               animation: "warningPulse 0.6s ease-in-out infinite",
             }}
           />
+        )}
+
+        {/* JOINING OVERLAY — quiz'e yönlendirilirken */}
+        {isRedirecting && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(2, 8, 23, 0.92)",
+              backdropFilter: "blur(16px)",
+              zIndex: 100,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "28px",
+            }}
+          >
+            <div
+              style={{
+                width: 90,
+                height: 90,
+                position: "relative",
+                borderRadius: "9999px",
+                padding: 4,
+                background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)",
+                boxShadow: "0 0 50px rgba(124,58,237,0.8)",
+              }}
+            >
+              <div
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  height: "100%",
+                  borderRadius: "9999px",
+                  backgroundColor: "#020817",
+                  overflow: "hidden",
+                }}
+              >
+                <Image
+                  src="/images/logo.png"
+                  alt="VibraXX"
+                  fill
+                  sizes="90px"
+                  style={{ objectFit: "contain", padding: "16%" }}
+                />
+              </div>
+            </div>
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                border: "4px solid rgba(139, 92, 246, 0.3)",
+                borderTop: "4px solid #a78bfa",
+                borderRadius: "50%",
+                animation: "spin 0.8s linear infinite",
+              }}
+            />
+            <div style={{ textAlign: "center" }}>
+              <div
+                style={{
+                  fontSize: "clamp(22px, 5vw, 30px)",
+                  fontWeight: 900,
+                  backgroundImage: "linear-gradient(135deg, #a78bfa, #f0abfc)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                  marginBottom: 8,
+                }}
+              >
+                Joining Arena...
+              </div>
+              <div style={{ fontSize: 14, color: "#64748b", fontWeight: 600 }}>
+                Preparing your quiz
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Top Header Bar */}
@@ -1217,7 +1265,7 @@ export default function LobbyPage() {
                       color: "#f9a8d4",
                     }}
                   >
-                    6 seconds
+                    9 seconds
                   </div>
                 </div>
                 <div
@@ -1246,7 +1294,7 @@ export default function LobbyPage() {
                       color: "#86efac",
                     }}
                   >
-                    2 per correct
+                    10 pts/correct
                   </div>
                 </div>
               </div>
