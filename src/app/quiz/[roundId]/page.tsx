@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import type { User } from "@supabase/supabase-js";
 import ShareButtons from "@/components/ShareButtons";
 import {
   Trophy,
@@ -34,21 +35,14 @@ interface Question {
   option_d: string;
 }
 
-// ✅ KANONIK: Helper to get correct answer from backend
-interface QuestionWithAnswer extends Question {
-  correct_option?: OptionId;
-  explanation?: string;
-}
-
 export default function QuizGamePage() {
   const router = useRouter();
   const params = useParams();
-  
-  // ✅ PROFESSIONAL: RoundId from URL (NO MAGIC!)
+
+  // UUID string — PostgreSQL otomatik cast eder
   const roundId = params?.roundId as string | null;
 
   // 🔐 === SECURITY STATE ===
-  const [isVerifying, setIsVerifying] = useState(true);
   const [securityPassed, setSecurityPassed] = useState(false);
 
   // === STATE ===
@@ -76,15 +70,16 @@ export default function QuizGamePage() {
   const [answers, setAnswers] = useState<AnswerStatus[]>([]);
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   // Final results from DB
   const [finalRank, setFinalRank] = useState<number | null>(null);
   const [finalTotalPlayers, setFinalTotalPlayers] = useState<number | null>(null);
-  
+
   // Timeout guard
   const timeoutTriggeredRef = useRef(false);
   const answerSubmittedRef = useRef<Set<number>>(new Set());
+  const finalRedirectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // === AUDIO REFS ===
   const correctSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -100,25 +95,15 @@ export default function QuizGamePage() {
   useEffect(() => {
     const verifyAccess = async () => {
       try {
-        console.log("🔐 Starting security verification...");
-
-        const {
-          data: { user },
-          error: authError,
-        } = await supabase.auth.getUser();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
 
         if (authError || !user) {
-          console.log("❌ Quiz Security: Not authenticated");
           router.push("/");
           return;
         }
 
-        console.log("✅ Quiz Security: User authenticated -", user.id);
-        console.log("✅ Quiz Security: All checks passed!");
-
-        setUser(user); // Set user for share buttons
+        setUser(user);
         setSecurityPassed(true);
-        setIsVerifying(false);
       } catch (error) {
         console.error("❌ Security check failed:", error);
         router.push("/");
@@ -134,31 +119,16 @@ export default function QuizGamePage() {
   useEffect(() => {
     const loadQuizData = async () => {
       try {
-        // Check: roundId from URL must exist
         if (!roundId) {
-          console.log("❌ [QUIZ] No roundId in URL");
           router.push("/lobby");
           return;
         }
 
         if (!securityPassed) return;
 
-        console.log("📝 [QUIZ] Loading quiz for round:", roundId);
-
-        const {
-          data: { user: authUser },
-        } = await supabase.auth.getUser();
-
-        if (!authUser) {
-          router.push("/lobby");
-          return;
-        }
-
-        // ✅ STEP 1: Get questions (DB checks everything)
+        // ✅ STEP 1: Get questions — DB checks participant status
         const { data: questionsData, error: questionsError } = await supabase
-          .rpc("get_round_questions", {
-            p_round_id: roundId
-          });
+          .rpc("get_round_questions", { p_round_id: roundId });
 
         if (questionsError || !questionsData || questionsData.length === 0) {
           console.error("❌ [QUIZ] Questions error:", questionsError);
@@ -166,26 +136,18 @@ export default function QuizGamePage() {
           return;
         }
 
-        console.log(`✅ [QUIZ] Loaded ${questionsData.length} questions`);
-
-        // ✅ STEP 2: Get round progress (comprehensive restore)
+        // ✅ STEP 2: Restore progress from DB
         const { data: progress, error: progressError } = await supabase
-          .rpc("get_round_progress", {
-            p_round_id: roundId
-          });
+          .rpc("get_round_progress", { p_round_id: roundId });
 
         let normalizedAnswers = Array(questionsData.length).fill("none");
 
         if (!progressError && progress) {
-          console.log(`✅ [QUIZ] Progress restored:`, progress);
-          
-          // Restore all state from DB
           setCurrentIndex(progress.current_index || 0);
           setCorrectCount(progress.correct_count || 0);
           setWrongCount(progress.wrong_count || 0);
           setTotalScore(progress.total_score || 0);
-          
-          // ✅ Normalize answers array (copy up to min length)
+
           if (progress.answers_array && Array.isArray(progress.answers_array)) {
             const copyLength = Math.min(progress.answers_array.length, questionsData.length);
             for (let i = 0; i < copyLength; i++) {
@@ -193,14 +155,12 @@ export default function QuizGamePage() {
             }
           }
         } else {
-          // Fresh start
           setCurrentIndex(0);
           setCorrectCount(0);
           setWrongCount(0);
           setTotalScore(0);
         }
 
-        // Set normalized answers and questions
         setAnswers(normalizedAnswers);
         setQuestions(questionsData);
         setTimeLeft(QUESTION_DURATION);
@@ -345,11 +305,10 @@ export default function QuizGamePage() {
   };
 
 
-  // ✅ FIXED: Stabilized final score countdown
+  // ✅ FIXED: Final score countdown — double redirect koruması
   useEffect(() => {
     if (!showFinalScore) return;
 
-    console.log("🏁 Final score screen activated");
     stopTick();
     playSound(gameoverSoundRef.current);
 
@@ -359,22 +318,19 @@ export default function QuizGamePage() {
     const interval = setInterval(() => {
       remaining -= 1;
       setFinalCountdown(Math.max(0, remaining));
-      
-      if (remaining <= 0) {
-        clearInterval(interval);
-      }
+      if (remaining <= 0) clearInterval(interval);
     }, 1000);
 
-    const timeout = setTimeout(() => {
-      console.log("🏠 Auto-redirecting to home...");
+    // Ref ile redirect — buton tıklanırsa clearTimeout yapılabilir
+    finalRedirectRef.current = setTimeout(() => {
       router.push("/");
     }, FINAL_SCORE_DURATION * 1000);
 
     return () => {
       clearInterval(interval);
-      clearTimeout(timeout);
+      if (finalRedirectRef.current) clearTimeout(finalRedirectRef.current);
     };
-  }, [showFinalScore, router]);
+  }, [showFinalScore]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sound toggle effect
   useEffect(() => {
@@ -400,7 +356,6 @@ export default function QuizGamePage() {
     if (!currentQ || !roundId) return;
     if (answerSubmittedRef.current.has(currentQ.question_id)) return;
 
-    console.log("✅ Answer selected:", optionId);
     playClick();
     setSelectedAnswer(optionId);
     setIsAnswerLocked(true);
@@ -472,7 +427,6 @@ export default function QuizGamePage() {
     if (!currentQ || !roundId) return;
     if (answerSubmittedRef.current.has(currentQ.question_id)) return;
 
-    console.log("⏱️ Timeout - auto submitting");
     setIsAnswerLocked(true);
     answerSubmittedRef.current.add(currentQ.question_id);
 
@@ -520,7 +474,6 @@ export default function QuizGamePage() {
   };
 
   const handleExitConfirmYes = async () => {
-    console.log("🚪 User confirmed exit");
     playClick();
     stopTick();
     setShowExitConfirm(false);
@@ -528,12 +481,7 @@ export default function QuizGamePage() {
     if (!roundId) return;
 
     try {
-      // ✅ KANONIK: Force finish round (auto-submit remaining)
-      await supabase.rpc("force_finish_user_round", {
-        p_round_id: roundId
-      });
-
-      // Load final results
+      await supabase.rpc("force_finish_user_round", { p_round_id: roundId });
       await loadFinalResults();
       setShowFinalScore(true);
     } catch (err) {
@@ -560,12 +508,14 @@ export default function QuizGamePage() {
     return "#ef4444";
   };
 
-  const accuracy = questions.length > 0
-    ? Math.round((correctCount / questions.length) * 100)
+  // ✅ FIX: Accuracy sadece cevaplanmış sorulara göre
+  const answered = correctCount + wrongCount;
+  const accuracy = answered > 0
+    ? Math.round((correctCount / answered) * 100)
     : 0;
 
   // 🔐 === SECURITY VERIFICATION SCREEN ===
-  if (isVerifying) {
+  if (!securityPassed) {
     return (
       <div
         style={{
@@ -594,13 +544,13 @@ export default function QuizGamePage() {
             color: "#a78bfa",
             fontSize: "16px",
             fontWeight: 600,
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
           }}
         >
           🔐 Verifying access...
         </p>
+        <style jsx>{`
+          @keyframes spin { to { transform: rotate(360deg); } }
+        `}</style>
       </div>
     );
   }
@@ -1065,7 +1015,7 @@ export default function QuizGamePage() {
                 textTransform: "uppercase",
               }}
             >
-              Round {roundId} • Question {currentIndex + 1}/{questions.length}
+              Global Arena • Question {currentIndex + 1}/{questions.length}
             </div>
           )}
 
@@ -1443,7 +1393,10 @@ export default function QuizGamePage() {
 
               {/* Action Button */}
               <button
-                onClick={() => router.push("/")}
+                onClick={() => {
+                  if (finalRedirectRef.current) clearTimeout(finalRedirectRef.current);
+                  router.push("/");
+                }}
                 style={{
                   width: "100%",
                   padding: "clamp(14px, 3vw, 16px) clamp(24px, 5vw, 32px)",

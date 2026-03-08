@@ -66,6 +66,7 @@ export default function LobbyPage() {
   const lastRoundIdRef = useRef<string | null>(null);
   const localSecondsInitRef = useRef(false);
   const alarmFiredRef = useRef(false);
+  const hasJoinedRef = useRef(false); // Scheduled round'a join edildi mi
 
   useEffect(() => {
     mountedRef.current = true;
@@ -147,6 +148,7 @@ export default function LobbyPage() {
         isRedirectingRef.current = false;
         localSecondsInitRef.current = false;
         alarmFiredRef.current = false;
+        hasJoinedRef.current = false;
         setShowWarning(false);
         setPlayers([]);
         setTotalPlayers(0);
@@ -165,28 +167,31 @@ export default function LobbyPage() {
       setPlayers(data.players ?? []);
       setTotalPlayers(data.participant_count ?? 0);
 
-      // Redirect logic
+      // === JOIN: Scheduled round varsa ve kredi varsa → önceden join et ===
+      if (
+        data.status === "no_live_round" &&
+        data.next_round_in_seconds != null &&
+        data.credits > 0 &&
+        !data.is_participant &&
+        !hasJoinedRef.current
+      ) {
+        hasJoinedRef.current = true;
+        console.log("[Lobby] Joining next scheduled round...");
+        const { data: joinResult, error: joinError } = await supabase.rpc("join_live_round");
+        const joinRow = Array.isArray(joinResult) ? joinResult[0] : joinResult;
+        if (joinError || (joinRow?.action !== "join" && joinRow?.message !== "already_joined")) {
+          console.log("[Lobby] Pre-join failed:", joinError || joinRow?.message);
+          hasJoinedRef.current = false;
+        } else {
+          console.log("[Lobby] Pre-joined successfully");
+        }
+        return;
+      }
+
+      // === REDIRECT: Round live ve is_participant → quiz'e git ===
       if (data.should_redirect_to_quiz && data.round_id && !isRedirectingRef.current) {
         isRedirectingRef.current = true;
         setIsRedirecting(true);
-
-        // Zaten katılmışsa → direkt git
-        if (data.is_participant) {
-          routerRef.current.push(`/quiz/${data.round_id}`);
-          return;
-        }
-
-        // Join et (parametresiz)
-        const { data: joinResult, error: joinError } = await supabase.rpc("join_live_round");
-        const joinRow = Array.isArray(joinResult) ? joinResult[0] : joinResult;
-
-        if (joinError || (joinRow?.action !== "join" && joinRow?.message !== "already_joined")) {
-          console.log("[Lobby] Join failed:", joinError || joinRow?.message);
-          isRedirectingRef.current = false;
-          setIsRedirecting(false);
-          return;
-        }
-
         routerRef.current.push(`/quiz/${data.round_id}`);
       }
     } catch (err) {
