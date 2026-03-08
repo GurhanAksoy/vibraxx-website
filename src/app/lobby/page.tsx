@@ -167,32 +167,34 @@ export default function LobbyPage() {
       setPlayers(data.players ?? []);
       setTotalPlayers(data.participant_count ?? 0);
 
-      // === JOIN: Scheduled round varsa ve kredi varsa → önceden join et ===
-      if (
-        data.status === "no_live_round" &&
-        data.next_round_in_seconds != null &&
-        data.credits > 0 &&
-        !data.is_participant &&
-        !hasJoinedRef.current
-      ) {
-        hasJoinedRef.current = true;
-        console.log("[Lobby] Joining next scheduled round...");
-        const { data: joinResult, error: joinError } = await supabase.rpc("join_live_round");
-        const joinRow = Array.isArray(joinResult) ? joinResult[0] : joinResult;
-        if (joinError || (joinRow?.action !== "join" && joinRow?.message !== "already_joined")) {
-          console.log("[Lobby] Pre-join failed:", joinError || joinRow?.message);
-          hasJoinedRef.current = false;
-        } else {
-          console.log("[Lobby] Pre-joined successfully");
-        }
-        return;
-      }
+      // === JOIN + REDIRECT: Round live → join et, sonra quiz'e git ===
+      if (data.status === "live" && data.round_id && !isRedirectingRef.current) {
+        if (!data.is_participant && !hasJoinedRef.current) {
+          hasJoinedRef.current = true;
+          const { data: joinResult, error: joinError } = await supabase.rpc("join_live_round");
+          const joinRow = Array.isArray(joinResult) ? joinResult[0] : joinResult;
 
-      // === REDIRECT: Round live ve is_participant → quiz'e git ===
-      if (data.should_redirect_to_quiz && data.round_id && !isRedirectingRef.current) {
-        isRedirectingRef.current = true;
-        setIsRedirecting(true);
-        routerRef.current.push(`/quiz/${data.round_id}`);
+          if (!joinError && joinRow) {
+            const msg: string = joinRow.message ?? "";
+            const action: string = joinRow.action ?? "";
+
+            if (action === "join" || msg === "ok" || msg === "already_joined") {
+              isRedirectingRef.current = true;
+              setIsRedirecting(true);
+              routerRef.current.push(`/quiz/${data.round_id}`);
+            } else {
+              // insufficient_credits, pool_not_ready, round_closed, vs → reset
+              hasJoinedRef.current = false;
+            }
+          } else {
+            hasJoinedRef.current = false;
+          }
+        } else if (data.is_participant) {
+          // Zaten join edilmiş → direkt redirect
+          isRedirectingRef.current = true;
+          setIsRedirecting(true);
+          routerRef.current.push(`/quiz/${data.round_id}`);
+        }
       }
     } catch (err) {
       console.error("[Lobby] fetchLobbyState error:", err);
@@ -621,98 +623,86 @@ export default function LobbyPage() {
             style={{
               maxWidth: "1400px",
               margin: "0 auto",
-              padding: "clamp(14px, 3.6vw, 19px) clamp(19px, 4.8vw, 38px)",
-              position: "relative",
+              padding: "clamp(10px, 2.5vw, 16px) clamp(12px, 3vw, 24px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "8px",
             }}
           >
-            {/* Sol: Back + Sound yan yana; Logo ortada absolute */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              {/* Left: Back + Sound butonu yan yana */}
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", zIndex: 21 }}>
-                <button
-                  onClick={handleBack}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    padding: "10px 16px",
-                    borderRadius: "12px",
-                    border: "1px solid rgba(148, 163, 253, 0.3)",
-                    background: "rgba(15, 23, 42, 0.8)",
-                    color: "white",
-                    fontSize: "clamp(13px, 2.5vw, 15px)",
-                    fontWeight: 600,
-                    transition: "all 0.3s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
-                    e.currentTarget.style.transform = "translateX(-4px)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "rgba(15, 23, 42, 0.8)";
-                    e.currentTarget.style.transform = "translateX(0)";
-                  }}
-                >
-                  <ArrowLeft style={{ width: 18, height: 18 }} />
-                  <span className="hide-on-small">Back</span>
-                </button>
+            {/* Left: Back + Sound */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+              <button
+                onClick={handleBack}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "8px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid rgba(148, 163, 253, 0.3)",
+                  background: "rgba(15, 23, 42, 0.8)",
+                  color: "white",
+                  fontSize: "clamp(12px, 2.5vw, 14px)",
+                  fontWeight: 600,
+                  transition: "all 0.3s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(15, 23, 42, 0.8)";
+                }}
+              >
+                <ArrowLeft style={{ width: 16, height: 16 }} />
+                <span className="hide-on-small">Back</span>
+              </button>
 
-                <button
-                  onClick={() => setIsPlaying(!isPlaying)}
-                  style={{
-                    padding: "11px",
-                    borderRadius: "12px",
-                    border: "1px solid rgba(148, 163, 253, 0.3)",
-                    background: "rgba(15, 23, 42, 0.8)",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "all 0.3s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "rgba(15, 23, 42, 0.8)";
-                  }}
-                >
-                  {isPlaying ? (
-                    <Volume2 style={{ width: 20, height: 20, color: "#a78bfa" }} />
-                  ) : (
-                    <VolumeX style={{ width: 20, height: 20, color: "#6b7280" }} />
-                  )}
-                </button>
-              </div>
-
-              {/* Sağ: boş spacer (logo ortada absolute) */}
-              <div style={{ width: "clamp(44px, 10vw, 60px)" }} />
+              <button
+                onClick={() => setIsPlaying(!isPlaying)}
+                style={{
+                  padding: "9px",
+                  borderRadius: "10px",
+                  border: "1px solid rgba(148, 163, 253, 0.3)",
+                  background: "rgba(15, 23, 42, 0.8)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "all 0.3s",
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(15, 23, 42, 0.8)";
+                }}
+              >
+                {isPlaying ? (
+                  <Volume2 style={{ width: 18, height: 18, color: "#a78bfa" }} />
+                ) : (
+                  <VolumeX style={{ width: 18, height: 18, color: "#6b7280" }} />
+                )}
+              </button>
             </div>
 
             {/* Center: Logo + GLOBAL ARENA Text */}
             <div
               style={{
-                position: "absolute",
-                left: "50%",
-                top: "50%",
-                transform: "translate(-50%, -50%)",
-                zIndex: 20,
                 display: "flex",
                 alignItems: "center",
-                gap: "clamp(12px, 3vw, 16px)",
+                gap: "clamp(8px, 2vw, 14px)",
+                flex: 1,
+                justifyContent: "center",
+                overflow: "hidden",
               }}
             >
               {/* Logo */}
               <div
                 style={{
                   position: "relative",
-                  width: "clamp(70px, 14vw, 90px)",
-                  height: "clamp(70px, 14vw, 90px)",
+                  width: "clamp(44px, 9vw, 62px)",
+                  height: "clamp(44px, 9vw, 62px)",
                   borderRadius: "50%",
                   padding: 3,
                   background: "linear-gradient(135deg, #7c3aed, #d946ef)",
@@ -765,7 +755,7 @@ export default function LobbyPage() {
               <div>
                 <div
                   style={{
-                    fontSize: "clamp(16px, 3.5vw, 22px)",
+                    fontSize: "clamp(13px, 3vw, 20px)",
                     fontWeight: 900,
                     backgroundImage: "linear-gradient(135deg, #a78bfa, #f0abfc)",
                     WebkitBackgroundClip: "text",
@@ -781,6 +771,27 @@ export default function LobbyPage() {
                 </div>
               </div>
             </div>
+
+            {/* Right: Credits badge */}
+            <div
+              style={{
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "7px 12px",
+                borderRadius: "10px",
+                background: "rgba(139, 92, 246, 0.15)",
+                border: "1px solid rgba(139, 92, 246, 0.4)",
+                fontSize: "clamp(12px, 2.5vw, 14px)",
+                fontWeight: 800,
+                color: "#c4b5fd",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <span style={{ fontSize: "clamp(14px, 2.8vw, 16px)" }}>⚡</span>
+              <span>{lobbyState?.credits ?? 0}</span>
+            </div>
           </div>
         </header>
 
@@ -791,7 +802,7 @@ export default function LobbyPage() {
             zIndex: 10,
             maxWidth: "1400px",
             margin: "0 auto",
-            padding: "clamp(24px, 5vw, 40px) clamp(16px, 4vw, 32px)",
+            padding: "clamp(16px, 4vw, 40px) clamp(12px, 3.5vw, 32px)",
           }}
         >
           {/* Sponsor Banner */}
@@ -997,7 +1008,7 @@ export default function LobbyPage() {
             {/* Countdown Section */}
             <div
               style={{
-                padding: "clamp(32px, 6vw, 56px)",
+                padding: "clamp(20px, 4vw, 48px)",
                 borderRadius: "28px",
                 border:
                   timeUntilStart <= 10
@@ -1011,7 +1022,7 @@ export default function LobbyPage() {
                 textAlign: "center",
                 animation:
                   showWarning && timeUntilStart <= 10
-                    ? "redAlarm 0.8s ease-in-out infinite, shake 0.5s ease-in-out infinite"
+                    ? "redAlarm 0.8s ease-in-out infinite"
                     : "none",
                 boxShadow:
                   timeUntilStart <= 10
@@ -1133,7 +1144,7 @@ export default function LobbyPage() {
               {/* Countdown Timer */}
               <div
                 style={{
-                  fontSize: "clamp(56px, 18vw, 120px)",
+                  fontSize: "clamp(48px, 16vw, 110px)",
                   fontWeight: 900,
                   backgroundImage:
                     timeUntilStart <= 10
@@ -1217,8 +1228,8 @@ export default function LobbyPage() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                  gap: "clamp(14px, 3.5vw, 20px)",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: "clamp(10px, 2.5vw, 20px)",
                   maxWidth: "900px",
                   margin: "0 auto",
                 }}
@@ -1384,7 +1395,7 @@ export default function LobbyPage() {
                     boxShadow: "0 0 15px rgba(139, 92, 246, 0.3)",
                   }}
                 >
-                  {Math.max(66, players.length)}
+                  {totalPlayers}
                 </div>
               </div>
 
@@ -1393,7 +1404,7 @@ export default function LobbyPage() {
                   display: "flex",
                   flexDirection: "column",
                   gap: "clamp(9px, 1.9vw, 12px)",
-                  maxHeight: "412px",
+                  maxHeight: "clamp(200px, 40vh, 400px)",
                   overflowY: "auto",
                   paddingRight: "8px",
                 }}
@@ -1543,7 +1554,7 @@ export default function LobbyPage() {
                 >
                   🌍{" "}
                   <strong style={{ color: "#c4b5fd", fontWeight: 800 }}>
-                    {Math.max(66, totalPlayers).toLocaleString()}
+                    {totalPlayers.toLocaleString()}
                   </strong>{" "}
                   players in this round
                 </div>
@@ -1564,9 +1575,11 @@ export default function LobbyPage() {
           .hide-on-small {
             display: none !important;
           }
+        }
 
-          header > div {
-            position: relative !important;
+        @media (max-width: 420px) {
+          .quiz-info-grid {
+            grid-template-columns: 1fr !important;
           }
         }
 
