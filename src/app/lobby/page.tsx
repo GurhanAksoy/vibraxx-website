@@ -57,6 +57,7 @@ export default function LobbyPage() {
 
   // ─── Round change detection ───
   const lastRoundIdRef = useRef<string | null>(null);
+  const localSecondsInitRef = useRef(false); // ilk set yapıldı mı
 
   // ─── Derived ───
   const isUrgent = localSeconds !== null && localSeconds <= 10 && localSeconds > 0;
@@ -149,14 +150,13 @@ export default function LobbyPage() {
       if (data.round_id && data.round_id !== lastRoundIdRef.current) {
         lastRoundIdRef.current = data.round_id;
         isRedirectingRef.current = false;
+        localSecondsInitRef.current = false; // yeni round → sayacı yeniden set et
       }
-
-      // ✅ ANA SAYFA İLE AYNI COUNTDOWN
-      // Live round varsa remaining_seconds, yoksa next_round_in_seconds
-      if (data.status === 'live' && data.remaining_seconds != null) {
-        setLocalSeconds(Math.max(0, data.remaining_seconds));
-      } else if (data.next_round_in_seconds != null) {
-        setLocalSeconds(Math.max(0, data.next_round_in_seconds));
+      if (!localSecondsInitRef.current) {
+        localSecondsInitRef.current = true;
+        if (data.next_round_in_seconds != null) {
+          setLocalSeconds(Math.max(0, data.next_round_in_seconds));
+        }
       }
 
       setLobbyState(data);
@@ -166,9 +166,7 @@ export default function LobbyPage() {
         setIsRedirecting(true);
 
         // ✅ EMNİYET KEMERİ: Join başarısızsa push yapma!
-        const { data: joinResult, error: joinError } = await supabase.rpc('join_live_round', {
-          p_round_id: data.round_id
-        });
+        const { data: joinResult, error: joinError } = await supabase.rpc('join_live_round');
 
         if (joinError || joinResult?.error) {
           console.log('[Lobby] Join failed, staying in lobby:', joinError || joinResult?.error);
@@ -200,10 +198,18 @@ export default function LobbyPage() {
     const countdownInterval = setInterval(() => {
       const now = Date.now();
       if (now < countdownPauseUntilRef.current) return;
-      setLocalSeconds((prev) => (prev && prev > 0 ? prev - 1 : prev));
+      setLocalSeconds((prev) => {
+        if (prev === null) return prev;
+        if (prev <= 1) {
+          // 0'a düştü → hemen DB'yi sorgula
+          setTimeout(() => fetchLobbyState(), 300);
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
     return () => clearInterval(countdownInterval);
-  }, []);
+  }, [fetchLobbyState]);
 
   // === WARNING & SOUND EFFECTS ===
   useEffect(() => {
@@ -660,7 +666,10 @@ export default function LobbyPage() {
                     />
                   </div>
                 </div>
+              </div>
 
+              {/* Right: Home + Sound Toggle */}
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", zIndex: 21 }}>
                 {/* Home Button */}
                 <button
                   type="button"
@@ -691,36 +700,35 @@ export default function LobbyPage() {
                 >
                   <Home style={{ width: 17, height: 17, color: "#a78bfa" }} />
                 </button>
-              </div>
 
-              {/* Right: Sound Toggle */}
-              <button
-                onClick={() => setIsPlaying(!isPlaying)}
-                style={{
-                  padding: "11px",
-                  borderRadius: "12px",
-                  border: "1px solid rgba(148, 163, 253, 0.3)",
-                  background: "rgba(15, 23, 42, 0.8)",
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  transition: "all 0.3s",
-                  zIndex: 21,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(15, 23, 42, 0.8)";
-                }}
-              >
-                {isPlaying ? (
-                  <Volume2 style={{ width: 20, height: 20, color: "#a78bfa" }} />
-                ) : (
-                  <VolumeX style={{ width: 20, height: 20, color: "#6b7280" }} />
-                )}
-              </button>
+                {/* Sound Toggle */}
+                <button
+                  onClick={() => setIsPlaying(!isPlaying)}
+                  style={{
+                    padding: "11px",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(148, 163, 253, 0.3)",
+                    background: "rgba(15, 23, 42, 0.8)",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "all 0.3s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "rgba(15, 23, 42, 0.8)";
+                  }}
+                >
+                  {isPlaying ? (
+                    <Volume2 style={{ width: 20, height: 20, color: "#a78bfa" }} />
+                  ) : (
+                    <VolumeX style={{ width: 20, height: 20, color: "#6b7280" }} />
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Center: GLOBAL ARENA — her zaman ortalı */}
