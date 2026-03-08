@@ -258,31 +258,30 @@ export default function QuizGamePage() {
 
   // === EXPLANATION TIMER (5 seconds) ===
   useEffect(() => {
-    if (!showExplanation || showFinalScore) return;
+    if (showExplanation && !showFinalScore) {
+      const timer = setTimeout(async () => {
+        // Move to next question or finish quiz
+        if (currentIndex < questions.length - 1) {
+          playSound(whooshSoundRef.current);
+          setCurrentIndex(currentIndex + 1);
+          setTimeLeft(QUESTION_DURATION);
+          timeoutTriggeredRef.current = false;
+          setSelectedAnswer(null);
+          setIsAnswerLocked(false);
+          setShowExplanation(false);
+          setCurrentCorrectOption(null);
+          setCurrentExplanation("");
+        } else {
+          // Quiz finished - load results from DB
+          await loadFinalResults();
+          setShowFinalScore(true);
+        }
+      }, 5000); // 5 seconds explanation
 
-    const idx = currentIndex;
-    const total = questions.length;
-
-    const timer = setTimeout(async () => {
-      if (idx < total - 1) {
-        playSound(whooshSoundRef.current);
-        setCurrentIndex(idx + 1);
-        setTimeLeft(QUESTION_DURATION);
-        timeoutTriggeredRef.current = false;
-        setSelectedAnswer(null);
-        setIsAnswerLocked(false);
-        setShowExplanation(false);
-        setCurrentCorrectOption(null);
-        setCurrentExplanation("");
-      } else {
-        await loadFinalResults();
-        setShowFinalScore(true);
-      }
-    }, 5000);
-
-    return () => clearTimeout(timer);
+      return () => clearTimeout(timer);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showExplanation, showFinalScore]); // currentIndex/questions captured at effect run time
+  }, [showExplanation, showFinalScore]);
 
   // === LOAD FINAL RESULTS FROM DB ===
   const loadFinalResults = async () => {
@@ -516,23 +515,16 @@ export default function QuizGamePage() {
     ? Math.round((correctCount / answered) * 100)
     : 0;
 
-  // === ALWAYS-RENDERED AUDIO (must be before early returns) ===
-  const alwaysAudio = (
-    <>
-      <audio ref={correctSoundRef} src="/sounds/correct.mp3" preload="auto" />
-      <audio ref={wrongSoundRef} src="/sounds/wrong.mp3" preload="auto" />
-      <audio ref={clickSoundRef} src="/sounds/click.mp3" preload="auto" />
-      <audio ref={gameoverSoundRef} src="/sounds/gameover.mp3" preload="auto" />
-      <audio ref={whooshSoundRef} src="/sounds/whoosh.mp3" preload="auto" />
-      <audio ref={tickSoundRef} src="/sounds/tick.mp3" preload="auto" />
-    </>
-  );
-
   // 🔐 === SECURITY VERIFICATION SCREEN ===
   if (!securityPassed) {
     return (
       <>
-        {alwaysAudio}
+        <audio ref={correctSoundRef} src="/sounds/correct.mp3" preload="auto" />
+        <audio ref={wrongSoundRef} src="/sounds/wrong.mp3" preload="auto" />
+        <audio ref={clickSoundRef} src="/sounds/click.mp3" preload="auto" />
+        <audio ref={gameoverSoundRef} src="/sounds/gameover.mp3" preload="auto" />
+        <audio ref={whooshSoundRef} src="/sounds/whoosh.mp3" preload="auto" />
+        <audio ref={tickSoundRef} src="/sounds/tick.mp3" preload="auto" />
         <div
           style={{
             minHeight: "100vh",
@@ -544,7 +536,7 @@ export default function QuizGamePage() {
             gap: "20px",
             color: "white",
           }}
-      >
+        >
         <div
           style={{
             width: "60px",
@@ -567,7 +559,7 @@ export default function QuizGamePage() {
         <style jsx>{`
           @keyframes spin { to { transform: rotate(360deg); } }
         `}</style>
-      </div>
+        </div>
       </>
     );
   }
@@ -576,7 +568,12 @@ export default function QuizGamePage() {
   if (isLoading) {
     return (
       <>
-        {alwaysAudio}
+        <audio ref={correctSoundRef} src="/sounds/correct.mp3" preload="auto" />
+        <audio ref={wrongSoundRef} src="/sounds/wrong.mp3" preload="auto" />
+        <audio ref={clickSoundRef} src="/sounds/click.mp3" preload="auto" />
+        <audio ref={gameoverSoundRef} src="/sounds/gameover.mp3" preload="auto" />
+        <audio ref={whooshSoundRef} src="/sounds/whoosh.mp3" preload="auto" />
+        <audio ref={tickSoundRef} src="/sounds/tick.mp3" preload="auto" />
         <div
           style={{
             minHeight: "100vh",
@@ -587,7 +584,7 @@ export default function QuizGamePage() {
             justifyContent: "center",
             color: "white",
           }}
-      >
+        >
         <div style={{ textAlign: "center" }}>
           <div
             className="animate-pulse"
@@ -611,7 +608,6 @@ export default function QuizGamePage() {
             Loading questions...
           </p>
         </div>
-      </div>
         </div>
       </>
     );
@@ -826,7 +822,13 @@ export default function QuizGamePage() {
         }
       `}</style>
 
-      {/* Audio Elements moved to always-render section */}
+      {/* Audio Elements */}
+      <audio ref={correctSoundRef} src="/sounds/correct.mp3" preload="auto" />
+      <audio ref={wrongSoundRef} src="/sounds/wrong.mp3" preload="auto" />
+      <audio ref={clickSoundRef} src="/sounds/click.mp3" preload="auto" />
+      <audio ref={gameoverSoundRef} src="/sounds/gameover.mp3" preload="auto" />
+      <audio ref={whooshSoundRef} src="/sounds/whoosh.mp3" preload="auto" />
+      <audio ref={tickSoundRef} src="/sounds/tick.mp3" preload="auto" />
 
       <div
         style={{
