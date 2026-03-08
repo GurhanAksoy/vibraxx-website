@@ -45,8 +45,7 @@ export default function QuizGamePage() {
   const params = useParams();
   
   // ✅ PROFESSIONAL: RoundId from URL (NO MAGIC!)
-  const roundIdParam = params?.roundId ? parseInt(params.roundId as string) : null;
-  const roundId = roundIdParam && Number.isFinite(roundIdParam) ? roundIdParam : null;
+  const roundId = params?.roundId as string | null;
 
   // 🔐 === SECURITY STATE ===
   const [isVerifying, setIsVerifying] = useState(true);
