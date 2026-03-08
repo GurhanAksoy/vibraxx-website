@@ -8,63 +8,71 @@ import {
   Flame,
   Volume2,
   VolumeX,
-  Home,
+  ArrowLeft,
   Shield,
-  Trophy,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Image from "next/image";
 
-// ============================================
-// LOBBY STATE — get_lobby_state RPC shape
-// ============================================
-interface LobbyStateData {
-  error?: string;
-  status?: string; // 'no_live_round' | 'live'
-  credits?: number;
-  next_round_in_seconds?: number;
-  round_id?: string; // ✅ UUID
-  started_at?: string;
-  remaining_seconds?: number;
-  is_participant?: boolean;
-  participant_count?: number;
-  should_redirect_to_quiz?: boolean; // ✅ DB KARAR VERİR
+interface LobbyPlayer {
+  user_id: string;
+  full_name: string;
+  avatar_url: string;
+  total_score: number;
+  streak: number;
+  joined_at: string;
+}
+
+interface LobbyState {
+  status: "live" | "no_live_round";
+  credits: number;
+  round_id: string | null;
+  started_at: string | null;
+  remaining_seconds: number | null;
+  next_round_in_seconds: number | null;
+  is_participant: boolean;
+  participant_count: number;
+  should_redirect_to_quiz: boolean;
 }
 
 export default function LobbyPage() {
   const router = useRouter();
+  const routerRef = useRef(router);
+  useEffect(() => { routerRef.current = router; }, [router]);
 
-  // ─── Canonical State (get_lobby_state) ───
-  const [lobbyState, setLobbyState] = useState<LobbyStateData | null>(null);
-  const [localSeconds, setLocalSeconds] = useState<number | null>(null);
-
-  // ─── UI State ───
+  // Core State
   const [isPlaying, setIsPlaying] = useState(false);
   const [showWarning, setShowWarning] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
-  const isRedirectingRef = useRef(false);
+  const [lobbyState, setLobbyState] = useState<LobbyState | null>(null);
+  const [localSeconds, setLocalSeconds] = useState<number | null>(null);
 
-  // ─── Audio refs ───
+  // Lobby Data
+  const [players, setPlayers] = useState<LobbyPlayer[]>([]);
+  const [totalPlayers, setTotalPlayers] = useState(0);
+
+  // Audio refs
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const alarmRef = useRef<HTMLAudioElement | null>(null);
   const countdownBeepRef = useRef<HTMLAudioElement | null>(null);
   const hasInteractedRef = useRef(false);
-  const alarmFiredRef = useRef(false);
+
+  // Control refs
+  const isRedirectingRef = useRef(false);
   const mountedRef = useRef(true);
-  const countdownPauseUntilRef = useRef<number>(0);  // ✅ Ana sayfa ile aynı
-
-  // ─── Round change detection ───
   const lastRoundIdRef = useRef<string | null>(null);
-  const localSecondsInitRef = useRef(false); // ilk set yapıldı mı
+  const localSecondsInitRef = useRef(false);
+  const alarmFiredRef = useRef(false);
 
-  // ─── Derived ───
-  const isUrgent = localSeconds !== null && localSeconds <= 10 && localSeconds > 0;
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // === AUDIO INITIALIZATION ===
   useEffect(() => {
-    mountedRef.current = true;
     if (typeof window === "undefined") return;
 
     const audio = new Audio("/sounds/vibraxx.mp3");
@@ -75,7 +83,6 @@ export default function LobbyPage() {
     countdownBeepRef.current = new Audio("/sounds/countdown.mp3");
 
     return () => {
-      mountedRef.current = false;
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
@@ -120,63 +127,62 @@ export default function LobbyPage() {
     }
   }, [isPlaying]);
 
-  // ─── Router ref (useCallback dependency döngüsünü kır) ───
-  const routerRef = useRef(router);
-  useEffect(() => { routerRef.current = router; }, [router]);
-
-  // ============================================
-  // FETCH LOBBY STATE — KANONİK (DB = KOMUTAN)
-  // ============================================
+  // === FETCH LOBBY STATE (ana loop) ===
   const fetchLobbyState = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) {
-        routerRef.current.push("/");
-        return;
-      }
-      const userId = session.user.id;
+      if (!session?.user) { routerRef.current.push("/"); return; }
 
       const { data, error } = await supabase.rpc("get_lobby_state", {
-        p_user_id: userId
+        p_user_id: session.user.id,
       });
 
       if (error || !data || !mountedRef.current) return;
+      if (data.error === "not_authenticated") { routerRef.current.push("/"); return; }
 
-      if (data.error === 'not_authenticated') {
-        routerRef.current.push("/");
-        return;
-      }
-
+      // Yeni round → state sıfırla
       if (data.round_id && data.round_id !== lastRoundIdRef.current) {
         lastRoundIdRef.current = data.round_id;
         isRedirectingRef.current = false;
         localSecondsInitRef.current = false;
+        alarmFiredRef.current = false;
+        setShowWarning(false);
+        setPlayers([]);
+        setTotalPlayers(0);
       }
 
-      if (!localSecondsInitRef.current) {
+      // Sayacı sadece ilk kez set et (sonra tick ile düşüyor)
+      if (!localSecondsInitRef.current && data.next_round_in_seconds != null) {
         localSecondsInitRef.current = true;
-        if (data.next_round_in_seconds != null) {
-          setLocalSeconds(Math.max(0, data.next_round_in_seconds));
-        }
+        setLocalSeconds(Math.max(0, data.next_round_in_seconds));
       }
 
       setLobbyState(data);
       setIsLoading(false);
 
+      // Player listesini güncelle
+      if (data.round_id) {
+        fetchLobbyPlayersById(data.round_id);
+        fetchTotalParticipantsById(data.round_id);
+      }
+
+      // Redirect logic
       if (data.should_redirect_to_quiz && data.round_id && !isRedirectingRef.current) {
         isRedirectingRef.current = true;
         setIsRedirecting(true);
 
+        // Zaten katılmışsa → direkt git
         if (data.is_participant) {
           routerRef.current.push(`/quiz/${data.round_id}`);
           return;
         }
 
-        const { data: joinResult, error: joinError } = await supabase.rpc('join_live_round');
+        // Join et (parametresiz)
+        const { data: joinResult, error: joinError } = await supabase.rpc("join_live_round");
         const joinRow = Array.isArray(joinResult) ? joinResult[0] : joinResult;
 
-        if (joinError || (joinRow?.action !== 'join' && joinRow?.message !== 'already_joined')) {
-          console.log('[Lobby] Join failed:', joinError || joinRow?.message);
+        if (joinError || (joinRow?.action !== "join" && joinRow?.message !== "already_joined")) {
+          console.log("[Lobby] Join failed:", joinError || joinRow?.message);
           isRedirectingRef.current = false;
           setIsRedirecting(false);
           return;
@@ -184,37 +190,55 @@ export default function LobbyPage() {
 
         routerRef.current.push(`/quiz/${data.round_id}`);
       }
-
     } catch (err) {
-      console.error("[Lobby] RPC error:", err);
+      console.error("[Lobby] fetchLobbyState error:", err);
     }
-  }, []); // ✅ dependency yok — sonsuz döngü yok
+  }, []); // stable — router via ref
 
-  // ─── Initial fetch + polling every 5s ───
+  // === FETCH LOBBY PLAYERS ===
+  const fetchLobbyPlayersById = useCallback(async (roundId: string) => {
+    try {
+      const { data, error } = await supabase.rpc("get_lobby_participants", {
+        p_round_id: roundId,
+      });
+      if (error) { console.error("[Lobby] Fetch players error:", error); return; }
+      if (data) setPlayers(data);
+    } catch (err) {
+      console.error("[Lobby] Fetch players error:", err);
+    }
+  }, []);
+
+  // === FETCH TOTAL PARTICIPANTS ===
+  const fetchTotalParticipantsById = useCallback(async (roundId: string) => {
+    try {
+      const { data, error } = await supabase.rpc("get_round_participant_count", {
+        p_round_id: roundId,
+      });
+      if (error) { console.error("[Lobby] Fetch count error:", error); return; }
+      if (typeof data === "number") setTotalPlayers(data);
+    } catch (err) {
+      console.error("[Lobby] Fetch total error:", err);
+    }
+  }, []);
+
+  // === POLLING ===
   useEffect(() => {
     fetchLobbyState();
     const interval = setInterval(fetchLobbyState, 5000);
     return () => clearInterval(interval);
   }, [fetchLobbyState]);
 
-  // ============================================
-  // 🎯 COUNTDOWN TICK - Ana sayfa ile TAM AYNI!
-  // ============================================
+  // === COUNTDOWN TICK ===
   useEffect(() => {
-    const countdownInterval = setInterval(() => {
-      const now = Date.now();
-      if (now < countdownPauseUntilRef.current) return;
+    const tick = setInterval(() => {
       setLocalSeconds((prev) => {
         if (prev === null) return prev;
-        if (prev <= 1) {
-          setTimeout(() => fetchLobbyState(), 300);
-          return 0;
-        }
+        if (prev <= 1) { setTimeout(() => fetchLobbyState(), 300); return 0; }
         return prev - 1;
       });
     }, 1000);
-    return () => clearInterval(countdownInterval);
-  }, []); // ✅ fetchLobbyState stable, dependency yok
+    return () => clearInterval(tick);
+  }, []); // stable
 
   // === WARNING & SOUND EFFECTS ===
   useEffect(() => {
@@ -242,12 +266,16 @@ export default function LobbyPage() {
     }
   }, [localSeconds, isPlaying]);
 
-  // ============================================
-  // 🎯 KANONİK: Sayaç 0 mantığı RPC'de!
-  // Frontend sadece polling yapar, karar vermez
-  // ============================================
-  // (Local countdown 0 check kaldırıldı - DB karar verir)
+  // === HANDLE BACK BUTTON ===
+  const handleBack = async () => {
+    console.log("[Lobby] User left lobby, round NOT deducted");
+    routerRef.current.push("/");
+  };
 
+  // === PROGRESS CALCULATION ===
+  const progress = localSeconds !== null
+    ? ((300 - Math.max(Math.min(localSeconds, 300), 0)) / 300) * 100
+    : 0;
 
   // === WARNING HELPERS ===
   const getWarningMessage = () => {
@@ -257,12 +285,14 @@ export default function LobbyPage() {
     return "Quiz Starting Soon";
   };
 
-  // === FORMAT MM:SS ===
-  const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
+  // === DERIVED VALUES ===
+  const timeUntilStart = localSeconds ?? 999;
+  const formattedCountdown = (() => {
+    if (localSeconds === null) return "00:00";
+    const m = Math.floor(localSeconds / 60);
+    const s = localSeconds % 60;
     return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  };
+  })();
 
   // === LOADING STATE ===
   if (isLoading) {
@@ -309,6 +339,7 @@ export default function LobbyPage() {
                 fill
                 sizes="120px"
                 style={{ objectFit: "contain", padding: "8px" }}
+                priority
               />
             </div>
           </div>
@@ -338,9 +369,98 @@ export default function LobbyPage() {
     );
   }
 
+  // === REDIRECTING OVERLAY ===
+  if (isRedirecting) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "white",
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <div
+            style={{
+              width: 120,
+              height: 120,
+              margin: "0 auto 24px",
+              position: "relative",
+              borderRadius: "50%",
+              padding: 4,
+              background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+              boxShadow: "0 0 40px rgba(124, 58, 237, 0.7)",
+            }}
+          >
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                height: "100%",
+                borderRadius: "50%",
+                backgroundColor: "#020817",
+                overflow: "hidden",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Image
+                src="/images/logo.png"
+                alt="VibraXX"
+                fill
+                sizes="120px"
+                style={{ objectFit: "contain", padding: "8px" }}
+                priority
+              />
+            </div>
+          </div>
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              margin: "0 auto 20px",
+              border: "4px solid rgba(139, 92, 246, 0.3)",
+              borderTop: "4px solid #a78bfa",
+              borderRadius: "50%",
+              animation: "spin 1s linear infinite",
+            }}
+          />
+          <p style={{ fontSize: 22, fontWeight: 800, color: "#a78bfa" }}>
+            Joining Arena...
+          </p>
+        </div>
+        <style jsx>{`
+          @keyframes spin {
+            to {
+              transform: rotate(360deg);
+            }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
   return (
     <>
       <style jsx global>{`
+        @keyframes pulse-ring {
+          0% {
+            transform: scale(0.95);
+            opacity: 1;
+          }
+          50% {
+            transform: scale(1);
+            opacity: 0.7;
+          }
+          100% {
+            transform: scale(0.95);
+            opacity: 1;
+          }
+        }
         @keyframes float {
           0%,
           100% {
@@ -358,14 +478,6 @@ export default function LobbyPage() {
             transform: translateX(100%);
           }
         }
-        @keyframes hero-shimmer {
-          0% {
-            background-position: 0% 50%;
-          }
-          100% {
-            background-position: 100% 50%;
-          }
-        }
         @keyframes slideIn {
           from {
             transform: translateY(20px);
@@ -374,6 +486,19 @@ export default function LobbyPage() {
           to {
             transform: translateY(0);
             opacity: 1;
+          }
+        }
+        @keyframes neonPulse {
+          0%,
+          100% {
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.6),
+              0 0 40px rgba(139, 92, 246, 0.4),
+              inset 0 0 20px rgba(139, 92, 246, 0.2);
+          }
+          50% {
+            box-shadow: 0 0 30px rgba(217, 70, 239, 0.9),
+              0 0 60px rgba(217, 70, 239, 0.6),
+              inset 0 0 30px rgba(217, 70, 239, 0.3);
           }
         }
         @keyframes redAlarm {
@@ -397,10 +522,10 @@ export default function LobbyPage() {
             transform: translateX(0) rotate(0deg);
           }
           25% {
-            transform: translateX(-4px) rotate(-1deg);
+            transform: translateX(-10px) rotate(-2deg);
           }
           75% {
-            transform: translateX(4px) rotate(1deg);
+            transform: translateX(10px) rotate(2deg);
           }
         }
         @keyframes warningPulse {
@@ -410,45 +535,38 @@ export default function LobbyPage() {
             opacity: 1;
           }
           50% {
-            transform: scale(1.03);
+            transform: scale(1.08);
             opacity: 0.9;
           }
         }
-        @keyframes redPulse {
+        @keyframes glowPulse {
           0%,
           100% {
-            box-shadow: 0 0 40px rgba(239, 68, 68, 0.8),
-              0 0 80px rgba(239, 68, 68, 0.5);
+            filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.6));
           }
           50% {
-            box-shadow: 0 0 60px rgba(220, 38, 38, 1),
-              0 0 100px rgba(220, 38, 38, 0.7);
+            filter: drop-shadow(0 0 20px rgba(251, 191, 36, 1));
           }
         }
+
         .animate-slide-in {
           animation: slideIn 0.5s ease-out forwards;
           opacity: 0;
-        }
-
-        .animate-float {
-          animation: float 6s ease-in-out infinite;
-        }
-
-        @keyframes spin {
-          to { transform: rotate(360deg); }
         }
 
         * {
           box-sizing: border-box;
           margin: 0;
           padding: 0;
+          -webkit-tap-highlight-color: transparent;
         }
 
-        html,
+        button {
+          cursor: pointer;
+        }
+
         body {
           overflow-x: hidden;
-          width: 100%;
-          max-width: 100vw;
         }
       `}</style>
 
@@ -497,7 +615,7 @@ export default function LobbyPage() {
         />
 
         {/* RED WARNING Overlay */}
-        {showWarning && isUrgent && (
+        {showWarning && timeUntilStart <= 10 && (
           <div
             style={{
               position: "fixed",
@@ -508,83 +626,6 @@ export default function LobbyPage() {
               animation: "warningPulse 0.6s ease-in-out infinite",
             }}
           />
-        )}
-
-        {/* JOINING OVERLAY — quiz'e yönlendirilirken */}
-        {isRedirecting && (
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(2, 8, 23, 0.92)",
-              backdropFilter: "blur(16px)",
-              zIndex: 100,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "28px",
-            }}
-          >
-            <div
-              style={{
-                width: 90,
-                height: 90,
-                position: "relative",
-                borderRadius: "9999px",
-                padding: 4,
-                background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)",
-                boxShadow: "0 0 50px rgba(124,58,237,0.8)",
-              }}
-            >
-              <div
-                style={{
-                  position: "relative",
-                  width: "100%",
-                  height: "100%",
-                  borderRadius: "9999px",
-                  backgroundColor: "#020817",
-                  overflow: "hidden",
-                }}
-              >
-                <Image
-                  src="/images/logo.png"
-                  alt="VibraXX"
-                  fill
-                  sizes="90px"
-                  style={{ objectFit: "contain", padding: "16%" }}
-                />
-              </div>
-            </div>
-            <div
-              style={{
-                width: 56,
-                height: 56,
-                border: "4px solid rgba(139, 92, 246, 0.3)",
-                borderTop: "4px solid #a78bfa",
-                borderRadius: "50%",
-                animation: "spin 0.8s linear infinite",
-              }}
-            />
-            <div style={{ textAlign: "center" }}>
-              <div
-                style={{
-                  fontSize: "clamp(22px, 5vw, 30px)",
-                  fontWeight: 900,
-                  backgroundImage: "linear-gradient(135deg, #a78bfa, #f0abfc)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                  marginBottom: 8,
-                }}
-              >
-                Joining Arena...
-              </div>
-              <div style={{ fontSize: 14, color: "#64748b", fontWeight: 600 }}>
-                Preparing your quiz
-              </div>
-            </div>
-          </div>
         )}
 
         {/* Top Header Bar */}
@@ -606,6 +647,7 @@ export default function LobbyPage() {
               position: "relative",
             }}
           >
+            {/* Sol: Back + Sound yan yana; Logo ortada absolute */}
             <div
               style={{
                 display: "flex",
@@ -613,100 +655,36 @@ export default function LobbyPage() {
                 justifyContent: "space-between",
               }}
             >
-              {/* Left: Logo + Home Button */}
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  zIndex: 21,
-                }}
-              >
-                {/* Logo */}
-                <div
-                  onClick={() => router.push("/")}
-                  style={{
-                    position: "relative",
-                    width: "clamp(48px, 13vw, 72px)",
-                    height: "clamp(48px, 13vw, 72px)",
-                    borderRadius: "9999px",
-                    padding: 4,
-                    background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)",
-                    boxShadow: "0 0 30px rgba(124,58,237,0.6)",
-                    flexShrink: 0,
-                    cursor: "pointer",
-                  }}
-                >
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: -5,
-                      borderRadius: "9999px",
-                      background: "radial-gradient(circle,#a855f7,transparent)",
-                      opacity: 0.4,
-                      filter: "blur(10px)",
-                      pointerEvents: "none",
-                    }}
-                  />
-                  <div
-                    style={{
-                      position: "relative",
-                      width: "100%",
-                      height: "100%",
-                      borderRadius: "9999px",
-                      backgroundColor: "#020817",
-                      overflow: "hidden",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Image
-                      src="/images/logo.png"
-                      alt="VibraXX"
-                      fill
-                      sizes="72px"
-                      style={{ objectFit: "contain", padding: "18%" }}
-                      priority
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Right: Home + Sound Toggle */}
+              {/* Left: Back + Sound butonu yan yana */}
               <div style={{ display: "flex", alignItems: "center", gap: "8px", zIndex: 21 }}>
-                {/* Home Button */}
                 <button
-                  type="button"
-                  onClick={() => router.push("/")}
+                  onClick={handleBack}
                   style={{
-                    width: "clamp(34px, 9vw, 38px)",
-                    height: "clamp(34px, 9vw, 38px)",
-                    borderRadius: "12px",
-                    border: "1px solid rgba(139, 92, 246, 0.3)",
-                    background: "rgba(15, 23, 42, 0.85)",
-                    display: "flex",
+                    display: "inline-flex",
                     alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    transition: "all 0.25s",
-                    boxShadow: "0 0 10px rgba(139, 92, 246, 0.15)",
+                    gap: "8px",
+                    padding: "10px 16px",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(148, 163, 253, 0.3)",
+                    background: "rgba(15, 23, 42, 0.8)",
+                    color: "white",
+                    fontSize: "clamp(13px, 2.5vw, 15px)",
+                    fontWeight: 600,
+                    transition: "all 0.3s",
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
-                    e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.6)";
-                    e.currentTarget.style.boxShadow = "0 0 18px rgba(139, 92, 246, 0.4)";
+                    e.currentTarget.style.transform = "translateX(-4px)";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "rgba(15, 23, 42, 0.85)";
-                    e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.3)";
-                    e.currentTarget.style.boxShadow = "0 0 10px rgba(139, 92, 246, 0.15)";
+                    e.currentTarget.style.background = "rgba(15, 23, 42, 0.8)";
+                    e.currentTarget.style.transform = "translateX(0)";
                   }}
                 >
-                  <Home style={{ width: 17, height: 17, color: "#a78bfa" }} />
+                  <ArrowLeft style={{ width: 18, height: 18 }} />
+                  <span className="hide-on-small">Back</span>
                 </button>
 
-                {/* Sound Toggle */}
                 <button
                   onClick={() => setIsPlaying(!isPlaying)}
                   style={{
@@ -714,7 +692,6 @@ export default function LobbyPage() {
                     borderRadius: "12px",
                     border: "1px solid rgba(148, 163, 253, 0.3)",
                     background: "rgba(15, 23, 42, 0.8)",
-                    cursor: "pointer",
                     display: "inline-flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -734,9 +711,12 @@ export default function LobbyPage() {
                   )}
                 </button>
               </div>
+
+              {/* Sağ: boş spacer (logo ortada absolute) */}
+              <div style={{ width: "clamp(44px, 10vw, 60px)" }} />
             </div>
 
-            {/* Center: GLOBAL ARENA — her zaman ortalı */}
+            {/* Center: Logo + GLOBAL ARENA Text */}
             <div
               style={{
                 position: "absolute",
@@ -744,10 +724,65 @@ export default function LobbyPage() {
                 top: "50%",
                 transform: "translate(-50%, -50%)",
                 zIndex: 20,
-                textAlign: "center",
-                pointerEvents: "none",
+                display: "flex",
+                alignItems: "center",
+                gap: "clamp(12px, 3vw, 16px)",
               }}
             >
+              {/* Logo */}
+              <div
+                style={{
+                  position: "relative",
+                  width: "clamp(70px, 14vw, 90px)",
+                  height: "clamp(70px, 14vw, 90px)",
+                  borderRadius: "50%",
+                  padding: 3,
+                  background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+                  boxShadow:
+                    "0 0 30px rgba(124, 58, 237, 0.7), 0 0 60px rgba(217, 70, 239, 0.4)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <div
+                  className="animate-glow"
+                  style={{
+                    position: "absolute",
+                    inset: -5,
+                    borderRadius: "50%",
+                    background: "radial-gradient(circle, #a855f7, transparent)",
+                    opacity: 0.5,
+                    filter: "blur(10px)",
+                    pointerEvents: "none",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "relative",
+                    width: "100%",
+                    height: "100%",
+                    borderRadius: "50%",
+                    backgroundColor: "#020817",
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: 10,
+                  }}
+                >
+                  <Image
+                    src="/images/logo.png"
+                    alt="VibraXX"
+                    fill
+                    sizes="90px"
+                    style={{ objectFit: "contain", padding: "5px" }}
+                    priority
+                  />
+                </div>
+              </div>
+
               {/* GLOBAL ARENA Text */}
               <div>
                 <div
@@ -761,22 +796,10 @@ export default function LobbyPage() {
                     textTransform: "uppercase",
                     letterSpacing: "0.08em",
                     lineHeight: 1.2,
+                    textShadow: "0 0 20px rgba(167, 139, 250, 0.5)",
                   }}
                 >
                   GLOBAL ARENA
-                </div>
-                <div
-                  style={{
-                    fontSize: "clamp(9px, 1.8vw, 11px)",
-                    color: "#64748b",
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.14em",
-                    textAlign: "center",
-                    marginTop: 2,
-                  }}
-                >
-                  LIVE LOBBY
                 </div>
               </div>
             </div>
@@ -847,6 +870,7 @@ export default function LobbyPage() {
                   objectFit: "contain",
                   padding: "clamp(12px, 3vw, 20px)",
                 }}
+                priority
                 onError={(e) => {
                   const img = e.currentTarget;
                   const container = img.parentElement as HTMLDivElement;
@@ -903,6 +927,7 @@ export default function LobbyPage() {
                   WebkitTextFillColor: "transparent",
                   backgroundClip: "text",
                   marginBottom: "8px",
+                  textShadow: "0 0 30px rgba(251, 191, 36, 0.4)",
                 }}
               >
                 Your Brand Here
@@ -984,50 +1009,6 @@ export default function LobbyPage() {
             </div>
           </div>
 
-          {/* Hero Text — anasayfa ile uyumlu */}
-          <div
-            style={{
-              textAlign: "center",
-              marginBottom: "clamp(28px, 5vw, 40px)",
-            }}
-          >
-            <h1
-              style={{
-                fontSize: "clamp(26px, 6vw, 42px)",
-                fontWeight: 800,
-                lineHeight: 1.2,
-                letterSpacing: "-0.03em",
-                marginBottom: 14,
-              }}
-            >
-              <span
-                style={{
-                  display: "inline-block",
-                  background: "linear-gradient(90deg, #7c3aed, #22d3ee, #f97316, #d946ef, #7c3aed)",
-                  backgroundSize: "250% 100%",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                  animation: "hero-shimmer 4s linear infinite",
-                }}
-              >
-                Challenge yourself. Challenge the world.
-              </span>
-            </h1>
-            <p
-              style={{
-                fontSize: "clamp(15px, 3.2vw, 17px)",
-                color: "#94a3b8",
-                maxWidth: 640,
-                margin: "0 auto",
-                lineHeight: 1.6,
-                fontWeight: 500,
-              }}
-            >
-              Join now to compete for skill-based rewards and global ranking
-            </p>
-          </div>
-
           <div
             style={{
               display: "grid",
@@ -1038,24 +1019,24 @@ export default function LobbyPage() {
             {/* Countdown Section */}
             <div
               style={{
-                padding: "clamp(20px, 6vw, 56px)",
+                padding: "clamp(32px, 6vw, 56px)",
                 borderRadius: "28px",
                 border:
-                  isUrgent
+                  timeUntilStart <= 10
                     ? "3px solid #ef4444"
                     : "3px solid rgba(139, 92, 246, 0.6)",
                 background:
-                  isUrgent
+                  timeUntilStart <= 10
                     ? "linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.1))"
                     : "rgba(15, 23, 42, 0.85)",
                 backdropFilter: "blur(25px)",
                 textAlign: "center",
                 animation:
-                  showWarning && isUrgent
+                  showWarning && timeUntilStart <= 10
                     ? "redAlarm 0.8s ease-in-out infinite, shake 0.5s ease-in-out infinite"
                     : "none",
                 boxShadow:
-                  isUrgent
+                  timeUntilStart <= 10
                     ? "0 0 60px rgba(239, 68, 68, 0.6)"
                     : "0 0 40px rgba(139, 92, 246, 0.4)",
               }}
@@ -1065,30 +1046,30 @@ export default function LobbyPage() {
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: "8px",
-                  padding: "clamp(8px, 2vw, 10px) clamp(12px, 3.5vw, 24px)",
+                  gap: "10px",
+                  padding: "10px 24px",
                   borderRadius: "999px",
                   background:
-                    isUrgent
+                    timeUntilStart <= 10
                       ? "rgba(239, 68, 68, 0.25)"
                       : "rgba(34, 197, 94, 0.25)",
                   border:
-                    isUrgent
+                    timeUntilStart <= 10
                       ? "2px solid rgba(239, 68, 68, 0.6)"
                       : "2px solid rgba(34, 197, 94, 0.5)",
                   marginBottom: "clamp(20px, 4vw, 32px)",
                   boxShadow:
-                    isUrgent
+                    timeUntilStart <= 10
                       ? "0 0 25px rgba(239, 68, 68, 0.5)"
                       : "0 0 20px rgba(34, 197, 94, 0.4)",
                 }}
               >
                 <Shield
                   style={{
-                    width: "clamp(16px, 4vw, 20px)",
-                    height: "clamp(16px, 4vw, 20px)",
+                    width: 20,
+                    height: 20,
                     color:
-                      isUrgent
+                      timeUntilStart <= 10
                         ? "#ef4444"
                         : "#4ade80",
                   }}
@@ -1098,30 +1079,30 @@ export default function LobbyPage() {
                     fontSize: "clamp(12px, 2.8vw, 14px)",
                     fontWeight: 800,
                     color:
-                      isUrgent
+                      timeUntilStart <= 10
                         ? "#fca5a5"
                         : "#4ade80",
                     textTransform: "uppercase",
                     letterSpacing: "0.06em",
                   }}
                 >
-                  {isUrgent
+                  {timeUntilStart <= 10
                     ? "🚨 STARTING NOW!"
                     : "✓ You're in the Lobby"}
                 </span>
               </div>
 
               {/* Warning Message */}
-              {showWarning && isUrgent && (
+              {showWarning && timeUntilStart <= 10 && (
                 <div
                   style={{
-                    padding: "clamp(12px, 3vw, 20px) clamp(14px, 4vw, 28px)",
+                    padding: "20px 28px",
                     borderRadius: "20px",
                     background:
                       "linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(220, 38, 38, 0.2))",
                     border: "3px solid #ef4444",
                     marginBottom: "clamp(20px, 4vw, 32px)",
-                    animation: "redPulse 0.6s ease-in-out infinite",
+                    animation: "neonPulse 0.6s ease-in-out infinite",
                     boxShadow: "0 0 40px rgba(239, 68, 68, 0.8)",
                   }}
                 >
@@ -1131,7 +1112,7 @@ export default function LobbyPage() {
                       fontWeight: 900,
                       color: "#fca5a5",
                       textTransform: "uppercase",
-                      letterSpacing: "0.06em",
+                      letterSpacing: "0.12em",
                       textShadow: "0 0 30px #ef4444",
                       margin: 0,
                     }}
@@ -1153,7 +1134,7 @@ export default function LobbyPage() {
                   gap: "14px",
                   flexWrap: "wrap",
                   color:
-                    isUrgent
+                    timeUntilStart <= 10
                       ? "#fca5a5"
                       : "white",
                 }}
@@ -1163,7 +1144,7 @@ export default function LobbyPage() {
                     width: "clamp(28px, 7vw, 36px)",
                     height: "clamp(28px, 7vw, 36px)",
                     color:
-                      isUrgent
+                      timeUntilStart <= 10
                         ? "#ef4444"
                         : "#a78bfa",
                   }}
@@ -1177,7 +1158,7 @@ export default function LobbyPage() {
                   fontSize: "clamp(56px, 18vw, 120px)",
                   fontWeight: 900,
                   backgroundImage:
-                    isUrgent
+                    timeUntilStart <= 10
                       ? "linear-gradient(135deg, #ef4444, #dc2626)"
                       : "linear-gradient(135deg, #a78bfa, #f0abfc)",
                   WebkitBackgroundClip: "text",
@@ -1185,14 +1166,55 @@ export default function LobbyPage() {
                   backgroundClip: "text",
                   marginBottom: "clamp(24px, 5vw, 40px)",
                   fontFamily: "monospace",
+                  textShadow:
+                    timeUntilStart <= 10
+                      ? "0 0 50px rgba(239, 68, 68, 0.8)"
+                      : "0 0 50px rgba(167, 139, 250, 0.6)",
                   animation:
-                    isUrgent
+                    timeUntilStart <= 10
                       ? "warningPulse 0.4s ease-in-out infinite"
                       : "none",
                   letterSpacing: "0.05em",
                 }}
               >
-                {localSeconds !== null ? formatTime(localSeconds) : "--:--"}
+                {formattedCountdown}
+              </div>
+
+              {/* Progress Bar */}
+              <div
+                style={{
+                  width: "100%",
+                  height: "14px",
+                  borderRadius: "999px",
+                  background: "rgba(30, 41, 59, 0.9)",
+                  overflow: "hidden",
+                  marginBottom: "clamp(24px, 5vw, 40px)",
+                  border:
+                    timeUntilStart <= 10
+                      ? "2px solid rgba(239, 68, 68, 0.5)"
+                      : "2px solid rgba(139, 92, 246, 0.4)",
+                  boxShadow:
+                    timeUntilStart <= 10
+                      ? "0 0 20px rgba(239, 68, 68, 0.5), inset 0 0 10px rgba(239, 68, 68, 0.3)"
+                      : "0 0 15px rgba(139, 92, 246, 0.4)",
+                }}
+              >
+                <div
+                  style={{
+                    width: `${progress}%`,
+                    height: "100%",
+                    background:
+                      timeUntilStart <= 10
+                        ? "linear-gradient(90deg, #ef4444, #dc2626)"
+                        : "linear-gradient(90deg, #7c3aed, #d946ef)",
+                    borderRadius: "999px",
+                    transition: "width 1s linear",
+                    boxShadow:
+                      timeUntilStart <= 10
+                        ? "0 0 25px rgba(239, 68, 68, 1)"
+                        : "0 0 25px rgba(139, 92, 246, 0.9)",
+                  }}
+                />
               </div>
 
               {/* Info Message */}
@@ -1200,7 +1222,7 @@ export default function LobbyPage() {
                 style={{
                   fontSize: "clamp(14px, 3.2vw, 17px)",
                   color:
-                    isUrgent
+                    timeUntilStart <= 10
                       ? "#fca5a5"
                       : "#cbd5e1",
                   marginBottom: "clamp(28px, 6vw, 40px)",
@@ -1208,7 +1230,7 @@ export default function LobbyPage() {
                   fontWeight: 600,
                 }}
               >
-                {isUrgent
+                {timeUntilStart <= 10
                   ? "🔥 Get ready! You'll be automatically entered when the countdown ends!"
                   : "You're in. Get ready!"}
               </p>
@@ -1217,15 +1239,15 @@ export default function LobbyPage() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: "clamp(8px, 2.5vw, 20px)",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                  gap: "clamp(14px, 3.5vw, 20px)",
                   maxWidth: "900px",
                   margin: "0 auto",
                 }}
               >
                 <div
                   style={{
-                    padding: "clamp(10px, 2.5vw, 20px)",
+                    padding: "clamp(14px, 3.5vw, 20px)",
                     borderRadius: "16px",
                     background: "rgba(139, 92, 246, 0.15)",
                     border: "2px solid rgba(139, 92, 246, 0.3)",
@@ -1234,9 +1256,9 @@ export default function LobbyPage() {
                 >
                   <div
                     style={{
-                      fontSize: "clamp(9px, 2vw, 13px)",
+                      fontSize: "clamp(11px, 2.3vw, 13px)",
                       color: "#94a3b8",
-                      marginBottom: "4px",
+                      marginBottom: "6px",
                       fontWeight: 600,
                     }}
                   >
@@ -1244,7 +1266,7 @@ export default function LobbyPage() {
                   </div>
                   <div
                     style={{
-                      fontSize: "clamp(11px, 2.8vw, 18px)",
+                      fontSize: "clamp(16px, 3.5vw, 20px)",
                       fontWeight: 800,
                       color: "#c4b5fd",
                     }}
@@ -1254,7 +1276,7 @@ export default function LobbyPage() {
                 </div>
                 <div
                   style={{
-                    padding: "clamp(10px, 2.5vw, 20px)",
+                    padding: "clamp(14px, 3.5vw, 20px)",
                     borderRadius: "16px",
                     background: "rgba(236, 72, 153, 0.15)",
                     border: "2px solid rgba(236, 72, 153, 0.3)",
@@ -1263,9 +1285,9 @@ export default function LobbyPage() {
                 >
                   <div
                     style={{
-                      fontSize: "clamp(9px, 2vw, 13px)",
+                      fontSize: "clamp(11px, 2.3vw, 13px)",
                       color: "#94a3b8",
-                      marginBottom: "4px",
+                      marginBottom: "6px",
                       fontWeight: 600,
                     }}
                   >
@@ -1273,7 +1295,7 @@ export default function LobbyPage() {
                   </div>
                   <div
                     style={{
-                      fontSize: "clamp(11px, 2.8vw, 18px)",
+                      fontSize: "clamp(16px, 3.5vw, 20px)",
                       fontWeight: 800,
                       color: "#f9a8d4",
                     }}
@@ -1283,7 +1305,7 @@ export default function LobbyPage() {
                 </div>
                 <div
                   style={{
-                    padding: "clamp(10px, 2.5vw, 20px)",
+                    padding: "clamp(14px, 3.5vw, 20px)",
                     borderRadius: "16px",
                     background: "rgba(34, 197, 94, 0.15)",
                     border: "2px solid rgba(34, 197, 94, 0.3)",
@@ -1292,9 +1314,9 @@ export default function LobbyPage() {
                 >
                   <div
                     style={{
-                      fontSize: "clamp(9px, 2vw, 13px)",
+                      fontSize: "clamp(11px, 2.3vw, 13px)",
                       color: "#94a3b8",
-                      marginBottom: "4px",
+                      marginBottom: "6px",
                       fontWeight: 600,
                     }}
                   >
@@ -1302,7 +1324,7 @@ export default function LobbyPage() {
                   </div>
                   <div
                     style={{
-                      fontSize: "clamp(11px, 2.8vw, 18px)",
+                      fontSize: "clamp(16px, 3.5vw, 20px)",
                       fontWeight: 800,
                       color: "#86efac",
                     }}
@@ -1315,7 +1337,7 @@ export default function LobbyPage() {
               <div
                 style={{
                   marginTop: "clamp(20px, 4.5vw, 28px)",
-                  padding: "clamp(10px, 2.5vw, 20px)",
+                  padding: "clamp(14px, 3.5vw, 20px)",
                   borderRadius: "14px",
                   background: "rgba(59, 130, 246, 0.12)",
                   border: "2px solid rgba(59, 130, 246, 0.25)",
@@ -1333,7 +1355,7 @@ export default function LobbyPage() {
               </div>
             </div>
 
-            {/* Players Section */}
+            {/* Players Section - 25% Smaller */}
             <div
               style={{
                 padding: "clamp(21px, 4.5vw, 30px)",
@@ -1384,7 +1406,7 @@ export default function LobbyPage() {
                     boxShadow: "0 0 15px rgba(139, 92, 246, 0.3)",
                   }}
                 >
-                  {lobbyState?.participant_count ?? 0}
+                  {Math.max(66, players.length)}
                 </div>
               </div>
 
@@ -1393,115 +1415,161 @@ export default function LobbyPage() {
                   display: "flex",
                   flexDirection: "column",
                   gap: "clamp(9px, 1.9vw, 12px)",
-                  maxHeight: "min(412px, 38vh)",
+                  maxHeight: "412px",
                   overflowY: "auto",
                   paddingRight: "8px",
                 }}
               >
-                {/* Player count */}
-                <div style={{
-                  padding: "20px",
-                  textAlign: "center",
-                  color: "#94a3b8",
-                  fontSize: "14px",
-                  marginBottom: "20px",
-                }}>
-                  {lobbyState?.participant_count ? `${lobbyState.participant_count} players in lobby` : 'Waiting for players...'}
-                </div>
-
-                {/* Prize Information - Subtle Premium */}
-                <div style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "12px",
-                  padding: "20px",
-                  borderRadius: "16px",
-                  background: "rgba(15,23,42,0.6)",
-                  border: "1px solid rgba(148,163,184,0.15)",
-                  backdropFilter: "blur(10px)",
-                }}>
-                  {/* Weekly */}
-                  <div style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: "12px",
-                  }}>
-                    <Trophy style={{ 
-                      width: 18, 
-                      height: 18, 
-                      color: "#a78bfa",
-                      flexShrink: 0,
-                      marginTop: "2px",
-                    }} />
-                    <div>
-                      <div style={{
-                        fontSize: "13px",
-                        fontWeight: 700,
-                        color: "#e2e8f0",
-                        marginBottom: "4px",
-                      }}>
-                        Weekly Reward
+                {players.length > 0 ? (
+                  players.map((player, idx) => (
+                    <div
+                      key={player.user_id}
+                      className="animate-slide-in"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "clamp(10px, 2.6vw, 13px)",
+                        padding: "clamp(10px, 2.6vw, 15px)",
+                        borderRadius: "18px",
+                        border: "1px solid rgba(255, 255, 255, 0.12)",
+                        background: "rgba(255, 255, 255, 0.04)",
+                        transition: "all 0.3s",
+                        animationDelay: `${idx * 0.1}s`,
+                        boxShadow: "0 0 15px rgba(0, 0, 0, 0.2)",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "rgba(139, 92, 246, 0.1)";
+                        e.currentTarget.style.transform = "translateX(8px)";
+                        e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.4)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)";
+                        e.currentTarget.style.transform = "translateX(0)";
+                        e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)";
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: "clamp(33px, 8.25vw, 40px)",
+                          height: "clamp(33px, 8.25vw, 40px)",
+                          borderRadius: "50%",
+                          border: "3px solid rgba(139, 92, 246, 0.6)",
+                          overflow: "hidden",
+                          flexShrink: 0,
+                          position: "relative",
+                          boxShadow: "0 0 15px rgba(139, 92, 246, 0.4)",
+                        }}
+                      >
+                        <Image
+                          src={player.avatar_url || "/images/logo.png"}
+                          alt={player.full_name}
+                          fill
+                          sizes="40px"
+                          style={{ objectFit: "cover" }}
+                        />
                       </div>
-                      <div style={{
-                        fontSize: "12px",
-                        color: "#94a3b8",
-                        lineHeight: 1.5,
-                      }}>
-                        15 Free Rounds for the highest weekly score.
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            marginBottom: "5px",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: "clamp(13px, 2.6vw, 15px)",
+                              fontWeight: 700,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {player.full_name || "Anonymous"}
+                          </span>
+                          {player.streak >= 10 && (
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "5px",
+                                padding: "3px 10px",
+                                borderRadius: "8px",
+                                background: "rgba(239, 68, 68, 0.25)",
+                                border: "1px solid rgba(239, 68, 68, 0.4)",
+                                boxShadow: "0 0 10px rgba(239, 68, 68, 0.3)",
+                              }}
+                            >
+                              <Flame style={{ width: 13, height: 13, color: "#fca5a5" }} />
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  fontWeight: 800,
+                                  color: "#fca5a5",
+                                }}
+                              >
+                                {player.streak}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "clamp(10px, 2.1vw, 12px)",
+                            color: "#94a3b8",
+                            fontWeight: 600,
+                          }}
+                        >
+                          🏆 {player.total_score.toLocaleString()} points
+                        </div>
                       </div>
                     </div>
+                  ))
+                ) : (
+                  <div
+                    style={{
+                      padding: "clamp(21px, 4.5vw, 30px)",
+                      textAlign: "center",
+                      color: "#64748b",
+                      fontSize: "clamp(12px, 2.4vw, 14px)",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Waiting for players to join...
                   </div>
-
-                  {/* Divider */}
-                  <div style={{
-                    height: "1px",
-                    background: "rgba(148,163,184,0.1)",
-                  }} />
-
-                  {/* Monthly */}
-                  <div style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: "12px",
-                  }}>
-                    <Trophy style={{ 
-                      width: 18, 
-                      height: 18, 
-                      color: "#fbbf24",
-                      flexShrink: 0,
-                      marginTop: "2px",
-                    }} />
-                    <div>
-                      <div style={{
-                        fontSize: "13px",
-                        fontWeight: 700,
-                        color: "#e2e8f0",
-                        marginBottom: "4px",
-                      }}>
-                        Monthly Grand Prize
-                      </div>
-                      <div style={{
-                        fontSize: "12px",
-                        color: "#94a3b8",
-                        lineHeight: 1.5,
-                      }}>
-                        £1,000 awarded to the highest monthly score.*
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Terms */}
-                  <div style={{
-                    fontSize: "10px",
-                    color: "#64748b",
-                    marginTop: "8px",
-                    lineHeight: 1.4,
-                  }}>
-                    *Subject to monthly participation threshold. See Prize Terms.
-                  </div>
-                </div>
+                )}
               </div>
 
+              {/* Total Players Info */}
+              <div
+                style={{
+                  marginTop: "clamp(15px, 3.4vw, 21px)",
+                  padding: "clamp(12px, 3vw, 16px)",
+                  borderRadius: "16px",
+                  background:
+                    "linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(217, 70, 239, 0.1))",
+                  border: "2px solid rgba(139, 92, 246, 0.3)",
+                  textAlign: "center",
+                  boxShadow: "0 0 20px rgba(139, 92, 246, 0.25)",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "clamp(12px, 2.4vw, 14px)",
+                    color: "#cbd5e1",
+                    fontWeight: 600,
+                  }}
+                >
+                  🌍{" "}
+                  <strong style={{ color: "#c4b5fd", fontWeight: 800 }}>
+                    {Math.max(66, totalPlayers).toLocaleString()}
+                  </strong>{" "}
+                  players in this round
+                </div>
+              </div>
             </div>
           </div>
         </main>
@@ -1515,8 +1583,18 @@ export default function LobbyPage() {
         }
 
         @media (max-width: 640px) {
+          .hide-on-small {
+            display: none !important;
+          }
+
           header > div {
             position: relative !important;
+          }
+        }
+
+        @media (max-width: 899px) {
+          .hide-mobile {
+            display: none !important;
           }
         }
 
@@ -1526,7 +1604,7 @@ export default function LobbyPage() {
 
         ::-webkit-scrollbar-track {
           background: rgba(15, 23, 42, 0.7);
-          border-radius: 10px;
+          borderRadius: 10px;
         }
 
         ::-webkit-scrollbar-thumb {
@@ -1535,7 +1613,7 @@ export default function LobbyPage() {
             rgba(139, 92, 246, 0.7),
             rgba(217, 70, 239, 0.5)
           );
-          border-radius: 10px;
+          borderRadius: 10px;
           border: 2px solid rgba(15, 23, 42, 0.7);
         }
 
