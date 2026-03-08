@@ -165,6 +165,12 @@ export default function LobbyPage() {
         isRedirectingRef.current = true;
         setIsRedirecting(true);
 
+        // Zaten katılmışsa → direkt quiz'e git, join çağırma
+        if (data.is_participant) {
+          router.push(`/quiz/${data.round_id}`);
+          return;
+        }
+
         // ✅ EMNİYET KEMERİ: Join başarısızsa push yapma!
         const { data: joinResult, error: joinError } = await supabase.rpc('join_live_round');
 
