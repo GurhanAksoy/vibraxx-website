@@ -120,38 +120,39 @@ export default function LobbyPage() {
     }
   }, [isPlaying]);
 
+  // ─── Router ref (useCallback dependency döngüsünü kır) ───
+  const routerRef = useRef(router);
+  useEffect(() => { routerRef.current = router; }, [router]);
+
   // ============================================
   // FETCH LOBBY STATE — KANONİK (DB = KOMUTAN)
   // ============================================
   const fetchLobbyState = useCallback(async () => {
     try {
-      // ✅ getSession — cache'den okur, network isteği atmaz
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
-        router.push("/");
+        routerRef.current.push("/");
         return;
       }
       const userId = session.user.id;
 
-      // ✅ TEK RPC: get_lobby_state — p_user_id geç
       const { data, error } = await supabase.rpc("get_lobby_state", {
         p_user_id: userId
       });
 
       if (error || !data || !mountedRef.current) return;
 
-      // Auth guard → home
       if (data.error === 'not_authenticated') {
-        router.push("/");
+        routerRef.current.push("/");
         return;
       }
 
-      // ✅ Round değişince isRedirectingRef reset et
       if (data.round_id && data.round_id !== lastRoundIdRef.current) {
         lastRoundIdRef.current = data.round_id;
         isRedirectingRef.current = false;
-        localSecondsInitRef.current = false; // yeni round → sayacı yeniden set et
+        localSecondsInitRef.current = false;
       }
+
       if (!localSecondsInitRef.current) {
         localSecondsInitRef.current = true;
         if (data.next_round_in_seconds != null) {
@@ -161,21 +162,19 @@ export default function LobbyPage() {
 
       setLobbyState(data);
       setIsLoading(false);
+
       if (data.should_redirect_to_quiz && data.round_id && !isRedirectingRef.current) {
         isRedirectingRef.current = true;
         setIsRedirecting(true);
 
-        // Zaten katılmışsa → direkt quiz'e git, join çağırma
         if (data.is_participant) {
-          router.push(`/quiz/${data.round_id}`);
+          routerRef.current.push(`/quiz/${data.round_id}`);
           return;
         }
 
-        // ✅ EMNİYET KEMERİ: Join başarısızsa push yapma!
         const { data: joinResult, error: joinError } = await supabase.rpc('join_live_round');
-
-        // RETURNS TABLE → array gelir, ilk row'u kontrol et
         const joinRow = Array.isArray(joinResult) ? joinResult[0] : joinResult;
+
         if (joinError || (joinRow?.action !== 'join' && joinRow?.message !== 'already_joined')) {
           console.log('[Lobby] Join failed:', joinError || joinRow?.message);
           isRedirectingRef.current = false;
@@ -183,14 +182,13 @@ export default function LobbyPage() {
           return;
         }
 
-        // Join başarılı → Quiz'e git
-        router.push(`/quiz/${data.round_id}`);
+        routerRef.current.push(`/quiz/${data.round_id}`);
       }
 
     } catch (err) {
       console.error("[Lobby] RPC error:", err);
     }
-  }, [router]);
+  }, []); // ✅ dependency yok — sonsuz döngü yok
 
   // ─── Initial fetch + polling every 5s ───
   useEffect(() => {
@@ -209,7 +207,6 @@ export default function LobbyPage() {
       setLocalSeconds((prev) => {
         if (prev === null) return prev;
         if (prev <= 1) {
-          // 0'a düştü → hemen DB'yi sorgula
           setTimeout(() => fetchLobbyState(), 300);
           return 0;
         }
@@ -217,7 +214,7 @@ export default function LobbyPage() {
       });
     }, 1000);
     return () => clearInterval(countdownInterval);
-  }, [fetchLobbyState]);
+  }, []); // ✅ fetchLobbyState stable, dependency yok
 
   // === WARNING & SOUND EFFECTS ===
   useEffect(() => {
