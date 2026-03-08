@@ -651,166 +651,126 @@ export default function LobbyPage() {
             style={{
               maxWidth: "1400px",
               margin: "0 auto",
-              padding: "clamp(14px, 3.6vw, 19px) clamp(19px, 4.8vw, 38px)",
-              position: "relative",
+              padding: "10px clamp(12px, 4vw, 32px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "8px",
             }}
           >
-            {/* Sol: Back + Sound yan yana; Logo ortada absolute */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              {/* Left: Back + Sound butonu yan yana */}
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", zIndex: 21 }}>
-                <button
-                  onClick={handleBack}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    padding: "10px 16px",
-                    borderRadius: "12px",
-                    border: "1px solid rgba(148, 163, 253, 0.3)",
-                    background: "rgba(15, 23, 42, 0.8)",
-                    color: "white",
-                    fontSize: "clamp(13px, 2.5vw, 15px)",
-                    fontWeight: 600,
-                    transition: "all 0.3s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
-                    e.currentTarget.style.transform = "translateX(-4px)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "rgba(15, 23, 42, 0.8)";
-                    e.currentTarget.style.transform = "translateX(0)";
-                  }}
-                >
-                  <ArrowLeft style={{ width: 18, height: 18 }} />
-                  <span className="hide-on-small">Back</span>
-                </button>
+            {/* Left: Back + Sound */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+              <button
+                onClick={handleBack}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "9px 13px",
+                  borderRadius: "12px",
+                  border: "1px solid rgba(148, 163, 253, 0.3)",
+                  background: "rgba(15, 23, 42, 0.8)",
+                  color: "white",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  transition: "all 0.3s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
+                  e.currentTarget.style.transform = "translateX(-4px)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(15, 23, 42, 0.8)";
+                  e.currentTarget.style.transform = "translateX(0)";
+                }}
+              >
+                <ArrowLeft style={{ width: 16, height: 16 }} />
+                <span className="hide-on-small">Back</span>
+              </button>
 
-                <button
-                  onClick={() => setIsPlaying(!isPlaying)}
-                  style={{
-                    padding: "11px",
-                    borderRadius: "12px",
-                    border: "1px solid rgba(148, 163, 253, 0.3)",
-                    background: "rgba(15, 23, 42, 0.8)",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "all 0.3s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "rgba(15, 23, 42, 0.8)";
-                  }}
-                >
-                  {isPlaying ? (
-                    <Volume2 style={{ width: 20, height: 20, color: "#a78bfa" }} />
-                  ) : (
-                    <VolumeX style={{ width: 20, height: 20, color: "#6b7280" }} />
-                  )}
-                </button>
-              </div>
-
-              {/* Sağ: boş spacer (logo ortada absolute) */}
-              <div style={{ width: "clamp(44px, 10vw, 60px)" }} />
+              <button
+                onClick={() => setIsPlaying(!isPlaying)}
+                style={{
+                  padding: "9px",
+                  borderRadius: "12px",
+                  border: "1px solid rgba(148, 163, 253, 0.3)",
+                  background: "rgba(15, 23, 42, 0.8)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "all 0.3s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(15, 23, 42, 0.8)"; }}
+              >
+                {isPlaying ? (
+                  <Volume2 style={{ width: 18, height: 18, color: "#a78bfa" }} />
+                ) : (
+                  <VolumeX style={{ width: 18, height: 18, color: "#6b7280" }} />
+                )}
+              </button>
             </div>
 
-            {/* Center: Logo + GLOBAL ARENA Text */}
-            <div
-              style={{
-                position: "absolute",
-                left: "50%",
-                top: "50%",
-                transform: "translate(-50%, -50%)",
-                zIndex: 20,
-                display: "flex",
-                alignItems: "center",
-                gap: "clamp(12px, 3vw, 16px)",
-              }}
-            >
-              {/* Logo */}
-              <div
-                style={{
+            {/* Center: Logo + Title */}
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              flex: 1,
+              justifyContent: "center",
+              minWidth: 0,
+            }}>
+              <div style={{
+                position: "relative",
+                width: "clamp(44px, 10vw, 60px)",
+                height: "clamp(44px, 10vw, 60px)",
+                borderRadius: "50%",
+                padding: 2,
+                background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+                boxShadow: "0 0 20px rgba(124, 58, 237, 0.6)",
+                flexShrink: 0,
+              }}>
+                <div style={{
                   position: "relative",
-                  width: "clamp(70px, 14vw, 90px)",
-                  height: "clamp(70px, 14vw, 90px)",
+                  width: "100%",
+                  height: "100%",
                   borderRadius: "50%",
-                  padding: 3,
-                  background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-                  boxShadow:
-                    "0 0 30px rgba(124, 58, 237, 0.7), 0 0 60px rgba(217, 70, 239, 0.4)",
+                  backgroundColor: "#020817",
+                  overflow: "hidden",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <div
-                  className="animate-glow"
-                  style={{
-                    position: "absolute",
-                    inset: -5,
-                    borderRadius: "50%",
-                    background: "radial-gradient(circle, #a855f7, transparent)",
-                    opacity: 0.5,
-                    filter: "blur(10px)",
-                    pointerEvents: "none",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "relative",
-                    width: "100%",
-                    height: "100%",
-                    borderRadius: "50%",
-                    backgroundColor: "#020817",
-                    overflow: "hidden",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    zIndex: 10,
-                  }}
-                >
+                }}>
                   <Image
                     src="/images/logo.png"
                     alt="VibraXX"
                     fill
-                    sizes="90px"
-                    style={{ objectFit: "contain", padding: "5px" }}
+                    sizes="60px"
+                    style={{ objectFit: "contain", padding: "4px" }}
                     priority
                   />
                 </div>
               </div>
 
-              {/* GLOBAL ARENA Text */}
-              <div>
-                <div
-                  style={{
-                    fontSize: "clamp(16px, 3.5vw, 22px)",
-                    fontWeight: 900,
-                    backgroundImage: "linear-gradient(135deg, #a78bfa, #f0abfc)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    backgroundClip: "text",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                    lineHeight: 1.2,
-                    textShadow: "0 0 20px rgba(167, 139, 250, 0.5)",
-                  }}
-                >
-                  GLOBAL ARENA
-                </div>
+              <div style={{
+                fontSize: "clamp(14px, 3.5vw, 20px)",
+                fontWeight: 900,
+                backgroundImage: "linear-gradient(135deg, #a78bfa, #f0abfc)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}>
+                GLOBAL ARENA
               </div>
             </div>
+
+            {/* Right: spacer for balance */}
+            <div style={{ width: "clamp(68px, 15vw, 90px)", flexShrink: 0 }} />
           </div>
         </header>
 
@@ -821,13 +781,13 @@ export default function LobbyPage() {
             zIndex: 10,
             maxWidth: "1400px",
             margin: "0 auto",
-            padding: "clamp(24px, 5vw, 40px) clamp(16px, 4vw, 32px)",
+            padding: "clamp(16px, 3vw, 32px) clamp(12px, 3vw, 24px)",
           }}
         >
           {/* Sponsor Banner */}
           <div
             style={{
-              marginBottom: "clamp(24px, 5vw, 36px)",
+              marginBottom: "clamp(16px, 3vw, 28px)",
               padding: "clamp(16px, 3.5vw, 28px)",
               borderRadius: "20px",
               background:
@@ -838,7 +798,7 @@ export default function LobbyPage() {
               overflow: "hidden",
               boxShadow:
                 "0 0 30px rgba(251, 191, 36, 0.3), inset 0 0 40px rgba(251, 191, 36, 0.06)",
-              minHeight: "clamp(100px, 18vw, 160px)",
+              minHeight: "clamp(80px, 16vw, 130px)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -863,7 +823,7 @@ export default function LobbyPage() {
                 position: "relative",
                 width: "100%",
                 height: "100%",
-                minHeight: "clamp(100px, 18vw, 160px)",
+                minHeight: "clamp(80px, 16vw, 130px)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -1027,7 +987,7 @@ export default function LobbyPage() {
             {/* Countdown Section */}
             <div
               style={{
-                padding: "clamp(32px, 6vw, 56px)",
+                padding: "clamp(20px, 4vw, 40px)",
                 borderRadius: "28px",
                 border:
                   timeUntilStart <= 10
@@ -1065,7 +1025,7 @@ export default function LobbyPage() {
                     timeUntilStart <= 10
                       ? "2px solid rgba(239, 68, 68, 0.6)"
                       : "2px solid rgba(34, 197, 94, 0.5)",
-                  marginBottom: "clamp(20px, 4vw, 32px)",
+                  marginBottom: "clamp(12px, 2.5vw, 20px)",
                   boxShadow:
                     timeUntilStart <= 10
                       ? "0 0 25px rgba(239, 68, 68, 0.5)"
@@ -1135,11 +1095,11 @@ export default function LobbyPage() {
                 style={{
                   fontSize: "clamp(22px, 5.5vw, 36px)",
                   fontWeight: 800,
-                  marginBottom: "clamp(16px, 3vw, 24px)",
+                  marginBottom: "clamp(10px, 2vw, 18px)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: "14px",
+                  gap: "10px",
                   flexWrap: "wrap",
                   color:
                     timeUntilStart <= 10
@@ -1163,7 +1123,7 @@ export default function LobbyPage() {
               {/* Countdown Timer */}
               <div
                 style={{
-                  fontSize: "clamp(56px, 18vw, 120px)",
+                  fontSize: "clamp(48px, 15vw, 100px)",
                   fontWeight: 900,
                   backgroundImage:
                     timeUntilStart <= 10
@@ -1172,7 +1132,7 @@ export default function LobbyPage() {
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
                   backgroundClip: "text",
-                  marginBottom: "clamp(24px, 5vw, 40px)",
+                  marginBottom: "clamp(12px, 3vw, 28px)",
                   fontFamily: "monospace",
                   textShadow:
                     timeUntilStart <= 10
@@ -1196,7 +1156,7 @@ export default function LobbyPage() {
                   borderRadius: "999px",
                   background: "rgba(30, 41, 59, 0.9)",
                   overflow: "hidden",
-                  marginBottom: "clamp(24px, 5vw, 40px)",
+                  marginBottom: "clamp(16px, 3vw, 28px)",
                   border:
                     timeUntilStart <= 10
                       ? "2px solid rgba(239, 68, 68, 0.5)"
@@ -1233,8 +1193,8 @@ export default function LobbyPage() {
                     timeUntilStart <= 10
                       ? "#fca5a5"
                       : "#cbd5e1",
-                  marginBottom: "clamp(28px, 6vw, 40px)",
-                  lineHeight: 1.7,
+                  marginBottom: "clamp(16px, 3vw, 28px)",
+                  lineHeight: 1.6,
                   fontWeight: 600,
                 }}
               >
@@ -1247,7 +1207,7 @@ export default function LobbyPage() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                  gridTemplateColumns: "repeat(3, 1fr)",
                   gap: "clamp(14px, 3.5vw, 20px)",
                   maxWidth: "900px",
                   margin: "0 auto",
@@ -1255,8 +1215,8 @@ export default function LobbyPage() {
               >
                 <div
                   style={{
-                    padding: "clamp(14px, 3.5vw, 20px)",
-                    borderRadius: "16px",
+                    padding: "clamp(10px, 2.5vw, 20px)",
+                    borderRadius: "12px",
                     background: "rgba(139, 92, 246, 0.15)",
                     border: "2px solid rgba(139, 92, 246, 0.3)",
                     boxShadow: "0 0 15px rgba(139, 92, 246, 0.2)",
@@ -1284,8 +1244,8 @@ export default function LobbyPage() {
                 </div>
                 <div
                   style={{
-                    padding: "clamp(14px, 3.5vw, 20px)",
-                    borderRadius: "16px",
+                    padding: "clamp(10px, 2.5vw, 20px)",
+                    borderRadius: "12px",
                     background: "rgba(236, 72, 153, 0.15)",
                     border: "2px solid rgba(236, 72, 153, 0.3)",
                     boxShadow: "0 0 15px rgba(236, 72, 153, 0.2)",
@@ -1313,8 +1273,8 @@ export default function LobbyPage() {
                 </div>
                 <div
                   style={{
-                    padding: "clamp(14px, 3.5vw, 20px)",
-                    borderRadius: "16px",
+                    padding: "clamp(10px, 2.5vw, 20px)",
+                    borderRadius: "12px",
                     background: "rgba(34, 197, 94, 0.15)",
                     border: "2px solid rgba(34, 197, 94, 0.3)",
                     boxShadow: "0 0 15px rgba(34, 197, 94, 0.2)",
@@ -1423,7 +1383,7 @@ export default function LobbyPage() {
                   display: "flex",
                   flexDirection: "column",
                   gap: "clamp(9px, 1.9vw, 12px)",
-                  maxHeight: "412px",
+                  maxHeight: "clamp(250px, 50vw, 380px)",
                   overflowY: "auto",
                   paddingRight: "8px",
                 }}
