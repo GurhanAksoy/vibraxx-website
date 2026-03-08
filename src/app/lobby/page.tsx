@@ -168,8 +168,10 @@ export default function LobbyPage() {
         // ✅ EMNİYET KEMERİ: Join başarısızsa push yapma!
         const { data: joinResult, error: joinError } = await supabase.rpc('join_live_round');
 
-        if (joinError || joinResult?.error) {
-          console.log('[Lobby] Join failed, staying in lobby:', joinError || joinResult?.error);
+        // RETURNS TABLE → array gelir, ilk row'u kontrol et
+        const joinRow = Array.isArray(joinResult) ? joinResult[0] : joinResult;
+        if (joinError || (joinRow?.action !== 'join' && joinRow?.message !== 'already_joined')) {
+          console.log('[Lobby] Join failed:', joinError || joinRow?.message);
           isRedirectingRef.current = false;
           setIsRedirecting(false);
           return;
