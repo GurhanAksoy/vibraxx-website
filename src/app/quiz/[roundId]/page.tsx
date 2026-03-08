@@ -1421,7 +1421,7 @@ export default function QuizGamePage() {
                     accuracy,
                     userName: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Player',
                     userCountry: user?.user_metadata?.country || '🌍',
-                    roundId: roundId ?? undefined,
+                    roundId: undefined,
                   }}
                   variant="full"
                 />
