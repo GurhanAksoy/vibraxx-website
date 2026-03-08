@@ -167,28 +167,14 @@ export default function LobbyPage() {
       setPlayers(data.players ?? []);
       setTotalPlayers(data.participant_count ?? 0);
 
-      // === REDIRECT: Round live + is_participant → quiz'e git ===
+      // === REDIRECT: Sadece zaten participant ise quiz'e git ===
+      // Join işlemi countdown 0'da ayrıca yapılır (handleCountdownZero)
       if (data.status === "live" && data.round_id && !isRedirectingRef.current) {
         if (data.is_participant) {
-          // Zaten katılmış → direkt git
           isRedirectingRef.current = true;
           setIsRedirecting(true);
           routerRef.current.push(`/quiz/${data.round_id}`);
           return;
-        }
-
-        // Katılmamış ama live → join et
-        if (!hasJoinedRef.current && data.credits > 0) {
-          hasJoinedRef.current = true;
-          const { data: joinResult, error: joinError } = await supabase.rpc("join_live_round");
-          const joinRow = Array.isArray(joinResult) ? joinResult[0] : joinResult;
-          if (!joinError && (joinRow?.action === "join" || joinRow?.message === "already_joined")) {
-            isRedirectingRef.current = true;
-            setIsRedirecting(true);
-            routerRef.current.push(`/quiz/${data.round_id}`);
-          } else {
-            hasJoinedRef.current = false; // retry next poll
-          }
         }
       }
     } catch (err) {
@@ -208,7 +194,7 @@ export default function LobbyPage() {
     const tick = setInterval(() => {
       setLocalSeconds((prev) => {
         if (prev === null) return prev;
-        if (prev <= 1) { setTimeout(() => fetchLobbyState(), 300); return 0; }
+        if (prev <= 1) { setTimeout(() => handleCountdownZero(), 300); return 0; }
         return prev - 1;
       });
     }, 1000);
@@ -240,6 +226,53 @@ export default function LobbyPage() {
       alarmFiredRef.current = false;
     }
   }, [localSeconds, isPlaying]);
+
+  // === COUNTDOWN SIFIRA DÜŞTÜ: JOIN + REDIRECT ===
+  const handleCountdownZero = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const { data, error } = await supabase.rpc("get_lobby_state", {
+        p_user_id: session.user.id,
+      });
+
+      if (error || !data) return;
+
+      // Round live değilse bekle (biraz gecikmiş olabilir)
+      if (data.status !== "live" || !data.round_id) {
+        setTimeout(() => fetchLobbyState(), 500);
+        return;
+      }
+
+      // Zaten participant → direkt git
+      if (data.is_participant) {
+        if (!isRedirectingRef.current) {
+          isRedirectingRef.current = true;
+          setIsRedirecting(true);
+          routerRef.current.push(`/quiz/${data.round_id}`);
+        }
+        return;
+      }
+
+      // Join et
+      if (!hasJoinedRef.current && data.credits > 0) {
+        hasJoinedRef.current = true;
+        const { data: joinResult, error: joinError } = await supabase.rpc("join_live_round");
+        const joinRow = Array.isArray(joinResult) ? joinResult[0] : joinResult;
+        if (!joinError && (joinRow?.action === "join" || joinRow?.message === "already_joined")) {
+          isRedirectingRef.current = true;
+          setIsRedirecting(true);
+          routerRef.current.push(`/quiz/${data.round_id}`);
+        } else {
+          hasJoinedRef.current = false;
+          setTimeout(() => fetchLobbyState(), 1000);
+        }
+      }
+    } catch (err) {
+      console.error("[Lobby] handleCountdownZero error:", err);
+    }
+  }, [fetchLobbyState]);
 
   // === HANDLE BACK BUTTON ===
   const handleBack = async () => {
