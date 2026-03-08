@@ -280,8 +280,7 @@ export default function QuizGamePage() {
 
       return () => clearTimeout(timer);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showExplanation, showFinalScore]);
+  }, [showExplanation, showFinalScore, currentIndex, questions.length, roundId]);
 
   // === LOAD FINAL RESULTS FROM DB ===
   const loadFinalResults = async () => {
@@ -371,7 +370,6 @@ export default function QuizGamePage() {
         p_round_id: roundId,
         p_question_id: currentQ.question_id,
         p_selected_option: optionId,
-        p_answer_time_ms: answerTimeMs
       });
 
       if (error) {
@@ -437,7 +435,6 @@ export default function QuizGamePage() {
         p_round_id: roundId,
         p_question_id: currentQ.question_id,
         p_selected_option: null,
-        p_answer_time_ms: QUESTION_DURATION * 1000
       });
 
       if (!error && data) {
@@ -518,25 +515,18 @@ export default function QuizGamePage() {
   // 🔐 === SECURITY VERIFICATION SCREEN ===
   if (!securityPassed) {
     return (
-      <>
-        <audio ref={correctSoundRef} src="/sounds/correct.mp3" preload="auto" />
-        <audio ref={wrongSoundRef} src="/sounds/wrong.mp3" preload="auto" />
-        <audio ref={clickSoundRef} src="/sounds/click.mp3" preload="auto" />
-        <audio ref={gameoverSoundRef} src="/sounds/gameover.mp3" preload="auto" />
-        <audio ref={whooshSoundRef} src="/sounds/whoosh.mp3" preload="auto" />
-        <audio ref={tickSoundRef} src="/sounds/tick.mp3" preload="auto" />
-        <div
-          style={{
-            minHeight: "100vh",
-            background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "20px",
-            color: "white",
-          }}
-        >
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "20px",
+          color: "white",
+        }}
+      >
         <div
           style={{
             width: "60px",
@@ -559,32 +549,24 @@ export default function QuizGamePage() {
         <style jsx>{`
           @keyframes spin { to { transform: rotate(360deg); } }
         `}</style>
-        </div>
-      </>
+      </div>
     );
   }
 
   // === LOADING SCREEN ===
   if (isLoading) {
     return (
-      <>
-        <audio ref={correctSoundRef} src="/sounds/correct.mp3" preload="auto" />
-        <audio ref={wrongSoundRef} src="/sounds/wrong.mp3" preload="auto" />
-        <audio ref={clickSoundRef} src="/sounds/click.mp3" preload="auto" />
-        <audio ref={gameoverSoundRef} src="/sounds/gameover.mp3" preload="auto" />
-        <audio ref={whooshSoundRef} src="/sounds/whoosh.mp3" preload="auto" />
-        <audio ref={tickSoundRef} src="/sounds/tick.mp3" preload="auto" />
-        <div
-          style={{
-            minHeight: "100vh",
-            background:
-              "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "white",
-          }}
-        >
+      <div
+        style={{
+          minHeight: "100vh",
+          background:
+            "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "white",
+        }}
+      >
         <div style={{ textAlign: "center" }}>
           <div
             className="animate-pulse"
@@ -608,8 +590,7 @@ export default function QuizGamePage() {
             Loading questions...
           </p>
         </div>
-        </div>
-      </>
+      </div>
     );
   }
 
