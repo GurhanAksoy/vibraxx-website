@@ -146,16 +146,32 @@ export default function QuizGamePage() {
         let normalizedAnswers = Array(questionsData.length).fill("none");
 
         if (!progressError && progress) {
-          setCurrentIndex(progress.current_index || 0);
-          setCorrectCount(progress.correct_count || 0);
-          setWrongCount(progress.wrong_count || 0);
-          setTotalScore(progress.total_score || 0);
-
+          // answers_array: ["correct","wrong",...] — cevaplanmış sırayla
+          // normalizedAnswers: 15 elemanlı, ilk N'i dolu, geri kalan "none"
           if (progress.answers_array && Array.isArray(progress.answers_array)) {
             const copyLength = Math.min(progress.answers_array.length, questionsData.length);
             for (let i = 0; i < copyLength; i++) {
               normalizedAnswers[i] = progress.answers_array[i] || "none";
             }
+          }
+
+          // İlk cevaplanmamış soruya git
+          const answeredCount = (progress.answers_array || []).length;
+          const restoredIndex = Math.min(answeredCount, questionsData.length - 1);
+
+          setCurrentIndex(restoredIndex);
+          setCorrectCount(progress.correct_count || 0);
+          setWrongCount(progress.wrong_count || 0);
+          setTotalScore(progress.total_score || 0);
+
+          // Tüm sorular bittiyse direkt final
+          if (answeredCount >= questionsData.length) {
+            setAnswers(normalizedAnswers);
+            setQuestions(questionsData);
+            setIsLoading(false);
+            await loadFinalResults();
+            setShowFinalScore(true);
+            return;
           }
         } else {
           setCurrentIndex(0);
@@ -168,6 +184,7 @@ export default function QuizGamePage() {
         setQuestions(questionsData);
         setTimeLeft(QUESTION_DURATION);
         timeoutTriggeredRef.current = false;
+        answerSubmittedRef.current = new Set();
         setIsLoading(false);
 
         // entry.mp3 — quiz başlarken 1 kez
