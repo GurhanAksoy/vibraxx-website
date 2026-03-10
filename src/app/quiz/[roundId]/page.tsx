@@ -146,31 +146,16 @@ export default function QuizGamePage() {
         let normalizedAnswers = Array(questionsData.length).fill("none");
 
         if (!progressError && progress) {
+          setCurrentIndex(progress.current_index || 0);
+          setCorrectCount(progress.correct_count || 0);
+          setWrongCount(progress.wrong_count || 0);
+          setTotalScore(progress.total_score || 0);
+
           if (progress.answers_array && Array.isArray(progress.answers_array)) {
             const copyLength = Math.min(progress.answers_array.length, questionsData.length);
             for (let i = 0; i < copyLength; i++) {
               normalizedAnswers[i] = progress.answers_array[i] || "none";
             }
-          }
-
-          // Refresh: cevaplı soruyu atla, ilk cevaplanmamışa git
-          let restoredIndex = progress.current_index || 0;
-          while (restoredIndex < questionsData.length && normalizedAnswers[restoredIndex] !== "none") {
-            restoredIndex++;
-          }
-
-          setCurrentIndex(restoredIndex);
-          setCorrectCount(progress.correct_count || 0);
-          setWrongCount(progress.wrong_count || 0);
-          setTotalScore(progress.total_score || 0);
-
-          if (restoredIndex >= questionsData.length) {
-            setAnswers(normalizedAnswers);
-            setQuestions(questionsData);
-            setIsLoading(false);
-            await loadFinalResults();
-            setShowFinalScore(true);
-            return;
           }
         } else {
           setCurrentIndex(0);
@@ -183,7 +168,6 @@ export default function QuizGamePage() {
         setQuestions(questionsData);
         setTimeLeft(QUESTION_DURATION);
         timeoutTriggeredRef.current = false;
-        answerSubmittedRef.current = new Set();
         setIsLoading(false);
 
         // entry.mp3 — quiz başlarken 1 kez
@@ -246,7 +230,7 @@ export default function QuizGamePage() {
     setTimeout(() => overlay.remove(), 200);
   };
 
-  // === QUESTION TIMER — cevap seçilse de DURMUYOR ===
+  // === QUESTION TIMER — cevap seçilse de durmuyor ===
   useEffect(() => {
     if (isLoading || showExplanation || showFinalScore || !currentQ) return;
 
@@ -255,12 +239,12 @@ export default function QuizGamePage() {
       return () => clearTimeout(t);
     }
 
-    // timeLeft === 0
     if (timeoutTriggeredRef.current) return;
     timeoutTriggeredRef.current = true;
 
     if (isAnswerLockedRef.current) {
-      // Cevap verilmişti — explanation aç
+      // Cevap verilmişti — whoosh + explanation aç
+      playSound(whooshSoundRef.current);
       setShowExplanation(true);
     } else {
       // Cevap verilmedi — timeout submit (o da explanation açacak)
@@ -394,13 +378,9 @@ export default function QuizGamePage() {
     setSelectedAnswer(optionId);
     setIsAnswerLocked(true);
     isAnswerLockedRef.current = true;
-    // timeoutTriggeredRef KALDIRILDI — timer 0'da isAnswerLockedRef'i görüp explanation açacak
-
-    const answerTimeMs = (QUESTION_DURATION - timeLeft) * 1000;
     answerSubmittedRef.current.add(currentQ.question_id);
 
     try {
-      // ✅ KANONIK: submit_answer RPC
       const { data, error } = await supabase.rpc("submit_answer", {
         p_round_id: roundId,
         p_question_id: currentQ.question_id,
@@ -409,28 +389,26 @@ export default function QuizGamePage() {
 
       if (error) {
         console.error("❌ Submit error:", error);
+        playSound(wrongSoundRef.current);
+        flashScreen('rgba(239, 68, 68, 1)');
         return;
       }
 
       if (data) {
         const correctFlag = data.is_correct || false;
         setIsCorrect(correctFlag);
-        
-        // ✅ KANONIK: Save explanation data
         setCurrentCorrectOption(data.correct_option);
         setCurrentExplanation(data.explanation || "");
-
-        // ✅ KANONIK: Update from DB (no local increment)
         setTotalScore(data.current_total_score || 0);
         setCorrectCount(data.correct_count || 0);
         setWrongCount(data.wrong_count || 0);
 
-        // ✅ Check if round finished (from backend)
-        if (data.round_finished) {
-          console.log("🏁 Round finished by DB");
-          await loadFinalResults();
-          setShowFinalScore(true);
-          return;
+        if (correctFlag) {
+          playSound(correctSoundRef.current);
+          flashScreen('rgba(34, 197, 94, 1)');
+        } else {
+          playSound(wrongSoundRef.current);
+          flashScreen('rgba(239, 68, 68, 1)');
         }
 
         setAnswers((prev) => {
@@ -441,20 +419,19 @@ export default function QuizGamePage() {
           return next;
         });
 
-        if (correctFlag) {
-          playSound(correctSoundRef.current);
-          flashScreen('rgba(34, 197, 94, 1)'); // Green flash
-        } else {
-          playSound(wrongSoundRef.current);
-          flashScreen('rgba(239, 68, 68, 1)'); // Red flash
+        if (data.round_finished) {
+          await loadFinalResults();
+          setShowFinalScore(true);
+          return;
         }
       }
     } catch (err) {
       console.error("❌ Answer submission error:", err);
+      playSound(wrongSoundRef.current);
     }
-
-    // Explanation timer'a bırakıldı — 9sn dolunca açılacak
+    // Timer 0'da explanation açılacak
   };
+
 
   const handleTimeout = async () => {
     if (isAnswerLocked || showExplanation || showFinalScore) return;
@@ -498,7 +475,9 @@ export default function QuizGamePage() {
       console.error("❌ Timeout submit error:", err);
     }
 
-    // Explanation timer'a bırakıldı
+    // RPC bitti → whoosh + explanation aç
+    playSound(whooshSoundRef.current);
+    setShowExplanation(true);
   };
 
   const handleExitClick = () => {
