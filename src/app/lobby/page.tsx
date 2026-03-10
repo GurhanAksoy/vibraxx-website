@@ -167,32 +167,14 @@ export default function LobbyPage() {
       setPlayers(data.players ?? []);
       setTotalPlayers(data.participant_count ?? data.players?.length ?? 0);
 
-      // === LIVE ROUND: participant ise redirect, değilse hemen join et ===
+      // === REDIRECT: Sadece zaten participant ise quiz'e git ===
+      // Join işlemi countdown 0'da handleCountdownZero ile yapılır
       if (data.status === "live" && data.round_id && !isRedirectingRef.current) {
         if (data.is_participant) {
-          // Zaten katılmış → direkt quiz'e
           isRedirectingRef.current = true;
           setIsRedirecting(true);
           routerRef.current.push(`/quiz/${data.round_id}`);
           return;
-        } else if (!hasJoinedRef.current && (data.credits ?? 0) > 0) {
-          // Live round var ama henüz katılmamış → hemen join et
-          hasJoinedRef.current = true;
-          try {
-            const { data: joinResult, error: joinError } = await supabase.rpc("join_live_round");
-            const joinRow = Array.isArray(joinResult) ? joinResult[0] : joinResult;
-            if (!joinError && (joinRow?.action === "join" || joinRow?.message === "already_joined")) {
-              isRedirectingRef.current = true;
-              setIsRedirecting(true);
-              routerRef.current.push(`/quiz/${data.round_id}`);
-              return;
-            } else {
-              hasJoinedRef.current = false;
-            }
-          } catch (e) {
-            hasJoinedRef.current = false;
-            console.error("[Lobby] auto-join error:", e);
-          }
         }
       }
     } catch (err) {
@@ -667,13 +649,14 @@ export default function LobbyPage() {
         >
           <div
             style={{
-              maxWidth: "1400px",
+              maxWidth: "900px",
               margin: "0 auto",
-              padding: "clamp(14px, 3.6vw, 19px) clamp(19px, 4.8vw, 38px)",
+              padding: "clamp(12px, 3vw, 18px) clamp(12px, 3vw, 24px)",
               position: "relative",
+              overflow: "hidden",
             }}
           >
-            {/* Sol: Back + Sound yan yana; Logo ortada absolute */}
+            {/* 3-col flex: [back+sound] [logo+text] [spacer] */}
             <div
               style={{
                 display: "flex",
@@ -681,8 +664,8 @@ export default function LobbyPage() {
                 justifyContent: "space-between",
               }}
             >
-              {/* Left: Back + Sound butonu yan yana */}
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", zIndex: 21 }}>
+              {/* Left: Back + Sound */}
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
                 <button
                   onClick={handleBack}
                   style={{
@@ -738,11 +721,11 @@ export default function LobbyPage() {
                 </button>
               </div>
 
-              {/* Sağ: boş spacer (logo ortada absolute) */}
-              <div style={{ width: "clamp(44px, 10vw, 60px)" }} />
+              {/* Right: spacer eşit genişlik */}
+              <div style={{ flexShrink: 0, width: "clamp(44px, 10vw, 80px)" }} />
             </div>
 
-            {/* Center: Logo + GLOBAL ARENA Text */}
+            {/* Center: Logo + GLOBAL ARENA — absolute yerine flex row ortası */}
             <div
               style={{
                 position: "absolute",
@@ -752,15 +735,16 @@ export default function LobbyPage() {
                 zIndex: 20,
                 display: "flex",
                 alignItems: "center",
-                gap: "clamp(12px, 3vw, 16px)",
+                gap: "clamp(8px, 2vw, 14px)",
+                pointerEvents: "none",
               }}
             >
               {/* Logo */}
               <div
                 style={{
                   position: "relative",
-                  width: "clamp(70px, 14vw, 90px)",
-                  height: "clamp(70px, 14vw, 90px)",
+                  width: "clamp(48px, 10vw, 72px)",
+                  height: "clamp(48px, 10vw, 72px)",
                   borderRadius: "50%",
                   padding: 3,
                   background: "linear-gradient(135deg, #7c3aed, #d946ef)",
@@ -813,7 +797,7 @@ export default function LobbyPage() {
               <div>
                 <div
                   style={{
-                    fontSize: "clamp(16px, 3.5vw, 22px)",
+                    fontSize: "clamp(14px, 3vw, 20px)",
                     fontWeight: 900,
                     backgroundImage: "linear-gradient(135deg, #a78bfa, #f0abfc)",
                     WebkitBackgroundClip: "text",
@@ -1292,7 +1276,7 @@ export default function LobbyPage() {
                   </div>
                   <div
                     style={{
-                      fontSize: "clamp(16px, 3.5vw, 20px)",
+                      fontSize: "clamp(13px, 3vw, 16px)",
                       fontWeight: 800,
                       color: "#c4b5fd",
                     }}
@@ -1321,7 +1305,7 @@ export default function LobbyPage() {
                   </div>
                   <div
                     style={{
-                      fontSize: "clamp(16px, 3.5vw, 20px)",
+                      fontSize: "clamp(13px, 3vw, 16px)",
                       fontWeight: 800,
                       color: "#f9a8d4",
                     }}
@@ -1350,7 +1334,7 @@ export default function LobbyPage() {
                   </div>
                   <div
                     style={{
-                      fontSize: "clamp(16px, 3.5vw, 20px)",
+                      fontSize: "clamp(11px, 2.8vw, 15px)",
                       fontWeight: 800,
                       color: "#86efac",
                     }}

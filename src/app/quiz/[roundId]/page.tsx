@@ -436,7 +436,8 @@ export default function QuizGamePage() {
       console.error("❌ Answer submission error:", err);
     }
 
-    // Explanation timer'a bırakıldı — 9sn dolunca açılacak
+    // RPC bitti -> explanation ac
+    setShowExplanation(true);
   };
 
   const handleTimeout = async () => {
