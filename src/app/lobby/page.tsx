@@ -167,6 +167,13 @@ export default function LobbyPage() {
       setPlayers(data.players ?? []);
       setTotalPlayers(data.participant_count ?? data.players?.length ?? 0);
 
+      // === KREDİ KONTROLÜ: 0 ise ana sayfaya yönlendir ===
+      if ((data.credits ?? 0) === 0 && !isRedirectingRef.current) {
+        isRedirectingRef.current = true;
+        routerRef.current.push("/?no_credits=1");
+        return;
+      }
+
       // === REDIRECT: Sadece zaten participant ise quiz'e git ===
       // Join işlemi countdown 0'da handleCountdownZero ile yapılır
       if (data.status === "live" && data.round_id && !isRedirectingRef.current) {
