@@ -174,13 +174,17 @@ export default function LobbyPage() {
         return;
       }
 
-      // === REDIRECT: Sadece zaten participant ise quiz'e git ===
-      // Join işlemi countdown 0'da handleCountdownZero ile yapılır
+      // === LIVE ROUND LOGIC ===
       if (data.status === "live" && data.round_id && !isRedirectingRef.current) {
         if (data.is_participant) {
+          // Zaten katılmış → quiz'e git
           isRedirectingRef.current = true;
           setIsRedirecting(true);
           routerRef.current.push(`/quiz/${data.round_id}`);
+          return;
+        } else {
+          // Round live ama henüz join olmamış → hemen join et
+          setTimeout(() => handleCountdownZero(), 100);
           return;
         }
       }

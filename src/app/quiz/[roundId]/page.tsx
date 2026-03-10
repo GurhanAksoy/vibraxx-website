@@ -80,7 +80,8 @@ export default function QuizGamePage() {
   const timeoutTriggeredRef = useRef(false);
   const answerSubmittedRef = useRef<Set<number>>(new Set());
   const finalRedirectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isAnswerLockedRef = useRef(false); // stale closure fix
+  const isAnswerLockedRef = useRef(false);
+  const rpcCompletedRef = useRef(false); // RPC tamamlandı mı? // stale closure fix
 
   // === AUDIO REFS ===
   const correctSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -260,9 +261,16 @@ export default function QuizGamePage() {
     timeoutTriggeredRef.current = true;
 
     if (isAnswerLockedRef.current) {
-      // Cevap verilmişti — whoosh + explanation aç
-      playSound(whooshSoundRef.current);
-      setShowExplanation(true);
+      // Cevap verilmişti — RPC tamamlanana kadar bekle
+      const waitForRpc = () => {
+        if (rpcCompletedRef.current) {
+          playSound(whooshSoundRef.current);
+          setShowExplanation(true);
+        } else {
+          setTimeout(waitForRpc, 100); // 100ms'de bir kontrol et
+        }
+      };
+      waitForRpc();
     } else {
       // Cevap verilmedi — timeout submit (o da explanation açacak)
       handleTimeout();
@@ -300,6 +308,7 @@ export default function QuizGamePage() {
           setCurrentIndex(currentIndex + 1);
           setTimeLeft(QUESTION_DURATION);
           timeoutTriggeredRef.current = false;
+          rpcCompletedRef.current = false;
           setSelectedAnswer(null);
           setIsAnswerLocked(false);
           isAnswerLockedRef.current = false;
@@ -446,6 +455,7 @@ export default function QuizGamePage() {
       console.error("❌ Answer submission error:", err);
       playSound(wrongSoundRef.current);
     }
+    rpcCompletedRef.current = true; // ✅ RPC tamamlandı
     // Timer 0'da explanation açılacak
   };
 
@@ -847,70 +857,13 @@ export default function QuizGamePage() {
       <div
         style={{
           minHeight: "100vh",
-          background:
-            "linear-gradient(135deg, #0f172a 0%, #1e1b4b 25%, #312e81 50%, #1e1b4b 75%, #0f172a 100%)",
-          backgroundSize: "400% 400%",
-          animation: "shimmer 15s ease infinite",
+          background: "linear-gradient(160deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
           color: "white",
           position: "relative",
           overflow: "hidden",
         }}
       >
-        {/* Animated Background Orbs */}
-        <div
-          className="animate-float"
-          style={{
-            position: "fixed",
-            top: "-10%",
-            left: "-5%",
-            width: "min(600px, 80vw)",
-            height: "min(600px, 80vw)",
-            borderRadius: "50%",
-            background:
-              "radial-gradient(circle, rgba(124,58,237,0.5) 0%, rgba(124,58,237,0.1) 40%, transparent 70%)",
-            filter: "blur(80px)",
-            opacity: 0.6,
-            pointerEvents: "none",
-            zIndex: 0,
-          }}
-        />
-        <div
-          className="animate-float"
-          style={{
-            position: "fixed",
-            bottom: "-10%",
-            right: "-5%",
-            width: "min(700px, 90vw)",
-            height: "min(700px, 90vw)",
-            borderRadius: "50%",
-            background:
-              "radial-gradient(circle, rgba(217,70,239,0.4) 0%, rgba(217,70,239,0.1) 40%, transparent 70%)",
-            filter: "blur(100px)",
-            opacity: 0.5,
-            pointerEvents: "none",
-            zIndex: 0,
-            animationDelay: "2s",
-          }}
-        />
-        <div
-          className="animate-float"
-          style={{
-            position: "fixed",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: "min(500px, 70vw)",
-            height: "min(500px, 70vw)",
-            borderRadius: "50%",
-            background:
-              "radial-gradient(circle, rgba(56,189,248,0.3) 0%, rgba(56,189,248,0.05) 40%, transparent 70%)",
-            filter: "blur(90px)",
-            opacity: 0.4,
-            pointerEvents: "none",
-            zIndex: 0,
-            animationDelay: "4s",
-          }}
-        />
+
 
         {/* ═══════════════════════════════════════════════════════════ */}
         {/* MINIMAL CONTROLS: Sound + Exit (No Header/Footer) */}
@@ -1244,7 +1197,7 @@ export default function QuizGamePage() {
                     style={{
                       display: "grid",
                       gridTemplateColumns: "repeat(2, 1fr)",
-                      gap: "clamp(12px, 3vw, 16px)",
+                      gap: "clamp(8px, 2vw, 12px)",
                     }}
                   >
                     {(["a", "b", "c", "d"] as OptionId[]).map((optId) => {
@@ -1283,8 +1236,8 @@ export default function QuizGamePage() {
                           disabled={locked}
                           style={{
                             position: "relative",
-                            padding: "clamp(16px, 3vw, 20px) clamp(14px, 3vw, 18px)",
-                            borderRadius: "clamp(16px, 3vw, 20px)",
+                            padding: "clamp(10px, 2.5vw, 16px) clamp(10px, 2.5vw, 14px)",
+                            borderRadius: "clamp(12px, 2.5vw, 16px)",
                             border: `3px solid ${borderColor}`,
                             background: bg,
                             color: "#f8fafc",
@@ -1309,20 +1262,7 @@ export default function QuizGamePage() {
                             }
                           }}
                         >
-                          {!locked && (
-                            <div
-                              style={{
-                                position: "absolute",
-                                top: 0,
-                                left: "-100%",
-                                width: "50%",
-                                height: "100%",
-                                background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)",
-                                animation: "shine 3s infinite",
-                                pointerEvents: "none",
-                              }}
-                            />
-                          )}
+
 
                           <div
                             style={{
@@ -1335,14 +1275,14 @@ export default function QuizGamePage() {
                           >
                             <div
                               style={{
-                                width: "clamp(36px, 7vw, 44px)",
-                                height: "clamp(36px, 7vw, 44px)",
-                                borderRadius: "12px",
+                                width: "clamp(28px, 6vw, 36px)",
+                                height: "clamp(28px, 6vw, 36px)",
+                                borderRadius: "8px",
                                 border: `2px solid ${borderColor}`,
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                fontSize: "clamp(16px, 3vw, 20px)",
+                                fontSize: "clamp(13px, 2.5vw, 16px)",
                                 fontWeight: 900,
                                 background: "rgba(15,23,42,0.9)",
                                 boxShadow: "inset 0 2px 8px rgba(0,0,0,0.3)",
@@ -1357,10 +1297,12 @@ export default function QuizGamePage() {
 
                             <div
                               style={{
-                                fontSize: "clamp(14px, 3vw, 16px)",
+                                fontSize: "clamp(12px, 2.8vw, 15px)",
                                 fontWeight: 600,
                                 color: "#f8fafc",
-                                lineHeight: 1.4,
+                                lineHeight: 1.35,
+                                wordBreak: "break-word",
+                                overflowWrap: "anywhere",
                               }}
                             >
                               {optText}
