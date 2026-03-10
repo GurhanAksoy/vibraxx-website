@@ -165,7 +165,7 @@ export default function LobbyPage() {
 
       // Players ve count doğrudan get_lobby_state'den gelir
       setPlayers(data.players ?? []);
-      setTotalPlayers(data.participant_count ?? 0);
+      setTotalPlayers(data.participant_count ?? data.players?.length ?? 0);
 
       // === REDIRECT: Sadece zaten participant ise quiz'e git ===
       // Join işlemi countdown 0'da ayrıca yapılır (handleCountdownZero)
@@ -819,7 +819,7 @@ export default function LobbyPage() {
           style={{
             position: "relative",
             zIndex: 10,
-            maxWidth: "1400px",
+            maxWidth: "900px",
             margin: "0 auto",
             padding: "clamp(24px, 5vw, 40px) clamp(16px, 4vw, 32px)",
           }}
@@ -1027,7 +1027,7 @@ export default function LobbyPage() {
             {/* Countdown Section */}
             <div
               style={{
-                padding: "clamp(32px, 6vw, 56px)",
+                padding: "clamp(16px, 4vw, 56px)",
                 borderRadius: "28px",
                 border:
                   timeUntilStart <= 10
@@ -1247,7 +1247,7 @@ export default function LobbyPage() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                  gridTemplateColumns: "repeat(3, 1fr)",
                   gap: "clamp(14px, 3.5vw, 20px)",
                   maxWidth: "900px",
                   margin: "0 auto",
@@ -1414,7 +1414,7 @@ export default function LobbyPage() {
                     boxShadow: "0 0 15px rgba(139, 92, 246, 0.3)",
                   }}
                 >
-                  {players.length}
+                  {totalPlayers > 0 ? totalPlayers.toLocaleString() : players.length}
                 </div>
               </div>
 

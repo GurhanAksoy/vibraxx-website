@@ -80,6 +80,7 @@ export default function QuizGamePage() {
   const timeoutTriggeredRef = useRef(false);
   const answerSubmittedRef = useRef<Set<number>>(new Set());
   const finalRedirectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isAnswerLockedRef = useRef(false); // stale closure fix
 
   // === AUDIO REFS ===
   const correctSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -240,7 +241,7 @@ export default function QuizGamePage() {
 
     if (timeLeft === 0 && !timeoutTriggeredRef.current) {
       timeoutTriggeredRef.current = true;
-      if (!isAnswerLocked) {
+      if (!isAnswerLockedRef.current) {
         // Hiç cevap vermediyse timeout submit
         handleTimeout();
       } else {
@@ -283,6 +284,7 @@ export default function QuizGamePage() {
           timeoutTriggeredRef.current = false;
           setSelectedAnswer(null);
           setIsAnswerLocked(false);
+          isAnswerLockedRef.current = false;
           setShowExplanation(false);
           setCurrentCorrectOption(null);
           setCurrentExplanation("");
@@ -374,6 +376,7 @@ export default function QuizGamePage() {
     playClick();
     setSelectedAnswer(optionId);
     setIsAnswerLocked(true);
+    isAnswerLockedRef.current = true;
     timeoutTriggeredRef.current = true;
 
     const answerTimeMs = (QUESTION_DURATION - timeLeft) * 1000;
@@ -442,6 +445,7 @@ export default function QuizGamePage() {
     if (answerSubmittedRef.current.has(currentQ.question_id)) return;
 
     setIsAnswerLocked(true);
+    isAnswerLockedRef.current = true;
     answerSubmittedRef.current.add(currentQ.question_id);
 
     try {
@@ -912,107 +916,7 @@ export default function QuizGamePage() {
           {/* ═══════════════════════════════════════════════════════════ */}
           {/* FLOATING CONTROLS - Top Right */}
           {/* ═══════════════════════════════════════════════════════════ */}
-          {!showFinalScore && (
-            <div
-              style={{
-                position: "fixed",
-                top: "clamp(16px, 4vw, 24px)",
-                right: "clamp(16px, 4vw, 24px)",
-                display: "flex",
-                gap: "clamp(8px, 2vw, 12px)",
-                zIndex: 50,
-              }}
-            >
-              {/* Sound Toggle */}
-              <button
-                onClick={handleSoundToggle}
-                style={{
-                  minWidth: "44px",
-                  minHeight: "44px",
-                  padding: "clamp(10px, 2vw, 12px)",
-                  borderRadius: "clamp(12px, 3vw, 14px)",
-                  border: `2px solid ${isSoundEnabled ? "rgba(167,139,250,0.6)" : "rgba(107,114,128,0.4)"}`,
-                  background: isSoundEnabled
-                    ? "linear-gradient(135deg, rgba(124,58,237,0.4), rgba(79,70,229,0.3))"
-                    : "rgba(30,27,75,0.7)",
-                  backdropFilter: "blur(10px)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  transition: "all 0.3s",
-                  boxShadow: isSoundEnabled
-                    ? "0 0 20px rgba(124,58,237,0.4)"
-                    : "0 4px 12px rgba(0,0,0,0.3)",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "scale(1.05)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "scale(1)";
-                }}
-              >
-                {isSoundEnabled ? (
-                  <Volume2
-                    style={{
-                      width: "clamp(20px, 4vw, 24px)",
-                      height: "clamp(20px, 4vw, 24px)",
-                      color: "#a78bfa",
-                    }}
-                  />
-                ) : (
-                  <VolumeX
-                    style={{
-                      width: "clamp(20px, 4vw, 24px)",
-                      height: "clamp(20px, 4vw, 24px)",
-                      color: "#6b7280",
-                    }}
-                  />
-                )}
-              </button>
 
-              {/* Exit Button */}
-              <button
-                onClick={handleExitClick}
-                style={{
-                  minWidth: "44px",
-                  minHeight: "44px",
-                  padding: "clamp(10px, 2vw, 12px) clamp(16px, 3vw, 20px)",
-                  borderRadius: "clamp(12px, 3vw, 14px)",
-                  border: "2px solid rgba(239,68,68,0.5)",
-                  background: "linear-gradient(135deg, rgba(220,38,38,0.4), rgba(185,28,28,0.3))",
-                  backdropFilter: "blur(10px)",
-                  color: "white",
-                  fontSize: "clamp(12px, 2.5vw, 14px)",
-                  fontWeight: 800,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  cursor: "pointer",
-                  transition: "all 0.3s",
-                  boxShadow: "0 0 20px rgba(239,68,68,0.3)",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "scale(1.05)";
-                  e.currentTarget.style.boxShadow = "0 0 30px rgba(239,68,68,0.5)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "scale(1)";
-                  e.currentTarget.style.boxShadow = "0 0 20px rgba(239,68,68,0.3)";
-                }}
-              >
-                <XCircle
-                  style={{
-                    width: "clamp(16px, 3vw, 18px)",
-                    height: "clamp(16px, 3vw, 18px)",
-                  }}
-                />
-                <span>Exit</span>
-              </button>
-            </div>
-          )}
 
           {/* ═══════════════════════════════════════════════════════════ */}
           {/* 🎖️ ROUND HEADER - Global Arena Feel */}
@@ -1021,13 +925,22 @@ export default function QuizGamePage() {
             <div style={{
                 display: "flex", justifyContent: "space-between", alignItems: "center",
                 marginBottom: "clamp(10px, 2.5vw, 16px)",
-                fontSize: "11px", fontWeight: 800, letterSpacing: "0.12em",
-                color: "#475569", textTransform: "uppercase",
               }}>
-                <span>Global Arena</span>
-                <span style={{ color: "#7c3aed", background: "rgba(124,58,237,0.15)", padding: "3px 10px", borderRadius: "20px", border: "1px solid rgba(124,58,237,0.3)" }}>
+                {/* Sol: Global Arena */}
+                <span style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "0.12em", color: "#475569", textTransform: "uppercase" }}>Global Arena</span>
+                {/* Orta: soru sayacı */}
+                <span style={{ fontSize: "11px", fontWeight: 800, color: "#7c3aed", background: "rgba(124,58,237,0.15)", padding: "3px 10px", borderRadius: "20px", border: "1px solid rgba(124,58,237,0.3)" }}>
                   {currentIndex + 1} / {questions.length}
                 </span>
+                {/* Sağ: ses + exit — kompakt */}
+                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                  <button onClick={handleSoundToggle} style={{ width: "32px", height: "32px", borderRadius: "8px", border: `1px solid ${isSoundEnabled ? "rgba(167,139,250,0.5)" : "rgba(107,114,128,0.3)"}`, background: isSoundEnabled ? "rgba(124,58,237,0.25)" : "rgba(30,27,75,0.5)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                    {isSoundEnabled ? <Volume2 style={{ width: "15px", height: "15px", color: "#a78bfa" }} /> : <VolumeX style={{ width: "15px", height: "15px", color: "#6b7280" }} />}
+                  </button>
+                  <button onClick={handleExitClick} style={{ height: "32px", padding: "0 10px", borderRadius: "8px", border: "1px solid rgba(239,68,68,0.45)", background: "rgba(220,38,38,0.2)", color: "#fca5a5", fontSize: "11px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em", display: "flex", alignItems: "center", gap: "4px", cursor: "pointer" }}>
+                    <XCircle style={{ width: "13px", height: "13px" }} />Exit
+                  </button>
+                </div>
               </div>
           )}
 
