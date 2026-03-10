@@ -167,14 +167,32 @@ export default function LobbyPage() {
       setPlayers(data.players ?? []);
       setTotalPlayers(data.participant_count ?? data.players?.length ?? 0);
 
-      // === REDIRECT: Sadece zaten participant ise quiz'e git ===
-      // Join işlemi countdown 0'da ayrıca yapılır (handleCountdownZero)
+      // === LIVE ROUND: participant ise redirect, değilse hemen join et ===
       if (data.status === "live" && data.round_id && !isRedirectingRef.current) {
         if (data.is_participant) {
+          // Zaten katılmış → direkt quiz'e
           isRedirectingRef.current = true;
           setIsRedirecting(true);
           routerRef.current.push(`/quiz/${data.round_id}`);
           return;
+        } else if (!hasJoinedRef.current && (data.credits ?? 0) > 0) {
+          // Live round var ama henüz katılmamış → hemen join et
+          hasJoinedRef.current = true;
+          try {
+            const { data: joinResult, error: joinError } = await supabase.rpc("join_live_round");
+            const joinRow = Array.isArray(joinResult) ? joinResult[0] : joinResult;
+            if (!joinError && (joinRow?.action === "join" || joinRow?.message === "already_joined")) {
+              isRedirectingRef.current = true;
+              setIsRedirecting(true);
+              routerRef.current.push(`/quiz/${data.round_id}`);
+              return;
+            } else {
+              hasJoinedRef.current = false;
+            }
+          } catch (e) {
+            hasJoinedRef.current = false;
+            console.error("[Lobby] auto-join error:", e);
+          }
         }
       }
     } catch (err) {
