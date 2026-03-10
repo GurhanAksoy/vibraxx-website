@@ -494,7 +494,7 @@ export default function QuizGamePage() {
     if (!roundId) return;
 
     try {
-      await supabase.rpc("force_finish_user_round", { p_round_id: roundId });
+      await supabase.rpc("finalize_user_round", { p_round_id: roundId });
       await loadFinalResults();
       setShowFinalScore(true);
     } catch (err) {
