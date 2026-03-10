@@ -146,16 +146,31 @@ export default function QuizGamePage() {
         let normalizedAnswers = Array(questionsData.length).fill("none");
 
         if (!progressError && progress) {
-          setCurrentIndex(progress.current_index || 0);
-          setCorrectCount(progress.correct_count || 0);
-          setWrongCount(progress.wrong_count || 0);
-          setTotalScore(progress.total_score || 0);
-
           if (progress.answers_array && Array.isArray(progress.answers_array)) {
             const copyLength = Math.min(progress.answers_array.length, questionsData.length);
             for (let i = 0; i < copyLength; i++) {
               normalizedAnswers[i] = progress.answers_array[i] || "none";
             }
+          }
+
+          // Refresh: cevaplı soruyu atla, ilk cevaplanmamışa git
+          let restoredIndex = progress.current_index || 0;
+          while (restoredIndex < questionsData.length && normalizedAnswers[restoredIndex] !== "none") {
+            restoredIndex++;
+          }
+
+          setCurrentIndex(restoredIndex);
+          setCorrectCount(progress.correct_count || 0);
+          setWrongCount(progress.wrong_count || 0);
+          setTotalScore(progress.total_score || 0);
+
+          if (restoredIndex >= questionsData.length) {
+            setAnswers(normalizedAnswers);
+            setQuestions(questionsData);
+            setIsLoading(false);
+            await loadFinalResults();
+            setShowFinalScore(true);
+            return;
           }
         } else {
           setCurrentIndex(0);
@@ -168,6 +183,7 @@ export default function QuizGamePage() {
         setQuestions(questionsData);
         setTimeLeft(QUESTION_DURATION);
         timeoutTriggeredRef.current = false;
+        answerSubmittedRef.current = new Set();
         setIsLoading(false);
 
         // entry.mp3 — quiz başlarken 1 kez
@@ -230,26 +246,27 @@ export default function QuizGamePage() {
     setTimeout(() => overlay.remove(), 200);
   };
 
-  // === QUESTION TIMER — cevap seçilse de durmuyor ===
+  // === QUESTION TIMER — cevap seçilse de DURMUYOR ===
   useEffect(() => {
     if (isLoading || showExplanation || showFinalScore || !currentQ) return;
 
     if (timeLeft > 0) {
-      const timer = setTimeout(() => setTimeLeft((p) => Math.max(0, p - 1)), 1000);
-      return () => clearTimeout(timer);
+      const t = setTimeout(() => setTimeLeft((p) => Math.max(0, p - 1)), 1000);
+      return () => clearTimeout(t);
     }
 
-    if (timeLeft === 0 && !timeoutTriggeredRef.current) {
-      timeoutTriggeredRef.current = true;
-      if (!isAnswerLockedRef.current) {
-        // Hiç cevap vermediyse timeout submit
-        handleTimeout();
-      } else {
-        // Cevap verdiyse zaten submit edildi, sadece explanation aç
-        setShowExplanation(true);
-      }
+    // timeLeft === 0
+    if (timeoutTriggeredRef.current) return;
+    timeoutTriggeredRef.current = true;
+
+    if (isAnswerLockedRef.current) {
+      // Cevap verilmişti — explanation aç
+      setShowExplanation(true);
+    } else {
+      // Cevap verilmedi — timeout submit (o da explanation açacak)
+      handleTimeout();
     }
-  }, [timeLeft, isLoading, showExplanation, showFinalScore, currentQ]); // isAnswerLocked dep dışında
+  }, [timeLeft, isLoading, showExplanation, showFinalScore, currentQ]);
 
   // Tick ses — showExplanation ve showFinalScore dışında hep çalar
   useEffect(() => {
@@ -377,7 +394,7 @@ export default function QuizGamePage() {
     setSelectedAnswer(optionId);
     setIsAnswerLocked(true);
     isAnswerLockedRef.current = true;
-    timeoutTriggeredRef.current = true;
+    // timeoutTriggeredRef KALDIRILDI — timer 0'da isAnswerLockedRef'i görüp explanation açacak
 
     const answerTimeMs = (QUESTION_DURATION - timeLeft) * 1000;
     answerSubmittedRef.current.add(currentQ.question_id);
@@ -436,8 +453,7 @@ export default function QuizGamePage() {
       console.error("❌ Answer submission error:", err);
     }
 
-    // RPC bitti -> explanation ac
-    setShowExplanation(true);
+    // Explanation timer'a bırakıldı — 9sn dolunca açılacak
   };
 
   const handleTimeout = async () => {
