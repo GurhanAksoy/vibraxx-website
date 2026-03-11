@@ -93,6 +93,7 @@ export default function QuizGamePage() {
   const whooshSoundRef = useRef<HTMLAudioElement | null>(null);
   const tickSoundRef = useRef<HTMLAudioElement | null>(null);
   const entrySoundRef = useRef<HTMLAudioElement | null>(null);
+  const startSoundRef = useRef<HTMLAudioElement | null>(null);
   const entryPlayedRef = useRef(false);
 
   const currentQ = questions[currentIndex] ?? null;
@@ -412,7 +413,8 @@ export default function QuizGamePage() {
 
     const advance = async () => {
       if (currentIndex < questions.length - 1) {
-        playSound(whooshSoundRef.current);
+        // start.mp3 — yeni soru baslarken
+        playSound(startSoundRef.current);
         setSelectedAnswer(null);
         setIsAnswerLocked(false);
         isAnswerLockedRef.current = false;
@@ -507,7 +509,7 @@ export default function QuizGamePage() {
 
       if (data) {
         const correctFlag = data.is_correct || false;
-        const correctOpt = (data.correct_option as OptionId) ?? null;
+        const correctOpt = (data.correct_option?.toLowerCase() as OptionId) ?? null;
 
         // ✅ FIX 1: Doğru cevabı ve durumu set et → render tetiklenir → yeşil yanar
         setIsCorrect(correctFlag);
@@ -559,7 +561,7 @@ export default function QuizGamePage() {
 
       if (!error && data) {
         setIsCorrect(false);
-        setCurrentCorrectOption((data.correct_option as OptionId) ?? null);
+        setCurrentCorrectOption((data.correct_option?.toLowerCase() as OptionId) ?? null);
         setCurrentExplanation(data.explanation || "");
         setTotalScore(data.current_total_score || 0);
         setCorrectCount(data.correct_count || 0);
@@ -817,6 +819,7 @@ export default function QuizGamePage() {
       <audio ref={whooshSoundRef} src="/sounds/whoosh.mp3" preload="auto" />
       <audio ref={tickSoundRef} src="/sounds/tick.mp3" preload="auto" />
       <audio ref={entrySoundRef} src="/sounds/entry.mp3" preload="auto" />
+      <audio ref={startSoundRef} src="/sounds/start.mp3" preload="auto" />
 
       <div style={{
         minHeight: "100vh",
