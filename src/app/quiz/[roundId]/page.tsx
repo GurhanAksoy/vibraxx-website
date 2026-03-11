@@ -445,7 +445,7 @@ export default function QuizGamePage() {
       if (data) {
         const correctFlag = data.is_correct || false;
         setIsCorrect(correctFlag);
-        setCurrentCorrectOption(data.correct_option ? String(data.correct_option).toLowerCase().trim() : null);
+        setCurrentCorrectOption((data.correct_option as OptionId) ?? null);
         setCurrentExplanation(data.explanation || "");
         setTotalScore(data.current_total_score || 0);
         setCorrectCount(data.correct_count || 0);
@@ -467,8 +467,7 @@ export default function QuizGamePage() {
           return next;
         });
 
-        // round_finished — explanation timer bitince skor kartı açılacak (advance() içinde)
-        // Burada setShowFinalScore ÇAĞIRILMAZ
+        // round_finished — explanation timer bitince advance() skor kartı açar
       }
     } catch (err) {
       console.error("❌ Answer submission error:", err);
@@ -497,7 +496,7 @@ export default function QuizGamePage() {
 
       if (!error && data) {
         // ✅ KANONIK: Save explanation data
-        setCurrentCorrectOption(data.correct_option ? String(data.correct_option).toLowerCase().trim() : null);
+        setCurrentCorrectOption((data.correct_option as OptionId) ?? null);
         setCurrentExplanation(data.explanation || "");
         
         // ✅ KANONIK: Update from DB
@@ -1246,26 +1245,24 @@ const loadFinalResults = async () => {
                       let boxShadow = "0 4px 20px rgba(0,0,0,0.3)";
                       let bg = "linear-gradient(135deg, rgba(30,27,75,0.8), rgba(15,23,42,0.9))";
 
-                      if (locked && currentCorrectOption) {
-                        // optId bu şık, currentCorrectOption DB'den gelen doğru cevap
-                        const thisIsCorrect = optId === currentCorrectOption;
-                        const thisIsWrongSelected = isSelected && !thisIsCorrect;
-                        if (thisIsCorrect) {
-                          // Doğru cevap — yeşil (seçilmiş olsun olmasın)
+                      if (currentCorrectOption) {
+                        if (optId === currentCorrectOption) {
                           borderColor = "#22c55e";
                           boxShadow = "0 0 25px rgba(34,197,94,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                           bg = "linear-gradient(135deg, rgba(22,163,74,0.3), rgba(21,128,61,0.2))";
-                        } else if (thisIsWrongSelected) {
-                          // Seçildi ama yanlış — kırmızı
+                        } else if (isSelected) {
                           borderColor = "#ef4444";
                           boxShadow = "0 0 25px rgba(239,68,68,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                           bg = "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))";
                         } else {
-                          // Diğerleri — soluk gri
                           borderColor = "rgba(75,85,99,0.4)";
                           boxShadow = "0 4px 15px rgba(0,0,0,0.2)";
                           bg = "linear-gradient(135deg, rgba(30,27,75,0.5), rgba(15,23,42,0.6))";
                         }
+                      } else if (isSelected) {
+                        borderColor = "#d946ef";
+                        boxShadow = "0 0 25px rgba(217,70,239,0.6), 0 4px 20px rgba(0,0,0,0.3)";
+                        bg = "linear-gradient(135deg, rgba(147,51,234,0.3), rgba(126,34,206,0.2))";
                       } else if (isSelected) {
                         borderColor = "#d946ef";
                         boxShadow = "0 0 25px rgba(217,70,239,0.6), 0 4px 20px rgba(0,0,0,0.3)";
