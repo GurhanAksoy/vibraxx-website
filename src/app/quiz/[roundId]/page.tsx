@@ -445,7 +445,7 @@ export default function QuizGamePage() {
       if (data) {
         const correctFlag = data.is_correct || false;
         setIsCorrect(correctFlag);
-        setCurrentCorrectOption(data.correct_option);
+        setCurrentCorrectOption(data.correct_option ? String(data.correct_option).toLowerCase().trim() : null);
         setCurrentExplanation(data.explanation || "");
         setTotalScore(data.current_total_score || 0);
         setCorrectCount(data.correct_count || 0);
@@ -467,11 +467,8 @@ export default function QuizGamePage() {
           return next;
         });
 
-        if (data.round_finished) {
-          await loadFinalResults();
-          setShowFinalScore(true);
-          return;
-        }
+        // round_finished — explanation timer bitince skor kartı açılacak (advance() içinde)
+        // Burada setShowFinalScore ÇAĞIRILMAZ
       }
     } catch (err) {
       console.error("❌ Answer submission error:", err);
@@ -500,7 +497,7 @@ export default function QuizGamePage() {
 
       if (!error && data) {
         // ✅ KANONIK: Save explanation data
-        setCurrentCorrectOption(data.correct_option);
+        setCurrentCorrectOption(data.correct_option ? String(data.correct_option).toLowerCase().trim() : null);
         setCurrentExplanation(data.explanation || "");
         
         // ✅ KANONIK: Update from DB
