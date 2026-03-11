@@ -196,21 +196,40 @@ export default function QuizGamePage() {
         let restoredIndex = 0;
 
         if (progress && progress.round_started_at && progress.server_now) {
-          const nowMs = new Date(progress.server_now).getTime();   // ✅ server clock
+          const nowMs = new Date(progress.server_now).getTime();
           const startMs = new Date(progress.round_started_at).getTime();
           const totalElapsed = Math.max(0, Math.floor((nowMs - startMs) / 1000));
-          // Kaçıncı soruda olduğumuzu server saatinden hesapla (18sn/soru döngüsü)
-          const questionIndex = Math.floor(totalElapsed / 18);
-          restoredIndex = Math.max(0, Math.min(questionIndex, questionsData.length - 1));
-          // O sorunun döngüsündeki pozisyon
-          const cycleElapsed = totalElapsed % 18;
-          if (cycleElapsed < QUESTION_DURATION) {
-            restoredTimeLeft = Math.max(QUESTION_DURATION - cycleElapsed, 1);
+          const TOTAL_ROUND_DURATION = questionsData.length * 18; // 15 * 18 = 270sn
+          const answeredCountForTimer = (progress.answers_array || []).length;
+
+          // Round suresi tamamen dolmussa direkt final score
+          if (totalElapsed >= TOTAL_ROUND_DURATION) {
+            setAnswers(normalizedAnswers);
+            setQuestions(questionsData);
+            setIsLoading(false);
+            await loadFinalResults();
+            setShowFinalScore(true);
+            return;
+          }
+
+          if (answeredCountForTimer === 0) {
+            // Ilk giris: lobby sayaci senkron, her zaman soru 1'den basla
+            restoredIndex = 0;
+            restoredTimeLeft = QUESTION_DURATION;
             restoredShowExp = false;
           } else {
-            restoredTimeLeft = 0;
-            restoredExpTimeLeft = Math.max(18 - cycleElapsed, 1);
-            restoredShowExp = true;
+            // Refresh: en az 1 soru cevaplanmis, UTC0 server clock'tan restore et
+            const questionIndex = Math.floor(totalElapsed / 18);
+            restoredIndex = Math.max(0, Math.min(questionIndex, questionsData.length - 1));
+            const cycleElapsed = totalElapsed % 18;
+            if (cycleElapsed < QUESTION_DURATION) {
+              restoredTimeLeft = Math.max(QUESTION_DURATION - cycleElapsed, 1);
+              restoredShowExp = false;
+            } else {
+              restoredTimeLeft = 0;
+              restoredExpTimeLeft = Math.max(18 - cycleElapsed, 1);
+              restoredShowExp = true;
+            }
           }
         }
 
