@@ -82,8 +82,7 @@ export default function QuizGamePage() {
   const answerSubmittedRef = useRef<Set<number>>(new Set());
   const finalRedirectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isAnswerLockedRef = useRef(false);
-  const rpcCompletedRef = useRef(false);
-  const [rpcCompleted, setRpcCompleted] = useState(false);
+  const rpcCompletedRef = useRef(false); // RPC tamamlandı mı? // stale closure fix
 
   // === AUDIO REFS ===
   const correctSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -146,42 +145,48 @@ export default function QuizGamePage() {
         const { data: progress, error: progressError } = await supabase
           .rpc("get_round_progress", { p_round_id: roundId });
 
-        let normalizedAnswers: AnswerStatus[] = Array(questionsData.length).fill("none");
-        let restoredIndex = 0;
+        let normalizedAnswers = Array(questionsData.length).fill("none");
 
         if (!progressError && progress) {
-          const answersArray = Array.isArray(progress.answers_array) ? progress.answers_array : [];
-          const answeredCount = Math.min(answersArray.length, questionsData.length);
-
-          for (let i = 0; i < answeredCount; i++) {
-            const val = answersArray[i];
-            normalizedAnswers[i] = val === "correct" || val === "wrong" ? val : "none";
+          // answers_array: ["correct","wrong",...] — cevaplanmış sırayla
+          // normalizedAnswers: 15 elemanlı, ilk N'i dolu, geri kalan "none"
+          if (progress.answers_array && Array.isArray(progress.answers_array)) {
+            const copyLength = Math.min(progress.answers_array.length, questionsData.length);
+            for (let i = 0; i < copyLength; i++) {
+              normalizedAnswers[i] = progress.answers_array[i] || "none";
+            }
           }
 
+          // İlk cevaplanmamış soruya git
+          const answeredCount = (progress.answers_array || []).length;
+          // answeredCount-1: son cevaplanan sorudan devam (explanation fazı koruması)
+          const restoredIndex = answeredCount > 0
+            ? Math.min(answeredCount - 1, questionsData.length - 1)
+            : 0;
+
+          setCurrentIndex(restoredIndex);
+          setCorrectCount(progress.correct_count || 0);
+          setWrongCount(progress.wrong_count || 0);
+          setTotalScore(progress.total_score || 0);
+
+          // Tüm sorular bittiyse direkt final
           if (answeredCount >= questionsData.length) {
-            // Tüm sorular bitti — final göster
             setAnswers(normalizedAnswers);
             setQuestions(questionsData);
-            setCurrentIndex(questionsData.length - 1);
-            setCorrectCount(progress.correct_count || 0);
-            setWrongCount(progress.wrong_count || 0);
-            setTotalScore(progress.total_score || 0);
             setIsLoading(false);
             await loadFinalResults();
             setShowFinalScore(true);
             return;
           }
-
-          // Refresh: cevaplanmış N soru → N. sorudan devam (0-indexed)
-          restoredIndex = answeredCount;
-          setCorrectCount(progress.correct_count || 0);
-          setWrongCount(progress.wrong_count || 0);
-          setTotalScore(progress.total_score || 0);
+        } else {
+          setCurrentIndex(0);
+          setCorrectCount(0);
+          setWrongCount(0);
+          setTotalScore(0);
         }
 
         setAnswers(normalizedAnswers);
         setQuestions(questionsData);
-        setCurrentIndex(restoredIndex);
         setTimeLeft(QUESTION_DURATION);
         setExplanationTimeLeft(QUESTION_DURATION);
         setShowExplanation(false);
@@ -192,7 +197,6 @@ export default function QuizGamePage() {
         setCurrentExplanation("");
         setIsCorrect(false);
         rpcCompletedRef.current = false;
-        setRpcCompleted(false);
         timeoutTriggeredRef.current = false;
         answerSubmittedRef.current = new Set();
         setIsLoading(false);
@@ -282,7 +286,6 @@ export default function QuizGamePage() {
     advancingRef.current = false;
     timeoutTriggeredRef.current = false;
     rpcCompletedRef.current = false;
-    setRpcCompleted(false);
     setTimeLeft(QUESTION_DURATION);
     setShowExplanation(false);
     setExplanationTimeLeft(QUESTION_DURATION);
@@ -291,7 +294,7 @@ export default function QuizGamePage() {
     if (questionTimerRef.current) clearInterval(questionTimerRef.current);
     questionTimerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
-        if (prev <= 1) {
+        if (prev === 1) {
           clearInterval(questionTimerRef.current!);
           questionTimerRef.current = null;
           return 0;
@@ -321,7 +324,7 @@ export default function QuizGamePage() {
       // Explanation sayacı
       explanationTimerRef.current = setInterval(() => {
         setExplanationTimeLeft((prev) => {
-          if (prev <= 1) {
+          if (prev === 1) {
             clearInterval(explanationTimerRef.current!);
             explanationTimerRef.current = null;
             return 0;
@@ -482,8 +485,7 @@ export default function QuizGamePage() {
       console.error("❌ Answer submission error:", err);
       playSound(wrongSoundRef.current);
     }
-    rpcCompletedRef.current = true;
-    setRpcCompleted(true); // ✅ RPC tamamlandı — timer 0'da explanation açılacak
+    rpcCompletedRef.current = true; // ✅ RPC tamamlandı — timer 0'da explanation açılacak
   };
 
 
@@ -531,7 +533,6 @@ export default function QuizGamePage() {
 
     // RPC bitti — master clock explanation açacak
     rpcCompletedRef.current = true;
-    setRpcCompleted(true);
   };
 
   const handleExitClick = () => {
@@ -1271,28 +1272,22 @@ const loadFinalResults = async () => {
                       let boxShadow = "0 4px 20px rgba(0,0,0,0.3)";
                       let bg = "linear-gradient(135deg, rgba(30,27,75,0.8), rgba(15,23,42,0.9))";
 
-                      // RPC tamamlandıktan sonra renk göster — ref reaktif değil, state kullan
-                      const showResolvedFeedback = isAnswerLocked && rpcCompleted;
-
-                      if (showResolvedFeedback) {
+                      if (locked && currentCorrectOption) {
+                        // currentCorrectOption geldi — final renkler
                         if (optId === currentCorrectOption) {
-                          // Doğru cevap — YEŞİL (seçilmiş olsun olmasın)
                           borderColor = "#22c55e";
                           boxShadow = "0 0 25px rgba(34,197,94,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                           bg = "linear-gradient(135deg, rgba(22,163,74,0.3), rgba(21,128,61,0.2))";
                         } else if (optId === selectedAnswer) {
-                          // Seçildi ama yanlış — KIRMIZI
                           borderColor = "#ef4444";
                           boxShadow = "0 0 25px rgba(239,68,68,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                           bg = "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))";
                         } else {
-                          // Diğerleri — soluk gri
                           borderColor = "rgba(75,85,99,0.4)";
                           boxShadow = "0 4px 15px rgba(0,0,0,0.2)";
                           bg = "linear-gradient(135deg, rgba(30,27,75,0.5), rgba(15,23,42,0.6))";
                         }
                       } else if (isSelected) {
-                        // RPC henüz dönmedi — seçili mor
                         borderColor = "#d946ef";
                         boxShadow = "0 0 25px rgba(217,70,239,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                         bg = "linear-gradient(135deg, rgba(147,51,234,0.3), rgba(126,34,206,0.2))";
@@ -1315,7 +1310,7 @@ const loadFinalResults = async () => {
                             boxShadow,
                             transition: "all 0.3s cubic-bezier(0.4, 0.2, 1)",
                             overflow: "hidden",
-                            opacity: showResolvedFeedback && optId !== currentCorrectOption && optId !== selectedAnswer ? 0.55 : 1,
+                            opacity: (locked && currentCorrectOption && optId !== currentCorrectOption && optId !== selectedAnswer) ? 0.55 : 1,
                             transform: isSelected && !locked ? "scale(1.02)" : "scale(1)",
                           }}
                           onMouseEnter={(e) => {
@@ -1355,7 +1350,7 @@ const loadFinalResults = async () => {
                                 fontWeight: 900,
                                 background: "rgba(15,23,42,0.9)",
                                 boxShadow: "inset 0 2px 8px rgba(0,0,0,0.3)",
-                                color: showResolvedFeedback
+                                color: (locked && currentCorrectOption)
                                   ? (optId === currentCorrectOption ? "#22c55e" : optId === selectedAnswer ? "#ef4444" : "#6b7280")
                                   : "#a78bfa",
                                 flexShrink: 0,
