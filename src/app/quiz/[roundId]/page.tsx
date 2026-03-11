@@ -157,11 +157,13 @@ export default function QuizGamePage() {
             }
           }
 
-          // İlk cevaplanmamış soruya git
+          // UTC0 bazlı index — DB'den gelir (elapsed / 18sn)
           const answeredCount = (progress.answers_array || []).length;
-          const restoredIndex = Math.min(answeredCount, questionsData.length - 1);
+          const utcIndex = typeof progress.current_index === "number"
+            ? Math.min(Math.max(progress.current_index, 0), questionsData.length - 1)
+            : Math.min(answeredCount, questionsData.length - 1);
 
-          setCurrentIndex(restoredIndex);
+          setCurrentIndex(utcIndex);
           setCorrectCount(progress.correct_count || 0);
           setWrongCount(progress.wrong_count || 0);
           setTotalScore(progress.total_score || 0);
@@ -467,7 +469,7 @@ export default function QuizGamePage() {
           return next;
         });
 
-        // round_finished — explanation timer bitince advance() skor kartı açar
+        // round_finished — advance() explanation bittikten sonra skor açar
       }
     } catch (err) {
       console.error("❌ Answer submission error:", err);
@@ -1245,24 +1247,23 @@ const loadFinalResults = async () => {
                       let boxShadow = "0 4px 20px rgba(0,0,0,0.3)";
                       let bg = "linear-gradient(135deg, rgba(30,27,75,0.8), rgba(15,23,42,0.9))";
 
-                      if (currentCorrectOption) {
+                      if (isAnswerLocked) {
                         if (optId === currentCorrectOption) {
+                          // Doğru cevap — YEŞİL
                           borderColor = "#22c55e";
                           boxShadow = "0 0 25px rgba(34,197,94,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                           bg = "linear-gradient(135deg, rgba(22,163,74,0.3), rgba(21,128,61,0.2))";
-                        } else if (isSelected) {
+                        } else if (optId === selectedAnswer) {
+                          // Seçildi ama yanlış — KIRMIZI
                           borderColor = "#ef4444";
                           boxShadow = "0 0 25px rgba(239,68,68,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                           bg = "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))";
                         } else {
+                          // Diğerleri — GRİ
                           borderColor = "rgba(75,85,99,0.4)";
                           boxShadow = "0 4px 15px rgba(0,0,0,0.2)";
                           bg = "linear-gradient(135deg, rgba(30,27,75,0.5), rgba(15,23,42,0.6))";
                         }
-                      } else if (isSelected) {
-                        borderColor = "#d946ef";
-                        boxShadow = "0 0 25px rgba(217,70,239,0.6), 0 4px 20px rgba(0,0,0,0.3)";
-                        bg = "linear-gradient(135deg, rgba(147,51,234,0.3), rgba(126,34,206,0.2))";
                       } else if (isSelected) {
                         borderColor = "#d946ef";
                         boxShadow = "0 0 25px rgba(217,70,239,0.6), 0 4px 20px rgba(0,0,0,0.3)";
