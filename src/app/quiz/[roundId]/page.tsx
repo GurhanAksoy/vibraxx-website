@@ -158,8 +158,8 @@ export default function QuizGamePage() {
             normalizedAnswers[i] = val === "correct" || val === "wrong" ? val : "none";
           }
 
-          // Tüm sorular bittiyse direkt final
           if (answeredCount >= questionsData.length) {
+            // Tüm sorular bitti — final göster
             setAnswers(normalizedAnswers);
             setQuestions(questionsData);
             setCurrentIndex(questionsData.length - 1);
@@ -172,7 +172,7 @@ export default function QuizGamePage() {
             return;
           }
 
-          // Restore: cevaplanmış soru sayısı = sonraki sorunun indexi
+          // Refresh: cevaplanmış N soru → N. sorudan devam (0-indexed)
           restoredIndex = answeredCount;
           setCorrectCount(progress.correct_count || 0);
           setWrongCount(progress.wrong_count || 0);
@@ -476,14 +476,14 @@ export default function QuizGamePage() {
           return next;
         });
 
-        // round_finished — advance() explanation sonrası final açar
+        // round_finished: advance() explanation sonrası final açar
       }
     } catch (err) {
       console.error("❌ Answer submission error:", err);
       playSound(wrongSoundRef.current);
     }
     rpcCompletedRef.current = true;
-    setRpcCompleted(true);
+    setRpcCompleted(true); // ✅ RPC tamamlandı — timer 0'da explanation açılacak
   };
 
 
@@ -508,6 +508,7 @@ export default function QuizGamePage() {
         setIsCorrect(false);
         setCurrentCorrectOption((data.correct_option as OptionId) ?? null);
         setCurrentExplanation(data.explanation || "");
+        
         // ✅ KANONIK: Update from DB
         setTotalScore(data.current_total_score || 0);
         setCorrectCount(data.correct_count || 0);
@@ -1266,16 +1267,16 @@ const loadFinalResults = async () => {
                       const isSelected = selectedAnswer === optId;
                       const locked = isAnswerLocked;
 
-                      // RPC tamamlandıktan sonra renk göster
-                      const showResolvedFeedback = isAnswerLocked && rpcCompleted;
-
                       let borderColor = "rgba(139,92,246,0.5)";
                       let boxShadow = "0 4px 20px rgba(0,0,0,0.3)";
                       let bg = "linear-gradient(135deg, rgba(30,27,75,0.8), rgba(15,23,42,0.9))";
 
+                      // RPC tamamlandıktan sonra renk göster — ref reaktif değil, state kullan
+                      const showResolvedFeedback = isAnswerLocked && rpcCompleted;
+
                       if (showResolvedFeedback) {
                         if (optId === currentCorrectOption) {
-                          // Doğru cevap — YEŞİL
+                          // Doğru cevap — YEŞİL (seçilmiş olsun olmasın)
                           borderColor = "#22c55e";
                           boxShadow = "0 0 25px rgba(34,197,94,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                           bg = "linear-gradient(135deg, rgba(22,163,74,0.3), rgba(21,128,61,0.2))";
@@ -1291,7 +1292,7 @@ const loadFinalResults = async () => {
                           bg = "linear-gradient(135deg, rgba(30,27,75,0.5), rgba(15,23,42,0.6))";
                         }
                       } else if (isSelected) {
-                        // RPC bekliyor — seçili mor
+                        // RPC henüz dönmedi — seçili mor
                         borderColor = "#d946ef";
                         boxShadow = "0 0 25px rgba(217,70,239,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                         bg = "linear-gradient(135deg, rgba(147,51,234,0.3), rgba(126,34,206,0.2))";
