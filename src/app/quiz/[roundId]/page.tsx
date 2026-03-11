@@ -188,21 +188,20 @@ export default function QuizGamePage() {
           setTotalScore(0);
         }
 
-        // ✅ FIX 2: Index ve timer SADECE UTC0 global saatinden hesapla
-        // answeredCount'a ASLA bakma — DB'ye yazılmış olsa bile aynı soruda kal
-        // Her soru 18sn: 9sn soru + 9sn explanation
+        // ✅ SERVER CLOCK — client Date.now() kullanma, clock drift'i önle
+        // server_now: DB'den gelen now() — HQ Trivia / Kahoot modeli
         let restoredTimeLeft = QUESTION_DURATION;
         let restoredExpTimeLeft = QUESTION_DURATION;
         let restoredShowExp = false;
         let restoredIndex = 0;
 
-        if (progress?.round_started_at) {
-          const nowMs = Date.now();
+        if (progress && progress.round_started_at && progress.server_now) {
+          const nowMs = new Date(progress.server_now).getTime();   // ✅ server clock
           const startMs = new Date(progress.round_started_at).getTime();
-          const totalElapsed = Math.floor((nowMs - startMs) / 1000);
-          // Kaçıncı soruda olduğumuzu UTC0 saatinden hesapla
+          const totalElapsed = Math.max(0, Math.floor((nowMs - startMs) / 1000));
+          // Kaçıncı soruda olduğumuzu server saatinden hesapla (18sn/soru döngüsü)
           const questionIndex = Math.floor(totalElapsed / 18);
-          restoredIndex = Math.min(questionIndex, questionsData.length - 1);
+          restoredIndex = Math.max(0, Math.min(questionIndex, questionsData.length - 1));
           // O sorunun döngüsündeki pozisyon
           const cycleElapsed = totalElapsed % 18;
           if (cycleElapsed < QUESTION_DURATION) {
