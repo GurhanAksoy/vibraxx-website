@@ -1165,7 +1165,14 @@ const loadFinalResults = async () => {
 
           ) : (
             <>
-              {!showExplanation ? (
+                            {/* Soru kartı — explanation açıkken üstte küçük görünür */}
+              <div style={{
+                transition: "all 0.4s ease",
+                transform: showExplanation ? "scale(0.97)" : "scale(1)",
+                opacity: showExplanation ? 0.7 : 1,
+                marginBottom: showExplanation ? "12px" : "0",
+              }}>
+
                 <article
                   className="animate-slide-up"
                   style={{
@@ -1319,8 +1326,8 @@ const loadFinalResults = async () => {
                                 fontWeight: 900,
                                 background: "rgba(15,23,42,0.9)",
                                 boxShadow: "inset 0 2px 8px rgba(0,0,0,0.3)",
-                                color: locked && isSelected
-                                  ? (isCorrect ? "#22c55e" : "#ef4444")
+                                color: locked
+                                  ? (optId === currentCorrectOption ? "#22c55e" : (isSelected ? "#ef4444" : "#6b7280"))
                                   : "#a78bfa",
                                 flexShrink: 0,
                               }}
@@ -1346,7 +1353,12 @@ const loadFinalResults = async () => {
                     })}
                   </div>
                 </article>
-              ) : (
+              
+              </div>
+
+              {/* Explanation kartı — showExplanation=true iken göster */}
+              {showExplanation && (
+
                 <article
                   className="animate-slide-up"
                   style={{
@@ -1500,7 +1512,6 @@ const loadFinalResults = async () => {
                         width: `${(explanationTimeLeft / QUESTION_DURATION) * 100}%`,
                         background: "linear-gradient(90deg, #38bdf8, #38bdf8aa)",
                         boxShadow: "0 0 8px #38bdf8",
-                        transition: "width 1s linear",
                         borderRadius: "3px",
                       }} />
                     </div>
@@ -1561,7 +1572,7 @@ const loadFinalResults = async () => {
                 )}
               </div>
             </>
-          )}
+              )}
 
           {showExitConfirm && (
             <div
