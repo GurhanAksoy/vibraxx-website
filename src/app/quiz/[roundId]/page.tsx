@@ -82,7 +82,8 @@ export default function QuizGamePage() {
   const answerSubmittedRef = useRef<Set<number>>(new Set());
   const finalRedirectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isAnswerLockedRef = useRef(false);
-  const rpcCompletedRef = useRef(false); // RPC tamamlandı mı? // stale closure fix
+  const rpcCompletedRef = useRef(false);
+  const [rpcCompleted, setRpcCompleted] = useState(false);
 
   // === AUDIO REFS ===
   const correctSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -145,46 +146,53 @@ export default function QuizGamePage() {
         const { data: progress, error: progressError } = await supabase
           .rpc("get_round_progress", { p_round_id: roundId });
 
-        let normalizedAnswers = Array(questionsData.length).fill("none");
+        let normalizedAnswers: AnswerStatus[] = Array(questionsData.length).fill("none");
+        let restoredIndex = 0;
 
         if (!progressError && progress) {
-          // answers_array: ["correct","wrong",...] — cevaplanmış sırayla
-          // normalizedAnswers: 15 elemanlı, ilk N'i dolu, geri kalan "none"
-          if (progress.answers_array && Array.isArray(progress.answers_array)) {
-            const copyLength = Math.min(progress.answers_array.length, questionsData.length);
-            for (let i = 0; i < copyLength; i++) {
-              normalizedAnswers[i] = progress.answers_array[i] || "none";
-            }
+          const answersArray = Array.isArray(progress.answers_array) ? progress.answers_array : [];
+          const answeredCount = Math.min(answersArray.length, questionsData.length);
+
+          for (let i = 0; i < answeredCount; i++) {
+            const val = answersArray[i];
+            normalizedAnswers[i] = val === "correct" || val === "wrong" ? val : "none";
           }
-
-          // İlk cevaplanmamış soruya git
-          const answeredCount = (progress.answers_array || []).length;
-          const restoredIndex = Math.min(answeredCount, questionsData.length - 1);
-
-          setCurrentIndex(restoredIndex);
-          setCorrectCount(progress.correct_count || 0);
-          setWrongCount(progress.wrong_count || 0);
-          setTotalScore(progress.total_score || 0);
 
           // Tüm sorular bittiyse direkt final
           if (answeredCount >= questionsData.length) {
             setAnswers(normalizedAnswers);
             setQuestions(questionsData);
+            setCurrentIndex(questionsData.length - 1);
+            setCorrectCount(progress.correct_count || 0);
+            setWrongCount(progress.wrong_count || 0);
+            setTotalScore(progress.total_score || 0);
             setIsLoading(false);
             await loadFinalResults();
             setShowFinalScore(true);
             return;
           }
-        } else {
-          setCurrentIndex(0);
-          setCorrectCount(0);
-          setWrongCount(0);
-          setTotalScore(0);
+
+          // Restore: cevaplanmış soru sayısı = sonraki sorunun indexi
+          restoredIndex = answeredCount;
+          setCorrectCount(progress.correct_count || 0);
+          setWrongCount(progress.wrong_count || 0);
+          setTotalScore(progress.total_score || 0);
         }
 
         setAnswers(normalizedAnswers);
         setQuestions(questionsData);
+        setCurrentIndex(restoredIndex);
         setTimeLeft(QUESTION_DURATION);
+        setExplanationTimeLeft(QUESTION_DURATION);
+        setShowExplanation(false);
+        setSelectedAnswer(null);
+        setIsAnswerLocked(false);
+        isAnswerLockedRef.current = false;
+        setCurrentCorrectOption(null);
+        setCurrentExplanation("");
+        setIsCorrect(false);
+        rpcCompletedRef.current = false;
+        setRpcCompleted(false);
         timeoutTriggeredRef.current = false;
         answerSubmittedRef.current = new Set();
         setIsLoading(false);
@@ -274,6 +282,7 @@ export default function QuizGamePage() {
     advancingRef.current = false;
     timeoutTriggeredRef.current = false;
     rpcCompletedRef.current = false;
+    setRpcCompleted(false);
     setTimeLeft(QUESTION_DURATION);
     setShowExplanation(false);
     setExplanationTimeLeft(QUESTION_DURATION);
@@ -445,7 +454,7 @@ export default function QuizGamePage() {
       if (data) {
         const correctFlag = data.is_correct || false;
         setIsCorrect(correctFlag);
-        setCurrentCorrectOption(data.correct_option);
+        setCurrentCorrectOption((data.correct_option as OptionId) ?? null);
         setCurrentExplanation(data.explanation || "");
         setTotalScore(data.current_total_score || 0);
         setCorrectCount(data.correct_count || 0);
@@ -467,17 +476,14 @@ export default function QuizGamePage() {
           return next;
         });
 
-        if (data.round_finished) {
-          await loadFinalResults();
-          setShowFinalScore(true);
-          return;
-        }
+        // round_finished — advance() explanation sonrası final açar
       }
     } catch (err) {
       console.error("❌ Answer submission error:", err);
       playSound(wrongSoundRef.current);
     }
-    rpcCompletedRef.current = true; // ✅ RPC tamamlandı — timer 0'da explanation açılacak
+    rpcCompletedRef.current = true;
+    setRpcCompleted(true);
   };
 
 
@@ -499,10 +505,9 @@ export default function QuizGamePage() {
       });
 
       if (!error && data) {
-        // ✅ KANONIK: Save explanation data
-        setCurrentCorrectOption(data.correct_option);
+        setIsCorrect(false);
+        setCurrentCorrectOption((data.correct_option as OptionId) ?? null);
         setCurrentExplanation(data.explanation || "");
-        
         // ✅ KANONIK: Update from DB
         setTotalScore(data.current_total_score || 0);
         setCorrectCount(data.correct_count || 0);
@@ -525,6 +530,7 @@ export default function QuizGamePage() {
 
     // RPC bitti — master clock explanation açacak
     rpcCompletedRef.current = true;
+    setRpcCompleted(true);
   };
 
   const handleExitClick = () => {
@@ -1260,25 +1266,32 @@ const loadFinalResults = async () => {
                       const isSelected = selectedAnswer === optId;
                       const locked = isAnswerLocked;
 
+                      // RPC tamamlandıktan sonra renk göster
+                      const showResolvedFeedback = isAnswerLocked && rpcCompleted;
+
                       let borderColor = "rgba(139,92,246,0.5)";
                       let boxShadow = "0 4px 20px rgba(0,0,0,0.3)";
                       let bg = "linear-gradient(135deg, rgba(30,27,75,0.8), rgba(15,23,42,0.9))";
 
-                      if (locked) {
-                        if (currentCorrectOption && optId === currentCorrectOption) {
+                      if (showResolvedFeedback) {
+                        if (optId === currentCorrectOption) {
+                          // Doğru cevap — YEŞİL
                           borderColor = "#22c55e";
                           boxShadow = "0 0 25px rgba(34,197,94,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                           bg = "linear-gradient(135deg, rgba(22,163,74,0.3), rgba(21,128,61,0.2))";
-                        } else if (selectedAnswer && optId === selectedAnswer && optId !== currentCorrectOption) {
+                        } else if (optId === selectedAnswer) {
+                          // Seçildi ama yanlış — KIRMIZI
                           borderColor = "#ef4444";
                           boxShadow = "0 0 25px rgba(239,68,68,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                           bg = "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))";
                         } else {
+                          // Diğerleri — soluk gri
                           borderColor = "rgba(75,85,99,0.4)";
                           boxShadow = "0 4px 15px rgba(0,0,0,0.2)";
                           bg = "linear-gradient(135deg, rgba(30,27,75,0.5), rgba(15,23,42,0.6))";
                         }
                       } else if (isSelected) {
+                        // RPC bekliyor — seçili mor
                         borderColor = "#d946ef";
                         boxShadow = "0 0 25px rgba(217,70,239,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                         bg = "linear-gradient(135deg, rgba(147,51,234,0.3), rgba(126,34,206,0.2))";
@@ -1301,7 +1314,7 @@ const loadFinalResults = async () => {
                             boxShadow,
                             transition: "all 0.3s cubic-bezier(0.4, 0.2, 1)",
                             overflow: "hidden",
-                            opacity: locked && !isSelected ? 0.55 : 1,
+                            opacity: showResolvedFeedback && optId !== currentCorrectOption && optId !== selectedAnswer ? 0.55 : 1,
                             transform: isSelected && !locked ? "scale(1.02)" : "scale(1)",
                           }}
                           onMouseEnter={(e) => {
@@ -1341,8 +1354,8 @@ const loadFinalResults = async () => {
                                 fontWeight: 900,
                                 background: "rgba(15,23,42,0.9)",
                                 boxShadow: "inset 0 2px 8px rgba(0,0,0,0.3)",
-                                color: locked
-                                  ? (optId === currentCorrectOption ? "#22c55e" : (isSelected ? "#ef4444" : "#6b7280"))
+                                color: showResolvedFeedback
+                                  ? (optId === currentCorrectOption ? "#22c55e" : optId === selectedAnswer ? "#ef4444" : "#6b7280")
                                   : "#a78bfa",
                                 flexShrink: 0,
                               }}
