@@ -157,13 +157,11 @@ export default function QuizGamePage() {
             }
           }
 
-          // UTC0 bazlı index — DB'den gelir (elapsed / 18sn)
+          // İlk cevaplanmamış soruya git
           const answeredCount = (progress.answers_array || []).length;
-          const utcIndex = typeof progress.current_index === "number"
-            ? Math.min(Math.max(progress.current_index, 0), questionsData.length - 1)
-            : Math.min(answeredCount, questionsData.length - 1);
+          const restoredIndex = Math.min(answeredCount, questionsData.length - 1);
 
-          setCurrentIndex(utcIndex);
+          setCurrentIndex(restoredIndex);
           setCorrectCount(progress.correct_count || 0);
           setWrongCount(progress.wrong_count || 0);
           setTotalScore(progress.total_score || 0);
@@ -447,7 +445,7 @@ export default function QuizGamePage() {
       if (data) {
         const correctFlag = data.is_correct || false;
         setIsCorrect(correctFlag);
-        setCurrentCorrectOption((data.correct_option as OptionId) ?? null);
+        setCurrentCorrectOption(data.correct_option);
         setCurrentExplanation(data.explanation || "");
         setTotalScore(data.current_total_score || 0);
         setCorrectCount(data.correct_count || 0);
@@ -469,7 +467,11 @@ export default function QuizGamePage() {
           return next;
         });
 
-        // round_finished — advance() explanation bittikten sonra skor açar
+        if (data.round_finished) {
+          await loadFinalResults();
+          setShowFinalScore(true);
+          return;
+        }
       }
     } catch (err) {
       console.error("❌ Answer submission error:", err);
@@ -498,7 +500,7 @@ export default function QuizGamePage() {
 
       if (!error && data) {
         // ✅ KANONIK: Save explanation data
-        setCurrentCorrectOption((data.correct_option as OptionId) ?? null);
+        setCurrentCorrectOption(data.correct_option);
         setCurrentExplanation(data.explanation || "");
         
         // ✅ KANONIK: Update from DB
@@ -723,6 +725,21 @@ const loadFinalResults = async () => {
             }}
           >
             Go Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isLoading && !showFinalScore && !currentQ) {
+    return (
+      <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", padding: "20px" }}>
+        <div style={{ textAlign: "center", maxWidth: "420px" }}>
+          <XCircle style={{ width: "64px", height: "64px", color: "#ef4444", margin: "0 auto 20px" }} />
+          <h2 style={{ fontSize: "24px", fontWeight: 900, marginBottom: "12px" }}>Quiz Sync Error</h2>
+          <p style={{ fontSize: "16px", color: "#94a3b8", marginBottom: "24px" }}>Unable to restore active question safely.</p>
+          <button onClick={() => router.push("/lobby")} style={{ padding: "12px 24px", borderRadius: "12px", border: "none", background: "linear-gradient(135deg, #7c3aed, #d946ef)", color: "white", fontSize: "16px", fontWeight: 700, cursor: "pointer" }}>
+            Back to Lobby
           </button>
         </div>
       </div>
@@ -1247,19 +1264,16 @@ const loadFinalResults = async () => {
                       let boxShadow = "0 4px 20px rgba(0,0,0,0.3)";
                       let bg = "linear-gradient(135deg, rgba(30,27,75,0.8), rgba(15,23,42,0.9))";
 
-                      if (isAnswerLocked) {
-                        if (optId === currentCorrectOption) {
-                          // Doğru cevap — YEŞİL
+                      if (locked) {
+                        if (currentCorrectOption && optId === currentCorrectOption) {
                           borderColor = "#22c55e";
                           boxShadow = "0 0 25px rgba(34,197,94,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                           bg = "linear-gradient(135deg, rgba(22,163,74,0.3), rgba(21,128,61,0.2))";
-                        } else if (optId === selectedAnswer) {
-                          // Seçildi ama yanlış — KIRMIZI
+                        } else if (selectedAnswer && optId === selectedAnswer && optId !== currentCorrectOption) {
                           borderColor = "#ef4444";
                           boxShadow = "0 0 25px rgba(239,68,68,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                           bg = "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))";
                         } else {
-                          // Diğerleri — GRİ
                           borderColor = "rgba(75,85,99,0.4)";
                           boxShadow = "0 4px 15px rgba(0,0,0,0.2)";
                           bg = "linear-gradient(135deg, rgba(30,27,75,0.5), rgba(15,23,42,0.6))";
