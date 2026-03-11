@@ -170,12 +170,6 @@ export default function QuizGamePage() {
 
           const answeredCount = (progress.answers_array || []).length;
 
-          // ✅ FIX 2: Refresh'te soru atlanmasını önle
-          // answeredCount = tamamlanmış soru sayısı
-          // Eğer mevcut soru cevaplanmışsa bir sonrakine git, yoksa aynı soruda kal
-          const restoredIndex = Math.min(answeredCount, questionsData.length - 1);
-
-          setCurrentIndex(restoredIndex);
           setCorrectCount(progress.correct_count || 0);
           setWrongCount(progress.wrong_count || 0);
           setTotalScore(progress.total_score || 0);
@@ -189,23 +183,27 @@ export default function QuizGamePage() {
             return;
           }
         } else {
-          setCurrentIndex(0);
           setCorrectCount(0);
           setWrongCount(0);
           setTotalScore(0);
         }
 
-        // ✅ FIX 2: UTC0 timer restore — sadece cevaplanmamış aktif soru için
-        // round_started_at'ten değil, o sorunun başlangıç anından hesapla
+        // ✅ FIX 2: Index ve timer SADECE UTC0 global saatinden hesapla
+        // answeredCount'a ASLA bakma — DB'ye yazılmış olsa bile aynı soruda kal
+        // Her soru 18sn: 9sn soru + 9sn explanation
         let restoredTimeLeft = QUESTION_DURATION;
         let restoredExpTimeLeft = QUESTION_DURATION;
         let restoredShowExp = false;
+        let restoredIndex = 0;
 
         if (progress?.round_started_at) {
           const nowMs = Date.now();
           const startMs = new Date(progress.round_started_at).getTime();
           const totalElapsed = Math.floor((nowMs - startMs) / 1000);
-          // Her soru: 9sn soru + 9sn explanation = 18sn döngü
+          // Kaçıncı soruda olduğumuzu UTC0 saatinden hesapla
+          const questionIndex = Math.floor(totalElapsed / 18);
+          restoredIndex = Math.min(questionIndex, questionsData.length - 1);
+          // O sorunun döngüsündeki pozisyon
           const cycleElapsed = totalElapsed % 18;
           if (cycleElapsed < QUESTION_DURATION) {
             restoredTimeLeft = Math.max(QUESTION_DURATION - cycleElapsed, 1);
@@ -216,6 +214,8 @@ export default function QuizGamePage() {
             restoredShowExp = true;
           }
         }
+
+        setCurrentIndex(restoredIndex);
 
         // ✅ FIX 3: entryPlayedRef sıfırla — her loadQuizData'da sadece 1 kez çalsın
         entryPlayedRef.current = false;
@@ -453,7 +453,8 @@ export default function QuizGamePage() {
   // ✅ FIX 1: Cevap seçilince hemen UI'ı kilitle + geçici mor göster,
   // RPC dönünce correct/wrong renklerini uygula
   const handleAnswerClick = async (optionId: OptionId) => {
-    if (isAnswerLocked || showExplanation || showFinalScore) return;
+    // ✅ ref ile kontrol — state stale closure'dan bağımsız
+    if (isAnswerLockedRef.current || showExplanation || showFinalScore) return;
     if (!currentQ || !roundId) return;
     if (answerSubmittedRef.current.has(currentQ.question_id)) return;
 
@@ -1196,7 +1197,6 @@ export default function QuizGamePage() {
                         <button
                           key={optId}
                           onClick={() => handleAnswerClick(optId)}
-                          disabled={locked}
                           style={{
                             position: "relative",
                             padding: "clamp(10px, 2.5vw, 16px) clamp(10px, 2.5vw, 14px)",
@@ -1206,6 +1206,8 @@ export default function QuizGamePage() {
                             color: "#f8fafc",
                             textAlign: "left",
                             cursor: locked ? "default" : "pointer",
+                            // ✅ disabled yerine pointerEvents — React style update'i engellemiyor
+                            pointerEvents: locked ? "none" : "auto",
                             boxShadow,
                             transition: "all 0.3s cubic-bezier(0.4, 0.2, 1)",
                             overflow: "hidden",
