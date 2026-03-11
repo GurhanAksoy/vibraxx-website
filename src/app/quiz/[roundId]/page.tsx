@@ -131,6 +131,15 @@ export default function QuizGamePage() {
 
         if (!securityPassed) return;
 
+        // Refresh / direkt URL girişi koruması
+        // Sadece lobby'den gelen param ile girilebilir
+        const urlParams = new URLSearchParams(window.location.search);
+        const fromLobby = urlParams.get("src") === "lobby";
+        if (!fromLobby) {
+          router.replace("/lobby");
+          return;
+        }
+
         // ✅ STEP 1: Get questions — DB checks participant status
         const { data: questionsData, error: questionsError } = await supabase
           .rpc("get_round_questions", { p_round_id: roundId });
@@ -253,27 +262,73 @@ export default function QuizGamePage() {
   const phaseRef = useRef<"question" | "explanation">("question");
 
   // Faz 1: Soru sayacı — cevap verilse de durmaz
+  // ═══════════════════════════════════════════════════════════
+  // SORU SAYACI — interval tabanlı, hiç durmuyor
+  // ═══════════════════════════════════════════════════════════
+  const questionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const explanationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Soru sayacını başlat
+  const startQuestionTimer = useCallback(() => {
+    if (questionTimerRef.current) clearInterval(questionTimerRef.current);
+    questionTimerRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(questionTimerRef.current!);
+          questionTimerRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
+
+  // Explanation sayacını başlat
+  const startExplanationTimer = useCallback(() => {
+    if (explanationTimerRef.current) clearInterval(explanationTimerRef.current);
+    explanationTimerRef.current = setInterval(() => {
+      setExplanationTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(explanationTimerRef.current!);
+          explanationTimerRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
+
+  // Soru yüklenince sayaç başlat
   useEffect(() => {
-    if (isLoading || showFinalScore || !currentQ) return;
-    if (showExplanation) return; // explanation fazındayız, bu effect çalışmaz
+    if (isLoading || showFinalScore || !currentQ || showExplanation) return;
+    timeoutTriggeredRef.current = false;
+    rpcCompletedRef.current = false;
+    setTimeLeft(QUESTION_DURATION);
+    startQuestionTimer();
+    return () => {
+      if (questionTimerRef.current) clearInterval(questionTimerRef.current);
+    };
+  }, [currentIndex, isLoading, showFinalScore, currentQ]);
 
-    if (timeLeft > 0) {
-      const t = setTimeout(() => setTimeLeft((p) => Math.max(0, p - 1)), 1000);
-      return () => clearTimeout(t);
-    }
-
-    // timeLeft === 0
+  // timeLeft 0 olunca — explanation'a geç
+  useEffect(() => {
+    if (timeLeft !== 0 || showExplanation || showFinalScore || isLoading) return;
     if (timeoutTriggeredRef.current) return;
     timeoutTriggeredRef.current = true;
 
+    const openExplanation = () => {
+      playSound(whooshSoundRef.current);
+      setShowExplanation(true);
+      setExplanationTimeLeft(QUESTION_DURATION);
+      startExplanationTimer();
+    };
+
     if (isAnswerLockedRef.current) {
-      // Cevap verildi — RPC tamamlanana kadar bekle (max 3sn)
+      // RPC tamamlandıysa aç, değilse bekle (max 3sn)
       let waited = 0;
       const tryOpen = () => {
         if (rpcCompletedRef.current || waited >= 3000) {
-          playSound(whooshSoundRef.current);
-          setShowExplanation(true);
-          setExplanationTimeLeft(QUESTION_DURATION);
+          openExplanation();
         } else {
           waited += 100;
           setTimeout(tryOpen, 100);
@@ -281,29 +336,29 @@ export default function QuizGamePage() {
       };
       tryOpen();
     } else {
-      // Cevap verilmedi — null submit
+      // Cevap verilmedi
       handleTimeout();
     }
-  }, [timeLeft, isLoading, showFinalScore, showExplanation, currentQ]);
+  }, [timeLeft, showExplanation, showFinalScore, isLoading]);
 
-  // Faz 2: Explanation sayacı
+  // handleTimeout sonrası explanation aç
   useEffect(() => {
-    if (!showExplanation || showFinalScore) return;
+    if (!rpcCompletedRef.current) return;
+    if (showExplanation || showFinalScore) return;
+    if (!timeoutTriggeredRef.current) return;
+    // timeout case — explanation aç
+  }, []);
 
-    if (explanationTimeLeft > 0) {
-      const t = setTimeout(() => setExplanationTimeLeft((p) => Math.max(0, p - 1)), 1000);
-      return () => clearTimeout(t);
-    }
+  // explanationTimeLeft 0 olunca — sonraki soruya geç
+  useEffect(() => {
+    if (explanationTimeLeft !== 0 || !showExplanation || showFinalScore) return;
 
-    // explanationTimeLeft === 0 — sonraki soruya geç
     const advance = async () => {
+      if (explanationTimerRef.current) clearInterval(explanationTimerRef.current);
       if (currentIndex < questions.length - 1) {
         playSound(whooshSoundRef.current);
         setCurrentIndex((p) => p + 1);
-        setTimeLeft(QUESTION_DURATION);
-        setExplanationTimeLeft(QUESTION_DURATION);
-        timeoutTriggeredRef.current = false;
-        rpcCompletedRef.current = false;
+        // currentIndex değişince yukarıdaki useEffect sayacı yeniden başlatır
         setSelectedAnswer(null);
         setIsAnswerLocked(false);
         isAnswerLockedRef.current = false;
@@ -316,89 +371,18 @@ export default function QuizGamePage() {
       }
     };
     advance();
-  }, [showExplanation, showFinalScore, explanationTimeLeft, currentIndex, questions.length]);
+  }, [explanationTimeLeft, showExplanation, showFinalScore, currentIndex, questions.length]);
 
-  // Tick ses — showExplanation ve showFinalScore dışında hep çalar
+  // Tick ses
   useEffect(() => {
-    if (
-      isSoundEnabled &&
-      !showFinalScore &&
-      !showExplanation &&
-      timeLeft > 0 &&
-      !isLoading
-    ) {
+    if (isSoundEnabled && !showFinalScore && !showExplanation && timeLeft > 0 && !isLoading) {
       startTick();
     } else {
       stopTick();
     }
-  }, [
-    isSoundEnabled,
-    showFinalScore,
-    showExplanation,
-    timeLeft,
-    isLoading,
-  ]);
+  }, [isSoundEnabled, showFinalScore, showExplanation, timeLeft, isLoading]);
 
-  // === EXPLANATION COUNTDOWN ===
-  useEffect(() => {
-    if (showExplanation && !showFinalScore) {
-      setExplanationTimeLeft(QUESTION_DURATION); // 9sn başlat
-    }
-  }, [showExplanation, showFinalScore]);
-
-  useEffect(() => {
-    if (!showExplanation || showFinalScore) return;
-    if (explanationTimeLeft <= 0) return;
-    const t = setTimeout(() => setExplanationTimeLeft((p) => Math.max(0, p - 1)), 1000);
-    return () => clearTimeout(t);
-  }, [showExplanation, showFinalScore, explanationTimeLeft]);
-
-  useEffect(() => {
-    if (!showExplanation || showFinalScore || explanationTimeLeft !== 0) return;
-    const advance = async () => {
-      if (currentIndex < questions.length - 1) {
-        playSound(whooshSoundRef.current);
-        setCurrentIndex(currentIndex + 1);
-        setTimeLeft(QUESTION_DURATION);
-        timeoutTriggeredRef.current = false;
-        rpcCompletedRef.current = false;
-        setSelectedAnswer(null);
-        setIsAnswerLocked(false);
-        isAnswerLockedRef.current = false;
-        setShowExplanation(false);
-        setCurrentCorrectOption(null);
-        setCurrentExplanation("");
-      } else {
-        await loadFinalResults();
-        setShowFinalScore(true);
-      }
-    };
-    advance();
-  }, [showExplanation, showFinalScore, explanationTimeLeft, currentIndex, questions.length]);
-
-  // === LOAD FINAL RESULTS FROM DB ===
-  const loadFinalResults = async () => {
-    if (!roundId) return;
-
-    try {
-      const { data, error } = await supabase.rpc("get_round_result", {
-        p_round_id: roundId
-      });
-
-      if (!error && data) {
-        console.log("✅ Final results loaded:", data);
-        setTotalScore(data.total_score || 0);
-        setCorrectCount(data.correct_count || 0);
-        setWrongCount(data.wrong_count || 0);
-        setFinalRank(data.rank || null);
-        setFinalTotalPlayers(data.total_players || null);
-      }
-    } catch (err) {
-      console.error("❌ Error loading final results:", err);
-    }
-  };
-
-
+  // loadFinalResults
   // ✅ FIXED: Final score countdown — double redirect koruması
   useEffect(() => {
     if (!showFinalScore) return;
@@ -505,10 +489,7 @@ export default function QuizGamePage() {
       console.error("❌ Answer submission error:", err);
       playSound(wrongSoundRef.current);
     }
-    rpcCompletedRef.current = true; // ✅ RPC tamamlandı
-    // RPC bitti → hemen explanation aç (timer 0 bekleme)
-    playSound(whooshSoundRef.current);
-    setShowExplanation(true);
+    rpcCompletedRef.current = true; // ✅ RPC tamamlandı — timer 0'da explanation açılacak
   };
 
 

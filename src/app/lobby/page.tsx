@@ -662,25 +662,25 @@ export default function LobbyPage() {
               margin: "0 auto",
               padding: "clamp(12px, 3vw, 18px) clamp(12px, 3vw, 24px)",
               position: "relative",
-              overflow: "hidden",
             }}
           >
-            {/* 3-col flex: [back+sound] [logo+text] [spacer] */}
+            {/* 3-col grid: [Home] [Logo+Text] [Sound] — tam simetrik */}
             <div
               style={{
-                display: "flex",
+                display: "grid",
+                gridTemplateColumns: "1fr auto 1fr",
                 alignItems: "center",
-                justifyContent: "space-between",
+                gap: "8px",
               }}
             >
-              {/* Left: Back + Sound */}
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+              {/* Sol: Home */}
+              <div style={{ display: "flex", alignItems: "center" }}>
                 <button
                   onClick={handleBack}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
-                    gap: "8px",
+                    gap: "6px",
                     padding: "10px 16px",
                     borderRadius: "12px",
                     border: "1px solid rgba(148, 163, 253, 0.3)",
@@ -689,20 +689,80 @@ export default function LobbyPage() {
                     fontSize: "clamp(13px, 2.5vw, 15px)",
                     fontWeight: 600,
                     transition: "all 0.3s",
+                    cursor: "pointer",
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
-                    e.currentTarget.style.transform = "translateX(-4px)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = "rgba(15, 23, 42, 0.8)";
-                    e.currentTarget.style.transform = "translateX(0)";
                   }}
                 >
                   <ArrowLeft style={{ width: 18, height: 18 }} />
-                  <span className="hide-on-small">Back</span>
+                  <span className="hide-on-small">Home</span>
                 </button>
+              </div>
 
+              {/* Orta: Logo + GLOBAL ARENA */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "clamp(8px, 2vw, 14px)",
+                  justifyContent: "center",
+                }}
+              >
+                <div
+                  style={{
+                    position: "relative",
+                    width: "clamp(44px, 9vw, 64px)",
+                    height: "clamp(44px, 9vw, 64px)",
+                    borderRadius: "50%",
+                    padding: 3,
+                    background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+                    boxShadow: "0 0 30px rgba(124, 58, 237, 0.7), 0 0 60px rgba(217, 70, 239, 0.4)",
+                    flexShrink: 0,
+                  }}
+                >
+                  <div
+                    style={{
+                      position: "relative",
+                      width: "100%",
+                      height: "100%",
+                      borderRadius: "50%",
+                      backgroundColor: "#020817",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <Image
+                      src="/images/logo.png"
+                      alt="VibraXX"
+                      fill
+                      sizes="64px"
+                      style={{ objectFit: "contain", padding: "5px" }}
+                      priority
+                    />
+                  </div>
+                </div>
+                <span
+                  style={{
+                    fontSize: "clamp(13px, 3vw, 20px)",
+                    fontWeight: 900,
+                    backgroundImage: "linear-gradient(135deg, #a78bfa, #f0abfc)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  GLOBAL ARENA
+                </span>
+              </div>
+
+              {/* Sağ: Sound */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
                 <button
                   onClick={() => setIsPlaying(!isPlaying)}
                   style={{
@@ -714,6 +774,7 @@ export default function LobbyPage() {
                     alignItems: "center",
                     justifyContent: "center",
                     transition: "all 0.3s",
+                    cursor: "pointer",
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = "rgba(139, 92, 246, 0.2)";
@@ -728,98 +789,6 @@ export default function LobbyPage() {
                     <VolumeX style={{ width: 20, height: 20, color: "#6b7280" }} />
                   )}
                 </button>
-              </div>
-
-              {/* Right: spacer eşit genişlik */}
-              <div style={{ flexShrink: 0, width: "clamp(44px, 10vw, 80px)" }} />
-            </div>
-
-            {/* Center: Logo + GLOBAL ARENA — absolute yerine flex row ortası */}
-            <div
-              style={{
-                position: "absolute",
-                left: "50%",
-                top: "50%",
-                transform: "translate(-50%, -50%)",
-                zIndex: 20,
-                display: "flex",
-                alignItems: "center",
-                gap: "clamp(8px, 2vw, 14px)",
-                pointerEvents: "none",
-              }}
-            >
-              {/* Logo */}
-              <div
-                style={{
-                  position: "relative",
-                  width: "clamp(48px, 10vw, 72px)",
-                  height: "clamp(48px, 10vw, 72px)",
-                  borderRadius: "50%",
-                  padding: 3,
-                  background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-                  boxShadow:
-                    "0 0 30px rgba(124, 58, 237, 0.7), 0 0 60px rgba(217, 70, 239, 0.4)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <div
-                  className="animate-glow"
-                  style={{
-                    position: "absolute",
-                    inset: -5,
-                    borderRadius: "50%",
-                    background: "radial-gradient(circle, #a855f7, transparent)",
-                    opacity: 0.5,
-                    filter: "blur(10px)",
-                    pointerEvents: "none",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "relative",
-                    width: "100%",
-                    height: "100%",
-                    borderRadius: "50%",
-                    backgroundColor: "#020817",
-                    overflow: "hidden",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    zIndex: 10,
-                  }}
-                >
-                  <Image
-                    src="/images/logo.png"
-                    alt="VibraXX"
-                    fill
-                    sizes="90px"
-                    style={{ objectFit: "contain", padding: "5px" }}
-                    priority
-                  />
-                </div>
-              </div>
-
-              {/* GLOBAL ARENA Text */}
-              <div>
-                <div
-                  style={{
-                    fontSize: "clamp(14px, 3vw, 20px)",
-                    fontWeight: 900,
-                    backgroundImage: "linear-gradient(135deg, #a78bfa, #f0abfc)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    backgroundClip: "text",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                    lineHeight: 1.2,
-                    textShadow: "0 0 20px rgba(167, 139, 250, 0.5)",
-                  }}
-                >
-                  GLOBAL ARENA
-                </div>
               </div>
             </div>
           </div>
