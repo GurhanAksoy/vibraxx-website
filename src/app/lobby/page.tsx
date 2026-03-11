@@ -170,7 +170,7 @@ export default function LobbyPage() {
       // === KREDİ KONTROLÜ: 0 ise ana sayfaya yönlendir ===
       if ((data.credits ?? 0) === 0 && !isRedirectingRef.current) {
         isRedirectingRef.current = true;
-        routerRef.current.push("/?no_credits=1");
+        routerRef.current.replace("/buy");
         return;
       }
 
@@ -182,11 +182,9 @@ export default function LobbyPage() {
           setIsRedirecting(true);
           routerRef.current.push(`/quiz/${data.round_id}`);
           return;
-        } else {
-          // Round live ama henüz join olmamış → hemen join et
-          setTimeout(() => handleCountdownZero(), 100);
-          return;
         }
+        // Live round var ama katılmamış → lobby'de bekle, sonraki round'a katıl
+        // handleCountdownZero ÇAĞIRILMAZ
       }
     } catch (err) {
       console.error("[Lobby] fetchLobbyState error:", err);

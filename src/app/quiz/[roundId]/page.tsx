@@ -261,18 +261,13 @@ export default function QuizGamePage() {
     timeoutTriggeredRef.current = true;
 
     if (isAnswerLockedRef.current) {
-      // Cevap verilmişti — RPC tamamlanana kadar bekle
-      const waitForRpc = () => {
-        if (rpcCompletedRef.current) {
-          playSound(whooshSoundRef.current);
-          setShowExplanation(true);
-        } else {
-          setTimeout(waitForRpc, 100); // 100ms'de bir kontrol et
-        }
-      };
-      waitForRpc();
+      // Cevap verilmişti — RPC zaten explanation açtı, sadece emin ol
+      if (!showExplanation) {
+        playSound(whooshSoundRef.current);
+        setShowExplanation(true);
+      }
     } else {
-      // Cevap verilmedi — timeout submit (o da explanation açacak)
+      // Cevap verilmedi — timeout submit
       handleTimeout();
     }
   }, [timeLeft, isLoading, showExplanation, showFinalScore, currentQ]);
@@ -456,7 +451,9 @@ export default function QuizGamePage() {
       playSound(wrongSoundRef.current);
     }
     rpcCompletedRef.current = true; // ✅ RPC tamamlandı
-    // Timer 0'da explanation açılacak
+    // RPC bitti → hemen explanation aç (timer 0 bekleme)
+    playSound(whooshSoundRef.current);
+    setShowExplanation(true);
   };
 
 
