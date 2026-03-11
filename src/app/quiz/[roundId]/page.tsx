@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
@@ -259,8 +259,26 @@ export default function QuizGamePage() {
   const questionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const explanationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Soru sayacını başlat
-  const startQuestionTimer = useCallback(() => {
+  // Timer callbacks inline useEffect içinde
+
+  // Soru yüklenince sayaç başlat
+  // ═══════════════════════════════════════════════════════════
+  // SORU SAYACI — sadece currentIndex değişince başlar
+  // ═══════════════════════════════════════════════════════════
+  const advancingRef = useRef(false); // advance() çift çalışmasın
+
+  useEffect(() => {
+    if (isLoading || showFinalScore || !currentQ) return;
+
+    // Her yeni soru başında sıfırla
+    advancingRef.current = false;
+    timeoutTriggeredRef.current = false;
+    rpcCompletedRef.current = false;
+    setTimeLeft(QUESTION_DURATION);
+    setShowExplanation(false);
+    setExplanationTimeLeft(QUESTION_DURATION);
+
+    // Soru sayacı
     if (questionTimerRef.current) clearInterval(questionTimerRef.current);
     questionTimerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
@@ -272,50 +290,39 @@ export default function QuizGamePage() {
         return prev - 1;
       });
     }, 1000);
-  }, []);
 
-  // Explanation sayacını başlat
-  const startExplanationTimer = useCallback(() => {
-    if (explanationTimerRef.current) clearInterval(explanationTimerRef.current);
-    explanationTimerRef.current = setInterval(() => {
-      setExplanationTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(explanationTimerRef.current!);
-          explanationTimerRef.current = null;
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, []);
-
-  // Soru yüklenince sayaç başlat
-  useEffect(() => {
-    if (isLoading || showFinalScore || !currentQ || showExplanation) return;
-    timeoutTriggeredRef.current = false;
-    rpcCompletedRef.current = false;
-    setTimeLeft(QUESTION_DURATION);
-    startQuestionTimer();
     return () => {
       if (questionTimerRef.current) clearInterval(questionTimerRef.current);
     };
-  }, [currentIndex, isLoading, showFinalScore, currentQ]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, isLoading, showFinalScore]);
 
-  // timeLeft 0 olunca — explanation'a geç
+  // timeLeft 0 → explanation aç
   useEffect(() => {
-    if (timeLeft !== 0 || showExplanation || showFinalScore || isLoading) return;
+    if (timeLeft !== 0 || showFinalScore || isLoading || !currentQ) return;
     if (timeoutTriggeredRef.current) return;
     timeoutTriggeredRef.current = true;
 
     const openExplanation = () => {
-      playSound(whooshSoundRef.current);
+      if (explanationTimerRef.current) clearInterval(explanationTimerRef.current);
       setShowExplanation(true);
       setExplanationTimeLeft(QUESTION_DURATION);
-      startExplanationTimer();
+      playSound(whooshSoundRef.current);
+
+      // Explanation sayacı
+      explanationTimerRef.current = setInterval(() => {
+        setExplanationTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(explanationTimerRef.current!);
+            explanationTimerRef.current = null;
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     };
 
     if (isAnswerLockedRef.current) {
-      // RPC tamamlandıysa aç, değilse bekle (max 3sn)
       let waited = 0;
       const tryOpen = () => {
         if (rpcCompletedRef.current || waited >= 3000) {
@@ -327,44 +334,34 @@ export default function QuizGamePage() {
       };
       tryOpen();
     } else {
-      // Cevap verilmedi
       handleTimeout();
     }
-  }, [timeLeft, showExplanation, showFinalScore, isLoading]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLeft, showFinalScore, isLoading]);
 
-  // handleTimeout sonrası explanation aç
-  useEffect(() => {
-    if (!rpcCompletedRef.current) return;
-    if (showExplanation || showFinalScore) return;
-    if (!timeoutTriggeredRef.current) return;
-    // timeout case — explanation aç
-  }, []);
-
-  // explanationTimeLeft 0 olunca — sonraki soruya geç
+  // explanationTimeLeft 0 → sonraki soru
   useEffect(() => {
     if (explanationTimeLeft !== 0 || !showExplanation || showFinalScore) return;
+    if (advancingRef.current) return;
+    advancingRef.current = true;
 
     const advance = async () => {
-      if (explanationTimerRef.current) clearInterval(explanationTimerRef.current);
       if (currentIndex < questions.length - 1) {
         playSound(whooshSoundRef.current);
-        setCurrentIndex((p) => p + 1);
-        // currentIndex değişince yukarıdaki useEffect sayacı yeniden başlatır
         setSelectedAnswer(null);
         setIsAnswerLocked(false);
         isAnswerLockedRef.current = false;
-        setShowExplanation(false);
         setCurrentCorrectOption(null);
         setCurrentExplanation("");
+        setCurrentIndex((p) => p + 1); // bu yukarıdaki useEffect'i tetikler
       } else {
         await loadFinalResults();
         setShowFinalScore(true);
       }
     };
     advance();
-  }, [explanationTimeLeft, showExplanation, showFinalScore, currentIndex, questions.length]);
-
-  // Tick ses
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [explanationTimeLeft, showExplanation, showFinalScore]);
   useEffect(() => {
     if (isSoundEnabled && !showFinalScore && !showExplanation && timeLeft > 0 && !isLoading) {
       startTick();
