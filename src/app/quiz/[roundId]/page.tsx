@@ -569,9 +569,22 @@ export default function QuizGamePage() {
   };
 
   const handleSoundToggle = () => {
-    if (isSoundEnabled) playClick();
-    setIsSoundEnabled((prev) => !prev);
-  };
+  if (isSoundEnabled) playClick();
+  setIsSoundEnabled((prev) => !prev);
+};
+
+const loadFinalResults = async () => {
+  if (!roundId) return;
+
+  const { data, error } = await supabase.rpc("get_round_result", {
+    p_round_id: roundId,
+  });
+
+  if (!error && data) {
+    setFinalRank(data.rank || null);
+    setFinalTotalPlayers(data.total_players || null);
+  }
+};
 
   // === HELPERS ===
   const getTimeColor = () => {
