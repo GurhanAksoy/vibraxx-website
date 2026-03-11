@@ -157,12 +157,11 @@ export default function QuizGamePage() {
             }
           }
 
-          // UTC0 bazlı soru indexi — DB hesaplıyor (geçen süre / 18sn)
-          const utcIndex = typeof progress.current_index === 'number'
-            ? Math.min(Math.max(progress.current_index, 0), questionsData.length - 1)
-            : Math.min((progress.answers_array || []).length, questionsData.length - 1);
+          // İlk cevaplanmamış soruya git
+          const answeredCount = (progress.answers_array || []).length;
+          const restoredIndex = Math.min(answeredCount, questionsData.length - 1);
 
-          setCurrentIndex(utcIndex);
+          setCurrentIndex(restoredIndex);
           setCorrectCount(progress.correct_count || 0);
           setWrongCount(progress.wrong_count || 0);
           setTotalScore(progress.total_score || 0);
