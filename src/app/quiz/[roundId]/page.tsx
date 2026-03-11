@@ -195,30 +195,35 @@ export default function QuizGamePage() {
         let restoredShowExp = false;
         let restoredIndex = 0;
 
-        if (progress && progress.round_started_at && progress.server_now) {
+        // VibraXX Global Live Quiz — UTC0 canonical model
+        // Lobby sayaci 0 olunca herkes ayni anda giris yapar → her zaman index=0
+        // Refresh durumunda scheduled_start'tan UTC0 hesabi yapilir
+        const answeredCountForTimer = (progress?.answers_array || []).length;
+
+        if (answeredCountForTimer === 0) {
+          // ✅ ILK GIRIS: Lobby sayaci garantisi — index 0, timeLeft 9
+          restoredIndex = 0;
+          restoredTimeLeft = QUESTION_DURATION;
+          restoredShowExp = false;
+        } else if (progress && progress.server_now) {
+          // ✅ REFRESH: scheduled_start'tan UTC0 hesabi
           const nowMs = new Date(progress.server_now).getTime();
-          const startMs = new Date(progress.round_started_at).getTime();
-          const totalElapsed = Math.max(0, Math.floor((nowMs - startMs) / 1000));
-          const TOTAL_ROUND_DURATION = questionsData.length * 18; // 15 * 18 = 270sn
-          const answeredCountForTimer = (progress.answers_array || []).length;
+          const anchorStr = progress.scheduled_start || progress.round_started_at;
+          if (anchorStr) {
+            const startMs = new Date(anchorStr).getTime();
+            const totalElapsed = Math.max(0, Math.floor((nowMs - startMs) / 1000));
+            const TOTAL_ROUND_DURATION = questionsData.length * 18; // 270sn
 
-          // Round suresi tamamen dolmussa direkt final score
-          if (totalElapsed >= TOTAL_ROUND_DURATION) {
-            setAnswers(normalizedAnswers);
-            setQuestions(questionsData);
-            setIsLoading(false);
-            await loadFinalResults();
-            setShowFinalScore(true);
-            return;
-          }
+            // Round bitmisse direkt final score
+            if (totalElapsed >= TOTAL_ROUND_DURATION) {
+              setAnswers(normalizedAnswers);
+              setQuestions(questionsData);
+              setIsLoading(false);
+              await loadFinalResults();
+              setShowFinalScore(true);
+              return;
+            }
 
-          if (answeredCountForTimer === 0) {
-            // Ilk giris: lobby sayaci senkron, her zaman soru 1'den basla
-            restoredIndex = 0;
-            restoredTimeLeft = QUESTION_DURATION;
-            restoredShowExp = false;
-          } else {
-            // Refresh: en az 1 soru cevaplanmis, UTC0 server clock'tan restore et
             const questionIndex = Math.floor(totalElapsed / 18);
             restoredIndex = Math.max(0, Math.min(questionIndex, questionsData.length - 1));
             const cycleElapsed = totalElapsed % 18;
