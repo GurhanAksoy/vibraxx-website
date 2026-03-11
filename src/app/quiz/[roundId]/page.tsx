@@ -131,15 +131,6 @@ export default function QuizGamePage() {
 
         if (!securityPassed) return;
 
-        // Refresh / direkt URL girişi koruması
-        // Sadece lobby'den gelen param ile girilebilir
-        const urlParams = new URLSearchParams(window.location.search);
-        const fromLobby = urlParams.get("src") === "lobby";
-        if (!fromLobby) {
-          router.replace("/lobby");
-          return;
-        }
-
         // ✅ STEP 1: Get questions — DB checks participant status
         const { data: questionsData, error: questionsError } = await supabase
           .rpc("get_round_questions", { p_round_id: roundId });
