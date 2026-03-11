@@ -159,10 +159,7 @@ export default function QuizGamePage() {
 
           // İlk cevaplanmamış soruya git
           const answeredCount = (progress.answers_array || []).length;
-          // answeredCount-1: son cevaplanan sorudan devam (explanation fazı koruması)
-          const restoredIndex = answeredCount > 0
-            ? Math.min(answeredCount - 1, questionsData.length - 1)
-            : 0;
+          const restoredIndex = Math.min(answeredCount, questionsData.length - 1);
 
           setCurrentIndex(restoredIndex);
           setCorrectCount(progress.correct_count || 0);
@@ -185,11 +182,32 @@ export default function QuizGamePage() {
           setTotalScore(0);
         }
 
+        // UTC0 Timer Restore — round_started_at varsa geçen süreyi hesapla
+        let restoredTimeLeft = QUESTION_DURATION;
+        let restoredExpTimeLeft = QUESTION_DURATION;
+        let restoredShowExp = false;
+
+        if (progress?.round_started_at) {
+          const nowMs = Date.now();
+          const startMs = new Date(progress.round_started_at).getTime();
+          const totalElapsed = Math.floor((nowMs - startMs) / 1000);
+          // Her soru 18sn: 9sn soru + 9sn explanation
+          const inQuestionCycle = totalElapsed % 18;
+          if (inQuestionCycle < QUESTION_DURATION) {
+            restoredTimeLeft = Math.max(QUESTION_DURATION - inQuestionCycle, 1);
+            restoredShowExp = false;
+          } else {
+            restoredTimeLeft = 0;
+            restoredExpTimeLeft = Math.max(18 - inQuestionCycle, 1);
+            restoredShowExp = true;
+          }
+        }
+
         setAnswers(normalizedAnswers);
         setQuestions(questionsData);
-        setTimeLeft(QUESTION_DURATION);
-        setExplanationTimeLeft(QUESTION_DURATION);
-        setShowExplanation(false);
+        setTimeLeft(restoredTimeLeft);
+        setExplanationTimeLeft(restoredExpTimeLeft);
+        setShowExplanation(restoredShowExp);
         setSelectedAnswer(null);
         setIsAnswerLocked(false);
         isAnswerLockedRef.current = false;
@@ -1272,13 +1290,12 @@ const loadFinalResults = async () => {
                       let boxShadow = "0 4px 20px rgba(0,0,0,0.3)";
                       let bg = "linear-gradient(135deg, rgba(30,27,75,0.8), rgba(15,23,42,0.9))";
 
-                      if (locked && currentCorrectOption) {
-                        // currentCorrectOption geldi — final renkler
+                      if (locked && currentCorrectOption !== null) {
                         if (optId === currentCorrectOption) {
                           borderColor = "#22c55e";
                           boxShadow = "0 0 25px rgba(34,197,94,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                           bg = "linear-gradient(135deg, rgba(22,163,74,0.3), rgba(21,128,61,0.2))";
-                        } else if (optId === selectedAnswer) {
+                        } else if (selectedAnswer && optId === selectedAnswer && optId !== currentCorrectOption) {
                           borderColor = "#ef4444";
                           boxShadow = "0 0 25px rgba(239,68,68,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                           bg = "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))";
@@ -1310,7 +1327,7 @@ const loadFinalResults = async () => {
                             boxShadow,
                             transition: "all 0.3s cubic-bezier(0.4, 0.2, 1)",
                             overflow: "hidden",
-                            opacity: (locked && currentCorrectOption && optId !== currentCorrectOption && optId !== selectedAnswer) ? 0.55 : 1,
+                            opacity: (locked && currentCorrectOption !== null && optId !== currentCorrectOption && optId !== selectedAnswer) ? 0.55 : 1,
                             transform: isSelected && !locked ? "scale(1.02)" : "scale(1)",
                           }}
                           onMouseEnter={(e) => {
@@ -1350,7 +1367,7 @@ const loadFinalResults = async () => {
                                 fontWeight: 900,
                                 background: "rgba(15,23,42,0.9)",
                                 boxShadow: "inset 0 2px 8px rgba(0,0,0,0.3)",
-                                color: (locked && currentCorrectOption)
+                                color: (locked && currentCorrectOption !== null)
                                   ? (optId === currentCorrectOption ? "#22c55e" : optId === selectedAnswer ? "#ef4444" : "#6b7280")
                                   : "#a78bfa",
                                 flexShrink: 0,
