@@ -1169,7 +1169,7 @@ const loadFinalResults = async () => {
               <div style={{
                 transition: "all 0.4s ease",
                 transform: showExplanation ? "scale(0.97)" : "scale(1)",
-                opacity: showExplanation ? 0.4 : 1,
+                opacity: showExplanation ? 0.35 : 1,
                 marginBottom: showExplanation ? "12px" : "0",
               }}>
 
@@ -1249,20 +1249,22 @@ const loadFinalResults = async () => {
                       let boxShadow = "0 4px 20px rgba(0,0,0,0.3)";
                       let bg = "linear-gradient(135deg, rgba(30,27,75,0.8), rgba(15,23,42,0.9))";
 
-                      if (locked) {
-                        const isCorrectOpt = optId === currentCorrectOption;
-                        if (isCorrectOpt) {
-                          // Doğru cevap — her zaman yeşil (seçilmiş olsun olmasın)
+                      if (locked && currentCorrectOption) {
+                        // optId bu şık, currentCorrectOption DB'den gelen doğru cevap
+                        const thisIsCorrect = optId === currentCorrectOption;
+                        const thisIsWrongSelected = isSelected && !thisIsCorrect;
+                        if (thisIsCorrect) {
+                          // Doğru cevap — yeşil (seçilmiş olsun olmasın)
                           borderColor = "#22c55e";
                           boxShadow = "0 0 25px rgba(34,197,94,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                           bg = "linear-gradient(135deg, rgba(22,163,74,0.3), rgba(21,128,61,0.2))";
-                        } else if (isSelected) {
-                          // Seçili ama yanlış — kırmızı
+                        } else if (thisIsWrongSelected) {
+                          // Seçildi ama yanlış — kırmızı
                           borderColor = "#ef4444";
                           boxShadow = "0 0 25px rgba(239,68,68,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                           bg = "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))";
                         } else {
-                          // Diğerleri — soluk
+                          // Diğerleri — soluk gri
                           borderColor = "rgba(75,85,99,0.4)";
                           boxShadow = "0 4px 15px rgba(0,0,0,0.2)";
                           bg = "linear-gradient(135deg, rgba(30,27,75,0.5), rgba(15,23,42,0.6))";
