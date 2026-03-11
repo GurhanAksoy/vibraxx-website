@@ -259,7 +259,6 @@ export default function QuizGamePage() {
   const questionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const explanationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Timer callbacks inline useEffect içinde
 
   // Soru yüklenince sayaç başlat
   // ═══════════════════════════════════════════════════════════
@@ -309,7 +308,6 @@ export default function QuizGamePage() {
       setExplanationTimeLeft(QUESTION_DURATION);
       playSound(whooshSoundRef.current);
 
-      // Explanation sayacı
       explanationTimerRef.current = setInterval(() => {
         setExplanationTimeLeft((prev) => {
           if (prev <= 1) {
@@ -323,9 +321,10 @@ export default function QuizGamePage() {
     };
 
     if (isAnswerLockedRef.current) {
+      // RPC bekleme — max 5sn, sonra zorla aç (donmayı önler)
       let waited = 0;
       const tryOpen = () => {
-        if (rpcCompletedRef.current || waited >= 3000) {
+        if (rpcCompletedRef.current || waited >= 5000) {
           openExplanation();
         } else {
           waited += 100;
@@ -334,7 +333,7 @@ export default function QuizGamePage() {
       };
       tryOpen();
     } else {
-      handleTimeout();
+      handleTimeout().then(() => openExplanation());
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLeft, showFinalScore, isLoading]);
@@ -399,26 +398,11 @@ export default function QuizGamePage() {
   }, [showFinalScore]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sound toggle effect
-  useEffect(() => {
-    if (!isSoundEnabled) {
-      stopTick();
-      return;
-    }
-    if (timeLeft > 0 && !isLoading && !showExplanation) {
-      startTick();
-    }
-  }, [isSoundEnabled, timeLeft, isLoading, showExplanation]);
-
-  // Stop tick safety
-  useEffect(() => {
-    if (showFinalScore || showExplanation || timeLeft <= 0) {
-      stopTick();
-    }
-  }, [showFinalScore, showExplanation, timeLeft]);
+  // Tick: tek effect L364'te yönetiliyor
 
   // === HANDLERS ===
   const handleAnswerClick = async (optionId: OptionId) => {
-    if (isAnswerLocked || showExplanation || showFinalScore) return;
+    if (isAnswerLocked || showFinalScore) return;
     if (!currentQ || !roundId) return;
     if (answerSubmittedRef.current.has(currentQ.question_id)) return;
 
@@ -482,7 +466,7 @@ export default function QuizGamePage() {
 
 
   const handleTimeout = async () => {
-    if (isAnswerLocked || showExplanation || showFinalScore) return;
+    if (isAnswerLocked || showFinalScore) return;
     if (!currentQ || !roundId) return;
     if (answerSubmittedRef.current.has(currentQ.question_id)) return;
 
@@ -1170,16 +1154,16 @@ const loadFinalResults = async () => {
                 transition: "all 0.4s ease",
                 transform: showExplanation ? "scale(0.97)" : "scale(1)",
                 opacity: showExplanation ? 0.7 : 1,
-                marginBottom: showExplanation ? "12px" : "0",
+                marginBottom: showExplanation ? "8px" : "0",
               }}>
 
                 <article
                   className="animate-slide-up"
                   style={{
                     padding:
-                      "clamp(24px, 5vw, 32px) clamp(20px, 4vw, 28px)",
+                      "clamp(14px, 3vw, 20px) clamp(12px, 3vw, 18px)",
                     borderRadius:
-                      "clamp(24px, 5vw, 32px)",
+                      "clamp(16px, 3vw, 20px)",
                     border: "2px solid rgba(139,92,246,0.4)",
                     background:
                       "linear-gradient(135deg, rgba(30,27,75,0.95) 0%, rgba(15,23,42,0.95) 100%)",
@@ -1222,7 +1206,7 @@ const loadFinalResults = async () => {
 
                   <h2
                     style={{
-                      fontSize: "clamp(18px, 4vw, 24px)",
+                      fontSize: "clamp(15px, 3.5vw, 20px)",
                       lineHeight: 1.5,
                       fontWeight: 700,
                       marginBottom: "24px",
@@ -1250,14 +1234,15 @@ const loadFinalResults = async () => {
                       let bg = "linear-gradient(135deg, rgba(30,27,75,0.8), rgba(15,23,42,0.9))";
 
                       if (locked) {
-                        if (isSelected) {
-                          borderColor = isCorrect ? "#22c55e" : "#ef4444";
-                          boxShadow = isCorrect
-                            ? "0 0 25px rgba(34,197,94,0.6), 0 4px 20px rgba(0,0,0,0.3)"
-                            : "0 0 25px rgba(239,68,68,0.6), 0 4px 20px rgba(0,0,0,0.3)";
-                          bg = isCorrect
-                            ? "linear-gradient(135deg, rgba(22,163,74,0.3), rgba(21,128,61,0.2))"
-                            : "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))";
+                        const isCorrectOpt = optId === currentCorrectOption;
+                        if (isCorrectOpt) {
+                          borderColor = "#22c55e";
+                          boxShadow = "0 0 25px rgba(34,197,94,0.6), 0 4px 20px rgba(0,0,0,0.3)";
+                          bg = "linear-gradient(135deg, rgba(22,163,74,0.3), rgba(21,128,61,0.2))";
+                        } else if (isSelected) {
+                          borderColor = "#ef4444";
+                          boxShadow = "0 0 25px rgba(239,68,68,0.6), 0 4px 20px rgba(0,0,0,0.3)";
+                          bg = "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))";
                         } else {
                           borderColor = "rgba(75,85,99,0.4)";
                           boxShadow = "0 4px 15px rgba(0,0,0,0.2)";
@@ -1363,9 +1348,9 @@ const loadFinalResults = async () => {
                   className="animate-slide-up"
                   style={{
                     padding:
-                      "clamp(24px, 5vw, 32px) clamp(20px, 4vw, 28px)",
+                      "clamp(14px, 3vw, 20px) clamp(12px, 3vw, 18px)",
                     borderRadius:
-                      "clamp(24px, 5vw, 32px)",
+                      "clamp(16px, 3vw, 20px)",
                     border: "2px solid rgba(56,189,248,0.5)",
                     background:
                       "linear-gradient(135deg, rgba(8,47,73,0.95), rgba(6,8,20,0.95))",
