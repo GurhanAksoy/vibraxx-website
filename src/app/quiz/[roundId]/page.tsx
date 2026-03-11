@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
@@ -39,7 +39,6 @@ export default function QuizGamePage() {
   const router = useRouter();
   const params = useParams();
 
-  // UUID string — PostgreSQL otomatik cast eder
   const roundId = params?.roundId as string | null;
 
   // 🔐 === SECURITY STATE ===
@@ -54,12 +53,13 @@ export default function QuizGamePage() {
   const [selectedAnswer, setSelectedAnswer] = useState<OptionId | null>(null);
   const [isAnswerLocked, setIsAnswerLocked] = useState(false);
 
-  // DB-driven scores (no local increment)
+  // DB-driven scores
   const [totalScore, setTotalScore] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
 
-  // Current question feedback from submit_answer
+  // ✅ FIX 1: currentCorrectOption artık RPC beklenmeden UI'da hemen yansıyor
+  // Bunun için ayrı "pendingCorrectOption" ref kullanıyoruz — RPC dönünce set ediyoruz
   const [currentCorrectOption, setCurrentCorrectOption] = useState<OptionId | null>(null);
   const [currentExplanation, setCurrentExplanation] = useState<string>("");
   const [isCorrect, setIsCorrect] = useState(false);
@@ -77,12 +77,13 @@ export default function QuizGamePage() {
   const [finalRank, setFinalRank] = useState<number | null>(null);
   const [finalTotalPlayers, setFinalTotalPlayers] = useState<number | null>(null);
 
-  // Timeout guard
+  // Refs
   const timeoutTriggeredRef = useRef(false);
   const answerSubmittedRef = useRef<Set<number>>(new Set());
   const finalRedirectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isAnswerLockedRef = useRef(false);
-  const rpcCompletedRef = useRef(false); // RPC tamamlandı mı? // stale closure fix
+  const rpcCompletedRef = useRef(false);
+  const isSoundEnabledRef = useRef(true); // ✅ FIX 3: stale closure önleme
 
   // === AUDIO REFS ===
   const correctSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -96,17 +97,20 @@ export default function QuizGamePage() {
 
   const currentQ = questions[currentIndex] ?? null;
 
-  // 🔐 === SECURITY CHECK - MUST RUN FIRST ===
+  // ✅ FIX 3: isSoundEnabled değişince ref'i de güncelle
+  useEffect(() => {
+    isSoundEnabledRef.current = isSoundEnabled;
+  }, [isSoundEnabled]);
+
+  // 🔐 === SECURITY CHECK ===
   useEffect(() => {
     const verifyAccess = async () => {
       try {
         const { data: { user }, error: authError } = await supabase.auth.getUser();
-
         if (authError || !user) {
           router.push("/");
           return;
         }
-
         setUser(user);
         setSecurityPassed(true);
       } catch (error) {
@@ -114,13 +118,23 @@ export default function QuizGamePage() {
         router.push("/");
       }
     };
-
     verifyAccess();
   }, [router]);
 
   // ============================================
   // 🔐 KANONIK: LOAD QUIZ DATA (DB = COMMANDER)
   // ============================================
+  const loadFinalResults = useCallback(async () => {
+    if (!roundId) return;
+    const { data, error } = await supabase.rpc("get_round_result", {
+      p_round_id: roundId,
+    });
+    if (!error && data) {
+      setFinalRank(data.rank || null);
+      setFinalTotalPlayers(data.total_players || null);
+    }
+  }, [roundId]);
+
   useEffect(() => {
     const loadQuizData = async () => {
       try {
@@ -128,10 +142,9 @@ export default function QuizGamePage() {
           router.push("/lobby");
           return;
         }
-
         if (!securityPassed) return;
 
-        // ✅ STEP 1: Get questions — DB checks participant status
+        // STEP 1: Get questions
         const { data: questionsData, error: questionsError } = await supabase
           .rpc("get_round_questions", { p_round_id: roundId });
 
@@ -141,15 +154,13 @@ export default function QuizGamePage() {
           return;
         }
 
-        // ✅ STEP 2: Restore progress from DB
+        // STEP 2: Restore progress from DB
         const { data: progress, error: progressError } = await supabase
           .rpc("get_round_progress", { p_round_id: roundId });
 
         let normalizedAnswers = Array(questionsData.length).fill("none");
 
         if (!progressError && progress) {
-          // answers_array: ["correct","wrong",...] — cevaplanmış sırayla
-          // normalizedAnswers: 15 elemanlı, ilk N'i dolu, geri kalan "none"
           if (progress.answers_array && Array.isArray(progress.answers_array)) {
             const copyLength = Math.min(progress.answers_array.length, questionsData.length);
             for (let i = 0; i < copyLength; i++) {
@@ -157,8 +168,11 @@ export default function QuizGamePage() {
             }
           }
 
-          // İlk cevaplanmamış soruya git
           const answeredCount = (progress.answers_array || []).length;
+
+          // ✅ FIX 2: Refresh'te soru atlanmasını önle
+          // answeredCount = tamamlanmış soru sayısı
+          // Eğer mevcut soru cevaplanmışsa bir sonrakine git, yoksa aynı soruda kal
           const restoredIndex = Math.min(answeredCount, questionsData.length - 1);
 
           setCurrentIndex(restoredIndex);
@@ -166,7 +180,6 @@ export default function QuizGamePage() {
           setWrongCount(progress.wrong_count || 0);
           setTotalScore(progress.total_score || 0);
 
-          // Tüm sorular bittiyse direkt final
           if (answeredCount >= questionsData.length) {
             setAnswers(normalizedAnswers);
             setQuestions(questionsData);
@@ -182,7 +195,8 @@ export default function QuizGamePage() {
           setTotalScore(0);
         }
 
-        // UTC0 Timer Restore — round_started_at varsa geçen süreyi hesapla
+        // ✅ FIX 2: UTC0 timer restore — sadece cevaplanmamış aktif soru için
+        // round_started_at'ten değil, o sorunun başlangıç anından hesapla
         let restoredTimeLeft = QUESTION_DURATION;
         let restoredExpTimeLeft = QUESTION_DURATION;
         let restoredShowExp = false;
@@ -191,17 +205,20 @@ export default function QuizGamePage() {
           const nowMs = Date.now();
           const startMs = new Date(progress.round_started_at).getTime();
           const totalElapsed = Math.floor((nowMs - startMs) / 1000);
-          // Her soru 18sn: 9sn soru + 9sn explanation
-          const inQuestionCycle = totalElapsed % 18;
-          if (inQuestionCycle < QUESTION_DURATION) {
-            restoredTimeLeft = Math.max(QUESTION_DURATION - inQuestionCycle, 1);
+          // Her soru: 9sn soru + 9sn explanation = 18sn döngü
+          const cycleElapsed = totalElapsed % 18;
+          if (cycleElapsed < QUESTION_DURATION) {
+            restoredTimeLeft = Math.max(QUESTION_DURATION - cycleElapsed, 1);
             restoredShowExp = false;
           } else {
             restoredTimeLeft = 0;
-            restoredExpTimeLeft = Math.max(18 - inQuestionCycle, 1);
+            restoredExpTimeLeft = Math.max(18 - cycleElapsed, 1);
             restoredShowExp = true;
           }
         }
+
+        // ✅ FIX 3: entryPlayedRef sıfırla — her loadQuizData'da sadece 1 kez çalsın
+        entryPlayedRef.current = false;
 
         setAnswers(normalizedAnswers);
         setQuestions(questionsData);
@@ -219,14 +236,18 @@ export default function QuizGamePage() {
         answerSubmittedRef.current = new Set();
         setIsLoading(false);
 
-        // entry.mp3 — quiz başlarken 1 kez
-        setTimeout(() => {
-          if (!entryPlayedRef.current && entrySoundRef.current && isSoundEnabled) {
-            entryPlayedRef.current = true;
-            entrySoundRef.current.currentTime = 0;
-            entrySoundRef.current.play().catch(() => {});
-          }
-        }, 100);
+        // ✅ FIX 3: entry.mp3 — ref ile isSoundEnabled oku, audio hazır olunca çal
+        const tryPlayEntry = () => {
+          if (entryPlayedRef.current) return;
+          if (!isSoundEnabledRef.current) return;
+          const audio = entrySoundRef.current;
+          if (!audio) return;
+          entryPlayedRef.current = true;
+          audio.currentTime = 0;
+          audio.play().catch(() => {});
+        };
+        // Kısa timeout + canplaythrough fallback
+        setTimeout(tryPlayEntry, 150);
 
       } catch (err) {
         console.error("❌ [QUIZ] Load error:", err);
@@ -235,36 +256,36 @@ export default function QuizGamePage() {
     };
 
     loadQuizData();
-  }, [securityPassed, roundId, router]);
+  }, [securityPassed, roundId, router, loadFinalResults]);
 
-  // === SIMPLE QUESTION TIMER ===
-  const playSound = (
+  // === SOUND HELPERS ===
+  const playSound = useCallback((
     audio: HTMLAudioElement | null,
     options?: { loop?: boolean }
   ) => {
-    if (!isSoundEnabled || !audio) return;
+    if (!isSoundEnabledRef.current || !audio) return;
     try {
       audio.loop = !!options?.loop;
       audio.currentTime = 0;
       audio.play().catch(() => {});
     } catch {}
-  };
+  }, []);
 
-  const stopSound = (audio: HTMLAudioElement | null) => {
+  const stopSound = useCallback((audio: HTMLAudioElement | null) => {
     if (!audio) return;
     try {
       audio.pause();
       audio.currentTime = 0;
       audio.loop = false;
     } catch {}
-  };
+  }, []);
 
-  const playClick = () => playSound(clickSoundRef.current);
-  const startTick = () => playSound(tickSoundRef.current, { loop: true });
-  const stopTick = () => stopSound(tickSoundRef.current);
+  const playClick = useCallback(() => playSound(clickSoundRef.current), [playSound]);
+  const startTick = useCallback(() => playSound(tickSoundRef.current, { loop: true }), [playSound]);
+  const stopTick = useCallback(() => stopSound(tickSoundRef.current), [stopSound]);
 
-  // === FLASH FEEDBACK (Screen Pulse) ===
-  const flashScreen = (color: string) => {
+  // === FLASH FEEDBACK ===
+  const flashScreen = useCallback((color: string) => {
     const overlay = document.createElement('div');
     overlay.style.cssText = `
       position: fixed;
@@ -273,34 +294,21 @@ export default function QuizGamePage() {
       opacity: 0.15;
       pointer-events: none;
       z-index: 9999;
-      animation: flashFade 200ms ease-out;
+      animation: flashFade 200ms ease-out forwards;
     `;
     document.body.appendChild(overlay);
-    setTimeout(() => overlay.remove(), 200);
-  };
+    setTimeout(() => overlay.remove(), 220);
+  }, []);
 
-  // === QUESTION TIMER — MASTER CLOCK — hiç durmuyor, iki faz: soru(9sn) → explanation(9sn) ===
-  const phaseRef = useRef<"question" | "explanation">("question");
-
-  // Faz 1: Soru sayacı — cevap verilse de durmaz
-  // ═══════════════════════════════════════════════════════════
-  // SORU SAYACI — interval tabanlı, hiç durmuyor
-  // ═══════════════════════════════════════════════════════════
+  // === TIMER STATE ===
   const questionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const explanationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const advancingRef = useRef(false);
 
-  // Timer callbacks inline useEffect içinde
-
-  // Soru yüklenince sayaç başlat
-  // ═══════════════════════════════════════════════════════════
-  // SORU SAYACI — sadece currentIndex değişince başlar
-  // ═══════════════════════════════════════════════════════════
-  const advancingRef = useRef(false); // advance() çift çalışmasın
-
+  // Yeni soru yüklenince sayaç başlat
   useEffect(() => {
     if (isLoading || showFinalScore || !currentQ) return;
 
-    // Her yeni soru başında sıfırla
     advancingRef.current = false;
     timeoutTriggeredRef.current = false;
     rpcCompletedRef.current = false;
@@ -308,11 +316,10 @@ export default function QuizGamePage() {
     setShowExplanation(false);
     setExplanationTimeLeft(QUESTION_DURATION);
 
-    // Soru sayacı
     if (questionTimerRef.current) clearInterval(questionTimerRef.current);
     questionTimerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
-        if (prev === 1) {
+        if (prev <= 1) {
           clearInterval(questionTimerRef.current!);
           questionTimerRef.current = null;
           return 0;
@@ -327,7 +334,7 @@ export default function QuizGamePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex, isLoading, showFinalScore]);
 
-  // timeLeft 0 → explanation aç
+  // ✅ FIX 4: timeLeft 0 → explanation aç (timeout path garantili)
   useEffect(() => {
     if (timeLeft !== 0 || showFinalScore || isLoading || !currentQ) return;
     if (timeoutTriggeredRef.current) return;
@@ -339,10 +346,9 @@ export default function QuizGamePage() {
       setExplanationTimeLeft(QUESTION_DURATION);
       playSound(whooshSoundRef.current);
 
-      // Explanation sayacı
       explanationTimerRef.current = setInterval(() => {
         setExplanationTimeLeft((prev) => {
-          if (prev === 1) {
+          if (prev <= 1) {
             clearInterval(explanationTimerRef.current!);
             explanationTimerRef.current = null;
             return 0;
@@ -353,6 +359,7 @@ export default function QuizGamePage() {
     };
 
     if (isAnswerLockedRef.current) {
+      // Kullanıcı cevap verdi — RPC bitmesini bekle (max 3 sn)
       let waited = 0;
       const tryOpen = () => {
         if (rpcCompletedRef.current || waited >= 3000) {
@@ -364,7 +371,12 @@ export default function QuizGamePage() {
       };
       tryOpen();
     } else {
-      handleTimeout();
+      // ✅ FIX 4: Timeout — handleTimeout çağır ve tamamlandığında explanation aç
+      const runTimeout = async () => {
+        await handleTimeout();
+        openExplanation();
+      };
+      runTimeout();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLeft, showFinalScore, isLoading]);
@@ -383,7 +395,8 @@ export default function QuizGamePage() {
         isAnswerLockedRef.current = false;
         setCurrentCorrectOption(null);
         setCurrentExplanation("");
-        setCurrentIndex((p) => p + 1); // bu yukarıdaki useEffect'i tetikler
+        setIsCorrect(false);
+        setCurrentIndex((p) => p + 1);
       } else {
         await loadFinalResults();
         setShowFinalScore(true);
@@ -392,16 +405,23 @@ export default function QuizGamePage() {
     advance();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [explanationTimeLeft, showExplanation, showFinalScore]);
+
+  // Tick yönetimi
   useEffect(() => {
     if (isSoundEnabled && !showFinalScore && !showExplanation && timeLeft > 0 && !isLoading) {
       startTick();
     } else {
       stopTick();
     }
-  }, [isSoundEnabled, showFinalScore, showExplanation, timeLeft, isLoading]);
+  }, [isSoundEnabled, showFinalScore, showExplanation, timeLeft, isLoading, startTick, stopTick]);
 
-  // loadFinalResults
-  // ✅ FIXED: Final score countdown — double redirect koruması
+  useEffect(() => {
+    if (showFinalScore || showExplanation || timeLeft <= 0) {
+      stopTick();
+    }
+  }, [showFinalScore, showExplanation, timeLeft, stopTick]);
+
+  // Final score countdown
   useEffect(() => {
     if (!showFinalScore) return;
 
@@ -417,7 +437,6 @@ export default function QuizGamePage() {
       if (remaining <= 0) clearInterval(interval);
     }, 1000);
 
-    // Ref ile redirect — buton tıklanırsa clearTimeout yapılabilir
     finalRedirectRef.current = setTimeout(() => {
       router.push("/");
     }, FINAL_SCORE_DURATION * 1000);
@@ -426,33 +445,21 @@ export default function QuizGamePage() {
       clearInterval(interval);
       if (finalRedirectRef.current) clearTimeout(finalRedirectRef.current);
     };
-  }, [showFinalScore]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Sound toggle effect
-  useEffect(() => {
-    if (!isSoundEnabled) {
-      stopTick();
-      return;
-    }
-    if (timeLeft > 0 && !isLoading && !showExplanation) {
-      startTick();
-    }
-  }, [isSoundEnabled, timeLeft, isLoading, showExplanation]);
-
-  // Stop tick safety
-  useEffect(() => {
-    if (showFinalScore || showExplanation || timeLeft <= 0) {
-      stopTick();
-    }
-  }, [showFinalScore, showExplanation, timeLeft]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showFinalScore]);
 
   // === HANDLERS ===
+
+  // ✅ FIX 1: Cevap seçilince hemen UI'ı kilitle + geçici mor göster,
+  // RPC dönünce correct/wrong renklerini uygula
   const handleAnswerClick = async (optionId: OptionId) => {
     if (isAnswerLocked || showExplanation || showFinalScore) return;
     if (!currentQ || !roundId) return;
     if (answerSubmittedRef.current.has(currentQ.question_id)) return;
 
     playClick();
+
+    // Hemen kilitle — kullanıcıya anında feedback ver
     setSelectedAnswer(optionId);
     setIsAnswerLocked(true);
     isAnswerLockedRef.current = true;
@@ -467,15 +474,20 @@ export default function QuizGamePage() {
 
       if (error) {
         console.error("❌ Submit error:", error);
+        // RPC hata → wrong olarak işle, ses çal
         playSound(wrongSoundRef.current);
         flashScreen('rgba(239, 68, 68, 1)');
+        rpcCompletedRef.current = true;
         return;
       }
 
       if (data) {
         const correctFlag = data.is_correct || false;
+        const correctOpt = (data.correct_option as OptionId) ?? null;
+
+        // ✅ FIX 1: Doğru cevabı ve durumu set et → render tetiklenir → yeşil yanar
         setIsCorrect(correctFlag);
-        setCurrentCorrectOption((data.correct_option as OptionId) ?? null);
+        setCurrentCorrectOption(correctOpt);
         setCurrentExplanation(data.explanation || "");
         setTotalScore(data.current_total_score || 0);
         setCorrectCount(data.correct_count || 0);
@@ -496,19 +508,17 @@ export default function QuizGamePage() {
           }
           return next;
         });
-
-        // round_finished: advance() explanation sonrası final açar
       }
     } catch (err) {
       console.error("❌ Answer submission error:", err);
       playSound(wrongSoundRef.current);
     }
-    rpcCompletedRef.current = true; // ✅ RPC tamamlandı — timer 0'da explanation açılacak
+
+    rpcCompletedRef.current = true;
   };
 
-
-  const handleTimeout = async () => {
-    if (isAnswerLocked || showExplanation || showFinalScore) return;
+  // ✅ FIX 4: handleTimeout async döndürür — caller await edebilir
+  const handleTimeout = async (): Promise<void> => {
     if (!currentQ || !roundId) return;
     if (answerSubmittedRef.current.has(currentQ.question_id)) return;
 
@@ -517,7 +527,6 @@ export default function QuizGamePage() {
     answerSubmittedRef.current.add(currentQ.question_id);
 
     try {
-      // ✅ KANONIK: submit_answer with null (timeout)
       const { data, error } = await supabase.rpc("submit_answer", {
         p_round_id: roundId,
         p_question_id: currentQ.question_id,
@@ -528,8 +537,6 @@ export default function QuizGamePage() {
         setIsCorrect(false);
         setCurrentCorrectOption((data.correct_option as OptionId) ?? null);
         setCurrentExplanation(data.explanation || "");
-        
-        // ✅ KANONIK: Update from DB
         setTotalScore(data.current_total_score || 0);
         setCorrectCount(data.correct_count || 0);
         setWrongCount(data.wrong_count || 0);
@@ -543,13 +550,12 @@ export default function QuizGamePage() {
         });
 
         playSound(wrongSoundRef.current);
-        flashScreen('rgba(239, 68, 68, 1)'); // Red flash for timeout
+        flashScreen('rgba(239, 68, 68, 1)');
       }
     } catch (err) {
       console.error("❌ Timeout submit error:", err);
     }
 
-    // RPC bitti — master clock explanation açacak
     rpcCompletedRef.current = true;
   };
 
@@ -563,9 +569,7 @@ export default function QuizGamePage() {
     playClick();
     stopTick();
     setShowExitConfirm(false);
-
     if (!roundId) return;
-
     try {
       await supabase.rpc("finalize_user_round", { p_round_id: roundId });
       await loadFinalResults();
@@ -577,28 +581,14 @@ export default function QuizGamePage() {
   };
 
   const handleExitConfirmNo = () => {
-    console.log("↩️ User cancelled exit");
     playClick();
     setShowExitConfirm(false);
   };
 
   const handleSoundToggle = () => {
-  if (isSoundEnabled) playClick();
-  setIsSoundEnabled((prev) => !prev);
-};
-
-const loadFinalResults = async () => {
-  if (!roundId) return;
-
-  const { data, error } = await supabase.rpc("get_round_result", {
-    p_round_id: roundId,
-  });
-
-  if (!error && data) {
-    setFinalRank(data.rank || null);
-    setFinalTotalPlayers(data.total_players || null);
-  }
-};
+    if (isSoundEnabled) playClick();
+    setIsSoundEnabled((prev) => !prev);
+  };
 
   // === HELPERS ===
   const getTimeColor = () => {
@@ -607,49 +597,32 @@ const loadFinalResults = async () => {
     return "#ef4444";
   };
 
-  // ✅ FIX: Accuracy sadece cevaplanmış sorulara göre
   const answered = correctCount + wrongCount;
   const accuracy = answered > 0
     ? Math.round((correctCount / answered) * 100)
     : 0;
 
-  // 🔐 === SECURITY VERIFICATION SCREEN ===
+  // 🔐 === SECURITY SCREEN ===
   if (!securityPassed) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "20px",
-          color: "white",
-        }}
-      >
-        <div
-          style={{
-            width: "60px",
-            height: "60px",
-            border: "4px solid rgba(139, 92, 246, 0.3)",
-            borderTopColor: "#8b5cf6",
-            borderRadius: "50%",
-            animation: "spin 1s linear infinite",
-          }}
-        />
-        <p
-          style={{
-            color: "#a78bfa",
-            fontSize: "16px",
-            fontWeight: 600,
-          }}
-        >
+      <div style={{
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        gap: "20px", color: "white",
+      }}>
+        <div style={{
+          width: "60px", height: "60px",
+          border: "4px solid rgba(139, 92, 246, 0.3)",
+          borderTopColor: "#8b5cf6",
+          borderRadius: "50%",
+          animation: "spin 1s linear infinite",
+        }} />
+        <p style={{ color: "#a78bfa", fontSize: "16px", fontWeight: 600 }}>
           🔐 Verifying access...
         </p>
-        <style jsx>{`
-          @keyframes spin { to { transform: rotate(360deg); } }
-        `}</style>
+        <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
@@ -657,97 +630,51 @@ const loadFinalResults = async () => {
   // === LOADING SCREEN ===
   if (isLoading) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background:
-            "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "white",
-        }}
-      >
+      <div style={{
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: "white",
+      }}>
         <div style={{ textAlign: "center" }}>
-          <div
-            className="animate-pulse"
-            style={{
-              width: "80px",
-              height: "80px",
-              margin: "0 auto 20px",
-              borderRadius: "50%",
-              border: "4px solid rgba(139,92,246,0.3)",
-              borderTopColor: "#a78bfa",
-              animation: "spin 1s linear infinite",
-            }}
-          />
-          <p
-            style={{
-              fontSize: "18px",
-              fontWeight: 600,
-              color: "#cbd5e1",
-            }}
-          >
+          <div style={{
+            width: "80px", height: "80px",
+            margin: "0 auto 20px",
+            borderRadius: "50%",
+            border: "4px solid rgba(139,92,246,0.3)",
+            borderTopColor: "#a78bfa",
+            animation: "spin 1s linear infinite",
+          }} />
+          <p style={{ fontSize: "18px", fontWeight: 600, color: "#cbd5e1" }}>
             Loading questions...
           </p>
         </div>
+        <style jsx global>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
   // === NO QUESTIONS FALLBACK ===
- if (!isLoading && questions.length === 0) {
+  if (!isLoading && questions.length === 0) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background:
-            "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "white",
-          padding: "20px",
-        }}
-      >
+      <div style={{
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: "white", padding: "20px",
+      }}>
         <div style={{ textAlign: "center", maxWidth: "400px" }}>
-          <XCircle
-            style={{
-              width: "64px",
-              height: "64px",
-              color: "#ef4444",
-              margin: "0 auto 20px",
-            }}
-          />
-          <h2
-            style={{
-              fontSize: "24px",
-              fontWeight: 900,
-              marginBottom: "12px",
-            }}
-          >
-            No Questions Available
-          </h2>
-          <p
-            style={{
-              fontSize: "16px",
-              color: "#94a3b8",
-              marginBottom: "24px",
-            }}
-          >
+          <XCircle style={{ width: "64px", height: "64px", color: "#ef4444", margin: "0 auto 20px" }} />
+          <h2 style={{ fontSize: "24px", fontWeight: 900, marginBottom: "12px" }}>No Questions Available</h2>
+          <p style={{ fontSize: "16px", color: "#94a3b8", marginBottom: "24px" }}>
             Unable to load quiz questions. Please try again later.
           </p>
           <button
             onClick={() => router.push("/")}
             style={{
-              padding: "12px 24px",
-              borderRadius: "12px",
-              border: "none",
+              padding: "12px 24px", borderRadius: "12px", border: "none",
               background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-              color: "white",
-              fontSize: "16px",
-              fontWeight: 700,
-              cursor: "pointer",
+              color: "white", fontSize: "16px", fontWeight: 700, cursor: "pointer",
             }}
           >
             Go Home
@@ -759,12 +686,26 @@ const loadFinalResults = async () => {
 
   if (!isLoading && !showFinalScore && !currentQ) {
     return (
-      <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", padding: "20px" }}>
+      <div style={{
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: "white", padding: "20px",
+      }}>
         <div style={{ textAlign: "center", maxWidth: "420px" }}>
           <XCircle style={{ width: "64px", height: "64px", color: "#ef4444", margin: "0 auto 20px" }} />
           <h2 style={{ fontSize: "24px", fontWeight: 900, marginBottom: "12px" }}>Quiz Sync Error</h2>
-          <p style={{ fontSize: "16px", color: "#94a3b8", marginBottom: "24px" }}>Unable to restore active question safely.</p>
-          <button onClick={() => router.push("/lobby")} style={{ padding: "12px 24px", borderRadius: "12px", border: "none", background: "linear-gradient(135deg, #7c3aed, #d946ef)", color: "white", fontSize: "16px", fontWeight: 700, cursor: "pointer" }}>
+          <p style={{ fontSize: "16px", color: "#94a3b8", marginBottom: "24px" }}>
+            Unable to restore active question safely.
+          </p>
+          <button
+            onClick={() => router.push("/lobby")}
+            style={{
+              padding: "12px 24px", borderRadius: "12px", border: "none",
+              background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+              color: "white", fontSize: "16px", fontWeight: 700, cursor: "pointer",
+            }}
+          >
             Back to Lobby
           </button>
         </div>
@@ -775,117 +716,55 @@ const loadFinalResults = async () => {
   return (
     <>
       <style jsx global>{`
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         @keyframes float {
-          0%,
-          100% {
-            transform: translateY(0px) rotate(0deg);
-          }
-          50% {
-            transform: translateY(-15px) rotate(2deg);
-          }
+          0%, 100% { transform: translateY(0px) rotate(0deg); }
+          50% { transform: translateY(-15px) rotate(2deg); }
         }
-
         @keyframes pulse {
-          0%,
-          100% {
-            opacity: 1;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.7;
-            transform: scale(0.98);
-          }
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.7; transform: scale(0.98); }
         }
-
         @keyframes slideUp {
-          from {
-            transform: translateY(30px);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
+          from { transform: translateY(30px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
         }
-
         @keyframes flashFade {
-          0% {
-            opacity: 0.15;
-          }
-          100% {
-            opacity: 0;
-          }
+          0% { opacity: 0.15; }
+          100% { opacity: 0; }
         }
-
         @keyframes shine {
-          0% {
-            transform: translateX(-150%) skewX(-25deg);
-          }
-          100% {
-            transform: translateX(250%) skewX(-25deg);
-          }
+          0% { transform: translateX(-150%) skewX(-25deg); }
+          100% { transform: translateX(250%) skewX(-25deg); }
         }
-
         @keyframes neonPulse {
-          0%,
-          100% {
-            box-shadow: 0 0 15px rgba(139, 92, 246, 0.6),
-              0 0 30px rgba(139, 92, 246, 0.4),
-              inset 0 0 10px rgba(139, 92, 246, 0.2);
+          0%, 100% {
+            box-shadow: 0 0 15px rgba(139,92,246,0.6),
+              0 0 30px rgba(139,92,246,0.4),
+              inset 0 0 10px rgba(139,92,246,0.2);
           }
           50% {
-            box-shadow: 0 0 25px rgba(217, 70, 239, 0.9),
-              0 0 50px rgba(217, 70, 239, 0.6),
-              inset 0 0 15px rgba(217, 70, 239, 0.3);
+            box-shadow: 0 0 25px rgba(217,70,239,0.9),
+              0 0 50px rgba(217,70,239,0.6),
+              inset 0 0 15px rgba(217,70,239,0.3);
           }
         }
-
         @keyframes glow {
-          0%,
-          100% {
-            filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.8));
-          }
-          50% {
-            filter: drop-shadow(0 0 20px rgba(217, 70, 239, 1));
-          }
+          0%, 100% { filter: drop-shadow(0 0 8px rgba(167,139,250,0.8)); }
+          50% { filter: drop-shadow(0 0 20px rgba(217,70,239,1)); }
         }
-
         @keyframes shimmer {
-          0% {
-            background-position: -200% center;
-          }
-          100% {
-            background-position: 200% center;
-          }
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
         }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-        @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-
-        .animate-float {
-          animation: float 6s ease-in-out infinite;
-        }
-        .animate-pulse {
-          animation: pulse 2s ease-in-out infinite;
-        }
-        .animate-slide-up {
-          animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .neon-border {
-          animation: neonPulse 3s ease-in-out infinite;
-        }
-        .glow-icon {
-          animation: glow 2s ease-in-out infinite;
-        }
+        .animate-float { animation: float 6s ease-in-out infinite; }
+        .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+        .animate-slide-up { animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+        .neon-border { animation: neonPulse 3s ease-in-out infinite; }
+        .glow-icon { animation: glow 2s ease-in-out infinite; }
 
         *:focus-visible {
           outline: 3px solid #a78bfa;
@@ -894,28 +773,15 @@ const loadFinalResults = async () => {
         }
 
         @media (min-width: 769px) {
-          .brand-text {
-            display: block !important;
-          }
+          .brand-text { display: block !important; }
         }
-
         @media (max-width: 640px) {
-          .score-pills {
-            flex-wrap: wrap;
-            justify-content: center;
-          }
-          .mobile-hide {
-            display: none !important;
-          }
+          .score-pills { flex-wrap: wrap; justify-content: center; }
+          .mobile-hide { display: none !important; }
         }
-
         @media (max-width: 480px) {
-          .stats-grid {
-            grid-template-columns: 1fr 1fr !important;
-          }
-          .stats-grid > div:last-child {
-            grid-column: 1 / -1;
-          }
+          .stats-grid { grid-template-columns: 1fr 1fr !important; }
+          .stats-grid > div:last-child { grid-column: 1 / -1; }
         }
       `}</style>
 
@@ -928,73 +794,89 @@ const loadFinalResults = async () => {
       <audio ref={tickSoundRef} src="/sounds/tick.mp3" preload="auto" />
       <audio ref={entrySoundRef} src="/sounds/entry.mp3" preload="auto" />
 
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "linear-gradient(160deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
-          color: "white",
+      <div style={{
+        minHeight: "100vh",
+        background: "linear-gradient(160deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
+        color: "white",
+        position: "relative",
+        overflow: "hidden",
+      }}>
+        <main style={{
           position: "relative",
-          overflow: "hidden",
-        }}
-      >
+          zIndex: 10,
+          maxWidth: "1200px",
+          margin: "0 auto",
+          padding: "clamp(12px, 3vw, 24px) clamp(12px, 3vw, 20px)",
+        }}>
 
-
-        {/* ═══════════════════════════════════════════════════════════ */}
-        {/* MINIMAL CONTROLS: Sound + Exit (No Header/Footer) */}
-        {/* ═══════════════════════════════════════════════════════════ */}
-
-        {/* MAIN CONTENT */}
-        <main
-          style={{
-            position: "relative",
-            zIndex: 10,
-            maxWidth: "1200px",
-            margin: "0 auto",
-            padding: "clamp(12px, 3vw, 24px) clamp(12px, 3vw, 20px)",
-          }}
-        >
-          {/* ═══════════════════════════════════════════════════════════ */}
-          {/* FLOATING CONTROLS - Top Right */}
-          {/* ═══════════════════════════════════════════════════════════ */}
-
-
-          {/* ═══════════════════════════════════════════════════════════ */}
-          {/* 🎖️ ROUND HEADER - Global Arena Feel */}
-          {/* ═══════════════════════════════════════════════════════════ */}
+          {/* ═══ ROUND HEADER ═══ */}
           {!showFinalScore && (
             <div style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                marginBottom: "clamp(10px, 2.5vw, 16px)",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              marginBottom: "clamp(10px, 2.5vw, 16px)",
+            }}>
+              <span style={{
+                fontSize: "11px", fontWeight: 800, letterSpacing: "0.12em",
+                color: "#475569", textTransform: "uppercase",
               }}>
-                {/* Sol: Global Arena */}
-                <span style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "0.12em", color: "#475569", textTransform: "uppercase" }}>Global Arena</span>
-                {/* Orta: soru sayacı */}
-                <span style={{ fontSize: "11px", fontWeight: 800, color: "#7c3aed", background: "rgba(124,58,237,0.15)", padding: "3px 10px", borderRadius: "20px", border: "1px solid rgba(124,58,237,0.3)" }}>
-                  {currentIndex + 1} / {questions.length}
-                </span>
-                {/* Sağ: ses + exit — kompakt */}
-                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                  <button onClick={handleSoundToggle} style={{ width: "32px", height: "32px", borderRadius: "8px", border: `1px solid ${isSoundEnabled ? "rgba(167,139,250,0.5)" : "rgba(107,114,128,0.3)"}`, background: isSoundEnabled ? "rgba(124,58,237,0.25)" : "rgba(30,27,75,0.5)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                    {isSoundEnabled ? <Volume2 style={{ width: "15px", height: "15px", color: "#a78bfa" }} /> : <VolumeX style={{ width: "15px", height: "15px", color: "#6b7280" }} />}
-                  </button>
-                  <button onClick={handleExitClick} style={{ height: "32px", padding: "0 10px", borderRadius: "8px", border: "1px solid rgba(239,68,68,0.45)", background: "rgba(220,38,38,0.2)", color: "#fca5a5", fontSize: "11px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em", display: "flex", alignItems: "center", gap: "4px", cursor: "pointer" }}>
-                    <XCircle style={{ width: "13px", height: "13px" }} />Exit
-                  </button>
-                </div>
+                Global Arena
+              </span>
+              <span style={{
+                fontSize: "11px", fontWeight: 800, color: "#7c3aed",
+                background: "rgba(124,58,237,0.15)", padding: "3px 10px",
+                borderRadius: "20px", border: "1px solid rgba(124,58,237,0.3)",
+              }}>
+                {currentIndex + 1} / {questions.length}
+              </span>
+              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                <button
+                  onClick={handleSoundToggle}
+                  style={{
+                    width: "32px", height: "32px", borderRadius: "8px",
+                    border: `1px solid ${isSoundEnabled ? "rgba(167,139,250,0.5)" : "rgba(107,114,128,0.3)"}`,
+                    background: isSoundEnabled ? "rgba(124,58,237,0.25)" : "rgba(30,27,75,0.5)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  {isSoundEnabled
+                    ? <Volume2 style={{ width: "15px", height: "15px", color: "#a78bfa" }} />
+                    : <VolumeX style={{ width: "15px", height: "15px", color: "#6b7280" }} />
+                  }
+                </button>
+                <button
+                  onClick={handleExitClick}
+                  style={{
+                    height: "32px", padding: "0 10px", borderRadius: "8px",
+                    border: "1px solid rgba(239,68,68,0.45)",
+                    background: "rgba(220,38,38,0.2)", color: "#fca5a5",
+                    fontSize: "11px", fontWeight: 800, textTransform: "uppercase",
+                    letterSpacing: "0.04em", display: "flex", alignItems: "center",
+                    gap: "4px", cursor: "pointer",
+                  }}
+                >
+                  <XCircle style={{ width: "13px", height: "13px" }} />Exit
+                </button>
               </div>
+            </div>
           )}
 
-          {/* TIMER BAR + COUNTER — compact mobile-first */}
+          {/* ═══ TIMER BAR ═══ */}
           {!showFinalScore && (
             <div style={{ marginBottom: "clamp(12px, 3vw, 20px)" }}>
-              {/* Timer row */}
               <div style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 marginBottom: "8px", padding: "0 2px",
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <Clock style={{ width: "14px", height: "14px", color: getTimeColor(), filter: `drop-shadow(0 0 4px ${getTimeColor()})` }} />
-                  <span style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                  <Clock style={{
+                    width: "14px", height: "14px", color: getTimeColor(),
+                    filter: `drop-shadow(0 0 4px ${getTimeColor()})`,
+                  }} />
+                  <span style={{
+                    fontSize: "11px", fontWeight: 700, color: "#64748b",
+                    textTransform: "uppercase", letterSpacing: "0.1em",
+                  }}>
                     Time
                   </span>
                 </div>
@@ -1006,7 +888,10 @@ const loadFinalResults = async () => {
                   {timeLeft}
                 </span>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                  <span style={{
+                    fontSize: "11px", fontWeight: 700, color: "#64748b",
+                    textTransform: "uppercase", letterSpacing: "0.1em",
+                  }}>
                     Score
                   </span>
                   <span style={{ fontSize: "14px", fontWeight: 900, color: "#a78bfa" }}>
@@ -1014,11 +899,9 @@ const loadFinalResults = async () => {
                   </span>
                 </div>
               </div>
-              {/* Progress bar */}
               <div style={{
                 height: "6px", borderRadius: "3px",
-                background: "rgba(30,27,75,0.8)",
-                overflow: "hidden",
+                background: "rgba(30,27,75,0.8)", overflow: "hidden",
                 border: "1px solid rgba(139,92,246,0.2)",
               }}>
                 <div style={{
@@ -1034,11 +917,7 @@ const loadFinalResults = async () => {
           )}
 
           {/* ═══════════════════════════════════════════════════════════ */}
-          {/* 🎖️ LIVE SCORE - Mini Display */}
-          {/* Score now in timer row */}
-
-          {/* ═══════════════════════════════════════════════════════════ */}
-          {/* 🏆 ULTRA-PREMIUM FINAL SCORE CARD */}
+          {/* 🏆 FINAL SCORE CARD                                         */}
           {/* ═══════════════════════════════════════════════════════════ */}
           {showFinalScore ? (
             <article
@@ -1056,21 +935,23 @@ const loadFinalResults = async () => {
                 overflow: "hidden",
               }}
             >
-              {/* Glow accent top */}
+              {/* Glow top accent */}
               <div style={{
                 position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)",
                 width: "180px", height: "2px",
                 background: "linear-gradient(90deg, transparent, #fbbf24, transparent)",
               }} />
 
-              {/* Trophy + Title row */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", marginBottom: "16px" }}>
+              {/* Trophy row */}
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                gap: "12px", marginBottom: "16px",
+              }}>
                 <div style={{
                   width: "52px", height: "52px", borderRadius: "50%",
                   background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  boxShadow: "0 0 20px rgba(251,191,36,0.5)",
-                  flexShrink: 0,
+                  boxShadow: "0 0 20px rgba(251,191,36,0.5)", flexShrink: 0,
                 }}>
                   <Trophy style={{ width: "28px", height: "28px", color: "white" }} />
                 </div>
@@ -1087,7 +968,7 @@ const loadFinalResults = async () => {
                 </div>
               </div>
 
-              {/* Score + Stats — single row */}
+              {/* Stats grid */}
               <div style={{
                 display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
                 gap: "8px", marginBottom: "16px",
@@ -1095,13 +976,14 @@ const loadFinalResults = async () => {
                 {/* Score */}
                 <div style={{
                   gridColumn: "1 / -1",
-                  padding: "14px 16px",
-                  borderRadius: "16px",
+                  padding: "14px 16px", borderRadius: "16px",
                   background: "linear-gradient(135deg, rgba(124,58,237,0.25), rgba(168,85,247,0.15))",
-                  border: "1.5px solid rgba(168,85,247,0.5)",
-                  marginBottom: "4px",
+                  border: "1.5px solid rgba(168,85,247,0.5)", marginBottom: "4px",
                 }}>
-                  <div style={{ fontSize: "11px", color: "#a78bfa", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "4px" }}>
+                  <div style={{
+                    fontSize: "11px", color: "#a78bfa", fontWeight: 700,
+                    letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "4px",
+                  }}>
                     Your Score
                   </div>
                   <div style={{
@@ -1118,8 +1000,7 @@ const loadFinalResults = async () => {
 
                 {/* Correct */}
                 <div style={{
-                  padding: "12px 8px",
-                  borderRadius: "14px",
+                  padding: "12px 8px", borderRadius: "14px",
                   background: "rgba(22,163,74,0.12)",
                   border: "1.5px solid rgba(34,197,94,0.35)",
                 }}>
@@ -1127,15 +1008,17 @@ const loadFinalResults = async () => {
                   <div style={{ fontSize: "clamp(28px, 9vw, 36px)", fontWeight: 900, color: "#22c55e", lineHeight: 1 }}>
                     {correctCount}
                   </div>
-                  <div style={{ fontSize: "10px", color: "#86efac", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", marginTop: "3px" }}>
+                  <div style={{
+                    fontSize: "10px", color: "#86efac", fontWeight: 700,
+                    letterSpacing: "0.05em", textTransform: "uppercase", marginTop: "3px",
+                  }}>
                     Correct
                   </div>
                 </div>
 
                 {/* Wrong */}
                 <div style={{
-                  padding: "12px 8px",
-                  borderRadius: "14px",
+                  padding: "12px 8px", borderRadius: "14px",
                   background: "rgba(220,38,38,0.12)",
                   border: "1.5px solid rgba(239,68,68,0.35)",
                 }}>
@@ -1143,15 +1026,17 @@ const loadFinalResults = async () => {
                   <div style={{ fontSize: "clamp(28px, 9vw, 36px)", fontWeight: 900, color: "#ef4444", lineHeight: 1 }}>
                     {wrongCount}
                   </div>
-                  <div style={{ fontSize: "10px", color: "#fca5a5", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", marginTop: "3px" }}>
+                  <div style={{
+                    fontSize: "10px", color: "#fca5a5", fontWeight: 700,
+                    letterSpacing: "0.05em", textTransform: "uppercase", marginTop: "3px",
+                  }}>
                     Wrong
                   </div>
                 </div>
 
-                {/* Unanswered */}
+                {/* Skipped */}
                 <div style={{
-                  padding: "12px 8px",
-                  borderRadius: "14px",
+                  padding: "12px 8px", borderRadius: "14px",
                   background: "rgba(100,116,139,0.12)",
                   border: "1.5px solid rgba(100,116,139,0.35)",
                 }}>
@@ -1159,7 +1044,10 @@ const loadFinalResults = async () => {
                   <div style={{ fontSize: "clamp(28px, 9vw, 36px)", fontWeight: 900, color: "#94a3b8", lineHeight: 1 }}>
                     {questions.length - correctCount - wrongCount}
                   </div>
-                  <div style={{ fontSize: "10px", color: "#64748b", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", marginTop: "3px" }}>
+                  <div style={{
+                    fontSize: "10px", color: "#64748b", fontWeight: 700,
+                    letterSpacing: "0.05em", textTransform: "uppercase", marginTop: "3px",
+                  }}>
                     Skipped
                   </div>
                 </div>
@@ -1181,7 +1069,7 @@ const loadFinalResults = async () => {
                 />
               </div>
 
-              {/* Countdown + Button */}
+              {/* Countdown */}
               <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "12px" }}>
                 Returning home in <span style={{ color: "#22c55e", fontWeight: 700 }}>{finalCountdown}s</span>
               </div>
@@ -1206,73 +1094,49 @@ const loadFinalResults = async () => {
 
           ) : (
             <>
-                            {/* Soru kartı — explanation açıkken üstte küçük görünür */}
+              {/* ═══ SORU KARTI ═══ */}
               <div style={{
                 transition: "all 0.4s ease",
                 transform: showExplanation ? "scale(0.97)" : "scale(1)",
                 opacity: showExplanation ? 0.35 : 1,
                 marginBottom: showExplanation ? "12px" : "0",
               }}>
-
                 <article
                   className="animate-slide-up"
                   style={{
-                    padding:
-                      "clamp(24px, 5vw, 32px) clamp(20px, 4vw, 28px)",
-                    borderRadius:
-                      "clamp(24px, 5vw, 32px)",
+                    padding: "clamp(24px, 5vw, 32px) clamp(20px, 4vw, 28px)",
+                    borderRadius: "clamp(24px, 5vw, 32px)",
                     border: "2px solid rgba(139,92,246,0.4)",
-                    background:
-                      "linear-gradient(135deg, rgba(30,27,75,0.95) 0%, rgba(15,23,42,0.95) 100%)",
-                    boxShadow:
-                      "0 20px 60px rgba(0,0,0,0.4), 0 0 40px rgba(139,92,246,0.2)",
+                    background: "linear-gradient(135deg, rgba(30,27,75,0.95) 0%, rgba(15,23,42,0.95) 100%)",
+                    boxShadow: "0 20px 60px rgba(0,0,0,0.4), 0 0 40px rgba(139,92,246,0.2)",
                     backdropFilter: "blur(20px)",
                     marginBottom: "24px",
                   }}
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                      marginBottom: "16px",
-                    }}
-                  >
-                    <Target
-                      style={{
-                        width: "24px",
-                        height: "24px",
-                        color: "#22d3ee",
-                        filter:
-                          "drop-shadow(0 0 8px #22d3ee)",
-                      }}
-                    />
-                    <span
-                      style={{
-                        fontSize:
-                          "clamp(11px, 2.3vw, 14px)",
-                        color: "#22d3ee",
-                        fontWeight: 800,
-                        letterSpacing: "0.15em",
-                        textTransform: "uppercase",
-                      }}
-                    >
+                  <div style={{
+                    display: "flex", alignItems: "center",
+                    gap: "10px", marginBottom: "16px",
+                  }}>
+                    <Target style={{
+                      width: "24px", height: "24px", color: "#22d3ee",
+                      filter: "drop-shadow(0 0 8px #22d3ee)",
+                    }} />
+                    <span style={{
+                      fontSize: "clamp(11px, 2.3vw, 14px)", color: "#22d3ee",
+                      fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase",
+                    }}>
                       Question {currentIndex + 1}
                     </span>
                   </div>
 
-                  <h2
-                    style={{
-                      fontSize: "clamp(18px, 4vw, 24px)",
-                      lineHeight: 1.5,
-                      fontWeight: 700,
-                      marginBottom: "24px",
-                      color: "#f8fafc",
-                    }}
-                  >
-                    {currentQ.question_text}
+                  <h2 style={{
+                    fontSize: "clamp(18px, 4vw, 24px)", lineHeight: 1.5,
+                    fontWeight: 700, marginBottom: "24px", color: "#f8fafc",
+                  }}>
+                    {currentQ?.question_text}
                   </h2>
 
+                  {/* ✅ FIX 1: Option butonları — currentCorrectOption set edildikten sonra renkler doğru */}
                   <div
                     className="question-grid"
                     style={{
@@ -1282,33 +1146,51 @@ const loadFinalResults = async () => {
                     }}
                   >
                     {(["a", "b", "c", "d"] as OptionId[]).map((optId) => {
-                      const optText = currentQ[`option_${optId}` as keyof Question] as string;
+                      const optText = currentQ?.[`option_${optId}` as keyof Question] as string;
                       const isSelected = selectedAnswer === optId;
                       const locked = isAnswerLocked;
+                      const correctKnown = currentCorrectOption !== null;
 
                       let borderColor = "rgba(139,92,246,0.5)";
                       let boxShadow = "0 4px 20px rgba(0,0,0,0.3)";
                       let bg = "linear-gradient(135deg, rgba(30,27,75,0.8), rgba(15,23,42,0.9))";
 
-                      if (locked && currentCorrectOption !== null) {
+                      if (locked && correctKnown) {
+                        // ✅ Doğru cevap → yeşil (seçilmiş olsun olmasın)
                         if (optId === currentCorrectOption) {
                           borderColor = "#22c55e";
                           boxShadow = "0 0 25px rgba(34,197,94,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                           bg = "linear-gradient(135deg, rgba(22,163,74,0.3), rgba(21,128,61,0.2))";
-                        } else if (selectedAnswer && optId === selectedAnswer && optId !== currentCorrectOption) {
+                        } else if (isSelected && optId !== currentCorrectOption) {
+                          // ✅ Seçilen yanlış şık → kırmızı
                           borderColor = "#ef4444";
                           boxShadow = "0 0 25px rgba(239,68,68,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                           bg = "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))";
+                        } else {
+                          // Diğer şıklar → soluk
+                          borderColor = "rgba(75,85,99,0.4)";
+                          boxShadow = "0 4px 15px rgba(0,0,0,0.2)";
+                          bg = "linear-gradient(135deg, rgba(30,27,75,0.5), rgba(15,23,42,0.6))";
+                        }
+                      } else if (locked && !correctKnown) {
+                        // RPC henüz dönmedi — seçili şık mor ile bekler
+                        if (isSelected) {
+                          borderColor = "#d946ef";
+                          boxShadow = "0 0 25px rgba(217,70,239,0.6), 0 4px 20px rgba(0,0,0,0.3)";
+                          bg = "linear-gradient(135deg, rgba(147,51,234,0.3), rgba(126,34,206,0.2))";
                         } else {
                           borderColor = "rgba(75,85,99,0.4)";
                           boxShadow = "0 4px 15px rgba(0,0,0,0.2)";
                           bg = "linear-gradient(135deg, rgba(30,27,75,0.5), rgba(15,23,42,0.6))";
                         }
                       } else if (isSelected) {
+                        // Henüz lock yok ama hover seçilmiş
                         borderColor = "#d946ef";
                         boxShadow = "0 0 25px rgba(217,70,239,0.6), 0 4px 20px rgba(0,0,0,0.3)";
                         bg = "linear-gradient(135deg, rgba(147,51,234,0.3), rgba(126,34,206,0.2))";
                       }
+
+                      const dimmed = locked && correctKnown && optId !== currentCorrectOption && optId !== selectedAnswer;
 
                       return (
                         <button
@@ -1327,8 +1209,9 @@ const loadFinalResults = async () => {
                             boxShadow,
                             transition: "all 0.3s cubic-bezier(0.4, 0.2, 1)",
                             overflow: "hidden",
-                            opacity: (locked && currentCorrectOption !== null && optId !== currentCorrectOption && optId !== selectedAnswer) ? 0.55 : 1,
+                            opacity: dimmed ? 0.55 : 1,
                             transform: isSelected && !locked ? "scale(1.02)" : "scale(1)",
+                            WebkitTapHighlightColor: "transparent",
                           }}
                           onMouseEnter={(e) => {
                             if (!locked) {
@@ -1343,49 +1226,32 @@ const loadFinalResults = async () => {
                             }
                           }}
                         >
-
-
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "12px",
-                              position: "relative",
-                              zIndex: 2,
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "clamp(28px, 6vw, 36px)",
-                                height: "clamp(28px, 6vw, 36px)",
-                                borderRadius: "8px",
-                                border: `2px solid ${borderColor}`,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontSize: "clamp(13px, 2.5vw, 16px)",
-                                fontWeight: 900,
-                                background: "rgba(15,23,42,0.9)",
-                                boxShadow: "inset 0 2px 8px rgba(0,0,0,0.3)",
-                                color: (locked && currentCorrectOption !== null)
-                                  ? (optId === currentCorrectOption ? "#22c55e" : optId === selectedAnswer ? "#ef4444" : "#6b7280")
-                                  : "#a78bfa",
-                                flexShrink: 0,
-                              }}
-                            >
+                          <div style={{
+                            display: "flex", alignItems: "center", gap: "12px",
+                            position: "relative", zIndex: 2,
+                          }}>
+                            <div style={{
+                              width: "clamp(28px, 6vw, 36px)",
+                              height: "clamp(28px, 6vw, 36px)",
+                              borderRadius: "8px",
+                              border: `2px solid ${borderColor}`,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: "clamp(13px, 2.5vw, 16px)", fontWeight: 900,
+                              background: "rgba(15,23,42,0.9)",
+                              boxShadow: "inset 0 2px 8px rgba(0,0,0,0.3)",
+                              color: (locked && correctKnown)
+                                ? (optId === currentCorrectOption ? "#22c55e" : optId === selectedAnswer ? "#ef4444" : "#6b7280")
+                                : "#a78bfa",
+                              flexShrink: 0,
+                            }}>
                               {optId.toUpperCase()}
                             </div>
-
-                            <div
-                              style={{
-                                fontSize: "clamp(12px, 2.8vw, 15px)",
-                                fontWeight: 600,
-                                color: "#f8fafc",
-                                lineHeight: 1.35,
-                                wordBreak: "break-word",
-                                overflowWrap: "anywhere",
-                              }}
-                            >
+                            <div style={{
+                              fontSize: "clamp(12px, 2.8vw, 15px)",
+                              fontWeight: 600, color: "#f8fafc",
+                              lineHeight: 1.35, wordBreak: "break-word",
+                              overflowWrap: "anywhere",
+                            }}>
                               {optText}
                             </div>
                           </div>
@@ -1394,133 +1260,82 @@ const loadFinalResults = async () => {
                     })}
                   </div>
                 </article>
-              
               </div>
 
-              {/* Explanation kartı — showExplanation=true iken göster */}
+              {/* ═══ EXPLANATION KARTI ═══ */}
               {showExplanation && (
-
                 <article
                   className="animate-slide-up"
                   style={{
-                    padding:
-                      "clamp(24px, 5vw, 32px) clamp(20px, 4vw, 28px)",
-                    borderRadius:
-                      "clamp(24px, 5vw, 32px)",
+                    padding: "clamp(24px, 5vw, 32px) clamp(20px, 4vw, 28px)",
+                    borderRadius: "clamp(24px, 5vw, 32px)",
                     border: "2px solid rgba(56,189,248,0.5)",
-                    background:
-                      "linear-gradient(135deg, rgba(8,47,73,0.95), rgba(6,8,20,0.95))",
-                    boxShadow:
-                      "0 20px 60px rgba(0,0,0,0.4), 0 0 40px rgba(56,189,248,0.3)",
+                    background: "linear-gradient(135deg, rgba(8,47,73,0.95), rgba(6,8,20,0.95))",
+                    boxShadow: "0 20px 60px rgba(0,0,0,0.4), 0 0 40px rgba(56,189,248,0.3)",
                     backdropFilter: "blur(20px)",
                     marginBottom: "24px",
                   }}
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      marginBottom: "16px",
-                      flexWrap: "wrap",
-                    }}
-                  >
+                  <div style={{
+                    display: "flex", alignItems: "center",
+                    gap: "12px", marginBottom: "16px", flexWrap: "wrap",
+                  }}>
                     {isCorrect ? (
                       <>
-                        <CheckCircle
-                          style={{
-                            width: "32px",
-                            height: "32px",
-                            color: "#22c55e",
-                            filter:
-                              "drop-shadow(0 0 10px #22c55e)",
-                          }}
-                        />
-                        <span
-                          style={{
-                            fontSize:
-                              "clamp(20px, 4vw, 26px)",
-                            fontWeight: 900,
-                            color: "#22c55e",
-                            textShadow:
-                              "0 0 10px rgba(34,197,94,0.5)",
-                          }}
-                        >
+                        <CheckCircle style={{
+                          width: "32px", height: "32px", color: "#22c55e",
+                          filter: "drop-shadow(0 0 10px #22c55e)",
+                        }} />
+                        <span style={{
+                          fontSize: "clamp(20px, 4vw, 26px)", fontWeight: 900,
+                          color: "#22c55e", textShadow: "0 0 10px rgba(34,197,94,0.5)",
+                        }}>
                           Correct Answer!
                         </span>
                       </>
                     ) : (
                       <>
-                        <XCircle
-                          style={{
-                            width: "32px",
-                            height: "32px",
-                            color: "#ef4444",
-                            filter:
-                              "drop-shadow(0 0 10px #ef4444)",
-                          }}
-                        />
-                        <span
-                          style={{
-                            fontSize:
-                              "clamp(20px, 4vw, 26px)",
-                            fontWeight: 900,
-                            color: "#ef4444",
-                            textShadow:
-                              "0 0 10px rgba(239,68,68,0.5)",
-                          }}
-                        >
+                        <XCircle style={{
+                          width: "32px", height: "32px", color: "#ef4444",
+                          filter: "drop-shadow(0 0 10px #ef4444)",
+                        }} />
+                        <span style={{
+                          fontSize: "clamp(20px, 4vw, 26px)", fontWeight: 900,
+                          color: "#ef4444", textShadow: "0 0 10px rgba(239,68,68,0.5)",
+                        }}>
                           Incorrect
                         </span>
                       </>
                     )}
                   </div>
 
-                  <div
-                    style={{
-                      padding: "14px 18px",
-                      borderRadius: "16px",
-                      background: "rgba(22,163,74,0.15)",
-                      border:
-                        "2px solid rgba(34,197,94,0.4)",
-                      marginBottom: "16px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize:
-                          "clamp(13px, 2.8vw, 15px)",
-                        color: "#86efac",
-                        fontWeight: 700,
-                      }}
-                    >
+                  <div style={{
+                    padding: "14px 18px", borderRadius: "16px",
+                    background: "rgba(22,163,74,0.15)",
+                    border: "2px solid rgba(34,197,94,0.4)",
+                    marginBottom: "16px",
+                  }}>
+                    <span style={{
+                      fontSize: "clamp(13px, 2.8vw, 15px)", color: "#86efac", fontWeight: 700,
+                    }}>
                       Correct Answer:{" "}
-                      <span
-                        style={{
-                          color: "#22c55e",
-                          fontWeight: 900,
-                          fontSize:
-                            "clamp(15px, 3.2vw, 18px)",
-                        }}
-                      >
+                      <span style={{
+                        color: "#22c55e", fontWeight: 900,
+                        fontSize: "clamp(15px, 3.2vw, 18px)",
+                      }}>
                         {currentCorrectOption?.toUpperCase() || "N/A"}
                       </span>
                     </span>
                   </div>
 
-                  <p
-                    style={{
-                      fontSize: "clamp(14px, 3vw, 16px)",
-                      color: "#e0f2fe",
-                      lineHeight: 1.7,
-                      marginBottom: "20px",
-                      fontWeight: 500,
-                    }}
-                  >
+                  <p style={{
+                    fontSize: "clamp(14px, 3vw, 16px)", color: "#e0f2fe",
+                    lineHeight: 1.7, marginBottom: "20px", fontWeight: 500,
+                  }}>
                     {currentExplanation || "No explanation available."}
                   </p>
 
-                  {/* Timer row — soru kartıyla aynı */}
+                  {/* Explanation timer */}
                   <div style={{ marginTop: "16px" }}>
                     <div style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -1528,7 +1343,10 @@ const loadFinalResults = async () => {
                     }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                         <Clock style={{ width: "14px", height: "14px", color: "#38bdf8" }} />
-                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                        <span style={{
+                          fontSize: "11px", fontWeight: 700, color: "#64748b",
+                          textTransform: "uppercase", letterSpacing: "0.1em",
+                        }}>
                           Next
                         </span>
                       </div>
@@ -1538,14 +1356,16 @@ const loadFinalResults = async () => {
                       }}>
                         {explanationTimeLeft}
                       </span>
-                      <span style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                      <span style={{
+                        fontSize: "11px", fontWeight: 700, color: "#64748b",
+                        textTransform: "uppercase", letterSpacing: "0.1em",
+                      }}>
                         &nbsp;
                       </span>
                     </div>
                     <div style={{
                       height: "6px", borderRadius: "3px",
-                      background: "rgba(30,27,75,0.8)",
-                      overflow: "hidden",
+                      background: "rgba(30,27,75,0.8)", overflow: "hidden",
                       border: "1px solid rgba(56,189,248,0.2)",
                     }}>
                       <div style={{
@@ -1554,181 +1374,118 @@ const loadFinalResults = async () => {
                         background: "linear-gradient(90deg, #38bdf8, #38bdf8aa)",
                         boxShadow: "0 0 8px #38bdf8",
                         borderRadius: "3px",
+                        transition: "width 1s linear",
                       }} />
                     </div>
                   </div>
                 </article>
               )}
 
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  flexWrap: "wrap",
-                  gap: "clamp(4px, 1vw, 6px)",
-                  padding: "0 16px",
-                }}
-              >
-                {Array.from({ length: questions.length }).map(
-                  (_, i) => {
-                    const st = answers[i];
-                    let bg =
-                      "rgba(75,85,99,0.4)";
-                    let shadow = "none";
+              {/* ═══ SORU NOKTALARI ═══ */}
+              <div style={{
+                display: "flex",
+                justifyContent: "center",
+                flexWrap: "wrap",
+                gap: "clamp(4px, 1vw, 6px)",
+                padding: "0 16px",
+              }}>
+                {Array.from({ length: questions.length }).map((_, i) => {
+                  const st = answers[i];
+                  let bg = "rgba(75,85,99,0.4)";
+                  let shadow = "none";
 
-                    if (i === currentIndex) {
-                      bg = "#a78bfa";
-                      shadow =
-                        "0 0 10px rgba(167,139,250,0.8)";
-                    } else if (st === "correct") {
-                      bg = "#22c55e";
-                      shadow =
-                        "0 0 8px rgba(34,197,94,0.6)";
-                    } else if (st === "wrong") {
-                      bg = "#ef4444";
-                      shadow =
-                        "0 0 8px rgba(239,68,68,0.6)";
-                    }
-
-                    return (
-                      <div
-                        key={i}
-                        style={{
-                          width:
-                            "clamp(6px, 1.5vw, 8px)",
-                          height:
-                            "clamp(6px, 1.5vw, 8px)",
-                          borderRadius: "50%",
-                          background: bg,
-                          boxShadow: shadow,
-                          transition: "all 0.3s ease",
-                          transform:
-                            i === currentIndex
-                              ? "scale(1.3)"
-                              : "scale(1)",
-                        }}
-                      />
-                    );
+                  if (i === currentIndex) {
+                    bg = "#a78bfa";
+                    shadow = "0 0 10px rgba(167,139,250,0.8)";
+                  } else if (st === "correct") {
+                    bg = "#22c55e";
+                    shadow = "0 0 8px rgba(34,197,94,0.6)";
+                  } else if (st === "wrong") {
+                    bg = "#ef4444";
+                    shadow = "0 0 8px rgba(239,68,68,0.6)";
                   }
-                )}
+
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        width: "clamp(6px, 1.5vw, 8px)",
+                        height: "clamp(6px, 1.5vw, 8px)",
+                        borderRadius: "50%",
+                        background: bg,
+                        boxShadow: shadow,
+                        transition: "all 0.3s ease",
+                        transform: i === currentIndex ? "scale(1.3)" : "scale(1)",
+                      }}
+                    />
+                  );
+                })}
               </div>
             </>
-              )}
+          )}
 
+          {/* ═══ EXIT CONFIRM MODAL ═══ */}
           {showExitConfirm && (
-            <div
-              style={{
-                position: "fixed",
-                inset: 0,
-                background: "rgba(0,0,0,0.85)",
-                backdropFilter: "blur(8px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 50,
-                padding: "20px",
-              }}
-            >
+            <div style={{
+              position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)",
+              backdropFilter: "blur(8px)", display: "flex",
+              alignItems: "center", justifyContent: "center", zIndex: 50,
+              padding: "20px",
+            }}>
               <div
                 className="animate-slide-up"
                 style={{
-                  width: "min(400px, 90vw)",
-                  padding: "32px 28px",
+                  width: "min(400px, 90vw)", padding: "32px 28px",
                   borderRadius: "24px",
-                  background:
-                    "linear-gradient(135deg, rgba(30,27,75,0.98), rgba(15,23,42,0.98))",
+                  background: "linear-gradient(135deg, rgba(30,27,75,0.98), rgba(15,23,42,0.98))",
                   border: "2px solid rgba(139,92,246,0.5)",
-                  boxShadow:
-                    "0 20px 60px rgba(0,0,0,0.8), 0 0 40px rgba(139,92,246,0.4)",
-                  textAlign: "center",
-                  backdropFilter: "blur(20px)",
+                  boxShadow: "0 20px 60px rgba(0,0,0,0.8), 0 0 40px rgba(139,92,246,0.4)",
+                  textAlign: "center", backdropFilter: "blur(20px)",
                 }}
               >
-                <div
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: "64px",
-                    height: "64px",
-                    borderRadius: "50%",
-                    background:
-                      "linear-gradient(135deg, rgba(239,68,68,0.2), rgba(220,38,38,0.1))",
-                    border:
-                      "2px solid rgba(239,68,68,0.5)",
-                    marginBottom: "20px",
-                  }}
-                >
-                  <Zap
-                    style={{
-                      width: "32px",
-                      height: "32px",
-                      color: "#ef4444",
-                      filter:
-                        "drop-shadow(0 0 10px #ef4444)",
-                    }}
-                  />
+                <div style={{
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  width: "64px", height: "64px", borderRadius: "50%",
+                  background: "linear-gradient(135deg, rgba(239,68,68,0.2), rgba(220,38,38,0.1))",
+                  border: "2px solid rgba(239,68,68,0.5)", marginBottom: "20px",
+                }}>
+                  <Zap style={{ width: "32px", height: "32px", color: "#ef4444", filter: "drop-shadow(0 0 10px #ef4444)" }} />
                 </div>
 
-                <h3
-                  style={{
-                    fontSize: "clamp(18px, 4vw, 22px)",
-                    fontWeight: 900,
-                    color: "#f8fafc",
-                    marginBottom: "12px",
-                  }}
-                >
+                <h3 style={{
+                  fontSize: "clamp(18px, 4vw, 22px)", fontWeight: 900,
+                  color: "#f8fafc", marginBottom: "12px",
+                }}>
                   Exit Quiz?
                 </h3>
 
-                <p
-                  style={{
-                    fontSize: "clamp(13px, 2.8vw, 15px)",
-                    color: "#94a3b8",
-                    marginBottom: "28px",
-                    lineHeight: 1.6,
-                  }}
-                >
-                  Your current progress will be saved and
-                  you'll see your final score.
+                <p style={{
+                  fontSize: "clamp(13px, 2.8vw, 15px)", color: "#94a3b8",
+                  marginBottom: "28px", lineHeight: 1.6,
+                }}>
+                  Your current progress will be saved and you'll see your final score.
                 </p>
 
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "12px",
-                  }}
-                >
+                <div style={{ display: "flex", gap: "12px" }}>
                   <button
                     onClick={handleExitConfirmNo}
                     style={{
-                      flex: 1,
-                      padding: "14px 20px",
-                      borderRadius: "999px",
-                      border:
-                        "2px solid rgba(139,92,246,0.6)",
-                      background:
-                        "linear-gradient(135deg, rgba(124,58,237,0.3), rgba(79,70,229,0.2))",
-                      color: "#f8fafc",
-                      fontWeight: 800,
-                      fontSize:
-                        "clamp(13px, 2.8vw, 15px)",
-                      cursor: "pointer",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
+                      flex: 1, padding: "14px 20px", borderRadius: "999px",
+                      border: "2px solid rgba(139,92,246,0.6)",
+                      background: "linear-gradient(135deg, rgba(124,58,237,0.3), rgba(79,70,229,0.2))",
+                      color: "#f8fafc", fontWeight: 800,
+                      fontSize: "clamp(13px, 2.8vw, 15px)", cursor: "pointer",
+                      textTransform: "uppercase", letterSpacing: "0.05em",
                       transition: "all 0.3s ease",
+                      WebkitTapHighlightColor: "transparent",
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.transform =
-                        "translateY(-2px)";
-                      e.currentTarget.style.boxShadow =
-                        "0 0 25px rgba(139,92,246,0.6)";
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.boxShadow = "0 0 25px rgba(139,92,246,0.6)";
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.transform =
-                        "translateY(0)";
-                      e.currentTarget.style.boxShadow =
-                        "none";
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "none";
                     }}
                   >
                     Continue Quiz
@@ -1737,33 +1494,22 @@ const loadFinalResults = async () => {
                   <button
                     onClick={handleExitConfirmYes}
                     style={{
-                      flex: 1,
-                      padding: "14px 20px",
-                      borderRadius: "999px",
-                      border:
-                        "2px solid rgba(239,68,68,0.6)",
-                      background:
-                        "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))",
-                      color: "#f8fafc",
-                      fontWeight: 800,
-                      fontSize:
-                        "clamp(13px, 2.8vw, 15px)",
-                      cursor: "pointer",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
+                      flex: 1, padding: "14px 20px", borderRadius: "999px",
+                      border: "2px solid rgba(239,68,68,0.6)",
+                      background: "linear-gradient(135deg, rgba(220,38,38,0.3), rgba(185,28,28,0.2))",
+                      color: "#f8fafc", fontWeight: 800,
+                      fontSize: "clamp(13px, 2.8vw, 15px)", cursor: "pointer",
+                      textTransform: "uppercase", letterSpacing: "0.05em",
                       transition: "all 0.3s ease",
+                      WebkitTapHighlightColor: "transparent",
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.transform =
-                        "translateY(-2px)";
-                      e.currentTarget.style.boxShadow =
-                        "0 0 25px rgba(239,68,68,0.6)";
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.boxShadow = "0 0 25px rgba(239,68,68,0.6)";
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.transform =
-                        "translateY(0)";
-                      e.currentTarget.style.boxShadow =
-                        "none";
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "none";
                     }}
                   >
                     Yes, Exit
