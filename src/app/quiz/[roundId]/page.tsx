@@ -249,29 +249,74 @@ export default function QuizGamePage() {
     setTimeout(() => overlay.remove(), 200);
   };
 
-  // === QUESTION TIMER — cevap seçilse de durmuyor ===
+  // === QUESTION TIMER — MASTER CLOCK — hiç durmuyor, iki faz: soru(9sn) → explanation(9sn) ===
+  const phaseRef = useRef<"question" | "explanation">("question");
+
+  // Faz 1: Soru sayacı — cevap verilse de durmaz
   useEffect(() => {
-    if (isLoading || showExplanation || showFinalScore || !currentQ) return;
+    if (isLoading || showFinalScore || !currentQ) return;
+    if (showExplanation) return; // explanation fazındayız, bu effect çalışmaz
 
     if (timeLeft > 0) {
       const t = setTimeout(() => setTimeLeft((p) => Math.max(0, p - 1)), 1000);
       return () => clearTimeout(t);
     }
 
+    // timeLeft === 0
     if (timeoutTriggeredRef.current) return;
     timeoutTriggeredRef.current = true;
 
     if (isAnswerLockedRef.current) {
-      // Cevap verilmişti — RPC zaten explanation açtı, sadece emin ol
-      if (!showExplanation) {
-        playSound(whooshSoundRef.current);
-        setShowExplanation(true);
-      }
+      // Cevap verildi — RPC tamamlanana kadar bekle (max 3sn)
+      let waited = 0;
+      const tryOpen = () => {
+        if (rpcCompletedRef.current || waited >= 3000) {
+          playSound(whooshSoundRef.current);
+          setShowExplanation(true);
+          setExplanationTimeLeft(QUESTION_DURATION);
+        } else {
+          waited += 100;
+          setTimeout(tryOpen, 100);
+        }
+      };
+      tryOpen();
     } else {
-      // Cevap verilmedi — timeout submit
+      // Cevap verilmedi — null submit
       handleTimeout();
     }
-  }, [timeLeft, isLoading, showExplanation, showFinalScore, currentQ]);
+  }, [timeLeft, isLoading, showFinalScore, showExplanation, currentQ]);
+
+  // Faz 2: Explanation sayacı
+  useEffect(() => {
+    if (!showExplanation || showFinalScore) return;
+
+    if (explanationTimeLeft > 0) {
+      const t = setTimeout(() => setExplanationTimeLeft((p) => Math.max(0, p - 1)), 1000);
+      return () => clearTimeout(t);
+    }
+
+    // explanationTimeLeft === 0 — sonraki soruya geç
+    const advance = async () => {
+      if (currentIndex < questions.length - 1) {
+        playSound(whooshSoundRef.current);
+        setCurrentIndex((p) => p + 1);
+        setTimeLeft(QUESTION_DURATION);
+        setExplanationTimeLeft(QUESTION_DURATION);
+        timeoutTriggeredRef.current = false;
+        rpcCompletedRef.current = false;
+        setSelectedAnswer(null);
+        setIsAnswerLocked(false);
+        isAnswerLockedRef.current = false;
+        setShowExplanation(false);
+        setCurrentCorrectOption(null);
+        setCurrentExplanation("");
+      } else {
+        await loadFinalResults();
+        setShowFinalScore(true);
+      }
+    };
+    advance();
+  }, [showExplanation, showFinalScore, explanationTimeLeft, currentIndex, questions.length]);
 
   // Tick ses — showExplanation ve showFinalScore dışında hep çalar
   useEffect(() => {
@@ -509,9 +554,8 @@ export default function QuizGamePage() {
       console.error("❌ Timeout submit error:", err);
     }
 
-    // RPC bitti → whoosh + explanation aç
-    playSound(whooshSoundRef.current);
-    setShowExplanation(true);
+    // RPC bitti — master clock explanation açacak
+    rpcCompletedRef.current = true;
   };
 
   const handleExitClick = () => {
