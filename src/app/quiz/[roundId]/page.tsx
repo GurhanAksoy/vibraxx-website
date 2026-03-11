@@ -200,12 +200,24 @@ export default function QuizGamePage() {
         // Lobby sayaci 0 olunca herkes ayni anda giris yapar → her zaman index=0
         // Refresh durumunda scheduled_start'tan UTC0 hesabi yapilir
         const answeredCountForTimer = (progress?.answers_array || []).length;
+        // joined_at doluysa kullanici daha once bu quiz e girdi
+        // cevap verip vermemesi fark etmez — refresh = skorkart
+        const hasJoinedBefore = !!progress?.joined_at;
 
-        if (answeredCountForTimer === 0) {
+        if (answeredCountForTimer === 0 && !hasJoinedBefore) {
           // ✅ ILK GIRIS: Lobby sayaci garantisi — index 0, timeLeft 9
           restoredIndex = 0;
           restoredTimeLeft = QUESTION_DURATION;
           restoredShowExp = false;
+        } else if (answeredCountForTimer === 0 && hasJoinedBefore) {
+          // ✅ REFRESH — hic cevap vermemis ama daha once girmis
+          // Skorkart ac, quiz disina cikart
+          setAnswers(normalizedAnswers);
+          setQuestions(questionsData);
+          setIsLoading(false);
+          await loadFinalResults();
+          setShowFinalScore(true);
+          return;
         } else if (progress && progress.server_now) {
           // ✅ REFRESH: scheduled_start'tan UTC0 hesabi
           const nowMs = new Date(progress.server_now).getTime();
