@@ -50,6 +50,7 @@ export default function QuizGamePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(QUESTION_DURATION);
+  const [explanationTimeLeft, setExplanationTimeLeft] = useState(QUESTION_DURATION);
   const [selectedAnswer, setSelectedAnswer] = useState<OptionId | null>(null);
   const [isAnswerLocked, setIsAnswerLocked] = useState(false);
 
@@ -261,21 +262,13 @@ export default function QuizGamePage() {
     timeoutTriggeredRef.current = true;
 
     if (isAnswerLockedRef.current) {
-      // Cevap verilmişti, RPC tamamlandıysa explanation aç
-      // RPC henüz tamamlanmadıysa bekle (max 3sn)
-      let waited = 0;
-      const waitAndOpen = () => {
-        if (rpcCompletedRef.current || waited >= 3000) {
-          playSound(whooshSoundRef.current);
-          setShowExplanation(true);
-        } else {
-          waited += 100;
-          setTimeout(waitAndOpen, 100);
-        }
-      };
-      waitAndOpen();
+      // Cevap verilmişti — RPC zaten explanation açtı, sadece emin ol
+      if (!showExplanation) {
+        playSound(whooshSoundRef.current);
+        setShowExplanation(true);
+      }
     } else {
-      // Cevap verilmedi — timeout submit (o da explanation açacak)
+      // Cevap verilmedi — timeout submit
       handleTimeout();
     }
   }, [timeLeft, isLoading, showExplanation, showFinalScore, currentQ]);
@@ -301,33 +294,42 @@ export default function QuizGamePage() {
     isLoading,
   ]);
 
-  // === EXPLANATION TIMER (5 seconds) ===
+  // === EXPLANATION COUNTDOWN ===
   useEffect(() => {
     if (showExplanation && !showFinalScore) {
-      const timer = setTimeout(async () => {
-        // Move to next question or finish quiz
-        if (currentIndex < questions.length - 1) {
-          playSound(whooshSoundRef.current);
-          setCurrentIndex(currentIndex + 1);
-          setTimeLeft(QUESTION_DURATION);
-          timeoutTriggeredRef.current = false;
-          rpcCompletedRef.current = false;
-          setSelectedAnswer(null);
-          setIsAnswerLocked(false);
-          isAnswerLockedRef.current = false;
-          setShowExplanation(false);
-          setCurrentCorrectOption(null);
-          setCurrentExplanation("");
-        } else {
-          // Quiz finished - load results from DB
-          await loadFinalResults();
-          setShowFinalScore(true);
-        }
-      }, 9000); // 9 seconds explanation
-
-      return () => clearTimeout(timer);
+      setExplanationTimeLeft(QUESTION_DURATION); // 9sn başlat
     }
-  }, [showExplanation, showFinalScore, currentIndex, questions.length, roundId]);
+  }, [showExplanation, showFinalScore]);
+
+  useEffect(() => {
+    if (!showExplanation || showFinalScore) return;
+    if (explanationTimeLeft <= 0) return;
+    const t = setTimeout(() => setExplanationTimeLeft((p) => Math.max(0, p - 1)), 1000);
+    return () => clearTimeout(t);
+  }, [showExplanation, showFinalScore, explanationTimeLeft]);
+
+  useEffect(() => {
+    if (!showExplanation || showFinalScore || explanationTimeLeft !== 0) return;
+    const advance = async () => {
+      if (currentIndex < questions.length - 1) {
+        playSound(whooshSoundRef.current);
+        setCurrentIndex(currentIndex + 1);
+        setTimeLeft(QUESTION_DURATION);
+        timeoutTriggeredRef.current = false;
+        rpcCompletedRef.current = false;
+        setSelectedAnswer(null);
+        setIsAnswerLocked(false);
+        isAnswerLockedRef.current = false;
+        setShowExplanation(false);
+        setCurrentCorrectOption(null);
+        setCurrentExplanation("");
+      } else {
+        await loadFinalResults();
+        setShowFinalScore(true);
+      }
+    };
+    advance();
+  }, [showExplanation, showFinalScore, explanationTimeLeft, currentIndex, questions.length]);
 
   // === LOAD FINAL RESULTS FROM DB ===
   const loadFinalResults = async () => {
@@ -458,7 +460,10 @@ export default function QuizGamePage() {
       console.error("❌ Answer submission error:", err);
       playSound(wrongSoundRef.current);
     }
-    rpcCompletedRef.current = true; // ✅ RPC tamamlandı — timer 0'da explanation açılacak
+    rpcCompletedRef.current = true; // ✅ RPC tamamlandı
+    // RPC bitti → hemen explanation aç (timer 0 bekleme)
+    playSound(whooshSoundRef.current);
+    setShowExplanation(true);
   };
 
 
@@ -1436,26 +1441,43 @@ export default function QuizGamePage() {
                     {currentExplanation || "No explanation available."}
                   </p>
 
-                  <div
-                    style={{
-                      padding: "14px 20px",
-                      borderRadius: "16px",
-                      background: "rgba(15,23,42,0.9)",
-                      border:
-                        "1px solid rgba(56,189,248,0.3)",
-                      textAlign: "center",
-                    }}
-                  >
-                    <p
-                      style={{
-                        fontSize:
-                          "clamp(12px, 2.5vw, 14px)",
-                        color: "#94a3b8",
-                        fontWeight: 600,
-                      }}
-                    >
-                      Next question starting...
-                    </p>
+                  {/* Timer row — soru kartıyla aynı */}
+                  <div style={{ marginTop: "16px" }}>
+                    <div style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      marginBottom: "8px", padding: "0 2px",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <Clock style={{ width: "14px", height: "14px", color: "#38bdf8" }} />
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                          Next
+                        </span>
+                      </div>
+                      <span style={{
+                        fontSize: "clamp(28px, 7vw, 36px)", fontWeight: 900,
+                        color: "#38bdf8", textShadow: "0 0 15px #38bdf8", lineHeight: 1,
+                      }}>
+                        {explanationTimeLeft}
+                      </span>
+                      <span style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                        &nbsp;
+                      </span>
+                    </div>
+                    <div style={{
+                      height: "6px", borderRadius: "3px",
+                      background: "rgba(30,27,75,0.8)",
+                      overflow: "hidden",
+                      border: "1px solid rgba(56,189,248,0.2)",
+                    }}>
+                      <div style={{
+                        height: "100%",
+                        width: `${(explanationTimeLeft / QUESTION_DURATION) * 100}%`,
+                        background: "linear-gradient(90deg, #38bdf8, #38bdf8aa)",
+                        boxShadow: "0 0 8px #38bdf8",
+                        transition: "width 1s linear",
+                        borderRadius: "3px",
+                      }} />
+                    </div>
                   </div>
                 </article>
               )}
