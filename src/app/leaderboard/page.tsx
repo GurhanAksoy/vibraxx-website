@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Crown, Trophy, Star, Target, Clock, Users,
-  Sparkles, Volume2, VolumeX, ChevronRight, Home,
+  Sparkles, Volume2, VolumeX, ChevronRight,
 } from "lucide-react";
+import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import Footer from "@/components/Footer";
 
@@ -198,24 +199,35 @@ export default function LeaderboardPage() {
             flexWrap: "wrap",
           }}>
 
-            {/* Left: Home + Music */}
+            {/* Left: Logo + Title */}
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <button
+              {/* Logo */}
+              <div
                 onClick={() => router.push("/")}
-                style={{
-                  display: "flex", alignItems: "center", gap: "8px",
-                  padding: "10px 16px", borderRadius: "12px",
-                  border: "2px solid rgba(139,92,246,.5)",
-                  background: "rgba(15,23,42,.8)", color: "white",
-                  fontSize: "14px", fontWeight: 700, cursor: "pointer", transition: "all .3s",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = "#a78bfa"; e.currentTarget.style.background = "rgba(139,92,246,.2)"; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(139,92,246,.5)"; e.currentTarget.style.background = "rgba(15,23,42,.8)"; }}
+                style={{ cursor: "pointer", flexShrink: 0 }}
               >
-                <Home style={{ width: 18, height: 18 }} />
-                <span>Home</span>
-              </button>
+                <Image
+                  src="/logo.png"
+                  alt="VibraXX"
+                  width={44}
+                  height={44}
+                  style={{ borderRadius: "10px", display: "block" }}
+                />
+              </div>
+              {/* Title */}
+              <div>
+                <div style={{ fontSize: "clamp(18px,3.5vw,24px)", fontWeight: 900, color: "white", letterSpacing: "1px", lineHeight: 1.1 }}>
+                  Leaderboard
+                </div>
+                <div style={{ fontSize: "11px", color: "#a78bfa", fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>
+                  VibraXX
+                </div>
+              </div>
+            </div>
 
+            {/* Center: Tabs — rendered below */}
+            {/* Right-ish: Home + Music */}
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               <button
                 onClick={toggleMusic}
                 title={isMusicPlaying ? "Mute Music" : "Play Music"}
