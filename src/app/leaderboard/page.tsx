@@ -327,7 +327,7 @@ function LeaderboardPage() {
 
             {/* Nav Tabs */}
             <nav role="navigation" aria-label="Leaderboard time period selection" style={{ display: "flex", gap: "8px", padding: "4px", borderRadius: "12px", background: "rgba(15,23,42,0.8)", border: "2px solid rgba(139,92,246,0.3)" }}>
-              {(['weekly', 'monthly'] as const).map((tab) => (
+              {(['daily', 'weekly', 'monthly'] as const).map((tab) => (
                 <button 
                   key={tab} 
                   onClick={() => setActiveTab(tab)} 
