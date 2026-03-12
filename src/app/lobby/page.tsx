@@ -67,6 +67,7 @@ export default function LobbyPage() {
   const localSecondsInitRef = useRef(false);
   const alarmFiredRef = useRef(false);
   const hasJoinedRef = useRef(false); // Scheduled round'a join edildi mi
+  const lastPresenceRef = useRef<number>(0); // Son enter_lobby zamanı
 
   useEffect(() => {
     mountedRef.current = true;
@@ -135,6 +136,13 @@ export default function LobbyPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) { routerRef.current.push("/"); return; }
 
+      // Presence: 30sn'de bir enter_lobby (throttle)
+      const _now = Date.now();
+      if (_now - lastPresenceRef.current > 30000) {
+        lastPresenceRef.current = _now;
+        await supabase.rpc("enter_lobby", { p_user_id: session.user.id });
+      }
+
       const { data, error } = await supabase.rpc("get_lobby_state", {
         p_user_id: session.user.id,
       });
@@ -188,6 +196,7 @@ export default function LobbyPage() {
     const interval = setInterval(() => { fetchLobbyState(); }, 5000);
     return () => clearInterval(interval);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   // === COUNTDOWN TICK ===
   useEffect(() => {
@@ -256,6 +265,7 @@ export default function LobbyPage() {
         if (!joinError && (joinRow?.action === "join" || joinRow?.message === "already_joined")) {
           isRedirectingRef.current = true;
           setIsRedirecting(true);
+          await supabase.rpc("leave_lobby", { p_user_id: session.user.id });
           sessionStorage.setItem(`quiz_fresh_${data.round_id}`, '1');
           routerRef.current.push(`/quiz/${data.round_id}`);
         } else {
@@ -271,6 +281,8 @@ export default function LobbyPage() {
   // === HANDLE BACK BUTTON ===
   const handleBack = async () => {
     console.log("[Lobby] User left lobby, round NOT deducted");
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) await supabase.rpc("leave_lobby", { p_user_id: session.user.id });
     routerRef.current.push("/");
   };
 
@@ -1125,11 +1137,12 @@ export default function LobbyPage() {
                   border: "1px solid rgba(251,191,36,0.45)",
                   backdropFilter: "blur(20px)",
                   boxShadow: "0 0 18px rgba(251,191,36,0.12), inset 0 1px 0 rgba(251,191,36,0.08)",
-                  padding: "clamp(10px, 2.5vw, 14px) clamp(16px, 3.5vw, 24px)",
+                  padding: "clamp(8px, 2vw, 12px) clamp(12px, 3vw, 20px)",
                   display: "flex",
                   alignItems: "center",
-                  gap: "clamp(10px, 2.5vw, 16px)",
-                  minHeight: "clamp(52px, 10vw, 68px)",
+                  justifyContent: "center",
+                  gap: "clamp(8px, 2vw, 14px)",
+                  minHeight: "clamp(44px, 8vw, 64px)",
                 }}
               >
                 {/* Shimmer sweep */}
@@ -1167,13 +1180,13 @@ export default function LobbyPage() {
                   </div>
                 </div>
                 {/* Sağ: sponsor.png */}
-                <div style={{ position: "relative", flex: 1, height: "clamp(28px, 5.5vw, 40px)" }}>
+                <div style={{ position: "relative", flex: 1, height: "clamp(28px, 5vw, 44px)", maxHeight: "44px" }}>
                   <Image
                     src="/images/sponsor.png"
                     alt="Official Sponsor"
                     fill
                     sizes="700px"
-                    style={{ objectFit: "contain", objectPosition: "left center" }}
+                    style={{ objectFit: "contain", objectPosition: "center center" }}
                     priority
                     onError={(e) => {
                       const img = e.currentTarget;
