@@ -1122,9 +1122,9 @@ export default function LobbyPage() {
                   borderRadius: "18px",
                   overflow: "hidden",
                   background: "linear-gradient(135deg, rgba(124,58,237,0.12) 0%, rgba(15,23,42,0.85) 40%, rgba(217,70,239,0.10) 100%)",
-                  border: "1px solid rgba(139,92,246,0.25)",
+                  border: "1px solid rgba(251,191,36,0.45)",
                   backdropFilter: "blur(20px)",
-                  boxShadow: "0 0 24px rgba(124,58,237,0.18), inset 0 1px 0 rgba(255,255,255,0.06)",
+                  boxShadow: "0 0 18px rgba(251,191,36,0.12), inset 0 1px 0 rgba(251,191,36,0.08)",
                   padding: "clamp(10px, 2.5vw, 14px) clamp(16px, 3.5vw, 24px)",
                   display: "flex",
                   alignItems: "center",
@@ -1152,11 +1152,14 @@ export default function LobbyPage() {
                   marginRight: "clamp(2px, 1vw, 4px)",
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                    <Sparkles style={{ width: 10, height: 10, color: "#a78bfa" }} />
+                    <Sparkles style={{ width: 10, height: 10, color: "#f472b6" }} />
                     <span style={{
                       fontSize: "clamp(8px, 1.6vw, 10px)",
                       fontWeight: 800,
-                      color: "#6d5fa6",
+                      backgroundImage: "linear-gradient(135deg, #f472b6, #ec4899)",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      backgroundClip: "text",
                       textTransform: "uppercase",
                       letterSpacing: "0.14em",
                       whiteSpace: "nowrap",
