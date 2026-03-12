@@ -281,50 +281,52 @@ export default function BuyPage() {
           border-bottom: 1px solid rgba(255,255,255,.08);
           backdrop-filter: blur(20px);
           background: rgba(15,23,42,.85);
+          overflow: hidden;
         }
         .vx-header-inner {
           max-width: min(960px, 100%); margin: 0 auto;
-          padding: 0 clamp(14px,4vw,24px);
-          height: clamp(56px,10vw,68px);
+          padding: 0 clamp(14px,4vw,20px);
+          height: 56px;
           display: flex; align-items: center; justify-content: space-between;
-          overflow: hidden;
+          gap: 12px;
+          flex-wrap: nowrap;
         }
         .vx-logo {
-          display: flex; align-items: center; gap: 10px;
-          cursor: pointer; transition: transform .3s; flex-shrink: 0;
+          display: flex; align-items: center; gap: 8px;
+          cursor: pointer; transition: opacity .2s; flex-shrink: 0;
+          min-width: 0;
         }
-        .vx-logo:hover { transform: scale(1.04); }
+        .vx-logo:hover { opacity: .85; }
         .vx-logo-outer {
-          position: relative;
-          width: clamp(44px,9vw,56px); height: clamp(44px,9vw,56px);
-          border-radius: 50%; padding: 3px;
+          width: 40px; height: 40px; flex-shrink: 0;
+          border-radius: 50%; padding: 2px;
           background: radial-gradient(circle at 0 0,#7c3aed,#d946ef);
-          box-shadow: 0 0 20px rgba(124,58,237,.5); flex-shrink: 0;
-        }
-        .vx-logo-glow {
-          position: absolute; inset: -4px; border-radius: 50%;
-          background: radial-gradient(circle,#a855f7,transparent);
-          opacity: .35; filter: blur(8px); pointer-events: none;
-          animation: glow 2s ease-in-out infinite;
+          box-shadow: 0 0 14px rgba(124,58,237,.45);
+          position: relative; overflow: hidden;
         }
         .vx-logo-circle {
-          position: relative; width: 100%; height: 100%;
+          width: 100%; height: 100%;
           border-radius: 50%; background: #020817;
-          display: flex; align-items: center; justify-content: center; overflow: hidden;
+          display: flex; align-items: center; justify-content: center;
+          overflow: hidden; position: relative;
         }
         .vx-logo-label {
-          font-size: clamp(10px,2vw,12px); color: #c4b5fd;
-          text-transform: uppercase; letter-spacing: .14em; font-weight: 600;
+          font-size: 12px; color: #c4b5fd;
+          text-transform: uppercase; letter-spacing: .12em; font-weight: 600;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .vx-audio-btn {
           display: flex; align-items: center; justify-content: center;
-          width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+          width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
           border: 2px solid rgba(139,92,246,.5);
           background: rgba(15,23,42,.8);
-          cursor: pointer; transition: all .3s;
+          cursor: pointer; transition: all .25s;
         }
         .vx-audio-btn:hover {
-          border-color: #a78bfa; background: rgba(139,92,246,.2); transform: scale(1.06);
+          border-color: #a78bfa; background: rgba(139,92,246,.2);
+        }
+        @media (max-width: 400px) {
+          .vx-logo-label { display: none !important; }
         }
 
         /* ── MAIN ── */
@@ -600,12 +602,11 @@ export default function BuyPage() {
           <div className="vx-header-inner">
             <div className="vx-logo" onClick={() => router.push("/")}>
               <div className="vx-logo-outer">
-                <div className="vx-logo-glow" />
                 <div className="vx-logo-circle">
-                  <Image src="/images/logo.png" alt="VibraXX" fill sizes="56px" style={{ objectFit: "contain", padding: "12%" }} />
+                  <Image src="/images/logo.png" alt="VibraXX" fill sizes="40px" style={{ objectFit: "contain", padding: "12%" }} />
                 </div>
               </div>
-              <span className="vx-logo-label mobile-hide">Live Quiz</span>
+              <span className="vx-logo-label">Live Quiz</span>
             </div>
 
             {/* Ses butonu en sağda */}
