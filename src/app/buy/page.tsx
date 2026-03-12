@@ -4,38 +4,21 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Footer from "@/components/Footer";
+import Image from "next/image";
 import {
-  Crown,
-  Zap,
-  TrendingUp,
-  Users,
-  Trophy,
-  Sparkles,
-  Lock,
-  ChevronRight,
-  Rocket,
-  ShoppingCart,
-  CheckCircle2,
-  Target,
-  Volume2,
-  VolumeX,
-  Shield,
-  Percent,
-  Gift,
-  Star,
-  Clock,
-  BarChart3,
-  Wifi,
-  Zap as Lightning,
+  Crown, Zap, TrendingUp, Users, Trophy, Sparkles,
+  Target, Volume2, VolumeX, Shield, Percent, Gift,
+  Star, Clock, BarChart3, ShoppingCart, CheckCircle2,
+  Lock, Rocket, Zap as Lightning,
 } from "lucide-react";
 
-// ═══════════════════════════════════════════════════════════
-// TYPES (DB Contract - Same as Leaderboard)
-// ═══════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────
+// TYPES
+// ─────────────────────────────────────────────
 
 interface PrizeData {
   prize: {
-    type: 'money' | 'credits';
+    type: "money" | "credits";
     amount: number;
     label: string;
     sublabel: string;
@@ -43,16 +26,12 @@ interface PrizeData {
     progress: number;
     threshold: number | null;
   };
-  countdown: {
-    days: number;
-    hours: number;
-    minutes: number;
-  };
+  countdown: { days: number; hours: number; minutes: number };
 }
 
-// ═══════════════════════════════════════════════════════════
-// PACKAGE CONFIGURATION (No prices - Stripe handles)
-// ═══════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────
+// PACKAGE CONFIG  (no prices — Stripe handles)
+// ─────────────────────────────────────────────
 
 const packages = [
   {
@@ -64,20 +43,17 @@ const packages = [
     badge: null,
     tagline: "Try it out",
     features: [
-      { icon: Lightning, text: "1 Quiz Round", highlight: false },
-      { icon: Target, text: "20 Questions", highlight: false },
-      { icon: Rocket, text: "Instant Access", highlight: true },
-      { icon: BarChart3, text: "Leaderboard Entry", highlight: false },
-      { icon: TrendingUp, text: "Score Tracking", highlight: false },
-      { icon: Wifi, text: "Real-time Stats", highlight: false },
+      { icon: Lightning,  text: "1 Quiz Round",        highlight: false },
+      { icon: Target,     text: "15 Questions",         highlight: false },
+      { icon: Rocket,     text: "Instant Access",       highlight: true  },
+      { icon: BarChart3,  text: "Leaderboard Entry",    highlight: false },
+      { icon: TrendingUp, text: "Score Tracking",       highlight: false },
     ],
     description: "Perfect for trying out the competition",
     color: {
-      primary: "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 50%, #6d28d9 100%)",
-      secondary: "rgba(139,92,246,0.15)",
-      border: "rgba(139,92,246,0.5)",
-      glow: "rgba(139,92,246,0.4)",
-      iconBg: "linear-gradient(135deg, #7c3aed, #d946ef)",
+      border:  "rgba(139,92,246,0.5)",
+      glow:    "rgba(139,92,246,0.4)",
+      iconBg:  "linear-gradient(135deg,#7c3aed,#d946ef)",
     },
   },
   {
@@ -86,98 +62,70 @@ const packages = [
     rounds: 30,
     popular: true,
     icon: Crown,
-    badge: "🔥 SAVE 20% 🔥", // ✅ FIXED: 40% → 20%
+    badge: "🔥 SAVE 20% 🔥",
     tagline: "Best Value",
     features: [
-      { icon: Trophy, text: "30 Quiz Rounds", highlight: true },
-      { icon: Percent, text: "20% Savings", highlight: true }, // ✅ FIXED: 40% → 20%
-      { icon: Target, text: "600 Questions Total", highlight: false },
-      { icon: Star, text: "Priority Support", highlight: false },
-      { icon: BarChart3, text: "Extended Statistics", highlight: false },
-      { icon: Crown, text: "Champion Badge", highlight: true },
-      { icon: Users, text: "Exclusive Discord Access", highlight: false },
-      { icon: Gift, text: "Monthly Prize Entry", highlight: true },
+      { icon: Trophy,     text: "30 Quiz Rounds",          highlight: true  },
+      { icon: Percent,    text: "20% Savings",              highlight: true  },
+      { icon: Target,     text: "450 Questions Total",      highlight: false },
+      { icon: Star,       text: "Priority Support",         highlight: false },
+      { icon: BarChart3,  text: "Extended Statistics",      highlight: false },
+      { icon: Crown,      text: "Champion Badge",           highlight: true  },
+      { icon: Users,      text: "Community Access",         highlight: false },
+      { icon: Gift,       text: "Monthly Prize Entry",      highlight: true  },
     ],
     description: "Ultimate package for serious competitors",
     color: {
-      primary: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)",
-      secondary: "rgba(251,191,36,0.15)",
-      border: "rgba(251,191,36,0.6)",
-      glow: "rgba(251,191,36,0.5)",
-      iconBg: "linear-gradient(135deg, #fbbf24, #f59e0b)",
+      border:  "rgba(251,191,36,0.6)",
+      glow:    "rgba(251,191,36,0.5)",
+      iconBg:  "linear-gradient(135deg,#fbbf24,#f59e0b)",
     },
   },
 ];
 
+// ─────────────────────────────────────────────
+// COMPONENT
+// ─────────────────────────────────────────────
+
 export default function BuyPage() {
   const router = useRouter();
-  
-  // ═══════════════════════════════════════════════════════════
-  // STATE (DB-driven only)
-  // ═══════════════════════════════════════════════════════════
-  const [user, setUser] = useState<any>(null);
-  const [liveCredits, setLiveCredits] = useState(0);
-  const [prizeData, setPrizeData] = useState<PrizeData | null>(null); // ✅ Same as Leaderboard
-  const [isLoading, setIsLoading] = useState(true);
-  const [processingPackageId, setProcessingPackageId] = useState<string | null>(null);
-  
-  // Music State
-  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
-  const [hasInteracted, setHasInteracted] = useState(false);
+
+  const [user,                 setUser]                 = useState<any>(null);
+  const [liveCredits,          setLiveCredits]          = useState(0);
+  const [prizeData,            setPrizeData]            = useState<PrizeData | null>(null);
+  const [isLoading,            setIsLoading]            = useState(true);
+  const [processingPackageId,  setProcessingPackageId]  = useState<string | null>(null);
+  const [isMusicPlaying,       setIsMusicPlaying]       = useState(false);
+  const [hasInteracted,        setHasInteracted]        = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // ═══════════════════════════════════════════════════════════
-  // BACKGROUND MUSIC
-  // ═══════════════════════════════════════════════════════════
+  // ── Music ──────────────────────────────────
   useEffect(() => {
-    // ✅ GUARD: Prevent memory leak
     if (!audioRef.current) {
       const audio = new Audio("/sounds/vibraxx.mp3");
       audio.loop = true;
       audio.volume = 0.3;
       audioRef.current = audio;
     }
-
-    const musicEnabled = localStorage.getItem("vibraxx_music_enabled");
-    if (musicEnabled === "true") {
-      setIsMusicPlaying(true);
-    }
-
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
+    if (localStorage.getItem("vibraxx_music_enabled") === "true") setIsMusicPlaying(true);
+    return () => { audioRef.current?.pause(); audioRef.current = null; };
   }, []);
 
   useEffect(() => {
-    const handleFirstInteraction = () => {
-      if (!hasInteracted) {
-        setHasInteracted(true);
-        const musicEnabled = localStorage.getItem("vibraxx_music_enabled");
-        if (musicEnabled === "true" && audioRef.current) {
-          audioRef.current.play().catch(err => {
-            console.log("Audio autoplay blocked:", err);
-          });
-        }
-      }
+    const onFirst = () => {
+      if (hasInteracted) return;
+      setHasInteracted(true);
+      if (localStorage.getItem("vibraxx_music_enabled") !== "false" && audioRef.current)
+        audioRef.current.play().catch(() => {});
     };
-
-    // ✅ Use pointerdown instead of click for better mobile support
-    document.addEventListener("pointerdown", handleFirstInteraction, { once: true });
-    return () => {
-      document.removeEventListener("pointerdown", handleFirstInteraction);
-    };
+    document.addEventListener("pointerdown", onFirst, { once: true });
+    return () => document.removeEventListener("pointerdown", onFirst);
   }, [hasInteracted]);
 
   useEffect(() => {
     if (!audioRef.current || !hasInteracted) return;
-
     if (isMusicPlaying) {
-      audioRef.current.play().catch(err => {
-        console.log("Audio play error:", err);
-      });
+      audioRef.current.play().catch(() => {});
       localStorage.setItem("vibraxx_music_enabled", "true");
     } else {
       audioRef.current.pause();
@@ -185,1264 +133,641 @@ export default function BuyPage() {
     }
   }, [isMusicPlaying, hasInteracted]);
 
-  const toggleMusic = useCallback(() => {
-    setIsMusicPlaying(prev => !prev);
-  }, []);
+  const toggleMusic = useCallback(() => setIsMusicPlaying(p => !p), []);
 
-  // ═══════════════════════════════════════════════════════════
-  // FETCH DATA (CANONICAL - Same RPC as Leaderboard)
-  // ═══════════════════════════════════════════════════════════
+  // ── Fetch ──────────────────────────────────
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      
       const { data: { user: authUser } } = await supabase.auth.getUser();
-
       if (!authUser) {
         await supabase.auth.signInWithOAuth({
           provider: "google",
-          options: {
-            redirectTo: `${window.location.origin}/auth/callback?redirect=/buy`,
-          },
+          options: { redirectTo: `${window.location.origin}/auth/callback?redirect=/buy` },
         });
         return;
       }
-
       setUser(authUser);
 
-      // ✅ CANONICAL: Get user credits
+      // Credits — v2_user_credits (DB Commander: RPC yok, direkt read kabul)
       const { data: creditsData } = await supabase
-        .from("user_credits")
-        .select("live_credits")
+        .from("v2_user_credits")
+        .select("paid_credits, bonus_credits")
         .eq("user_id", authUser.id)
         .single();
+      setLiveCredits((creditsData?.paid_credits || 0) + (creditsData?.bonus_credits || 0));
 
-      setLiveCredits(creditsData?.live_credits || 0);
-
-      // ✅ CANONICAL: Use SAME RPC as Leaderboard for prize data
-      const { data: leaderboardData, error: prizeError } = await supabase.rpc("get_leaderboard_data", {
-        p_tab: 'monthly' // ✅ £1000 prize is MONTHLY, not weekly
-      });
-
-      if (!prizeError && leaderboardData) {
-        setPrizeData({
-          prize: leaderboardData.prize,
-          countdown: leaderboardData.countdown
-        });
-      }
+      // Prize data — same RPC as leaderboard
+      const { data: lb, error: lbErr } = await supabase.rpc("get_leaderboard_data", { p_tab: "monthly" });
+      if (!lbErr && lb) setPrizeData({ prize: lb.prize, countdown: lb.countdown });
 
       setIsLoading(false);
     };
-
     loadData();
-  }, [router]);
+  }, []);
 
-  // ═══════════════════════════════════════════════════════════
-  // REALTIME: Prize Pool Updates
-  // ═══════════════════════════════════════════════════════════
+  // ── Realtime ───────────────────────────────
   useEffect(() => {
-    // ✅ GUARD: Wait for both prizeData AND user to be ready
     if (!prizeData || !user?.id) return;
 
-    const refreshPrizeData = async () => {
-      const { data: leaderboardData, error } = await supabase.rpc("get_leaderboard_data", {
-        p_tab: 'monthly' // ✅ £1000 prize is MONTHLY
-      });
-
-      if (!error && leaderboardData) {
-        setPrizeData({
-          prize: leaderboardData.prize,
-          countdown: leaderboardData.countdown
-        });
-      }
+    const refreshPrize = async () => {
+      const { data: lb, error } = await supabase.rpc("get_leaderboard_data", { p_tab: "monthly" });
+      if (!error && lb) setPrizeData({ prize: lb.prize, countdown: lb.countdown });
     };
 
-    // ✅ Listen for new purchases (updates prize pool)
-    const purchaseChannel = supabase
+    const refreshCredits = async () => {
+      const { data } = await supabase
+        .from("v2_user_credits")
+        .select("paid_credits, bonus_credits")
+        .eq("user_id", user.id)
+        .single();
+      if (data) setLiveCredits((data.paid_credits || 0) + (data.bonus_credits || 0));
+    };
+
+    // v2_round_participants INSERT = yeni satın alma sinyali
+    const purchaseCh = supabase
       .channel("buy-page-purchases")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "premium_purchases",
-        },
-        () => {
-          console.log("[Realtime] New purchase - refreshing prize pool");
-          refreshPrizeData();
-        }
-      )
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "v2_round_participants" }, refreshPrize)
       .subscribe();
 
-    // ✅ Listen for credit updates
-    const creditChannel = supabase
-      .channel(`buy-page-credits-${user?.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "user_credits",
-          filter: `user_id=eq.${user?.id}`,
-        },
-        () => {
-          console.log("[Realtime] Credits updated");
-          // Refresh credits
-          supabase
-            .from("user_credits")
-            .select("live_credits")
-            .eq("user_id", user.id)
-            .single()
-            .then(({ data }) => {
-              if (data) setLiveCredits(data.live_credits || 0);
-            });
-        }
-      )
+    const creditCh = supabase
+      .channel(`buy-page-credits-${user.id}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "v2_user_credits", filter: `user_id=eq.${user.id}` }, refreshCredits)
       .subscribe();
 
     return () => {
-      supabase.removeChannel(purchaseChannel);
-      supabase.removeChannel(creditChannel);
+      supabase.removeChannel(purchaseCh);
+      supabase.removeChannel(creditCh);
     };
-  }, [prizeData, user]); // ✅ Add user to dependencies
+  }, [prizeData, user]);
 
-  // ═══════════════════════════════════════════════════════════
-  // PURCHASE HANDLER (Stripe checkout)
-  // ═══════════════════════════════════════════════════════════
+  // ── Purchase ───────────────────────────────
   const handlePurchase = async (pkg: typeof packages[0]) => {
-    if (!user) {
-      router.push("/");
-      return;
-    }
-
+    if (!user) { router.push("/"); return; }
     setProcessingPackageId(pkg.id);
-
     try {
-      // ✅ SECURITY: Only send package type - backend controls pricing
-      const response = await fetch("/api/create-checkout-session", {
-        method: "POST",
+      const res  = await fetch("/api/create-checkout-session", {
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          package: pkg.id,  // ✅ Only 'single' | 'bundle'
-        }),
+        body:    JSON.stringify({ package: pkg.id }),
       });
-
-      const data = await response.json();
-
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        throw new Error("Failed to create checkout session");
-      }
-    } catch (error) {
-      console.error("Purchase error:", error);
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+      else throw new Error("No checkout URL");
+    } catch {
       alert("Failed to process purchase. Please try again.");
       setProcessingPackageId(null);
     }
   };
 
-  // ═══════════════════════════════════════════════════════════
-  // LOADING STATE
-  // ═══════════════════════════════════════════════════════════
+  // ── Loading ────────────────────────────────
   if (isLoading) {
     return (
-      <div style={{
-        minHeight: "100vh",
-        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}>
-        <div style={{
-          width: "60px",
-          height: "60px",
-          border: "4px solid rgba(139, 92, 246, 0.3)",
-          borderTopColor: "#8b5cf6",
-          borderRadius: "50%",
-          animation: "spin 1s linear infinite"
-        }} />
-        <style jsx>{`
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
+      <div style={{ minHeight: "100vh", background: "linear-gradient(135deg,#0f172a,#1e1b4b)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <div style={{ width: 52, height: 52, border: "4px solid rgba(139,92,246,.3)", borderTopColor: "#8b5cf6", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
       </div>
     );
   }
+
+  // Prize ring helpers
+  const CIRCUMFERENCE = 2 * Math.PI * 85;
+  const progressRatio = Math.min((prizeData?.prize?.progress || 0) / (prizeData?.prize?.threshold || 1000), 1);
+  const dashOffset    = CIRCUMFERENCE * (1 - progressRatio);
+  const isUnlocked    = prizeData?.prize?.unlocked === true;
 
   return (
     <>
       <style jsx global>{`
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { overflow-x: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-        
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
 
-        @keyframes glow {
-          0%, 100% { box-shadow: 0 0 20px rgba(251,191,36,0.4); }
-          50% { box-shadow: 0 0 40px rgba(251,191,36,0.8); }
-        }
+        @keyframes spin        { to { transform: rotate(360deg); } }
+        @keyframes glow        { 0%,100% { box-shadow: 0 0 20px rgba(251,191,36,.4); } 50% { box-shadow: 0 0 40px rgba(251,191,36,.8); } }
+        @keyframes pulse       { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:.9; transform:scale(1.04); } }
+        @keyframes float       { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-8px); } }
+        @keyframes shimmer     { 0% { background-position:-200% center; } 100% { background-position:200% center; } }
+        @keyframes slideUp     { from { transform:translateY(24px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+        @keyframes scaleIn     { from { transform:scale(.92); opacity:0; } to { transform:scale(1); opacity:1; } }
+        @keyframes cardShine   { 0% { left:-100%; } 100% { left:200%; } }
+        @keyframes megaBounce  { 0%,100% { transform:translateY(0) scale(1); } 40% { transform:translateY(-6px) scale(1.08); } }
 
-        @keyframes pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.9; transform: scale(1.05); }
-        }
+        .animate-glow       { animation: glow      2s ease-in-out infinite; }
+        .animate-pulse      { animation: pulse     2s ease-in-out infinite; }
+        .animate-slide-up   { animation: slideUp   0.5s ease-out both; }
+        .animate-scale-in   { animation: scaleIn   0.4s ease-out both; }
+        .animate-mega-bounce{ animation: megaBounce 1.5s ease-in-out infinite; }
 
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-10px); }
-        }
-
-        @keyframes shimmer {
-          0% { background-position: -200% center; }
-          100% { background-position: 200% center; }
-        }
-
-        @keyframes slideUp {
-          from { transform: translateY(30px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-
-        @keyframes scaleIn {
-          from { transform: scale(0.9); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
-        }
-
-        @keyframes cardShine {
-          0% { left: -100%; }
-          100% { left: 200%; }
-        }
-
-        @keyframes megaBounce {
-          0%, 100% { transform: translateY(0) scale(1); }
-          25% { transform: translateY(-8px) scale(1.1); }
-          50% { transform: translateY(-4px) scale(1.05); }
-          75% { transform: translateY(-6px) scale(1.08); }
-        }
-
-        .animate-glow { animation: glow 2s ease-in-out infinite; }
-        .animate-pulse { animation: pulse 2s ease-in-out infinite; }
-        .animate-slide-up { animation: slideUp 0.6s ease-out; }
-        .animate-scale-in { animation: scaleIn 0.5s ease-out; }
-        .animate-mega-bounce { animation: megaBounce 1.5s ease-in-out infinite; }
-
-        .vx-buy-container {
+        /* ── LAYOUT ── */
+        .vx-container {
           min-height: 100vh;
-          background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 25%, #312e81 50%, #1e1b4b 75%, #0f172a 100%);
-          background-size: 400% 400%;
+          background: linear-gradient(135deg,#0f172a 0%,#1e1b4b 25%,#312e81 50%,#1e1b4b 75%,#0f172a 100%);
           color: white;
           position: relative;
         }
-
-        .vx-buy-bg-grid {
-          position: absolute;
-          inset: 0;
-          background-image: 
-            linear-gradient(rgba(139, 92, 246, 0.05) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(139, 92, 246, 0.05) 1px, transparent 1px);
+        .vx-bg-grid {
+          position: absolute; inset: 0; pointer-events: none;
+          background-image:
+            linear-gradient(rgba(139,92,246,.04) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(139,92,246,.04) 1px, transparent 1px);
           background-size: 50px 50px;
-          opacity: 0.5;
-          pointer-events: none;
         }
 
-        .vx-buy-header {
-          position: relative;
-          z-index: 10;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        /* ── HEADER ── */
+        .vx-header {
+          position: relative; z-index: 10;
+          border-bottom: 1px solid rgba(255,255,255,.08);
           backdrop-filter: blur(20px);
-          background: rgba(15, 23, 42, 0.8);
+          background: rgba(15,23,42,.85);
         }
-
-        .vx-buy-header-inner {
-          max-width: 1400px;
-          margin: 0 auto;
-          padding: 0 clamp(16px, 4vw, 24px);
-          display: flex;
-          align-items: center;
-          justifyContent: space-between;
-          height: clamp(60px, 12vw, 80px);
-          gap: clamp(12px, 3vw, 16px);
+        .vx-header-inner {
+          max-width: min(960px, 100%); margin: 0 auto;
+          padding: 0 clamp(14px,4vw,24px);
+          height: clamp(56px,10vw,68px);
+          display: flex; align-items: center; justify-content: space-between;
+          overflow: hidden;
         }
-
-        .vx-buy-logo {
-          display: flex;
-          align-items: center;
-          gap: clamp(8px, 2vw, 10px);
-          cursor: pointer;
-          transition: transform 0.3s;
+        .vx-logo {
+          display: flex; align-items: center; gap: 10px;
+          cursor: pointer; transition: transform .3s; flex-shrink: 0;
         }
-        .vx-buy-logo:hover { transform: scale(1.05); }
-
-        .vx-buy-logo-outer {
+        .vx-logo:hover { transform: scale(1.04); }
+        .vx-logo-outer {
           position: relative;
-          width: clamp(60px, 12vw, 90px);
-          height: clamp(60px, 12vw, 90px);
-          border-radius: 50%;
-          padding: 4px;
-          background: radial-gradient(circle at 0 0, #7c3aed, #d946ef);
-          box-shadow: 0 0 30px rgba(124, 58, 237, 0.6);
-          flex-shrink: 0;
+          width: clamp(44px,9vw,56px); height: clamp(44px,9vw,56px);
+          border-radius: 50%; padding: 3px;
+          background: radial-gradient(circle at 0 0,#7c3aed,#d946ef);
+          box-shadow: 0 0 20px rgba(124,58,237,.5); flex-shrink: 0;
         }
-
-        .vx-buy-logo-glow {
-          position: absolute;
-          inset: -5px;
-          border-radius: 50%;
-          background: radial-gradient(circle, #a855f7, transparent);
-          opacity: 0.4;
-          filter: blur(10px);
-          pointer-events: none;
+        .vx-logo-glow {
+          position: absolute; inset: -4px; border-radius: 50%;
+          background: radial-gradient(circle,#a855f7,transparent);
+          opacity: .35; filter: blur(8px); pointer-events: none;
           animation: glow 2s ease-in-out infinite;
         }
-
-        .vx-buy-logo-circle {
-          position: relative;
-          width: 100%;
-          height: 100%;
-          border-radius: 50%;
-          background-color: #020817;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow: hidden;
+        .vx-logo-circle {
+          position: relative; width: 100%; height: 100%;
+          border-radius: 50%; background: #020817;
+          display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+        .vx-logo-label {
+          font-size: clamp(10px,2vw,12px); color: #c4b5fd;
+          text-transform: uppercase; letter-spacing: .14em; font-weight: 600;
+        }
+        .vx-audio-btn {
+          display: flex; align-items: center; justify-content: center;
+          width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+          border: 2px solid rgba(139,92,246,.5);
+          background: rgba(15,23,42,.8);
+          cursor: pointer; transition: all .3s;
+        }
+        .vx-audio-btn:hover {
+          border-color: #a78bfa; background: rgba(139,92,246,.2); transform: scale(1.06);
         }
 
-        .vx-buy-logo-img {
-          width: 100%;
-          height: 100%;
-          object-fit: contain;
-          padding: 10px;
+        /* ── MAIN ── */
+        .vx-main {
+          position: relative; z-index: 1;
+          max-width: min(960px, 100%); margin: 0 auto;
+          padding: clamp(28px,6vw,52px) clamp(14px,4vw,24px) 0;
         }
 
-        .vx-buy-logo-text {
-          font-size: clamp(11px, 2.2vw, 13px);
-          color: #c4b5fd;
-          text-transform: uppercase;
-          letter-spacing: 0.14em;
-          font-weight: 600;
-        }
-
-        .vx-buy-right {
-          display: flex;
-          align-items: center;
-          gap: clamp(10px, 2.5vw, 12px);
-        }
-
-        .vx-buy-audio-btn,
-        .vx-buy-back-btn {
-          display: flex;
-          align-items: center;
-          gap: clamp(6px, 1.5vw, 8px);
-          padding: clamp(8px, 2vw, 10px) clamp(14px, 3vw, 16px);
-          border-radius: clamp(10px, 2.5vw, 12px);
-          border: 2px solid rgba(139, 92, 246, 0.5);
-          background: rgba(15, 23, 42, 0.8);
-          color: white;
-          font-size: clamp(13px, 3vw, 14px);
-          font-weight: 700;
-          cursor: pointer;
-          transition: all 0.3s;
-          min-height: 44px;
-        }
-
-        .vx-buy-audio-btn {
-          width: 44px;
-          height: 44px;
-          padding: 0;
-          justify-content: center;
-        }
-
-        .vx-buy-audio-btn:hover,
-        .vx-buy-back-btn:hover {
-          border-color: #a78bfa;
-          background: rgba(139, 92, 246, 0.2);
-          transform: scale(1.05);
-        }
-
-        .vx-buy-main {
-          position: relative;
-          z-index: 1;
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: clamp(40px, 8vw, 80px) clamp(16px, 4vw, 24px) 0;
-        }
-
-        .vx-buy-hero {
-          text-align: center;
-          margin-bottom: clamp(50px, 10vw, 80px);
-        }
-
-        .vx-buy-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: clamp(6px, 1.5vw, 8px);
-          padding: clamp(8px, 2vw, 10px) clamp(18px, 4vw, 20px);
-          background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.15));
-          border: 2px solid rgba(251, 191, 36, 0.6);
-          border-radius: 999px;
-          font-size: clamp(11px, 2.2vw, 13px);
-          font-weight: 800;
-          color: #fbbf24;
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-          margin-bottom: clamp(20px, 4vw, 28px);
+        /* ── HERO ── */
+        .vx-hero { text-align: center; margin-bottom: clamp(28px,6vw,48px); }
+        .vx-hero-badge {
+          display: inline-flex; align-items: center; gap: 7px;
+          padding: 7px 16px;
+          background: linear-gradient(135deg,rgba(251,191,36,.18),rgba(245,158,11,.12));
+          border: 2px solid rgba(251,191,36,.55); border-radius: 999px;
+          font-size: clamp(10px,2vw,12px); font-weight: 800; color: #fbbf24;
+          text-transform: uppercase; letter-spacing: .1em;
+          margin-bottom: clamp(14px,3vw,20px);
           animation: pulse 2s ease-in-out infinite;
-          box-shadow: 0 0 20px rgba(251,191,36,0.3);
         }
-
-        .vx-buy-title {
-          font-size: clamp(36px, 8vw, 64px);
-          font-weight: 900;
-          margin-bottom: clamp(20px, 4vw, 28px);
-          line-height: 1.1;
-        }
-
-        .vx-buy-title-gradient {
-          background: linear-gradient(90deg, #a78bfa, #f0abfc, #fbbf24, #f0abfc, #a78bfa);
-          background-size: 200% auto;
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
+        .vx-hero-title {
+          font-size: clamp(28px,6.5vw,52px); font-weight: 900;
+          line-height: 1.1; margin-bottom: clamp(12px,3vw,18px);
+          background: linear-gradient(90deg,#a78bfa,#f0abfc,#fbbf24,#f0abfc,#a78bfa);
+          background-size: 200% auto; background-clip: text;
+          -webkit-background-clip: text; -webkit-text-fill-color: transparent;
           animation: shimmer 4s linear infinite;
         }
-
-        .vx-buy-subtitle {
-          font-size: clamp(15px, 3.5vw, 19px);
-          color: #cbd5e1;
-          line-height: 1.7;
-          max-width: 720px;
-          margin: 0 auto clamp(28px, 5vw, 36px);
+        .vx-hero-sub {
+          font-size: clamp(13px,3vw,16px); color: #cbd5e1;
+          line-height: 1.65; max-width: min(600px,100%); margin: 0 auto clamp(18px,4vw,26px);
+        }
+        .vx-trust { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+        .vx-trust-badge {
+          display: flex; align-items: center; gap: 6px;
+          padding: 7px 14px;
+          background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.35);
+          border-radius: 8px; font-size: clamp(11px,2.2vw,13px);
+          font-weight: 700; color: #86efac;
         }
 
-        .vx-buy-trust {
-          display: flex;
+        /* ── PRIZE BLOCK ── */
+        .vx-prize {
+          padding: clamp(20px,4vw,32px) clamp(18px,4vw,32px);
+          border-radius: clamp(16px,3vw,22px);
+          background: linear-gradient(135deg,rgba(251,191,36,.2),rgba(245,158,11,.14));
+          border: 2px solid rgba(251,191,36,.55);
+          margin-bottom: clamp(28px,6vw,48px);
+          position: relative; overflow: hidden;
+          animation: glow 2s ease-in-out infinite;
+        }
+        .vx-prize-label {
+          font-size: clamp(12px,2.5vw,15px); color: #fcd34d; font-weight: 800;
+          text-transform: uppercase; letter-spacing: 1.2px;
+          text-align: center; margin-bottom: clamp(16px,3.5vw,24px);
+          position: relative; z-index: 1;
+        }
+        .vx-prize-content {
+          display: flex; align-items: center; justify-content: center;
+          gap: clamp(20px,5vw,44px); position: relative; z-index: 1;
           flex-wrap: wrap;
-          justify-content: center;
-          gap: clamp(14px, 3vw, 18px);
+        }
+        .vx-prize-ring {
+          position: relative; flex-shrink: 0;
+          width: clamp(130px,25vw,170px); height: clamp(130px,25vw,170px);
+          display: flex; align-items: center; justify-content: center;
+        }
+        .vx-prize-info { flex: 1; min-width: 0; text-align: left; }
+        .vx-prize-amount {
+          font-size: clamp(32px,7vw,56px); font-weight: 900; line-height: 1; margin-bottom: 10px;
+          background: linear-gradient(90deg,#fbbf24,#f59e0b,#fbbf24);
+          background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
 
-        .vx-buy-trust-badge {
-          display: flex;
-          align-items: center;
-          gap: clamp(6px, 1.5vw, 8px);
-          padding: clamp(8px, 2vw, 10px) clamp(16px, 3.5vw, 18px);
-          background: rgba(34, 197, 94, 0.12);
-          border: 2px solid rgba(34, 197, 94, 0.4);
-          border-radius: clamp(8px, 2vw, 10px);
-          font-size: clamp(12px, 2.5vw, 14px);
-          font-weight: 700;
-          color: #86efac;
-          box-shadow: 0 0 15px rgba(34,197,94,0.2);
-        }
-
-        .prize-pool-content {
-          display: flex;
-          flex-direction: row;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .prize-pool-info {
-          text-align: left;
-        }
-
-        .prize-pool-countdown {
-          justify-content: flex-start;
-        }
-
-        .vx-buy-cards {
+        /* ── CARDS ── */
+        .vx-cards {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
-          gap: clamp(32px, 6vw, 48px);
-          margin-bottom: clamp(80px, 12vw, 100px);
+          grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+          gap: clamp(20px,4vw,32px);
+          margin-bottom: clamp(48px,8vw,72px);
         }
-
-        .vx-buy-card {
+        .vx-card {
           position: relative;
-          background: linear-gradient(135deg, rgba(30, 27, 75, 0.95), rgba(15, 23, 42, 0.95));
-          border: 3px solid transparent;
-          border-radius: clamp(24px, 5vw, 32px);
-          padding: clamp(36px, 6vw, 48px) clamp(28px, 5vw, 40px);
-          transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
+          background: linear-gradient(135deg,rgba(30,27,75,.95),rgba(15,23,42,.95));
+          border: 2px solid transparent;
+          border-radius: clamp(18px,4vw,24px);
+          padding: clamp(24px,4vw,36px) clamp(20px,4vw,30px);
+          display: flex; flex-direction: column; overflow: hidden;
+          transition: all .4s cubic-bezier(.4,0,.2,1);
         }
-
-        .vx-buy-card::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: radial-gradient(circle at 50% 0%, rgba(139,92,246,0.15), transparent 70%);
-          opacity: 0;
-          transition: opacity 0.5s;
-          pointer-events: none;
+        .vx-card::before {
+          content: ''; position: absolute; inset: 0;
+          background: radial-gradient(circle at 50% 0%,rgba(139,92,246,.12),transparent 70%);
+          opacity: 0; transition: opacity .4s; pointer-events: none;
         }
-
-        .vx-buy-card::after {
-          content: '';
-          position: absolute;
-          top: -50%;
-          left: -50%;
-          width: 200%;
-          height: 200%;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
-          transform: rotate(45deg);
-          pointer-events: none;
+        .vx-card::after {
+          content: ''; position: absolute; top: -50%; left: -50%;
+          width: 200%; height: 200%;
+          background: linear-gradient(90deg,transparent,rgba(255,255,255,.04),transparent);
+          transform: rotate(45deg); pointer-events: none;
         }
-
-        .vx-buy-card:hover::before {
-          opacity: 1;
+        .vx-card:hover::before { opacity: 1; }
+        .vx-card:hover::after  { animation: cardShine 1.4s ease-in-out; }
+        .vx-card:hover { transform: translateY(-10px) scale(1.015); box-shadow: 0 30px 70px rgba(139,92,246,.5); }
+        .vx-card.popular {
+          border-color: #fbbf24 !important;
+          box-shadow: 0 0 50px rgba(251,191,36,.35);
+          background: linear-gradient(135deg,rgba(45,35,75,.95),rgba(30,20,52,.95));
         }
+        .vx-card.popular:hover { box-shadow: 0 30px 70px rgba(251,191,36,.6); }
 
-        .vx-buy-card:hover::after {
-          animation: cardShine 1.5s ease-in-out;
-        }
-
-        .vx-buy-card:hover {
-          transform: translateY(-16px) scale(1.02);
-          box-shadow: 0 40px 100px rgba(139, 92, 246, 0.6);
-        }
-
-        .vx-buy-card.popular {
-          border-color: #fbbf24;
-          box-shadow: 0 0 80px rgba(251, 191, 36, 0.4);
-          background: linear-gradient(135deg, rgba(45, 35, 75, 0.95), rgba(30, 20, 52, 0.95));
-        }
-
-        .vx-buy-card.popular:hover {
-          box-shadow: 0 40px 100px rgba(251, 191, 36, 0.7);
-        }
-
-        .vx-buy-ribbon {
-          position: absolute;
-          top: clamp(20px, 4vw, 28px);
-          right: clamp(-36px, -7vw, -48px);
-          background: linear-gradient(135deg, #fbbf24, #f59e0b);
-          color: #0f172a;
-          padding: 10px 52px;
-          font-size: clamp(11px, 2.4vw, 14px);
-          font-weight: 900;
-          letter-spacing: 0.1em;
-          box-shadow: 0 4px 20px rgba(251, 191, 36, 0.6);
-          transform: rotate(45deg);
-          z-index: 2;
+        .vx-ribbon {
+          position: absolute; top: clamp(16px,3.5vw,22px); right: clamp(-32px,-6vw,-42px);
+          background: linear-gradient(135deg,#fbbf24,#f59e0b);
+          color: #0f172a; padding: 8px 46px;
+          font-size: clamp(10px,2.2vw,12px); font-weight: 900; letter-spacing: .08em;
+          box-shadow: 0 4px 16px rgba(251,191,36,.55);
+          transform: rotate(45deg); z-index: 2;
           animation: megaBounce 1.5s ease-in-out infinite;
         }
 
-        .vx-buy-card-header {
-          text-align: center;
-          margin-bottom: clamp(28px, 5vw, 36px);
-          position: relative;
-          z-index: 1;
+        .vx-card-header { text-align: center; margin-bottom: clamp(18px,4vw,26px); position: relative; z-index: 1; }
+        .vx-icon-wrap {
+          width: clamp(72px,14vw,90px); height: clamp(72px,14vw,90px);
+          border-radius: 50%; display: flex; align-items: center; justify-content: center;
+          margin: 0 auto clamp(14px,3vw,20px); position: relative;
+          transition: all .4s cubic-bezier(.4,0,.2,1);
         }
-
-        .vx-buy-icon-wrapper {
-          width: clamp(100px, 18vw, 120px);
-          height: clamp(100px, 18vw, 120px);
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin: 0 auto clamp(24px, 5vw, 32px);
-          position: relative;
-          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        .vx-icon-wrap::before {
+          content: ''; position: absolute; inset: -6px; border-radius: 50%;
+          opacity: .45; filter: blur(16px); transition: all .4s; z-index: -1;
         }
+        .vx-card:hover .vx-icon-wrap { transform: scale(1.12) rotate(360deg); }
+        .vx-card:hover .vx-icon-wrap::before { opacity: .85; filter: blur(24px); }
+        .vx-icon { width: clamp(34px,7vw,44px); height: clamp(34px,7vw,44px); color: white; filter: drop-shadow(0 0 8px rgba(255,255,255,.4)); }
 
-        .vx-buy-icon-wrapper::before {
-          content: '';
-          position: absolute;
-          inset: -8px;
-          border-radius: 50%;
-          opacity: 0.5;
-          filter: blur(20px);
-          transition: all 0.4s;
-          z-index: -1;
-        }
-
-        .vx-buy-card:hover .vx-buy-icon-wrapper {
-          transform: scale(1.15) rotate(360deg);
-        }
-
-        .vx-buy-card:hover .vx-buy-icon-wrapper::before {
-          opacity: 1;
-          filter: blur(30px);
-        }
-
-        .vx-buy-icon {
-          width: clamp(48px, 10vw, 60px);
-          height: clamp(48px, 10vw, 60px);
-          color: white;
-          filter: drop-shadow(0 0 10px rgba(255,255,255,0.5));
-        }
-
-        .vx-buy-card-tagline {
-          font-size: clamp(11px, 2.2vw, 13px);
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.1em;
-          margin-bottom: clamp(6px, 1.5vw, 8px);
-          opacity: 0.8;
-        }
-
-        .vx-buy-card-name {
-          font-size: clamp(26px, 5vw, 32px);
-          font-weight: 900;
-          margin-bottom: clamp(10px, 2.5vw, 12px);
-          background: linear-gradient(90deg, #ffffff, #e5e7eb, #ffffff);
-          background-size: 200% auto;
-          background-clip: text;
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
+        .vx-tagline { font-size: clamp(10px,2vw,12px); font-weight: 700; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 5px; opacity: .8; }
+        .vx-card-name {
+          font-size: clamp(20px,4.5vw,26px); font-weight: 900; margin-bottom: 6px;
+          background: linear-gradient(90deg,#fff,#e5e7eb,#fff); background-size: 200% auto;
+          background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
           animation: shimmer 3s linear infinite;
         }
+        .vx-card-desc { font-size: clamp(12px,2.5vw,14px); color: #94a3b8; }
 
-        .vx-buy-card-desc {
-          font-size: clamp(13px, 2.8vw, 15px);
-          color: #94a3b8;
-          line-height: 1.5;
+        .vx-round-display {
+          text-align: center; margin-bottom: clamp(18px,4vw,26px);
+          padding: clamp(16px,3.5vw,22px);
+          background: linear-gradient(135deg,rgba(255,255,255,.04),rgba(255,255,255,.02));
+          border-radius: 16px; border: 1px solid rgba(255,255,255,.07);
         }
-
-        .vx-buy-round-display {
-          text-align: center;
-          margin-bottom: clamp(28px, 5vw, 36px);
-          padding: clamp(24px, 5vw, 32px);
-          background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
-          border-radius: 20px;
-          border: 2px solid rgba(255, 255, 255, 0.08);
-          backdrop-filter: blur(10px);
-        }
-
-        .vx-buy-round-display.vx-buy-round-bundle {
-          background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
-          border: 2px solid rgba(251, 191, 36, 0.4);
+        .vx-round-display.bundle {
+          background: linear-gradient(135deg,rgba(251,191,36,.12),rgba(245,158,11,.08));
+          border: 1px solid rgba(251,191,36,.35);
           animation: glow 2s ease-in-out infinite;
         }
-
-        .vx-buy-round-text {
-          font-size: clamp(40px, 9vw, 56px);
-          font-weight: 900;
-          background: linear-gradient(90deg, #a78bfa, #f0abfc, #fbbf24);
-          background-size: 200% auto;
-          background-clip: text;
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          line-height: 1.2;
-          margin-bottom: clamp(10px, 2.5vw, 12px);
+        .vx-round-text {
+          font-size: clamp(32px,7vw,44px); font-weight: 900; line-height: 1.15;
+          margin-bottom: 8px;
+          background: linear-gradient(90deg,#a78bfa,#f0abfc,#fbbf24); background-size: 200% auto;
+          background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
           animation: shimmer 3s linear infinite;
         }
-
-        .vx-buy-round-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: clamp(6px, 1.5vw, 8px);
-          padding: clamp(8px, 2vw, 10px) clamp(18px, 4vw, 20px);
-          background: linear-gradient(135deg, rgba(251, 191, 36, 0.3), rgba(245, 158, 11, 0.2));
-          border: 2px solid rgba(251, 191, 36, 0.6);
-          border-radius: 999px;
-          font-size: clamp(14px, 3vw, 16px);
-          font-weight: 900;
-          color: #fbbf24;
-          margin-bottom: clamp(10px, 2.5vw, 12px);
-          box-shadow: 0 0 20px rgba(251,191,36,0.3);
-          animation: pulse 2s ease-in-out infinite;
+        .vx-round-badge {
+          display: inline-flex; align-items: center; gap: 6px;
+          padding: 6px 14px;
+          background: linear-gradient(135deg,rgba(251,191,36,.25),rgba(245,158,11,.15));
+          border: 1px solid rgba(251,191,36,.5); border-radius: 999px;
+          font-size: clamp(12px,2.5vw,14px); font-weight: 900; color: #fbbf24;
+          margin-bottom: 8px; animation: pulse 2s ease-in-out infinite;
         }
+        .vx-round-sub { font-size: clamp(11px,2.3vw,13px); color: #94a3b8; font-weight: 600; }
+        .bundle .vx-round-sub { color: #fcd34d; }
 
-        .vx-buy-round-subtext {
-          font-size: clamp(13px, 2.8vw, 15px);
-          color: #94a3b8;
-          font-weight: 600;
+        .vx-features { flex: 1; margin-bottom: clamp(18px,4vw,26px); }
+        .vx-feature {
+          display: flex; align-items: center; gap: clamp(10px,2.5vw,12px);
+          padding: clamp(9px,2vw,11px) clamp(10px,2.5vw,13px);
+          margin-bottom: 6px; font-size: clamp(12px,2.5vw,14px); color: #cbd5e1;
+          background: rgba(255,255,255,.025); border-radius: 10px;
+          border: 1px solid rgba(255,255,255,.05); transition: all .25s;
         }
+        .vx-feature:hover { background: rgba(139,92,246,.09); border-color: rgba(139,92,246,.28); transform: translateX(4px); }
+        .vx-feature.hi { background: rgba(251,191,36,.07); border-color: rgba(251,191,36,.25); }
+        .vx-feat-icon { width: clamp(16px,3.5vw,18px); height: clamp(16px,3.5vw,18px); flex-shrink: 0; color: #22c55e; }
+        .vx-feature.hi .vx-feat-icon { color: #fbbf24; }
 
-        .vx-buy-round-bundle .vx-buy-round-subtext {
-          color: #fcd34d;
+        .vx-btn {
+          width: 100%; padding: clamp(14px,3.5vw,18px);
+          background: linear-gradient(135deg,#7c3aed,#d946ef);
+          border: none; border-radius: clamp(12px,3vw,14px); color: white;
+          font-size: clamp(14px,3vw,16px); font-weight: 900; cursor: pointer;
+          display: flex; align-items: center; justify-content: center; gap: 10px;
+          box-shadow: 0 8px 30px rgba(124,58,237,.45);
+          transition: all .35s cubic-bezier(.4,0,.2,1);
+          position: relative; overflow: hidden; z-index: 1; min-height: 44px;
         }
-
-        .vx-buy-features {
-          flex: 1;
-          margin-bottom: clamp(28px, 5vw, 36px);
+        .vx-btn::before {
+          content: ''; position: absolute; top: 50%; left: 50%;
+          width: 0; height: 0; border-radius: 50%;
+          background: rgba(255,255,255,.18);
+          transform: translate(-50%,-50%);
+          transition: width .55s, height .55s; z-index: -1;
         }
+        .vx-btn:hover::before { width: 300px; height: 300px; }
+        .vx-btn:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(124,58,237,.65); }
+        .vx-btn:disabled { opacity: .6; cursor: not-allowed; }
+        .vx-btn.popular { background: linear-gradient(135deg,#fbbf24,#f59e0b); box-shadow: 0 8px 30px rgba(251,191,36,.45); }
+        .vx-btn.popular:hover:not(:disabled) { box-shadow: 0 12px 40px rgba(251,191,36,.65); }
 
-        .vx-buy-feature {
-          display: flex;
-          align-items: center;
-          gap: clamp(12px, 3vw, 14px);
-          padding: clamp(12px, 3vw, 14px) clamp(14px, 3.5vw, 16px);
-          margin-bottom: clamp(8px, 2vw, 10px);
-          font-size: clamp(14px, 3vw, 16px);
-          color: #cbd5e1;
-          background: rgba(255, 255, 255, 0.03);
-          border-radius: clamp(10px, 2.5vw, 12px);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          transition: all 0.3s;
-        }
-
-        .vx-buy-feature:hover {
-          background: rgba(139, 92, 246, 0.1);
-          border-color: rgba(139, 92, 246, 0.3);
-          transform: translateX(clamp(4px, 1.5vw, 6px));
-        }
-
-        .vx-buy-feature.highlight {
-          background: rgba(251, 191, 36, 0.08);
-          border-color: rgba(251, 191, 36, 0.3);
-        }
-
-        .vx-buy-feature-icon {
-          width: clamp(20px, 4.5vw, 22px);
-          height: clamp(20px, 4.5vw, 22px);
-          flex-shrink: 0;
-          color: #22c55e;
-        }
-
-        .vx-buy-feature.highlight .vx-buy-feature-icon {
-          color: #fbbf24;
-        }
-
-        .vx-buy-btn {
-          width: 100%;
-          padding: clamp(18px, 4vw, 22px);
-          background: linear-gradient(135deg, #7c3aed, #d946ef);
-          border: none;
-          border-radius: clamp(14px, 3.5vw, 16px);
-          color: white;
-          font-size: clamp(16px, 3.5vw, 18px);
-          font-weight: 900;
-          cursor: pointer;
-          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: clamp(10px, 2.5vw, 12px);
-          box-shadow: 0 10px 40px rgba(124, 58, 237, 0.5);
-          position: relative;
-          overflow: hidden;
-          z-index: 1;
-          min-height: 44px;
-        }
-
-        .vx-buy-btn::before {
-          content: '';
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          width: 0;
-          height: 0;
-          border-radius: 50%;
-          background: rgba(255, 255, 255, 0.2);
-          transform: translate(-50%, -50%);
-          transition: width 0.6s, height 0.6s;
-          z-index: -1;
-        }
-
-        .vx-buy-btn:hover::before {
-          width: 400px;
-          height: 400px;
-        }
-
-        .vx-buy-btn:hover:not(:disabled) {
-          transform: translateY(-4px);
-          box-shadow: 0 15px 50px rgba(124, 58, 237, 0.7);
-        }
-
-        .vx-buy-btn:active:not(:disabled) {
-          transform: translateY(-2px);
-        }
-
-        .vx-buy-btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        .vx-buy-btn.popular {
-          background: linear-gradient(135deg, #fbbf24, #f59e0b);
-          box-shadow: 0 10px 40px rgba(251, 191, 36, 0.5);
-        }
-
-        .vx-buy-btn.popular:hover:not(:disabled) {
-          box-shadow: 0 15px 50px rgba(251, 191, 36, 0.7);
-        }
-
-        .vx-buy-benefits {
-          max-width: 1000px;
-          margin: 0 auto clamp(80px, 12vw, 100px);
-        }
-
-        .vx-buy-benefits-title {
-          text-align: center;
-          font-size: clamp(32px, 7vw, 44px);
-          font-weight: 900;
-          margin-bottom: clamp(50px, 8vw, 60px);
-          background: linear-gradient(90deg, #ffffff, #e5e7eb, #ffffff);
-          background-size: 200% auto;
-          background-clip: text;
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
+        /* ── BENEFITS ── */
+        .vx-benefits { max-width: min(860px,100%); margin: 0 auto clamp(48px,8vw,72px); }
+        .vx-benefits-title {
+          text-align: center; font-size: clamp(24px,5.5vw,36px); font-weight: 900;
+          margin-bottom: clamp(28px,5vw,44px);
+          background: linear-gradient(90deg,#fff,#e5e7eb,#fff); background-size: 200% auto;
+          background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
           animation: shimmer 3s linear infinite;
         }
-
-        .vx-buy-benefits-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
-          gap: clamp(20px, 4vw, 28px);
+        .vx-benefits-grid {
+          display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,190px),1fr));
+          gap: clamp(14px,3vw,20px);
         }
-
-        .vx-buy-benefit {
-          padding: clamp(24px, 4.5vw, 32px);
-          border-radius: clamp(18px, 4vw, 24px);
-          background: rgba(255, 255, 255, 0.03);
-          border: 2px solid rgba(255, 255, 255, 0.1);
-          transition: all 0.4s;
-          text-align: center;
+        .vx-benefit {
+          padding: clamp(18px,4vw,24px); border-radius: clamp(14px,3vw,18px);
+          background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.09);
+          transition: all .35s; text-align: center;
         }
-
-        .vx-buy-benefit:hover {
-          background: rgba(139, 92, 246, 0.12);
-          border-color: rgba(139, 92, 246, 0.5);
-          transform: translateY(-12px) scale(1.02);
-          box-shadow: 0 20px 60px rgba(139, 92, 246, 0.4);
+        .vx-benefit:hover { background: rgba(139,92,246,.1); border-color: rgba(139,92,246,.4); transform: translateY(-8px); box-shadow: 0 16px 40px rgba(139,92,246,.3); }
+        .vx-benefit-icon {
+          width: clamp(48px,9vw,56px); height: clamp(48px,9vw,56px); border-radius: 14px;
+          display: flex; align-items: center; justify-content: center;
+          margin: 0 auto clamp(12px,3vw,16px); transition: transform .35s;
         }
+        .vx-benefit:hover .vx-benefit-icon { transform: scale(1.1) rotate(5deg); }
+        .vx-benefit-title { font-size: clamp(14px,3vw,16px); font-weight: 800; margin-bottom: 5px; color: #e5e7eb; }
+        .vx-benefit-text  { font-size: clamp(12px,2.5vw,13px); color: #94a3b8; line-height: 1.6; }
 
-        .vx-buy-benefit-icon {
-          width: clamp(56px, 11vw, 64px);
-          height: clamp(56px, 11vw, 64px);
-          border-radius: 16px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin: 0 auto clamp(16px, 3.5vw, 20px);
-          transition: transform 0.4s;
+        /* ── MOBILE ── */
+        @media (max-width: 600px) {
+          .mobile-hide     { display: none !important; }
+          .vx-prize-info   { text-align: center; }
+          .vx-prize-amount { text-align: center; }
+          /* ribbon taşmasını önle */
+          .vx-ribbon       { right: -38px !important; padding: 7px 40px !important; font-size: 9px !important; }
+          /* card hover transform mobilde sıfırla (dokunmatik) */
+          .vx-card:hover   { transform: none !important; }
+          .vx-card:hover .vx-icon-wrap { transform: none !important; }
+          .vx-benefit:hover { transform: none !important; }
+          /* card içi padding küçült */
+          .vx-card { padding: clamp(18px,5vw,24px) clamp(14px,4vw,20px) !important; }
+          /* prize ring küçültme zaten clamp ile — info sütun yap */
+          .vx-prize-content { flex-direction: column; align-items: center; }
+          /* benefits grid tek sütun */
+          .vx-benefits-grid { grid-template-columns: 1fr 1fr !important; }
+          /* hero badge küçük ekranda wrap olmasın */
+          .vx-trust { gap: 7px; }
+          .vx-trust-badge { padding: 6px 10px; font-size: 11px; }
         }
-
-        .vx-buy-benefit:hover .vx-buy-benefit-icon {
-          transform: scale(1.1) rotate(5deg);
-        }
-
-        .vx-buy-benefit-title {
-          font-size: clamp(16px, 3.5vw, 18px);
-          font-weight: 800;
-          margin-bottom: clamp(6px, 1.5vw, 8px);
-          color: #e5e7eb;
-        }
-
-        .vx-buy-benefit-text {
-          font-size: clamp(14px, 3vw, 15px);
-          color: #94a3b8;
-          line-height: 1.7;
-        }
-
-        @media (max-width: 768px) {
-          .mobile-hide { display: none !important; }
-          .prize-pool-content { flex-direction: column !important; }
-          .prize-pool-info { text-align: center !important; }
-          .prize-pool-countdown { justify-content: center !important; }
+        @media (max-width: 380px) {
+          .vx-benefits-grid { grid-template-columns: 1fr !important; }
+          .vx-hero-title    { font-size: 24px !important; }
+          .vx-prize-amount  { font-size: 28px !important; }
         }
       `}</style>
 
-      <div className="vx-buy-container">
-        <div className="vx-buy-bg-grid" />
+      <div className="vx-container">
+        <div className="vx-bg-grid" />
 
-        {/* Header */}
-        <header className="vx-buy-header">
-          <div className="vx-buy-header-inner">
-            <div className="vx-buy-logo" onClick={() => router.push("/")}>
-              <div className="vx-buy-logo-outer">
-                <div className="vx-buy-logo-glow" />
-                <div className="vx-buy-logo-circle">
-                  <img src="/images/logo.png" alt="VibraXX Logo" className="vx-buy-logo-img" />
+        {/* ── HEADER ── */}
+        <header className="vx-header">
+          <div className="vx-header-inner">
+            <div className="vx-logo" onClick={() => router.push("/")}>
+              <div className="vx-logo-outer">
+                <div className="vx-logo-glow" />
+                <div className="vx-logo-circle">
+                  <Image src="/images/logo.png" alt="VibraXX" fill sizes="56px" style={{ objectFit: "contain", padding: "12%" }} />
                 </div>
               </div>
-              <div className="vx-buy-logo-text mobile-hide">
-                Live Quiz
-              </div>
+              <span className="vx-logo-label mobile-hide">Live Quiz</span>
             </div>
 
-            <div className="vx-buy-right">
-              <button className="vx-buy-audio-btn" onClick={toggleMusic}>
-                {isMusicPlaying ? <Volume2 size={20} /> : <VolumeX size={20} />}
-              </button>
-
-              <button className="vx-buy-back-btn" onClick={() => router.push("/")}>
-                <ChevronRight size={16} style={{ transform: "rotate(180deg)" }} />
-                <span className="mobile-hide">Back to Home</span>
-              </button>
-            </div>
+            {/* Ses butonu en sağda */}
+            <button className="vx-audio-btn" onClick={toggleMusic} title={isMusicPlaying ? "Mute" : "Play music"}
+              style={{ background: isMusicPlaying ? "linear-gradient(135deg,rgba(139,92,246,.9),rgba(124,58,237,.9))" : "rgba(15,23,42,.8)", boxShadow: isMusicPlaying ? "0 0 14px rgba(139,92,246,.5)" : "none" }}>
+              {isMusicPlaying
+                ? <Volume2  style={{ width: 18, height: 18, color: "white" }} />
+                : <VolumeX  style={{ width: 18, height: 18, color: "#94a3b8" }} />}
+            </button>
           </div>
         </header>
 
-        {/* Main */}
-        <main className="vx-buy-main">
-          {/* Hero */}
-          <div className="vx-buy-hero animate-slide-up">
-            <div className="vx-buy-badge">
-              <Sparkles size={18} />
-              LIMITED TIME OFFER
+        {/* ── MAIN ── */}
+        <main className="vx-main">
+
+          {/* HERO */}
+          <div className="vx-hero animate-slide-up">
+            <div className="vx-hero-badge">
+              <Sparkles size={16} />
+              Choose Your Plan
             </div>
-
-            <h1 className="vx-buy-title">
-              <span className="vx-buy-title-gradient">Choose Your Champion Plan</span>
-            </h1>
-
-            <p className="vx-buy-subtitle">
-              Join the elite competition for the <strong style={{ color: "#fbbf24", fontWeight: 900 }}>£1,000 monthly prize</strong>. 
-              Skill-based, UK-regulated, and completely transparent. Your journey to victory starts here.
+            <h1 className="vx-hero-title">Compete. Win. Repeat.</h1>
+            <p className="vx-hero-sub">
+              Join the global skill-based quiz competition and fight for the{" "}
+              <strong style={{ color: "#fbbf24", fontWeight: 900 }}>£1,000 monthly prize</strong>.
+              Pure knowledge, zero chance.
             </p>
-
-            <div className="vx-buy-trust">
-              <div className="vx-buy-trust-badge">
-                <Shield size={16} />
-                <span>Secure Payment</span>
-              </div>
-              <div className="vx-buy-trust-badge">
-                <Lock size={16} />
-                <span>SSL Encrypted</span>
-              </div>
-              <div className="vx-buy-trust-badge">
-                <CheckCircle2 size={16} />
-                <span>Instant Access</span>
-              </div>
+            <div className="vx-trust">
+              <div className="vx-trust-badge"><Shield   size={14} /><span>Secure Payment</span></div>
+              <div className="vx-trust-badge"><Lock     size={14} /><span>SSL Encrypted</span></div>
+              <div className="vx-trust-badge"><CheckCircle2 size={14} /><span>Instant Access</span></div>
             </div>
           </div>
 
-          {/* ✅ PRIZE POOL SECTION - EXACT SAME AS LEADERBOARD */}
+          {/* PRIZE BLOCK */}
           {prizeData?.prize && prizeData?.countdown && (
-            <div className="animate-glow animate-scale-in" style={{
-              padding: "clamp(32px, 6vw, 48px) clamp(24px, 5vw, 40px)",
-              borderRadius: "clamp(20px, 4vw, 28px)",
-              background: "linear-gradient(135deg, rgba(251,191,36,0.25), rgba(245,158,11,0.2))",
-              border: "3px solid rgba(251,191,36,0.6)",
-              marginBottom: "clamp(60px, 10vw, 80px)",
-              position: "relative",
-              overflow: "hidden",
-            }}>
-              <div style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: "radial-gradient(circle at 50% 50%, rgba(251,191,36,0.15) 0%, transparent 70%)",
-                pointerEvents: "none",
-              }} />
+            <div className="vx-prize animate-scale-in">
+              <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 50% 50%,rgba(251,191,36,.12) 0%,transparent 70%)", pointerEvents: "none" }} />
+              <div className="vx-prize-label">💰 {prizeData.prize.label || "Monthly Prize Pool"}</div>
 
-              <div style={{
-                fontSize: "clamp(14px, 3vw, 18px)",
-                color: "#fcd34d",
-                fontWeight: 800,
-                marginBottom: "clamp(24px, 5vw, 32px)",
-                textTransform: "uppercase",
-                letterSpacing: "1.5px",
-                textAlign: "center",
-                position: "relative",
-                zIndex: 1,
-              }}>
-                💰 {prizeData?.prize?.label || 'Prize Pool'}
-              </div>
-
-              <div className="prize-pool-content" style={{
-                display: "flex",
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "clamp(32px, 6vw, 48px)",
-                position: "relative",
-                zIndex: 1,
-              }}>
-                
-                {/* Circular Progress Ring - EXACT SAME */}
-                <div style={{
-                  position: "relative",
-                  width: "clamp(160px, 30vw, 200px)",
-                  height: "clamp(160px, 30vw, 200px)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}>
-                  <svg
-                    width="100%"
-                    height="100%"
-                    viewBox="0 0 200 200"
-                    style={{
-                      transform: "rotate(-90deg)",
-                      filter: prizeData?.prize?.unlocked 
-                        ? "drop-shadow(0 0 20px rgba(251,191,36,0.8))"
-                        : "drop-shadow(0 0 10px rgba(139,92,246,0.5))",
-                    }}>
-                    <circle
-                      cx="100"
-                      cy="100"
-                      r="85"
-                      fill="none"
-                      stroke="rgba(15,23,42,0.6)"
-                      strokeWidth="12"
-                    />
-                    <circle
-                      cx="100"
-                      cy="100"
-                      r="85"
-                      fill="none"
-                      stroke={prizeData?.prize?.unlocked 
-                        ? "url(#goldGradient)" 
-                        : "url(#purpleGradient)"}
-                      strokeWidth="12"
-                      strokeLinecap="round"
-                      strokeDasharray={`${2 * Math.PI * 85}`}
-                      strokeDashoffset={`${2 * Math.PI * 85 * (1 - Math.min(
-                        (prizeData?.prize?.progress || 0) / (prizeData?.prize?.threshold || 1), 
-                        1
-                      ))}`}
-                      style={{
-                        transition: "stroke-dashoffset 1s ease-out, stroke 0.5s ease",
-                      }}
-                    />
+              <div className="vx-prize-content">
+                {/* Ring */}
+                <div className="vx-prize-ring">
+                  <svg width="100%" height="100%" viewBox="0 0 200 200" style={{ transform: "rotate(-90deg)", filter: isUnlocked ? "drop-shadow(0 0 18px rgba(251,191,36,.8))" : "drop-shadow(0 0 10px rgba(139,92,246,.5))" }}>
                     <defs>
-                      <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#fbbf24" />
-                        <stop offset="50%" stopColor="#f59e0b" />
+                      <linearGradient id="buyGold"   x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%"   stopColor="#fbbf24" />
+                        <stop offset="50%"  stopColor="#f59e0b" />
                         <stop offset="100%" stopColor="#fbbf24" />
                       </linearGradient>
-                      <linearGradient id="purpleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#8b5cf6" />
-                        <stop offset="50%" stopColor="#d946ef" />
+                      <linearGradient id="buyPurple" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%"   stopColor="#8b5cf6" />
+                        <stop offset="50%"  stopColor="#d946ef" />
                         <stop offset="100%" stopColor="#8b5cf6" />
                       </linearGradient>
                     </defs>
+                    <circle cx="100" cy="100" r="85" fill="none" stroke="rgba(15,23,42,.6)" strokeWidth="12" />
+                    <circle cx="100" cy="100" r="85" fill="none"
+                      stroke={isUnlocked ? "url(#buyGold)" : "url(#buyPurple)"}
+                      strokeWidth="12" strokeLinecap="round"
+                      strokeDasharray={CIRCUMFERENCE} strokeDashoffset={dashOffset}
+                      style={{ transition: "stroke-dashoffset 1s ease-out, stroke .5s ease" }}
+                    />
                   </svg>
-
-                  <div style={{
-                    position: "absolute",
-                    top: "50%",
-                    left: "50%",
-                    transform: "translate(-50%, -50%)",
-                    textAlign: "center",
-                  }}>
-                    <div style={{
-                      fontSize: "clamp(32px, 6vw, 48px)",
-                      marginBottom: "8px",
-                      animation: prizeData?.prize?.unlocked 
-                        ? "float 2s ease-in-out infinite"
-                        : "none",
-                    }}>
-                      {prizeData?.prize?.unlocked ? "🎉" : "🔒"}
+                  <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", textAlign: "center" }}>
+                    <div style={{ fontSize: "clamp(26px,5vw,36px)", marginBottom: 5, animation: isUnlocked ? "float 2s ease-in-out infinite" : "none" }}>
+                      {isUnlocked ? "🎉" : "🔒"}
                     </div>
-                    <div style={{
-                      fontSize: "clamp(24px, 5vw, 36px)",
-                      fontWeight: 900,
-                      background: prizeData?.prize?.unlocked
-                        ? "linear-gradient(90deg, #fbbf24, #f59e0b)"
-                        : "linear-gradient(90deg, #8b5cf6, #d946ef)",
-                      backgroundClip: "text",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      lineHeight: 1,
-                    }}>
-                      {prizeData?.prize?.threshold 
-                        ? Math.round(((prizeData?.prize?.progress || 0) / prizeData.prize.threshold) * 100)
-                        : 0}%
+                    <div style={{ fontSize: "clamp(16px,3.5vw,22px)", fontWeight: 900, background: isUnlocked ? "linear-gradient(90deg,#fbbf24,#f59e0b)" : "linear-gradient(90deg,#8b5cf6,#d946ef)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1 }}>
+                      {Math.round(progressRatio * 100)}%
                     </div>
                   </div>
                 </div>
 
-                {/* Right Side - Info - EXACT SAME */}
-                <div className="prize-pool-info" style={{ flex: 1, textAlign: "left" }}>
-                  <div style={{
-                    fontSize: "clamp(48px, 10vw, 80px)",
-                    fontWeight: 900,
-                    background: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)",
-                    backgroundClip: "text",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    lineHeight: 1,
-                    marginBottom: "16px",
-                    filter: prizeData?.prize?.unlocked
-                      ? "drop-shadow(0 0 20px rgba(251,191,36,0.6))"
-                      : "none",
-                  }}>
-                    £{(prizeData?.prize?.amount || 0).toLocaleString()}
+                {/* Info */}
+                <div className="vx-prize-info">
+                  <div className="vx-prize-amount" style={{ filter: isUnlocked ? "drop-shadow(0 0 16px rgba(251,191,36,.6))" : "none" }}>
+                    £{(prizeData.prize.amount || 1000).toLocaleString()}
                   </div>
 
-                  {prizeData?.prize?.unlocked ? (
-                    <div style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      padding: "10px 20px",
-                      borderRadius: "999px",
-                      background: "linear-gradient(135deg, rgba(34,197,94,0.25), rgba(21,128,61,0.2))",
-                      border: "2px solid rgba(34,197,94,0.6)",
-                      marginBottom: "16px",
-                    }}>
-                      <Sparkles style={{ width: "20px", height: "20px", color: "#22c55e" }} />
-                      <span style={{
-                        fontSize: "clamp(12px, 2.5vw, 16px)",
-                        fontWeight: 800,
-                        color: "#22c55e",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                      }}>
-                        PRIZE ACTIVE!
-                      </span>
+                  {isUnlocked ? (
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 14px", borderRadius: "999px", background: "linear-gradient(135deg,rgba(34,197,94,.22),rgba(21,128,61,.16))", border: "2px solid rgba(34,197,94,.55)", marginBottom: 10 }}>
+                      <Sparkles style={{ width: 16, height: 16, color: "#22c55e" }} />
+                      <span style={{ fontSize: "clamp(11px,2.2vw,13px)", fontWeight: 800, color: "#22c55e", textTransform: "uppercase", letterSpacing: ".5px" }}>PRIZE ACTIVE!</span>
                     </div>
                   ) : (
-                    <div style={{ marginBottom: "16px" }}>
-                      <div style={{
-                        fontSize: "clamp(14px, 3vw, 18px)",
-                        fontWeight: 700,
-                        color: "#fcd34d",
-                        marginBottom: "8px",
-                      }}>
-                        {(prizeData?.prize?.progress || 0).toLocaleString()} / {(prizeData?.prize?.threshold || 0).toLocaleString()} Paid Entries
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: "clamp(12px,2.5vw,15px)", fontWeight: 700, color: "#fcd34d", marginBottom: 6 }}>
+                        {(prizeData.prize.progress || 0).toLocaleString()} / {(prizeData.prize.threshold || 1000).toLocaleString()} Paid Entries
                       </div>
-                      <div style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        padding: "8px 16px",
-                        borderRadius: "999px",
-                        background: "rgba(139,92,246,0.2)",
-                        border: "1px solid rgba(139,92,246,0.5)",
-                      }}>
-                        <Target style={{ width: "16px", height: "16px", color: "#a78bfa" }} />
-                        <span style={{
-                          fontSize: "clamp(11px, 2.2vw, 14px)",
-                          fontWeight: 700,
-                          color: "#a78bfa",
-                        }}>
-                          {((prizeData?.prize?.threshold || 0) - (prizeData?.prize?.progress || 0)).toLocaleString()} more to unlock!
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 11px", borderRadius: "999px", background: "rgba(139,92,246,.18)", border: "1px solid rgba(139,92,246,.45)" }}>
+                        <Target style={{ width: 11, height: 11, color: "#a78bfa", flexShrink: 0 }} />
+                        <span style={{ fontSize: "clamp(10px,2vw,12px)", fontWeight: 700, color: "#a78bfa" }}>
+                          {((prizeData.prize.threshold || 1000) - (prizeData.prize.progress || 0)).toLocaleString()} more to unlock!
                         </span>
                       </div>
                     </div>
                   )}
 
-                  {/* Countdown - EXACT SAME */}
-                  <div className="prize-pool-countdown" style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "flex-start",
-                    gap: "8px",
-                    fontSize: "clamp(11px, 2.2vw, 14px)",
-                    color: "#cbd5e1",
-                  }}>
-                    <Clock style={{ width: "16px", height: "16px" }} />
-                    <span>
-                      Resets in {prizeData?.countdown?.days || 0}d {prizeData?.countdown?.hours || 0}h {prizeData?.countdown?.minutes || 0}m
-                    </span>
+                  <div style={{ fontSize: "clamp(10px,2vw,12px)", color: "#94a3b8", marginBottom: 8, lineHeight: 1.5 }}>
+                    {prizeData.prize.sublabel}
                   </div>
-
-                  {/* Sublabel */}
-                  <div style={{
-                    fontSize: "clamp(11px, 2.2vw, 13px)",
-                    color: "#94a3b8",
-                    marginTop: "12px",
-                    fontStyle: "italic",
-                  }}>
-                    {prizeData?.prize?.sublabel || 'Prize information'}
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 11px", borderRadius: "999px", background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)", fontSize: "clamp(10px,2vw,12px)", color: "#94a3b8", fontWeight: 600 }}>
+                    <Clock style={{ width: 11, height: 11, flexShrink: 0 }} />
+                    Resets in {prizeData.countdown.days}d {prizeData.countdown.hours}h {prizeData.countdown.minutes}m
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Package Cards */}
-          <div className="vx-buy-cards">
-            {packages.map((pkg, index) => {
-              const Icon = pkg.icon;
+          {/* PACKAGE CARDS */}
+          <div className="vx-cards">
+            {packages.map((pkg, i) => {
+              const Icon        = pkg.icon;
               const isProcessing = processingPackageId === pkg.id;
-
               return (
-                <div 
-                  key={pkg.id} 
-                  className={`vx-buy-card ${pkg.popular ? "popular" : ""} animate-slide-up`}
-                  style={{
-                    borderColor: pkg.color.border,
-                    animationDelay: `${index * 0.15}s`,
-                  }}>
-                  {pkg.badge && (
-                    <div className="vx-buy-ribbon">
-                      {pkg.badge}
-                    </div>
-                  )}
+                <div key={pkg.id}
+                  className={`vx-card ${pkg.popular ? "popular" : ""} animate-slide-up`}
+                  style={{ borderColor: pkg.color.border, animationDelay: `${i * 0.12}s` }}>
 
-                  <div className="vx-buy-card-header">
-                    <div
-                      className="vx-buy-icon-wrapper"
-                      style={{
-                        background: pkg.color.iconBg,
-                        boxShadow: `0 0 50px ${pkg.color.glow}`,
-                      }}>
-                      <div style={{
-                        position: "absolute",
-                        inset: -8,
-                        background: pkg.color.iconBg,
-                        borderRadius: "50%",
-                        opacity: 0.5,
-                        filter: "blur(20px)",
-                      }} />
-                      <Icon className="vx-buy-icon" />
+                  {pkg.badge && <div className="vx-ribbon">{pkg.badge}</div>}
+
+                  <div className="vx-card-header">
+                    <div className="vx-icon-wrap" style={{ background: pkg.color.iconBg, boxShadow: `0 0 40px ${pkg.color.glow}` }}>
+                      <div style={{ position: "absolute", inset: -6, background: pkg.color.iconBg, borderRadius: "50%", opacity: .45, filter: "blur(16px)" }} />
+                      <Icon className="vx-icon" />
                     </div>
-                    {pkg.tagline && (
-                      <div className="vx-buy-card-tagline" style={{ color: pkg.popular ? "#fbbf24" : "#a78bfa" }}>
-                        {pkg.tagline}
-                      </div>
-                    )}
-                    <h3 className="vx-buy-card-name">{pkg.name}</h3>
-                    <p className="vx-buy-card-desc">{pkg.description}</p>
+                    {pkg.tagline && <div className="vx-tagline" style={{ color: pkg.popular ? "#fbbf24" : "#a78bfa" }}>{pkg.tagline}</div>}
+                    <h3 className="vx-card-name">{pkg.name}</h3>
+                    <p className="vx-card-desc">{pkg.description}</p>
                   </div>
 
-                  {/* Round Display - No Pricing */}
-                  {pkg.id === 'single' ? (
-                    <div className="vx-buy-round-display">
-                      <div className="vx-buy-round-text">1 Round</div>
-                      <div className="vx-buy-round-subtext">Perfect for trying out</div>
-                    </div>
-                  ) : (
-                    <div className="vx-buy-round-display vx-buy-round-bundle">
-                      <div className="vx-buy-round-text">30 Rounds</div>
-                      <div className="vx-buy-round-badge">
-                        <Sparkles size={16} />
-                        <span>20% OFF</span> {/* ✅ FIXED: 40% → 20% */}
-                      </div>
-                      <div className="vx-buy-round-subtext">Best Value Package</div>
-                    </div>
-                  )}
+                  <div className={`vx-round-display ${pkg.id === "bundle" ? "bundle" : ""}`}>
+                    <div className="vx-round-text">{pkg.rounds === 1 ? "1 Round" : "30 Rounds"}</div>
+                    {pkg.id === "bundle" && (
+                      <div className="vx-round-badge"><Sparkles size={14} /><span>20% OFF</span></div>
+                    )}
+                    <div className="vx-round-sub">{pkg.id === "single" ? "Perfect for trying out" : "Best Value Package"}</div>
+                  </div>
 
-                  <div className="vx-buy-features">
-                    {pkg.features.map((feature, idx) => {
-                      const FeatureIcon = feature.icon;
+                  <div className="vx-features">
+                    {pkg.features.map((f, idx) => {
+                      const FIcon = f.icon;
                       return (
-                        <div key={idx} className={`vx-buy-feature ${feature.highlight ? "highlight" : ""}`}>
-                          <FeatureIcon className="vx-buy-feature-icon" />
-                          <span>{feature.text}</span>
+                        <div key={idx} className={`vx-feature ${f.highlight ? "hi" : ""}`}>
+                          <FIcon className="vx-feat-icon" />
+                          <span>{f.text}</span>
                         </div>
                       );
                     })}
                   </div>
 
-                  <button
-                    onClick={() => handlePurchase(pkg)}
-                    disabled={isProcessing}
-                    className={`vx-buy-btn ${pkg.popular ? "popular" : ""}`}>
+                  <button onClick={() => handlePurchase(pkg)} disabled={isProcessing}
+                    className={`vx-btn ${pkg.popular ? "popular" : ""}`}>
                     {isProcessing ? (
                       <>
-                        <div style={{
-                          width: "20px",
-                          height: "20px",
-                          border: "3px solid rgba(255,255,255,0.3)",
-                          borderTopColor: "white",
-                          borderRadius: "50%",
-                          animation: "spin 0.8s linear infinite",
-                        }} />
+                        <div style={{ width: 18, height: 18, border: "3px solid rgba(255,255,255,.3)", borderTopColor: "white", borderRadius: "50%", animation: "spin .8s linear infinite" }} />
                         <span>Processing...</span>
                       </>
                     ) : (
                       <>
-                        <ShoppingCart size={22} />
-                        <span>Purchase Now - Instant Access</span>
+                        <ShoppingCart size={20} />
+                        <span>Purchase Now — Instant Access</span>
                       </>
                     )}
                   </button>
@@ -1451,53 +776,26 @@ export default function BuyPage() {
             })}
           </div>
 
-          {/* Benefits */}
-          <div className="vx-buy-benefits">
-            <h2 className="vx-buy-benefits-title">Why Choose VibraXX?</h2>
-            <div className="vx-buy-benefits-grid">
-              <div className="vx-buy-benefit animate-scale-in" style={{ animationDelay: "0.1s" }}>
-                <div className="vx-buy-benefit-icon" style={{ background: "linear-gradient(135deg, #3b82f6, #2563eb)" }}>
-                  <Trophy size={28} color="white" />
+          {/* BENEFITS */}
+          <div className="vx-benefits">
+            <h2 className="vx-benefits-title">Why VibraXX?</h2>
+            <div className="vx-benefits-grid">
+              {[
+                { bg: "linear-gradient(135deg,#3b82f6,#2563eb)", icon: <Trophy size={26} color="white" />, title: "Skill-Based",      text: "Compete on pure knowledge. No luck, no chance — every correct answer counts." },
+                { bg: "linear-gradient(135deg,#10b981,#059669)", icon: <Shield size={26} color="white" />, title: "UK Based",         text: "Operated by Sermin Limited, a company registered in England & Wales." },
+                { bg: "linear-gradient(135deg,#f59e0b,#d97706)", icon: <TrendingUp size={26} color="white" />, title: "Track Progress", text: "Real-time stats, detailed analytics, and tier rankings after every round." },
+                { bg: "linear-gradient(135deg,#8b5cf6,#7c3aed)", icon: <Rocket size={26} color="white" />,    title: "Instant Access", text: "Start playing immediately after purchase. No waiting, no delays." },
+              ].map(({ bg, icon, title, text }, i) => (
+                <div key={title} className="vx-benefit animate-scale-in" style={{ animationDelay: `${(i + 1) * 0.1}s` }}>
+                  <div className="vx-benefit-icon" style={{ background: bg }}>{icon}</div>
+                  <div className="vx-benefit-title">{title}</div>
+                  <div className="vx-benefit-text">{text}</div>
                 </div>
-                <div className="vx-buy-benefit-title">Skill-Based Competition</div>
-                <div className="vx-buy-benefit-text">
-                  Test your knowledge and compete based on pure skill, not chance. Every question counts!
-                </div>
-              </div>
-
-              <div className="vx-buy-benefit animate-scale-in" style={{ animationDelay: "0.2s" }}>
-                <div className="vx-buy-benefit-icon" style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}>
-                  <Shield size={28} color="white" />
-                </div>
-                <div className="vx-buy-benefit-title">UK Regulated</div>
-                <div className="vx-buy-benefit-text">
-                  Fully compliant with UK gaming laws and consumer protection standards
-                </div>
-              </div>
-
-              <div className="vx-buy-benefit animate-scale-in" style={{ animationDelay: "0.3s" }}>
-                <div className="vx-buy-benefit-icon" style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}>
-                  <TrendingUp size={28} color="white" />
-                </div>
-                <div className="vx-buy-benefit-title">Track Progress</div>
-                <div className="vx-buy-benefit-text">
-                  Real-time statistics, detailed performance analytics, and tier rankings
-                </div>
-              </div>
-
-              <div className="vx-buy-benefit animate-scale-in" style={{ animationDelay: "0.4s" }}>
-                <div className="vx-buy-benefit-icon" style={{ background: "linear-gradient(135deg, #8b5cf6, #7c3aed)" }}>
-                  <Rocket size={28} color="white" />
-                </div>
-                <div className="vx-buy-benefit-title">Instant Access</div>
-                <div className="vx-buy-benefit-text">
-                  Start playing immediately after purchase - no waiting, no delays
-                </div>
-              </div>
+              ))}
             </div>
           </div>
-        </main>
 
+        </main>
         <Footer />
       </div>
     </>
