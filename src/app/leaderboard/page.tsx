@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { 
@@ -158,16 +158,8 @@ function PodiumCard({ player, place }: { player: Player; place: 1 | 2 | 3 }) {
 // ═══════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════
-// STATIC JSON-LD (no re-render, no hydration risk)
-// ═══════════════════════════════════════════════════════════
-
-// ═══════════════════════════════════════════════════════════
-// COMPONENT
-// ═══════════════════════════════════════════════════════════
-
 function LeaderboardPage() {
-  const [activeTab, setActiveTab] = useState<'weekly' | 'monthly'>('weekly');
+  const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [data, setData] = useState<LeaderboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
@@ -239,22 +231,12 @@ function LeaderboardPage() {
         const { data: rpcData, error } = await supabase.rpc("get_leaderboard_data", { p_tab: activeTab });
         
         if (error) {
-          console.error(`Leaderboard error:`, error);
           setData(null);
           return;
         }
         
-        // DEBUG: Check if avatar_url comes from DB
-        if (rpcData?.players?.[0]) {
-          console.log("🔍 First player has avatar_url?", !!rpcData.players[0].avatar_url);
-          if (rpcData.players[0].avatar_url) {
-            console.log("   Avatar URL:", rpcData.players[0].avatar_url);
-          }
-        }
-        
         setData(rpcData || null);
       } catch (error) {
-        console.error(`Leaderboard exception:`, error);
         setData(null);
       } finally {
         setLoading(false);
@@ -266,11 +248,6 @@ function LeaderboardPage() {
 
   return (
     <>
-      {/* JSON-LD Structured Data - STATIC (no re-render, no hydration risk) */}
-      {/* JSON-LD removed - causes React hydration crashes */}
-
-      {/* Styles moved to globals.css to prevent DOM hydration issues */}
-
       <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 15%, #4c1d95 35%, #6b21a8 50%, #4c1d95 65%, #1e1b4b 85%, #0f172a 100%)", color: "white", paddingBottom: "0" }}>
         <div style={{ padding: "clamp(20px, 5vw, 40px) clamp(16px, 4vw, 24px)" }}>
           
@@ -360,7 +337,7 @@ function LeaderboardPage() {
                   style={{ padding: "10px 20px", borderRadius: "10px", border: "none", background: activeTab === tab ? "linear-gradient(135deg, #7c3aed, #d946ef)" : "transparent", color: activeTab === tab ? "white" : "#94a3b8", fontSize: "13px", fontWeight: 800, textTransform: "uppercase", cursor: "pointer", transition: "all 0.3s", letterSpacing: "0.5px" }}
                   onMouseEnter={(e) => { if (activeTab !== tab) { e.currentTarget.style.color = "#cbd5e1"; e.currentTarget.style.background = "rgba(139,92,246,0.15)"; } }}
                   onMouseLeave={(e) => { if (activeTab !== tab) { e.currentTarget.style.color = "#94a3b8"; e.currentTarget.style.background = "transparent"; } }}>
-                  {tab === 'weekly' ? '📅 Weekly' : '📆 Monthly'}
+                  {tab === 'daily' ? '⚡ Daily' : tab === 'weekly' ? '📅 Weekly' : '📆 Monthly'}
                 </button>
               ))}
             </nav>
