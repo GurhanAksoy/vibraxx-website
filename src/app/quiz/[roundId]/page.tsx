@@ -196,59 +196,34 @@ export default function QuizGamePage() {
         let restoredShowExp = false;
         let restoredIndex = 0;
 
-        // VibraXX Global Live Quiz — UTC0 canonical model
-        // Lobby sayaci 0 olunca herkes ayni anda giris yapar → her zaman index=0
-        // Refresh durumunda scheduled_start'tan UTC0 hesabi yapilir
-        const answeredCountForTimer = (progress?.answers_array || []).length;
-        // round_status: 'live' ise devam et, degilse skorkart
-        // get_round_progress RPC'den geliyor
-        const roundIsLive = progress?.round_status === 'live';
+        // VibraXX KANONIK KURAL: Quiz sayfasına bir kez girdin mi = o round bitti.
+        // Lobby redirect öncesi sessionStorage'a tek kullanımlık flag set edilir.
+        // Refresh'te flag yok → direkt skorkart. Cevap vermiş/vermemiş fark etmez.
+        const isFreshEntry = (() => {
+          if (typeof window === 'undefined') return false;
+          const key = `quiz_fresh_${roundId}`;
+          const val = sessionStorage.getItem(key);
+          if (val === '1') {
+            sessionStorage.removeItem(key); // tek kullanım — tüketildi
+            return true;
+          }
+          return false;
+        })();
 
-        if (answeredCountForTimer === 0 && roundIsLive) {
-          // ILK GIRIS: Lobby sayaci garantisi — index 0, timeLeft 9
-          restoredIndex = 0;
-          restoredTimeLeft = QUESTION_DURATION;
-          restoredShowExp = false;
-        } else if (answeredCountForTimer === 0 && !roundIsLive) {
-          // REFRESH — hic cevap vermemis, round live degil → skorkart
+        if (!isFreshEntry) {
+          // REFRESH veya tekrar giriş denemesi → skorkart
           setAnswers(normalizedAnswers);
           setQuestions(questionsData);
           setIsLoading(false);
           await loadFinalResults();
           setShowFinalScore(true);
           return;
-        } else if (progress && progress.server_now) {
-          // ✅ REFRESH: scheduled_start'tan UTC0 hesabi
-          const nowMs = new Date(progress.server_now).getTime();
-          const anchorStr = progress.scheduled_start || progress.round_started_at;
-          if (anchorStr) {
-            const startMs = new Date(anchorStr).getTime();
-            const totalElapsed = Math.max(0, Math.floor((nowMs - startMs) / 1000));
-            const TOTAL_ROUND_DURATION = questionsData.length * 18; // 270sn
-
-            // Round bitmisse direkt final score
-            if (totalElapsed >= TOTAL_ROUND_DURATION) {
-              setAnswers(normalizedAnswers);
-              setQuestions(questionsData);
-              setIsLoading(false);
-              await loadFinalResults();
-              setShowFinalScore(true);
-              return;
-            }
-
-            const questionIndex = Math.floor(totalElapsed / 18);
-            restoredIndex = Math.max(0, Math.min(questionIndex, questionsData.length - 1));
-            const cycleElapsed = totalElapsed % 18;
-            if (cycleElapsed < QUESTION_DURATION) {
-              restoredTimeLeft = Math.max(QUESTION_DURATION - cycleElapsed, 1);
-              restoredShowExp = false;
-            } else {
-              restoredTimeLeft = 0;
-              restoredExpTimeLeft = Math.max(18 - cycleElapsed, 1);
-              restoredShowExp = true;
-            }
-          }
         }
+
+        // isFreshEntry = true → lobby'den yeni giriş → index=0, tam süre
+        restoredIndex = 0;
+        restoredTimeLeft = QUESTION_DURATION;
+        restoredShowExp = false;
 
         setCurrentIndex(restoredIndex);
 

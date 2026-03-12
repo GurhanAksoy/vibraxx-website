@@ -180,6 +180,7 @@ export default function LobbyPage() {
           // Zaten katılmış → quiz'e git
           isRedirectingRef.current = true;
           setIsRedirecting(true);
+          sessionStorage.setItem(`quiz_fresh_${data.round_id}`, '1');
           routerRef.current.push(`/quiz/${data.round_id}`);
           return;
         }
@@ -259,6 +260,7 @@ export default function LobbyPage() {
         if (!isRedirectingRef.current) {
           isRedirectingRef.current = true;
           setIsRedirecting(true);
+          sessionStorage.setItem(`quiz_fresh_${data.round_id}`, '1');
           routerRef.current.push(`/quiz/${data.round_id}`);
         }
         return;
@@ -272,6 +274,7 @@ export default function LobbyPage() {
         if (!joinError && (joinRow?.action === "join" || joinRow?.message === "already_joined")) {
           isRedirectingRef.current = true;
           setIsRedirecting(true);
+          sessionStorage.setItem(`quiz_fresh_${data.round_id}`, '1');
           routerRef.current.push(`/quiz/${data.round_id}`);
         } else {
           hasJoinedRef.current = false;
@@ -804,196 +807,47 @@ export default function LobbyPage() {
             padding: "clamp(24px, 5vw, 40px) clamp(16px, 4vw, 32px)",
           }}
         >
-          {/* Sponsor Banner */}
+          {/* Sponsor Banner — minimal premium */}
           <div
             style={{
-              marginBottom: "clamp(24px, 5vw, 36px)",
-              padding: "clamp(16px, 3.5vw, 28px)",
-              borderRadius: "20px",
-              background:
-                "linear-gradient(135deg, rgba(251, 191, 36, 0.18), rgba(245, 158, 11, 0.12))",
-              border: "2px solid rgba(251, 191, 36, 0.5)",
-              backdropFilter: "blur(20px)",
+              marginBottom: "clamp(12px, 2.5vw, 20px)",
+              padding: "8px 16px",
+              borderRadius: "14px",
+              background: "linear-gradient(135deg, rgba(251,191,36,0.09), rgba(245,158,11,0.06))",
+              border: "1px solid rgba(251,191,36,0.30)",
+              backdropFilter: "blur(16px)",
               position: "relative",
               overflow: "hidden",
-              boxShadow:
-                "0 0 30px rgba(251, 191, 36, 0.3), inset 0 0 40px rgba(251, 191, 36, 0.06)",
-              minHeight: "clamp(100px, 18vw, 160px)",
+              boxShadow: "0 0 16px rgba(251,191,36,0.12)",
+              height: "60px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <div
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "50%",
-                height: "100%",
-                background:
-                  "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent)",
-                animation: "shimmer 3s infinite",
-                pointerEvents: "none",
-              }}
-            />
-
-            <div
-              style={{
-                position: "relative",
-                width: "100%",
-                height: "100%",
-                minHeight: "clamp(100px, 18vw, 160px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
+            {/* Shimmer */}
+            <div style={{ position: "absolute", top: 0, left: 0, width: "40%", height: "100%", background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.09), transparent)", animation: "shimmer 3s infinite", pointerEvents: "none" }} />
+            {/* sponsor.png */}
+            <div style={{ position: "relative", width: "100%", height: "44px" }}>
               <Image
                 src="/images/sponsor.png"
                 alt="Official Sponsor"
                 fill
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
-                style={{
-                  objectFit: "contain",
-                  padding: "clamp(12px, 3vw, 20px)",
-                }}
+                sizes="860px"
+                style={{ objectFit: "contain", padding: "4px 16px" }}
                 priority
                 onError={(e) => {
                   const img = e.currentTarget;
-                  const container = img.parentElement as HTMLDivElement;
-                  if (container) {
-                    container.style.display = "none";
-                    const placeholder = container.nextElementSibling as HTMLDivElement;
-                    if (placeholder) placeholder.style.display = "block";
-                  }
+                  img.style.display = "none";
+                  const ph = document.getElementById("sponsor-ph") as HTMLElement | null;
+                  if (ph) ph.style.display = "flex";
                 }}
               />
             </div>
-
-            <div
-              id="sponsor-placeholder"
-              style={{
-                position: "relative",
-                zIndex: 10,
-                textAlign: "center",
-                display: "none",
-              }}
-            >
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  padding: "4px 12px",
-                  borderRadius: "999px",
-                  background: "rgba(251, 191, 36, 0.25)",
-                  border: "1px solid rgba(251, 191, 36, 0.6)",
-                  marginBottom: "10px",
-                }}
-              >
-                <Sparkles style={{ width: 12, height: 12, color: "#fbbf24" }} />
-                <span
-                  style={{
-                    fontSize: "clamp(9px, 1.8vw, 11px)",
-                    fontWeight: 700,
-                    color: "#fbbf24",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                  }}
-                >
-                  Sponsor Space Available
-                </span>
-              </div>
-
-              <h2
-                style={{
-                  fontSize: "clamp(18px, 4.5vw, 32px)",
-                  fontWeight: 900,
-                  backgroundImage: "linear-gradient(135deg, #fbbf24, #f59e0b)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                  marginBottom: "8px",
-                  textShadow: "0 0 30px rgba(251, 191, 36, 0.4)",
-                }}
-              >
-                Your Brand Here
-              </h2>
-
-              <p
-                style={{
-                  fontSize: "clamp(11px, 2.8vw, 14px)",
-                  color: "#fcd34d",
-                  fontWeight: 600,
-                  marginBottom: "12px",
-                  lineHeight: 1.4,
-                }}
-              >
-                Reach 12,000+ active quiz players daily!
-              </p>
-
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  flexWrap: "wrap",
-                  justifyContent: "center",
-                }}
-              >
-                <div
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "8px",
-                    background: "rgba(15, 23, 42, 0.6)",
-                    border: "1px solid rgba(251, 191, 36, 0.3)",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: "clamp(9px, 2vw, 11px)",
-                      color: "#cbd5e1",
-                    }}
-                  >
-                    📊 <strong style={{ color: "#fbbf24" }}>12K+</strong> Players
-                  </span>
-                </div>
-                <div
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "8px",
-                    background: "rgba(15, 23, 42, 0.6)",
-                    border: "1px solid rgba(251, 191, 36, 0.3)",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: "clamp(9px, 2vw, 11px)",
-                      color: "#cbd5e1",
-                    }}
-                  >
-                    🎯 <strong style={{ color: "#fbbf24" }}>Premium</strong> Spot
-                  </span>
-                </div>
-                <div
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "8px",
-                    background: "rgba(15, 23, 42, 0.6)",
-                    border: "1px solid rgba(251, 191, 36, 0.3)",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: "clamp(9px, 2vw, 11px)",
-                      color: "#cbd5e1",
-                    }}
-                  >
-                    💰 <strong style={{ color: "#fbbf24" }}>High</strong> ROI
-                  </span>
-                </div>
-              </div>
+            {/* Placeholder */}
+            <div id="sponsor-ph" style={{ display: "none", position: "absolute", inset: 0, alignItems: "center", justifyContent: "center", gap: "8px" }}>
+              <Sparkles style={{ width: 13, height: 13, color: "#fbbf24" }} />
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "#fbbf24", textTransform: "uppercase", letterSpacing: "0.10em" }}>Official Sponsor</span>
             </div>
           </div>
 
@@ -1322,25 +1176,6 @@ export default function LobbyPage() {
                 </div>
               </div>
 
-              <div
-                style={{
-                  marginTop: "clamp(20px, 4.5vw, 28px)",
-                  padding: "clamp(14px, 3.5vw, 20px)",
-                  borderRadius: "14px",
-                  background: "rgba(59, 130, 246, 0.12)",
-                  border: "2px solid rgba(59, 130, 246, 0.25)",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "clamp(13px, 3vw, 15px)",
-                    color: "#bfdbfe",
-                    fontWeight: 600,
-                  }}
-                >
-                  💡 <strong style={{ color: "white" }}>Pro Tip:</strong> Speed matters. Answer fast and accurately to dominate the leaderboard.
-                </div>
-              </div>
             </div>
 
             {/* Players Section - 25% Smaller */}
