@@ -175,18 +175,8 @@ export default function LobbyPage() {
       }
 
       // === LIVE ROUND LOGIC ===
-      if (data.status === "live" && data.round_id && !isRedirectingRef.current) {
-        if (data.is_participant) {
-          // Zaten katılmış → quiz'e git
-          isRedirectingRef.current = true;
-          setIsRedirecting(true);
-          sessionStorage.setItem(`quiz_fresh_${data.round_id}`, '1');
-          routerRef.current.push(`/quiz/${data.round_id}`);
-          return;
-        }
-        // Live round var ama katılmamış → lobby'de bekle, sonraki round'a katıl
-        // handleCountdownZero ÇAĞIRILMAZ
-      }
+      // Kullanıcı SADECE sayaç 0 → join_live_round ile quiz'e alınır.
+      // is_participant = quiz'den çıkmış → lobby'de bekler, bir sonraki round.
     } catch (err) {
       console.error("[Lobby] fetchLobbyState error:", err);
     }
@@ -255,16 +245,8 @@ export default function LobbyPage() {
         return;
       }
 
-      // Zaten participant → direkt git
-      if (data.is_participant) {
-        if (!isRedirectingRef.current) {
-          isRedirectingRef.current = true;
-          setIsRedirecting(true);
-          sessionStorage.setItem(`quiz_fresh_${data.round_id}`, '1');
-          routerRef.current.push(`/quiz/${data.round_id}`);
-        }
-        return;
-      }
+      // Zaten participant → quiz'den çıkmış, lobby'de bekle
+      if (data.is_participant) return;
 
       // Join et
       if (!hasJoinedRef.current && data.credits > 0) {
@@ -807,50 +789,6 @@ export default function LobbyPage() {
             padding: "clamp(24px, 5vw, 40px) clamp(16px, 4vw, 32px)",
           }}
         >
-          {/* Sponsor Banner — minimal premium */}
-          <div
-            style={{
-              marginBottom: "clamp(12px, 2.5vw, 20px)",
-              padding: "8px 16px",
-              borderRadius: "14px",
-              background: "linear-gradient(135deg, rgba(251,191,36,0.09), rgba(245,158,11,0.06))",
-              border: "1px solid rgba(251,191,36,0.30)",
-              backdropFilter: "blur(16px)",
-              position: "relative",
-              overflow: "hidden",
-              boxShadow: "0 0 16px rgba(251,191,36,0.12)",
-              height: "60px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {/* Shimmer */}
-            <div style={{ position: "absolute", top: 0, left: 0, width: "40%", height: "100%", background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.09), transparent)", animation: "shimmer 3s infinite", pointerEvents: "none" }} />
-            {/* sponsor.png */}
-            <div style={{ position: "relative", width: "100%", height: "44px" }}>
-              <Image
-                src="/images/sponsor.png"
-                alt="Official Sponsor"
-                fill
-                sizes="860px"
-                style={{ objectFit: "contain", padding: "4px 16px" }}
-                priority
-                onError={(e) => {
-                  const img = e.currentTarget;
-                  img.style.display = "none";
-                  const ph = document.getElementById("sponsor-ph") as HTMLElement | null;
-                  if (ph) ph.style.display = "flex";
-                }}
-              />
-            </div>
-            {/* Placeholder */}
-            <div id="sponsor-ph" style={{ display: "none", position: "absolute", inset: 0, alignItems: "center", justifyContent: "center", gap: "8px" }}>
-              <Sparkles style={{ width: 13, height: 13, color: "#fbbf24" }} />
-              <span style={{ fontSize: "11px", fontWeight: 700, color: "#fbbf24", textTransform: "uppercase", letterSpacing: "0.10em" }}>Official Sponsor</span>
-            </div>
-          </div>
-
           <div
             style={{
               display: "grid",
@@ -1173,6 +1111,89 @@ export default function LobbyPage() {
                   >
                     10 pts/correct
                   </div>
+                </div>
+              </div>
+
+              {/* ── SPONSOR BANNER — countdown hemen altı ── */}
+              <div
+                style={{
+                  marginTop: "clamp(20px, 4vw, 28px)",
+                  position: "relative",
+                  borderRadius: "18px",
+                  overflow: "hidden",
+                  background: "linear-gradient(135deg, rgba(124,58,237,0.12) 0%, rgba(15,23,42,0.85) 40%, rgba(217,70,239,0.10) 100%)",
+                  border: "1px solid rgba(139,92,246,0.25)",
+                  backdropFilter: "blur(20px)",
+                  boxShadow: "0 0 24px rgba(124,58,237,0.18), inset 0 1px 0 rgba(255,255,255,0.06)",
+                  padding: "clamp(10px, 2.5vw, 14px) clamp(16px, 3.5vw, 24px)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "clamp(10px, 2.5vw, 16px)",
+                  minHeight: "clamp(52px, 10vw, 68px)",
+                }}
+              >
+                {/* Shimmer sweep */}
+                <div style={{
+                  position: "absolute", top: 0, left: 0,
+                  width: "35%", height: "100%",
+                  background: "linear-gradient(90deg, transparent, rgba(167,139,250,0.07), transparent)",
+                  animation: "shimmer 4s ease-in-out infinite",
+                  pointerEvents: "none",
+                }} />
+                {/* Sol: SPONSORED BY etiketi */}
+                <div style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  gap: "2px",
+                  flexShrink: 0,
+                  borderRight: "1px solid rgba(139,92,246,0.20)",
+                  paddingRight: "clamp(10px, 2.5vw, 16px)",
+                  marginRight: "clamp(2px, 1vw, 4px)",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                    <Sparkles style={{ width: 10, height: 10, color: "#a78bfa" }} />
+                    <span style={{
+                      fontSize: "clamp(8px, 1.6vw, 10px)",
+                      fontWeight: 800,
+                      color: "#6d5fa6",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.14em",
+                      whiteSpace: "nowrap",
+                    }}>Sponsored by</span>
+                  </div>
+                </div>
+                {/* Sağ: sponsor.png */}
+                <div style={{ position: "relative", flex: 1, height: "clamp(28px, 5.5vw, 40px)" }}>
+                  <Image
+                    src="/images/sponsor.png"
+                    alt="Official Sponsor"
+                    fill
+                    sizes="700px"
+                    style={{ objectFit: "contain", objectPosition: "left center" }}
+                    priority
+                    onError={(e) => {
+                      const img = e.currentTarget;
+                      img.style.display = "none";
+                      const ph = img.parentElement?.nextElementSibling as HTMLElement | null;
+                      if (ph) ph.style.display = "flex";
+                    }}
+                  />
+                </div>
+                {/* Placeholder: sponsor.png yoksa */}
+                <div style={{
+                  display: "none", flex: 1,
+                  alignItems: "center", gap: "8px",
+                }}>
+                  <span style={{
+                    fontSize: "clamp(13px, 3vw, 17px)",
+                    fontWeight: 800,
+                    backgroundImage: "linear-gradient(135deg, #a78bfa, #f0abfc)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                    letterSpacing: "0.04em",
+                  }}>Your Brand Here</span>
                 </div>
               </div>
 
