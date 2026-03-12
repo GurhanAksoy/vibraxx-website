@@ -56,32 +56,32 @@ interface LeaderboardData {
 const PODIUM_CFG = {
   1: {
     order: 2, animDelay: "0.2s", glowClass: "animate-glow", hoverY: "-12px",
-    card: { pad: "clamp(24px, 5vw, 36px)", radius: "clamp(20px, 4vw, 28px)", border: "4px solid rgba(251,191,36,0.8)", bg: "linear-gradient(135deg, rgba(251,191,36,0.25), rgba(245,158,11,0.2))", blur: "25px", shadow: "0 0 60px rgba(251,191,36,0.6)" },
-    medal: { size: "clamp(90px, 18vw, 120px)", pad: "5px", ring: "linear-gradient(135deg, #fbbf24, #f59e0b)", glow: "0 0 50px rgba(251,191,36,0.8)", emoji: "🥇", emojiSize: "clamp(40px, 8vw, 60px)", margin: "0 auto clamp(20px, 4vw, 24px)" },
-    badge: { size: "clamp(36px, 7vw, 48px)", bottom: "-10px", border: "3px solid #0f172a", fontSize: "clamp(16px, 3.5vw, 24px)" },
-    name: { size: "clamp(18px, 4vw, 24px)", weight: 900, mb: "6px" },
+    card: { pad: "clamp(14px, 3vw, 20px)", radius: "clamp(20px, 4vw, 28px)", border: "4px solid rgba(251,191,36,0.8)", bg: "linear-gradient(135deg, rgba(251,191,36,0.25), rgba(245,158,11,0.2))", blur: "25px", shadow: "0 0 60px rgba(251,191,36,0.6)" },
+    medal: { size: "clamp(60px, 12vw, 80px)", pad: "5px", ring: "linear-gradient(135deg, #fbbf24, #f59e0b)", glow: "0 0 50px rgba(251,191,36,0.8)", emoji: "🥇", emojiSize: "clamp(26px, 5vw, 36px)", margin: "0 auto clamp(20px, 4vw, 24px)" },
+    badge: { size: "clamp(24px, 5vw, 32px)", bottom: "-10px", border: "3px solid #0f172a", fontSize: "clamp(16px, 3.5vw, 24px)" },
+    name: { size: "clamp(13px, 2.8vw, 17px)", weight: 900, mb: "6px" },
     tier: { gap: "6px", pad: "6px 14px", fontSize: "clamp(11px, 2.2vw, 14px)", iconSize: "clamp(14px, 3vw, 18px)", mb: "16px" },
-    score: { size: "clamp(32px, 7vw, 48px)", gradient: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)", mb: "12px" },
+    score: { size: "clamp(18px, 4vw, 26px)", gradient: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)", mb: "12px" },
     showCrown: true, statsGrid: true,
   },
   2: {
     order: 1, animDelay: "0.1s", glowClass: "", hoverY: "-8px",
-    card: { pad: "clamp(20px, 4vw, 28px)", radius: "clamp(16px, 3vw, 24px)", border: "3px solid rgba(192,192,192,0.6)", bg: "linear-gradient(135deg, rgba(192,192,192,0.2), rgba(156,163,175,0.15))", blur: "20px", shadow: "0 0 40px rgba(192,192,192,0.4)" },
-    medal: { size: "clamp(70px, 14vw, 100px)", pad: "4px", ring: "linear-gradient(135deg, #d1d5db, #9ca3af)", glow: "0 0 30px rgba(192,192,192,0.6)", emoji: "🥈", emojiSize: "clamp(32px, 6vw, 48px)", margin: "0 auto clamp(16px, 3vw, 20px)" },
-    badge: { size: "clamp(32px, 6vw, 40px)", bottom: "-8px", border: "2px solid #0f172a", fontSize: "clamp(14px, 3vw, 20px)" },
-    name: { size: "clamp(14px, 3vw, 18px)", weight: 800, mb: "4px" },
+    card: { pad: "clamp(12px, 2.5vw, 18px)", radius: "clamp(16px, 3vw, 24px)", border: "3px solid rgba(192,192,192,0.6)", bg: "linear-gradient(135deg, rgba(192,192,192,0.2), rgba(156,163,175,0.15))", blur: "20px", shadow: "0 0 40px rgba(192,192,192,0.4)" },
+    medal: { size: "clamp(50px, 10vw, 68px)", pad: "4px", ring: "linear-gradient(135deg, #d1d5db, #9ca3af)", glow: "0 0 30px rgba(192,192,192,0.6)", emoji: "🥈", emojiSize: "clamp(22px, 4vw, 30px)", margin: "0 auto clamp(16px, 3vw, 20px)" },
+    badge: { size: "clamp(22px, 4.5vw, 28px)", bottom: "-8px", border: "2px solid #0f172a", fontSize: "clamp(14px, 3vw, 20px)" },
+    name: { size: "clamp(12px, 2.5vw, 15px)", weight: 800, mb: "4px" },
     tier: { gap: "4px", pad: "4px 10px", fontSize: "clamp(10px, 2vw, 12px)", iconSize: null, mb: "12px" },
-    score: { size: "clamp(24px, 5vw, 36px)", gradient: "linear-gradient(90deg, #d1d5db, #9ca3af)", mb: "8px" },
+    score: { size: "clamp(16px, 3.5vw, 22px)", gradient: "linear-gradient(90deg, #d1d5db, #9ca3af)", mb: "8px" },
     showCrown: false, statsGrid: false,
   },
   3: {
     order: 3, animDelay: "0.15s", glowClass: "", hoverY: "-8px",
-    card: { pad: "clamp(20px, 4vw, 28px)", radius: "clamp(16px, 3vw, 24px)", border: "3px solid rgba(217,119,6,0.6)", bg: "linear-gradient(135deg, rgba(217,119,6,0.2), rgba(194,65,12,0.15))", blur: "20px", shadow: "0 0 40px rgba(217,119,6,0.4)" },
-    medal: { size: "clamp(70px, 14vw, 100px)", pad: "4px", ring: "linear-gradient(135deg, #d97706, #c2410c)", glow: "0 0 30px rgba(217,119,6,0.6)", emoji: "🥉", emojiSize: "clamp(32px, 6vw, 48px)", margin: "0 auto clamp(16px, 3vw, 20px)" },
-    badge: { size: "clamp(32px, 6vw, 40px)", bottom: "-8px", border: "2px solid #0f172a", fontSize: "clamp(14px, 3vw, 20px)" },
-    name: { size: "clamp(14px, 3vw, 18px)", weight: 800, mb: "4px" },
+    card: { pad: "clamp(12px, 2.5vw, 18px)", radius: "clamp(16px, 3vw, 24px)", border: "3px solid rgba(217,119,6,0.6)", bg: "linear-gradient(135deg, rgba(217,119,6,0.2), rgba(194,65,12,0.15))", blur: "20px", shadow: "0 0 40px rgba(217,119,6,0.4)" },
+    medal: { size: "clamp(50px, 10vw, 68px)", pad: "4px", ring: "linear-gradient(135deg, #d97706, #c2410c)", glow: "0 0 30px rgba(217,119,6,0.6)", emoji: "🥉", emojiSize: "clamp(22px, 4vw, 30px)", margin: "0 auto clamp(16px, 3vw, 20px)" },
+    badge: { size: "clamp(22px, 4.5vw, 28px)", bottom: "-8px", border: "2px solid #0f172a", fontSize: "clamp(14px, 3vw, 20px)" },
+    name: { size: "clamp(12px, 2.5vw, 15px)", weight: 800, mb: "4px" },
     tier: { gap: "4px", pad: "4px 10px", fontSize: "clamp(10px, 2vw, 12px)", iconSize: null, mb: "12px" },
-    score: { size: "clamp(24px, 5vw, 36px)", gradient: "linear-gradient(90deg, #d97706, #c2410c)", mb: "8px" },
+    score: { size: "clamp(16px, 3.5vw, 22px)", gradient: "linear-gradient(90deg, #d97706, #c2410c)", mb: "8px" },
     showCrown: false, statsGrid: false,
   },
 } as const;
@@ -100,7 +100,7 @@ function PodiumCard({ player, place }: { player: Player; place: 1 | 2 | 3 }) {
       <div className={c.glowClass || undefined} style={{ padding: c.card.pad, borderRadius: c.card.radius, border: c.card.border, background: c.card.bg, backdropFilter: `blur(${c.card.blur})`, textAlign: "center" as const, boxShadow: c.card.shadow, transition: "transform 0.3s", cursor: "default" }}
         onMouseEnter={(e) => (e.currentTarget.style.transform = `translateY(${c.hoverY})`)}
         onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}>
-        {c.showCrown && <Crown className="animate-crown" style={{ width: "clamp(32px, 6vw, 48px)", height: "clamp(32px, 6vw, 48px)", color: "#fbbf24", margin: "0 auto clamp(12px, 2.5vw, 16px)" }} />}
+        {c.showCrown && <Crown className="animate-crown" style={{ width: "clamp(20px, 4vw, 28px)", height: "clamp(20px, 4vw, 28px)", color: "#fbbf24", margin: "0 auto clamp(8px, 1.5vw, 10px)" }} />}
         
         {/* Medal + Avatar */}
         <div style={{ position: "relative", width: c.medal.size, height: c.medal.size, margin: c.medal.margin, borderRadius: "50%", padding: c.medal.pad, background: c.medal.ring, boxShadow: c.medal.glow }}>
@@ -249,10 +249,10 @@ function LeaderboardPage() {
   return (
     <>
       <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 15%, #4c1d95 35%, #6b21a8 50%, #4c1d95 65%, #1e1b4b 85%, #0f172a 100%)", color: "white", paddingBottom: "0" }}>
-        <div style={{ padding: "clamp(20px, 5vw, 40px) clamp(16px, 4vw, 24px)" }}>
+        <div style={{ padding: "clamp(12px, 3vw, 24px) clamp(12px, 3vw, 20px)" }}>
           
           {/* HEADER */}
-          <header role="banner" style={{ maxWidth: "1400px", margin: "0 auto clamp(24px, 5vw, 40px)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
+          <header role="banner" style={{ maxWidth: "1400px", margin: "0 auto clamp(12px, 2.5vw, 20px)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
             
             {/* Logo (Lobby tarzı) + Leaderboard */}
             <div style={{ display: "flex", alignItems: "center", gap: "clamp(12px, 2.5vw, 16px)" }}>
@@ -262,8 +262,8 @@ function LeaderboardPage() {
                 aria-label="Go to homepage"
                 style={{
                   position: "relative",
-                  width: "clamp(48px, 13vw, 72px)",
-                  height: "clamp(48px, 13vw, 72px)",
+                  width: "clamp(40px, 9vw, 56px)",
+                  height: "clamp(40px, 9vw, 56px)",
                   borderRadius: "9999px",
                   padding: 4,
                   background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)",
@@ -387,31 +387,31 @@ function LeaderboardPage() {
           <main role="main" style={{ maxWidth: "1400px", margin: "0 auto" }}>
             
             {/* ═══ HERO SECTION ═══ */}
-            <div className="animate-slide-up" style={{ padding: "clamp(32px, 6vw, 48px) clamp(24px, 5vw, 40px)", borderRadius: "clamp(20px, 4vw, 28px)", border: "3px solid rgba(251,191,36,0.7)", background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)", boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 50px rgba(251,191,36,0.4), inset 0 0 30px rgba(251,191,36,0.1)", backdropFilter: "blur(20px)", marginBottom: "clamp(24px, 5vw, 40px)", textAlign: "center" as const, position: "relative", overflow: "hidden" }}>
+            <div className="animate-slide-up" style={{ padding: "clamp(16px, 3vw, 22px) clamp(14px, 3vw, 24px)", borderRadius: "clamp(16px, 3vw, 24px)", border: "3px solid rgba(251,191,36,0.7)", background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)", boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 50px rgba(251,191,36,0.4), inset 0 0 30px rgba(251,191,36,0.1)", backdropFilter: "blur(20px)", marginBottom: "clamp(14px, 3vw, 22px)", textAlign: "center" as const, position: "relative", overflow: "hidden" }}>
               
               {/* Title */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px", marginBottom: "clamp(20px, 4vw, 32px)", flexWrap: "wrap" }}>
-                <Trophy className="animate-float" style={{ width: "clamp(32px, 7vw, 48px)", height: "clamp(32px, 7vw, 48px)", color: "#fbbf24" }} />
-                <h1 style={{ fontSize: "clamp(24px, 5vw, 48px)", fontWeight: 900, background: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", textTransform: "uppercase", letterSpacing: "2px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px", marginBottom: "clamp(10px, 2vw, 16px)", flexWrap: "wrap" }}>
+                <Trophy className="animate-float" style={{ width: "clamp(18px, 3vw, 24px)", height: "clamp(18px, 3vw, 24px)", color: "#fbbf24" }} />
+                <h1 style={{ fontSize: "clamp(16px, 3vw, 22px)", fontWeight: 900, background: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", textTransform: "uppercase", letterSpacing: "2px" }}>
                   {data?.prize?.label || 'Leaderboard'}
                 </h1>
-                <Trophy className="animate-float" style={{ width: "clamp(32px, 7vw, 48px)", height: "clamp(32px, 7vw, 48px)", color: "#fbbf24" }} />
+                <Trophy className="animate-float" style={{ width: "clamp(18px, 3vw, 24px)", height: "clamp(18px, 3vw, 24px)", color: "#fbbf24" }} />
               </div>
 
               {/* ═══ PRIZE BLOCK ═══ */}
               {data?.prize?.type === 'money' ? (
                 /* Monthly: £1000 + unlock */
-                <div className="animate-glow" style={{ padding: "clamp(32px, 6vw, 48px) clamp(24px, 5vw, 40px)", borderRadius: "clamp(20px, 4vw, 28px)", background: "linear-gradient(135deg, rgba(251,191,36,0.25), rgba(245,158,11,0.2))", border: "3px solid rgba(251,191,36,0.6)", marginBottom: "clamp(24px, 5vw, 32px)", position: "relative", overflow: "hidden" }}>
+                <div className="animate-glow" style={{ padding: "clamp(14px, 2.5vw, 20px) clamp(14px, 3vw, 24px)", borderRadius: "clamp(14px, 3vw, 20px)", background: "linear-gradient(135deg, rgba(251,191,36,0.25), rgba(245,158,11,0.2))", border: "3px solid rgba(251,191,36,0.6)", marginBottom: "clamp(12px, 2.5vw, 18px)", position: "relative", overflow: "hidden" }}>
                   <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "radial-gradient(circle at 50% 50%, rgba(251,191,36,0.15) 0%, transparent 70%)", pointerEvents: "none" }} />
                   
-                  <div style={{ fontSize: "clamp(14px, 3vw, 18px)", color: "#fcd34d", fontWeight: 800, marginBottom: "clamp(24px, 5vw, 32px)", textTransform: "uppercase", letterSpacing: "1.5px", textAlign: "center" as const, position: "relative", zIndex: 1 }}>
+                  <div style={{ fontSize: "clamp(11px, 2vw, 13px)", color: "#fcd34d", fontWeight: 800, marginBottom: "clamp(10px, 2vw, 16px)", textTransform: "uppercase", letterSpacing: "1.5px", textAlign: "center" as const, position: "relative", zIndex: 1 }}>
                     💰 {data?.prize?.label || 'Monthly £1,000 Skill Reward'}
                   </div>
                   
-                  <div className="prize-pool-content" style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "clamp(32px, 6vw, 48px)", position: "relative", zIndex: 1 }}>
+                  <div className="prize-pool-content" style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "clamp(16px, 3vw, 24px)", position: "relative", zIndex: 1 }}>
                     
                     {/* Progress Ring */}
-                    <div style={{ position: "relative", width: "clamp(160px, 30vw, 200px)", height: "clamp(160px, 30vw, 200px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ position: "relative", width: "clamp(80px, 14vw, 110px)", height: "clamp(80px, 14vw, 110px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <svg width="100%" height="100%" viewBox="0 0 200 200" style={{ transform: "rotate(-90deg)", filter: data?.prize?.unlocked ? "drop-shadow(0 0 20px rgba(251,191,36,0.8))" : "drop-shadow(0 0 10px rgba(139,92,246,0.5))" }}>
                         <circle cx="100" cy="100" r="85" fill="none" stroke="rgba(15,23,42,0.6)" strokeWidth="12" />
                         <circle cx="100" cy="100" r="85" fill="none" stroke={data?.prize?.unlocked ? "url(#goldGradient)" : "url(#purpleGradient)"} strokeWidth="12" strokeLinecap="round" 
@@ -433,10 +433,10 @@ function LeaderboardPage() {
                       </svg>
                       
                       <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", textAlign: "center" as const }}>
-                        <div style={{ fontSize: "clamp(32px, 6vw, 48px)", marginBottom: "8px", animation: data?.prize?.unlocked ? "float 2s ease-in-out infinite" : "none" }}>
+                        <div style={{ fontSize: "clamp(20px, 3.5vw, 28px)", marginBottom: "4px", animation: data?.prize?.unlocked ? "float 2s ease-in-out infinite" : "none" }}>
                           {data?.prize?.unlocked ? "🎉" : "🔒"}
                         </div>
-                        <div style={{ fontSize: "clamp(24px, 5vw, 36px)", fontWeight: 900, background: data?.prize?.unlocked ? "linear-gradient(90deg, #fbbf24, #f59e0b)" : "linear-gradient(90deg, #8b5cf6, #d946ef)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1 }}>
+                        <div style={{ fontSize: "clamp(14px, 2.5vw, 18px)", fontWeight: 900, background: data?.prize?.unlocked ? "linear-gradient(90deg, #fbbf24, #f59e0b)" : "linear-gradient(90deg, #8b5cf6, #d946ef)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1 }}>
                           {(() => {
                             const pct = data?.prize?.threshold ? Math.round(((data?.prize?.progress || 0) / data.prize.threshold) * 100) : 0;
                             return pct > 0 ? `${pct}%` : "—";
@@ -447,7 +447,7 @@ function LeaderboardPage() {
                     
                     {/* Info */}
                     <div className="prize-pool-info" style={{ flex: 1, textAlign: "left" as const }}>
-                      <div style={{ fontSize: "clamp(48px, 10vw, 80px)", fontWeight: 900, background: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1, marginBottom: "16px", filter: data?.prize?.unlocked ? "drop-shadow(0 0 20px rgba(251,191,36,0.6))" : "none" }}>
+                      <div style={{ fontSize: "clamp(28px, 5vw, 40px)", fontWeight: 900, background: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1, marginBottom: "16px", filter: data?.prize?.unlocked ? "drop-shadow(0 0 20px rgba(251,191,36,0.6))" : "none" }}>
                         £{displayNum(data?.prize?.amount)}
                       </div>
                       
@@ -485,22 +485,22 @@ function LeaderboardPage() {
                 </div>
               ) : (
                 /* Weekly: 15 Credits */
-                <div style={{ padding: "clamp(32px, 6vw, 48px) clamp(24px, 5vw, 40px)", borderRadius: "clamp(20px, 4vw, 28px)", background: "linear-gradient(135deg, rgba(139,92,246,0.25), rgba(124,58,237,0.2))", border: "3px solid rgba(139,92,246,0.6)", marginBottom: "clamp(24px, 5vw, 32px)", position: "relative", overflow: "hidden", textAlign: "center" as const }}>
+                <div style={{ padding: "clamp(14px, 2.5vw, 20px) clamp(14px, 3vw, 24px)", borderRadius: "clamp(14px, 3vw, 20px)", background: "linear-gradient(135deg, rgba(139,92,246,0.25), rgba(124,58,237,0.2))", border: "3px solid rgba(139,92,246,0.6)", marginBottom: "clamp(24px, 5vw, 32px)", position: "relative", overflow: "hidden", textAlign: "center" as const }}>
                   <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "radial-gradient(circle at 50% 50%, rgba(139,92,246,0.15) 0%, transparent 70%)", pointerEvents: "none" }} />
                   
-                  <div style={{ fontSize: "clamp(18px, 4vw, 24px)", fontWeight: 900, background: "linear-gradient(90deg, #a78bfa, #d946ef, #a78bfa)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "clamp(16px, 3vw, 24px)", position: "relative", zIndex: 1 }}>
+                  <div style={{ fontSize: "clamp(13px, 2.5vw, 16px)", fontWeight: 900, background: "linear-gradient(90deg, #a78bfa, #d946ef, #a78bfa)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "clamp(16px, 3vw, 24px)", position: "relative", zIndex: 1 }}>
                     🏆 {data?.prize?.label || 'Weekly Champion Reward'}
                   </div>
                   
-                  <div style={{ fontSize: "clamp(64px, 12vw, 96px)", marginBottom: "clamp(16px, 3vw, 24px)", position: "relative", zIndex: 1, animation: "float 3s ease-in-out infinite" }}>
+                  <div style={{ fontSize: "clamp(32px, 6vw, 48px)", marginBottom: "clamp(8px, 1.5vw, 12px)", position: "relative", zIndex: 1, animation: "float 3s ease-in-out infinite" }}>
                     🎁
                   </div>
                   
-                  <div style={{ fontSize: "clamp(48px, 10vw, 72px)", fontWeight: 900, background: "linear-gradient(90deg, #a78bfa, #f0abfc)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1, marginBottom: "12px", position: "relative", zIndex: 1 }}>
+                  <div style={{ fontSize: "clamp(28px, 5vw, 40px)", fontWeight: 900, background: "linear-gradient(90deg, #a78bfa, #f0abfc)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1, marginBottom: "12px", position: "relative", zIndex: 1 }}>
                     {displayNum(data?.prize?.amount)} Credits
                   </div>
                   
-                  <div style={{ fontSize: "clamp(14px, 3vw, 18px)", color: "#c4b5fd", fontWeight: 600, marginBottom: "clamp(16px, 3vw, 24px)", position: "relative", zIndex: 1 }}>
+                  <div style={{ fontSize: "clamp(11px, 2vw, 13px)", color: "#c4b5fd", fontWeight: 600, marginBottom: "clamp(8px, 1.5vw, 12px)", position: "relative", zIndex: 1 }}>
                     {data?.prize?.sublabel || 'Free Live Arena Rounds'}
                   </div>
                   
@@ -512,32 +512,32 @@ function LeaderboardPage() {
               )}
 
               {/* Stats Cards */}
-              <div className="mobile-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "clamp(12px, 3vw, 16px)" }}>
-                <div style={{ padding: "clamp(16px, 3vw, 20px)", borderRadius: "14px", background: "linear-gradient(135deg, rgba(139,92,246,0.2), rgba(124,58,237,0.15))", border: "2px solid rgba(139,92,246,0.5)", transition: "all 0.3s", cursor: "pointer" }}
+              <div className="mobile-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "clamp(8px, 2vw, 12px)" }}>
+                <div style={{ padding: "clamp(10px, 2vw, 14px)", borderRadius: "12px", background: "linear-gradient(135deg, rgba(139,92,246,0.2), rgba(124,58,237,0.15))", border: "2px solid rgba(139,92,246,0.5)", transition: "all 0.3s", cursor: "pointer" }}
                   onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(139,92,246,0.4)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}>
-                  <Users style={{ width: "clamp(20px, 4vw, 28px)", height: "clamp(20px, 4vw, 28px)", color: "#a78bfa", margin: "0 auto 8px" }} />
-                  <div style={{ fontSize: "clamp(20px, 4vw, 32px)", fontWeight: 900, color: "#a78bfa", lineHeight: 1, marginBottom: "4px" }}>
+                  <Users style={{ width: "clamp(16px, 3vw, 20px)", height: "clamp(16px, 3vw, 20px)", color: "#a78bfa", margin: "0 auto 6px" }} />
+                  <div style={{ fontSize: "clamp(16px, 3vw, 22px)", fontWeight: 900, color: "#a78bfa", lineHeight: 1, marginBottom: "4px" }}>
                     {displayNum(data?.stats?.total_players)}
                   </div>
                   <div style={{ fontSize: "clamp(10px, 2vw, 12px)", color: "#c4b5fd", fontWeight: 600, textTransform: "uppercase" }}>Players</div>
                 </div>
                 
-                <div style={{ padding: "clamp(16px, 3vw, 20px)", borderRadius: "14px", background: "linear-gradient(135deg, rgba(34,197,94,0.2), rgba(21,128,61,0.15))", border: "2px solid rgba(34,197,94,0.5)", transition: "all 0.3s", cursor: "pointer" }}
+                <div style={{ padding: "clamp(10px, 2vw, 14px)", borderRadius: "12px", background: "linear-gradient(135deg, rgba(34,197,94,0.2), rgba(21,128,61,0.15))", border: "2px solid rgba(34,197,94,0.5)", transition: "all 0.3s", cursor: "pointer" }}
                   onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(34,197,94,0.4)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}>
-                  <Star style={{ width: "clamp(20px, 4vw, 28px)", height: "clamp(20px, 4vw, 28px)", color: "#22c55e", margin: "0 auto 8px" }} />
-                  <div style={{ fontSize: "clamp(20px, 4vw, 32px)", fontWeight: 900, color: "#22c55e", lineHeight: 1, marginBottom: "4px" }}>
+                  <Star style={{ width: "clamp(16px, 3vw, 20px)", height: "clamp(16px, 3vw, 20px)", color: "#22c55e", margin: "0 auto 6px" }} />
+                  <div style={{ fontSize: "clamp(16px, 3vw, 22px)", fontWeight: 900, color: "#22c55e", lineHeight: 1, marginBottom: "4px" }}>
                     {displayNum(data?.stats?.top_score)}
                   </div>
                   <div style={{ fontSize: "clamp(10px, 2vw, 12px)", color: "#86efac", fontWeight: 600, textTransform: "uppercase" }}>Top Score</div>
                 </div>
                 
-                <div style={{ padding: "clamp(16px, 3vw, 20px)", borderRadius: "14px", background: "linear-gradient(135deg, rgba(56,189,248,0.2), rgba(14,165,233,0.15))", border: "2px solid rgba(56,189,248,0.5)", transition: "all 0.3s", cursor: "pointer" }}
+                <div style={{ padding: "clamp(10px, 2vw, 14px)", borderRadius: "12px", background: "linear-gradient(135deg, rgba(56,189,248,0.2), rgba(14,165,233,0.15))", border: "2px solid rgba(56,189,248,0.5)", transition: "all 0.3s", cursor: "pointer" }}
                   onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(56,189,248,0.4)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}>
-                  <Target style={{ width: "clamp(20px, 4vw, 28px)", height: "clamp(20px, 4vw, 28px)", color: "#38bdf8", margin: "0 auto 8px" }} />
-                  <div style={{ fontSize: "clamp(20px, 4vw, 32px)", fontWeight: 900, color: "#38bdf8", lineHeight: 1, marginBottom: "4px" }}>
+                  <Target style={{ width: "clamp(16px, 3vw, 20px)", height: "clamp(16px, 3vw, 20px)", color: "#38bdf8", margin: "0 auto 6px" }} />
+                  <div style={{ fontSize: "clamp(16px, 3vw, 22px)", fontWeight: 900, color: "#38bdf8", lineHeight: 1, marginBottom: "4px" }}>
                     {displayNum(data?.stats?.avg_accuracy)}%
                   </div>
                   <div style={{ fontSize: "clamp(10px, 2vw, 12px)", color: "#7dd3fc", fontWeight: 600, textTransform: "uppercase" }}>Avg Accuracy</div>
@@ -547,19 +547,19 @@ function LeaderboardPage() {
 
             {/* ═══ LOADING / EMPTY / LEADERBOARD ═══ */}
             {loading ? (
-              <div role="status" aria-live="polite" aria-label="Loading leaderboard data" style={{ padding: "clamp(60px, 12vw, 100px)", textAlign: "center" as const }}>
+              <div role="status" aria-live="polite" aria-label="Loading leaderboard data" style={{ padding: "clamp(32px, 7vw, 56px)", textAlign: "center" as const }}>
                 <div style={{ width: "60px", height: "60px", borderRadius: "50%", border: "4px solid rgba(139,92,246,0.3)", borderTopColor: "#a78bfa", animation: "spin 1s linear infinite", margin: "0 auto 20px" }} />
                 <p style={{ color: "#94a3b8", fontSize: "16px" }}>Loading leaderboard...</p>
               </div>
             ) : !data?.players || data.players.length === 0 ? (
-              <div role="status" aria-label="No players found" style={{ padding: "clamp(60px, 12vw, 100px)", textAlign: "center" as const, borderRadius: "20px", border: "2px solid rgba(139,92,246,0.3)", background: "rgba(15,23,42,0.6)" }}>
+              <div role="status" aria-label="No players found" style={{ padding: "clamp(32px, 7vw, 56px)", textAlign: "center" as const, borderRadius: "20px", border: "2px solid rgba(139,92,246,0.3)", background: "rgba(15,23,42,0.6)" }}>
                 <Trophy style={{ width: "48px", height: "48px", color: "#64748b", margin: "0 auto 16px" }} />
                 <p style={{ color: "#94a3b8", fontSize: "16px" }}>No players yet. Be the first!</p>
               </div>
             ) : (
               <>
                 {/* TOP 3 PODIUM */}
-                <section aria-labelledby="podium-title" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "clamp(16px, 3vw, 24px)", marginBottom: "clamp(32px, 6vw, 48px)", alignItems: "end" }} className="mobile-stack">
+                <section aria-labelledby="podium-title" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "clamp(10px, 2vw, 16px)", marginBottom: "clamp(18px, 3.5vw, 28px)", alignItems: "end" }} className="mobile-stack">
                   <h2 id="podium-title" style={{ position: "absolute", left: "-9999px" }}>Top 3 Players</h2>
                   {top3[1] && <PodiumCard key={top3[1].user_id} player={top3[1]} place={2} />}
                   {top3[0] && <PodiumCard key={top3[0].user_id} player={top3[0]} place={1} />}
@@ -568,8 +568,8 @@ function LeaderboardPage() {
 
                 {/* REST LIST */}
                 {restPlayers.length > 0 && (
-                  <section aria-labelledby="ranked-players-title" className="animate-slide-up" style={{ padding: "clamp(24px, 5vw, 32px)", borderRadius: "clamp(16px, 3vw, 24px)", border: "2px solid rgba(139,92,246,0.5)", background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)", boxShadow: "0 20px 60px rgba(0,0,0,0.6)", backdropFilter: "blur(20px)", animationDelay: "0.3s" }}>
-                    <h2 id="ranked-players-title" style={{ fontSize: "clamp(18px, 4vw, 24px)", fontWeight: 900, marginBottom: "clamp(20px, 4vw, 24px)", display: "flex", alignItems: "center", gap: "10px" }}>
+                  <section aria-labelledby="ranked-players-title" className="animate-slide-up" style={{ padding: "clamp(14px, 3vw, 20px)", borderRadius: "clamp(12px, 2.5vw, 18px)", border: "2px solid rgba(139,92,246,0.5)", background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)", boxShadow: "0 20px 60px rgba(0,0,0,0.6)", backdropFilter: "blur(20px)", animationDelay: "0.3s" }}>
+                    <h2 id="ranked-players-title" style={{ fontSize: "clamp(14px, 3vw, 18px)", fontWeight: 900, marginBottom: "clamp(12px, 2.5vw, 16px)", display: "flex", alignItems: "center", gap: "10px" }}>
                       <Sparkles style={{ width: "24px", height: "24px", color: "#a78bfa" }} />
                       Ranked Players
                     </h2>
