@@ -204,8 +204,11 @@ export default function LeaderboardPage() {
               onClick={() => router.push("/")}
               style={{ display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", flexShrink: 0 }}
             >
-              <div style={{ position: "relative", width: 44, height: 44, borderRadius: "10px", overflow: "hidden", flexShrink: 0 }}>
-                <Image src="/images/logo.png" alt="VibraXX Logo" fill sizes="44px" style={{ objectFit: "contain" }} />
+              <div style={{ position: "relative", width: 48, height: 48, borderRadius: "9999px", padding: 3, background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)", boxShadow: "0 0 20px rgba(124,58,237,0.6)", flexShrink: 0 }}>
+                <div className="animate-glow" style={{ position: "absolute", inset: -4, borderRadius: "9999px", background: "radial-gradient(circle,#a855f7,transparent)", opacity: 0.4, filter: "blur(8px)", pointerEvents: "none" }} />
+                <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: "9999px", backgroundColor: "#020817", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                  <Image src="/images/logo.png" alt="VibraXX Logo" fill sizes="48px" style={{ objectFit: "contain", padding: "18%" }} />
+                </div>
               </div>
               <span style={{ fontSize: "clamp(16px,2.5vw,20px)", fontWeight: 900, background: "linear-gradient(90deg, #fbbf24, #f59e0b)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", letterSpacing: "1px", whiteSpace: "nowrap" }}>
                 Leaderboard
