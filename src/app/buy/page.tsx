@@ -36,20 +36,20 @@ interface PrizeData {
 const packages = [
   {
     id: "single",
-    name: "Single Round",
-    rounds: 1,
+    name: "Starter Pack",
+    rounds: 3,
     popular: false,
     icon: Zap,
     badge: null,
-    tagline: "Try it out",
+    tagline: "Get started",
     features: [
-      { icon: Lightning,  text: "1 Quiz Round",        highlight: false },
-      { icon: Target,     text: "15 Questions",         highlight: false },
-      { icon: Rocket,     text: "Instant Access",       highlight: true  },
-      { icon: BarChart3,  text: "Leaderboard Entry",    highlight: false },
-      { icon: TrendingUp, text: "Score Tracking",       highlight: false },
+      { icon: Lightning,  text: "3 Quiz Rounds",        highlight: false },
+      { icon: Target,     text: "15 Questions Each",     highlight: false },
+      { icon: Rocket,     text: "Instant Access",        highlight: true  },
+      { icon: BarChart3,  text: "Leaderboard Entry",     highlight: false },
+      { icon: TrendingUp, text: "Score Tracking",        highlight: false },
     ],
-    description: "Perfect for trying out the competition",
+    description: "Jump in with 3 rounds and start competing",
     color: {
       border:  "rgba(139,92,246,0.5)",
       glow:    "rgba(139,92,246,0.4)",
@@ -259,14 +259,16 @@ export default function BuyPage() {
         .animate-mega-bounce{ animation: megaBounce 1.5s ease-in-out infinite; }
 
         /* ── LAYOUT ── */
-        .vx-container {
-          min-height: 100vh;
+        body {
           background: linear-gradient(135deg,#0f172a 0%,#1e1b4b 25%,#312e81 50%,#1e1b4b 75%,#0f172a 100%);
+          background-attachment: fixed;
+        }
+        .vx-container {
           color: white;
           position: relative;
         }
         .vx-bg-grid {
-          position: absolute; inset: 0; pointer-events: none;
+          position: fixed; inset: 0; pointer-events: none; z-index: 0;
           background-image:
             linear-gradient(rgba(139,92,246,.04) 1px, transparent 1px),
             linear-gradient(90deg, rgba(139,92,246,.04) 1px, transparent 1px);
@@ -737,12 +739,12 @@ export default function BuyPage() {
                     <p className="vx-card-desc">{pkg.description}</p>
                   </div>
 
-                  <div className={`vx-round-display ${pkg.id === "bundle" ? "bundle" : ""}`}>
-                    <div className="vx-round-text">{pkg.rounds === 1 ? "1 Round" : "30 Rounds"}</div>
+                    <div className={`vx-round-display ${pkg.id === "bundle" ? "bundle" : ""}`}>
+                    <div className="vx-round-text">{pkg.rounds === 3 ? "3 Rounds" : "30 Rounds"}</div>
                     {pkg.id === "bundle" && (
                       <div className="vx-round-badge"><Sparkles size={14} /><span>20% OFF</span></div>
                     )}
-                    <div className="vx-round-sub">{pkg.id === "single" ? "Perfect for trying out" : "Best Value Package"}</div>
+                    <div className="vx-round-sub">{pkg.id === "single" ? "Jump in and start competing" : "Best Value Package"}</div>
                   </div>
 
                   <div className="vx-features">
@@ -796,8 +798,8 @@ export default function BuyPage() {
           </div>
 
         </main>
-        <Footer />
       </div>
+      <Footer />
     </>
   );
 }
