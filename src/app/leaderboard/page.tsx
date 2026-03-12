@@ -24,6 +24,7 @@ interface Player {
   id: string; rank: number; name: string; score: number;
   correct: number; wrong: number; rounds: number; accuracy: number;
   tier: string; tierIcon: string; tierColor: string;
+  avatarUrl: string;
 }
 
 interface RpcPayload {
@@ -102,6 +103,7 @@ export default function LeaderboardPage() {
           wrong: p.wrong_answers || 0, rounds: p.rounds_played || 0,
           accuracy: p.accuracy || 0,
           tier: p.tier || "Bronze", tierIcon: p.tier_icon || "🥉", tierColor: p.tier_color || "#cd7f32",
+          avatarUrl: p.avatar_url || "",
         }));
         setRpcData(data as RpcPayload);
         setPlayers(mapped);
@@ -570,7 +572,13 @@ export default function LeaderboardPage() {
                         onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
                       >
                         <div style={{ position: "relative", width: "clamp(56px,12vw,80px)", height: "clamp(56px,12vw,80px)", margin: "0 auto clamp(10px,2vw,16px)", borderRadius: "50%", padding: 3, background: "linear-gradient(135deg,#d1d5db,#9ca3af)", boxShadow: "0 0 20px rgba(192,192,192,.5)" }}>
-                          <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: "#1e293b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(22px,5vw,36px)" }}>🥈</div>
+                          <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: "50%", background: "#1e293b", overflow: "hidden" }}>
+                          {top3[1].avatarUrl ? (
+                            <Image src={top3[1].avatarUrl} alt={top3[1].name} fill sizes="80px" style={{ objectFit: "cover" }} />
+                          ) : (
+                            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(22px,5vw,36px)" }}>🥈</div>
+                          )}
+                        </div>
                           <div style={{ position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%)", width: "clamp(22px,5vw,32px)", height: "clamp(22px,5vw,32px)", borderRadius: "50%", background: "linear-gradient(135deg,#d1d5db,#9ca3af)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #0f172a", color: "#0f172a", fontWeight: 900, fontSize: "clamp(10px,2.5vw,16px)" }}>2</div>
                         </div>
                         <h2 style={{ fontSize: "clamp(12px,2.5vw,16px)", fontWeight: 800, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{top3[1].name}</h2>
@@ -592,7 +600,13 @@ export default function LeaderboardPage() {
                       >
                         <Crown className="animate-crown" style={{ width: "clamp(22px,5vw,40px)", height: "clamp(22px,5vw,40px)", color: "#fbbf24", margin: "0 auto clamp(8px,2vw,12px)" }} />
                         <div style={{ position: "relative", width: "clamp(68px,14vw,100px)", height: "clamp(68px,14vw,100px)", margin: "0 auto clamp(12px,2.5vw,20px)", borderRadius: "50%", padding: 4, background: "linear-gradient(135deg,#fbbf24,#f59e0b)", boxShadow: "0 0 40px rgba(251,191,36,.7)" }}>
-                          <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: "#1e293b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(28px,6vw,48px)" }}>🥇</div>
+                          <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: "50%", background: "#1e293b", overflow: "hidden" }}>
+                          {top3[0].avatarUrl ? (
+                            <Image src={top3[0].avatarUrl} alt={top3[0].name} fill sizes="100px" style={{ objectFit: "cover" }} />
+                          ) : (
+                            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(28px,6vw,48px)" }}>🥇</div>
+                          )}
+                        </div>
                           <div style={{ position: "absolute", bottom: -8, left: "50%", transform: "translateX(-50%)", width: "clamp(26px,5.5vw,38px)", height: "clamp(26px,5.5vw,38px)", borderRadius: "50%", background: "linear-gradient(135deg,#fbbf24,#f59e0b)", display: "flex", alignItems: "center", justifyContent: "center", border: "3px solid #0f172a", color: "#0f172a", fontWeight: 900, fontSize: "clamp(11px,2.5vw,18px)" }}>1</div>
                         </div>
                         <h2 style={{ fontSize: "clamp(14px,3vw,20px)", fontWeight: 900, marginBottom: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{top3[0].name}</h2>
@@ -616,7 +630,13 @@ export default function LeaderboardPage() {
                         onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
                       >
                         <div style={{ position: "relative", width: "clamp(56px,12vw,80px)", height: "clamp(56px,12vw,80px)", margin: "0 auto clamp(10px,2vw,16px)", borderRadius: "50%", padding: 3, background: "linear-gradient(135deg,#d97706,#c2410c)", boxShadow: "0 0 20px rgba(217,119,6,.5)" }}>
-                          <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: "#1e293b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(22px,5vw,36px)" }}>🥉</div>
+                          <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: "50%", background: "#1e293b", overflow: "hidden" }}>
+                          {top3[2].avatarUrl ? (
+                            <Image src={top3[2].avatarUrl} alt={top3[2].name} fill sizes="80px" style={{ objectFit: "cover" }} />
+                          ) : (
+                            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(22px,5vw,36px)" }}>🥉</div>
+                          )}
+                        </div>
                           <div style={{ position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%)", width: "clamp(22px,5vw,32px)", height: "clamp(22px,5vw,32px)", borderRadius: "50%", background: "linear-gradient(135deg,#d97706,#c2410c)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #0f172a", color: "#0f172a", fontWeight: 900, fontSize: "clamp(10px,2.5vw,16px)" }}>3</div>
                         </div>
                         <h2 style={{ fontSize: "clamp(12px,2.5vw,16px)", fontWeight: 800, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{top3[2].name}</h2>
