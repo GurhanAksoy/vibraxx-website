@@ -80,13 +80,14 @@ export default function LeaderboardPage() {
         setIsMusicPlaying(true);
         audioRef.current.play().catch(() => {});
       }
+      document.removeEventListener("click", onFirst);
     };
-    document.addEventListener("click", onFirst, { once: true });
+    document.addEventListener("click", onFirst);
     return () => document.removeEventListener("click", onFirst);
   }, [hasInteracted]);
 
   useEffect(() => {
-    if (!audioRef.current || !hasInteracted) return;
+    if (!audioRef.current) return;
     if (isMusicPlaying) {
       audioRef.current.play().catch(() => {});
       localStorage.setItem("vibraxx_music_enabled", "true");
@@ -192,42 +193,46 @@ export default function LeaderboardPage() {
           <header style={{
             maxWidth: "900px",
             margin: "0 auto clamp(24px,5vw,40px)",
-            display: "flex",
+            display: "grid",
+            gridTemplateColumns: "auto 1fr auto",
             alignItems: "center",
-            justifyContent: "space-between",
             gap: "16px",
-            flexWrap: "wrap",
           }}>
 
-            {/* Left: Logo + Title */}
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              {/* Logo */}
-              <div
-                onClick={() => router.push("/")}
-                style={{ cursor: "pointer", flexShrink: 0 }}
-              >
-                <Image
-                  src="/logo.png"
-                  alt="VibraXX"
-                  width={44}
-                  height={44}
-                  style={{ borderRadius: "10px", display: "block" }}
-                />
-              </div>
-              {/* Title */}
-              <div>
-                <div style={{ fontSize: "clamp(18px,3.5vw,24px)", fontWeight: 900, color: "white", letterSpacing: "1px", lineHeight: 1.1 }}>
-                  Leaderboard
-                </div>
-                <div style={{ fontSize: "11px", color: "#a78bfa", fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>
-                  VibraXX
-                </div>
-              </div>
+            {/* LEFT: Logo + Leaderboard */}
+            <div
+              onClick={() => router.push("/")}
+              style={{ display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", flexShrink: 0 }}
+            >
+              <Image src="/logo.png" alt="VibraXX" width={44} height={44} style={{ borderRadius: "10px", display: "block" }} />
+              <span style={{ fontSize: "clamp(16px,2.5vw,20px)", fontWeight: 900, color: "white", letterSpacing: "1px", whiteSpace: "nowrap" }}>
+                Leaderboard
+              </span>
             </div>
 
-            {/* Center: Tabs — rendered below */}
-            {/* Right-ish: Home + Music */}
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            {/* CENTER: Tabs */}
+            <nav style={{ display: "flex", justifyContent: "center", gap: "4px", padding: "4px", borderRadius: "12px", background: "rgba(15,23,42,.8)", border: "2px solid rgba(139,92,246,.3)" }}>
+              {(["daily", "weekly", "monthly"] as Tab[]).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  style={{
+                    padding: "9px 16px", borderRadius: "10px", border: "none",
+                    background: activeTab === tab ? "linear-gradient(135deg, #7c3aed, #d946ef)" : "transparent",
+                    color: activeTab === tab ? "white" : "#94a3b8",
+                    fontSize: "12px", fontWeight: 800, textTransform: "uppercase",
+                    letterSpacing: "0.5px", cursor: "pointer", transition: "all .3s", whiteSpace: "nowrap",
+                  }}
+                  onMouseEnter={e => { if (activeTab !== tab) { e.currentTarget.style.color = "#cbd5e1"; e.currentTarget.style.background = "rgba(139,92,246,.15)"; } }}
+                  onMouseLeave={e => { if (activeTab !== tab) { e.currentTarget.style.color = "#94a3b8"; e.currentTarget.style.background = "transparent"; } }}
+                >
+                  {TAB_LABEL[tab]}
+                </button>
+              ))}
+            </nav>
+
+            {/* RIGHT: Music + Live */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
               <button
                 onClick={toggleMusic}
                 title={isMusicPlaying ? "Mute Music" : "Play Music"}
@@ -235,9 +240,7 @@ export default function LeaderboardPage() {
                   display: "flex", alignItems: "center", justifyContent: "center",
                   width: 40, height: 40, borderRadius: "10px",
                   border: "2px solid rgba(139,92,246,.5)",
-                  background: isMusicPlaying
-                    ? "linear-gradient(135deg, rgba(139,92,246,.95), rgba(124,58,237,.95))"
-                    : "rgba(15,23,42,.8)",
+                  background: isMusicPlaying ? "linear-gradient(135deg, rgba(139,92,246,.95), rgba(124,58,237,.95))" : "rgba(15,23,42,.8)",
                   cursor: "pointer", transition: "all .3s",
                   boxShadow: isMusicPlaying ? "0 0 15px rgba(139,92,246,.5)" : "none",
                 }}
@@ -249,44 +252,10 @@ export default function LeaderboardPage() {
                   : <VolumeX style={{ width: 18, height: 18, color: "#94a3b8" }} />
                 }
               </button>
-            </div>
-
-            {/* Center: Tabs */}
-            <nav style={{
-              display: "flex", gap: "4px", padding: "4px",
-              borderRadius: "12px", background: "rgba(15,23,42,.8)",
-              border: "2px solid rgba(139,92,246,.3)",
-            }}>
-              {(["daily", "weekly", "monthly"] as Tab[]).map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  style={{
-                    padding: "9px 16px", borderRadius: "10px", border: "none",
-                    background: activeTab === tab
-                      ? "linear-gradient(135deg, #7c3aed, #d946ef)"
-                      : "transparent",
-                    color: activeTab === tab ? "white" : "#94a3b8",
-                    fontSize: "12px", fontWeight: 800,
-                    textTransform: "uppercase", letterSpacing: "0.5px",
-                    cursor: "pointer", transition: "all .3s",
-                  }}
-                  onMouseEnter={e => { if (activeTab !== tab) { e.currentTarget.style.color = "#cbd5e1"; e.currentTarget.style.background = "rgba(139,92,246,.15)"; } }}
-                  onMouseLeave={e => { if (activeTab !== tab) { e.currentTarget.style.color = "#94a3b8"; e.currentTarget.style.background = "transparent"; } }}
-                >
-                  {TAB_LABEL[tab]}
-                </button>
-              ))}
-            </nav>
-
-            {/* Right: Live badge */}
-            <div style={{
-              display: "inline-flex", alignItems: "center", gap: "8px",
-              padding: "8px 16px", borderRadius: "999px",
-              background: "rgba(34,197,94,.15)", border: "1px solid rgba(34,197,94,.5)",
-            }}>
-              <div className="animate-pulse" style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e" }} />
-              <span style={{ fontSize: "12px", color: "#22c55e", fontWeight: 600 }}>Live</span>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: "7px", padding: "8px 14px", borderRadius: "999px", background: "rgba(34,197,94,.15)", border: "1px solid rgba(34,197,94,.5)" }}>
+                <div className="animate-pulse" style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e" }} />
+                <span style={{ fontSize: "12px", color: "#22c55e", fontWeight: 600 }}>Live</span>
+              </div>
             </div>
           </header>
 
