@@ -252,7 +252,7 @@ function LeaderboardPage() {
         <div style={{ padding: "clamp(12px, 3vw, 24px) clamp(12px, 3vw, 20px)" }}>
           
           {/* HEADER */}
-          <header role="banner" style={{ maxWidth: "1400px", margin: "0 auto clamp(12px, 2.5vw, 20px)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
+          <header role="banner" style={{ maxWidth: "820px", margin: "0 auto clamp(12px, 2.5vw, 20px)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
             
             {/* Logo (Lobby tarzı) + Leaderboard */}
             <div style={{ display: "flex", alignItems: "center", gap: "clamp(12px, 2.5vw, 16px)" }}>
@@ -384,162 +384,113 @@ function LeaderboardPage() {
             </div>
           </header>
 
-          <main role="main" style={{ maxWidth: "1400px", margin: "0 auto" }}>
+          <main role="main" style={{ maxWidth: "820px", margin: "0 auto" }}>
             
             {/* ═══ HERO SECTION ═══ */}
-            <div className="animate-slide-up" style={{ padding: "clamp(16px, 3vw, 22px) clamp(14px, 3vw, 24px)", borderRadius: "clamp(16px, 3vw, 24px)", border: "3px solid rgba(251,191,36,0.7)", background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)", boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 50px rgba(251,191,36,0.4), inset 0 0 30px rgba(251,191,36,0.1)", backdropFilter: "blur(20px)", marginBottom: "clamp(14px, 3vw, 22px)", textAlign: "center" as const, position: "relative", overflow: "hidden" }}>
-              
+            <div className="animate-slide-up" style={{ maxWidth: "820px", margin: "0 auto clamp(14px, 3vw, 22px)", padding: "clamp(14px, 2.5vw, 20px) clamp(14px, 3vw, 22px)", borderRadius: "clamp(14px, 3vw, 20px)", border: "2px solid rgba(251,191,36,0.7)", background: "linear-gradient(135deg, rgba(30,27,75,0.98) 0%, rgba(15,23,42,0.98) 100%)", boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 50px rgba(251,191,36,0.4), inset 0 0 30px rgba(251,191,36,0.1)", backdropFilter: "blur(20px)", marginBottom: "clamp(12px, 2.5vw, 18px)", textAlign: "center" as const, position: "relative", overflow: "hidden" }}>
+
               {/* Title */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px", marginBottom: "clamp(10px, 2vw, 16px)", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", marginBottom: "clamp(10px, 2vw, 16px)", flexWrap: "wrap" }}>
                 <Trophy className="animate-float" style={{ width: "clamp(18px, 3vw, 24px)", height: "clamp(18px, 3vw, 24px)", color: "#fbbf24" }} />
                 <h1 style={{ fontSize: "clamp(16px, 3vw, 22px)", fontWeight: 900, background: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", textTransform: "uppercase", letterSpacing: "2px" }}>
-                  {data?.prize?.label || 'Leaderboard'}
+                  {activeTab === 'daily' ? 'Daily Champion' : activeTab === 'weekly' ? 'Weekly Champion' : 'Monthly Champion'}
                 </h1>
                 <Trophy className="animate-float" style={{ width: "clamp(18px, 3vw, 24px)", height: "clamp(18px, 3vw, 24px)", color: "#fbbf24" }} />
               </div>
 
               {/* ═══ PRIZE BLOCK ═══ */}
-              {data?.prize?.type === 'money' ? (
-                /* Monthly: £1000 + unlock */
-                <div className="animate-glow" style={{ padding: "clamp(14px, 2.5vw, 20px) clamp(14px, 3vw, 24px)", borderRadius: "clamp(14px, 3vw, 20px)", background: "linear-gradient(135deg, rgba(251,191,36,0.25), rgba(245,158,11,0.2))", border: "3px solid rgba(251,191,36,0.6)", marginBottom: "clamp(12px, 2.5vw, 18px)", position: "relative", overflow: "hidden" }}>
-                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "radial-gradient(circle at 50% 50%, rgba(251,191,36,0.15) 0%, transparent 70%)", pointerEvents: "none" }} />
-                  
-                  <div style={{ fontSize: "clamp(11px, 2vw, 13px)", color: "#fcd34d", fontWeight: 800, marginBottom: "clamp(10px, 2vw, 16px)", textTransform: "uppercase", letterSpacing: "1.5px", textAlign: "center" as const, position: "relative", zIndex: 1 }}>
-                    💰 {data?.prize?.label || 'Monthly £1,000 Skill Reward'}
+              {activeTab === 'daily' && (
+                /* Daily: Statü — ödül yok */
+                <div style={{ padding: "clamp(14px, 2.5vw, 20px) clamp(14px, 3vw, 24px)", borderRadius: "clamp(12px, 2.5vw, 16px)", background: "linear-gradient(135deg, rgba(139,92,246,0.2), rgba(124,58,237,0.15))", border: "2px solid rgba(139,92,246,0.5)", marginBottom: "clamp(12px, 2.5vw, 18px)", position: "relative", overflow: "hidden", textAlign: "center" as const }}>
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "radial-gradient(circle at 50% 50%, rgba(139,92,246,0.1) 0%, transparent 70%)", pointerEvents: "none" }} />
+                  <div style={{ fontSize: "clamp(28px, 6vw, 40px)", marginBottom: "8px" }}>🏅</div>
+                  <div style={{ fontSize: "clamp(15px, 3vw, 20px)", fontWeight: 900, background: "linear-gradient(90deg, #a78bfa, #f0abfc)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", marginBottom: "6px" }}>
+                    Daily Glory
                   </div>
-                  
-                  <div className="prize-pool-content" style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "clamp(16px, 3vw, 24px)", position: "relative", zIndex: 1 }}>
-                    
-                    {/* Progress Ring */}
-                    <div style={{ position: "relative", width: "clamp(80px, 14vw, 110px)", height: "clamp(80px, 14vw, 110px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <svg width="100%" height="100%" viewBox="0 0 200 200" style={{ transform: "rotate(-90deg)", filter: data?.prize?.unlocked ? "drop-shadow(0 0 20px rgba(251,191,36,0.8))" : "drop-shadow(0 0 10px rgba(139,92,246,0.5))" }}>
-                        <circle cx="100" cy="100" r="85" fill="none" stroke="rgba(15,23,42,0.6)" strokeWidth="12" />
-                        <circle cx="100" cy="100" r="85" fill="none" stroke={data?.prize?.unlocked ? "url(#goldGradient)" : "url(#purpleGradient)"} strokeWidth="12" strokeLinecap="round" 
-                          strokeDasharray={`${2 * Math.PI * 85}`} 
-                          strokeDashoffset={`${2 * Math.PI * 85 * (1 - Math.min((data?.prize?.progress || 0) / (data?.prize?.threshold || 1), 1))}`} 
-                          style={{ transition: "stroke-dashoffset 1s ease-out, stroke 0.5s ease" }} />
-                        <defs>
-                          <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stopColor="#fbbf24" />
-                            <stop offset="50%" stopColor="#f59e0b" />
-                            <stop offset="100%" stopColor="#fbbf24" />
-                          </linearGradient>
-                          <linearGradient id="purpleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stopColor="#8b5cf6" />
-                            <stop offset="50%" stopColor="#d946ef" />
-                            <stop offset="100%" stopColor="#8b5cf6" />
-                          </linearGradient>
-                        </defs>
-                      </svg>
-                      
-                      <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", textAlign: "center" as const }}>
-                        <div style={{ fontSize: "clamp(20px, 3.5vw, 28px)", marginBottom: "4px", animation: data?.prize?.unlocked ? "float 2s ease-in-out infinite" : "none" }}>
-                          {data?.prize?.unlocked ? "🎉" : "🔒"}
-                        </div>
-                        <div style={{ fontSize: "clamp(14px, 2.5vw, 18px)", fontWeight: 900, background: data?.prize?.unlocked ? "linear-gradient(90deg, #fbbf24, #f59e0b)" : "linear-gradient(90deg, #8b5cf6, #d946ef)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1 }}>
-                          {(() => {
-                            const pct = data?.prize?.threshold ? Math.round(((data?.prize?.progress || 0) / data.prize.threshold) * 100) : 0;
-                            return pct > 0 ? `${pct}%` : "—";
-                          })()}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Info */}
-                    <div className="prize-pool-info" style={{ flex: 1, textAlign: "left" as const }}>
-                      <div style={{ fontSize: "clamp(28px, 5vw, 40px)", fontWeight: 900, background: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1, marginBottom: "16px", filter: data?.prize?.unlocked ? "drop-shadow(0 0 20px rgba(251,191,36,0.6))" : "none" }}>
-                        £{displayNum(data?.prize?.amount)}
-                      </div>
-                      
-                      {data?.prize?.unlocked ? (
-                        <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "10px 20px", borderRadius: "999px", background: "linear-gradient(135deg, rgba(34,197,94,0.25), rgba(21,128,61,0.2))", border: "2px solid rgba(34,197,94,0.6)", marginBottom: "16px" }}>
-                          <Sparkles style={{ width: "20px", height: "20px", color: "#22c55e" }} />
-                          <span style={{ fontSize: "clamp(12px, 2.5vw, 16px)", fontWeight: 800, color: "#22c55e", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                            PRIZE ACTIVE!
-                          </span>
-                        </div>
-                      ) : (
-                        <div style={{ marginBottom: "16px" }}>
-                          <div style={{ fontSize: "clamp(14px, 3vw, 18px)", fontWeight: 700, color: "#fcd34d", marginBottom: "8px" }}>
-                            {displayNum(data?.prize?.progress)} / {displayNum(data?.prize?.threshold)} Paid Entries
-                          </div>
-                          <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "8px 16px", borderRadius: "999px", background: "rgba(139,92,246,0.2)", border: "1px solid rgba(139,92,246,0.5)" }}>
-                            <Target style={{ width: "16px", height: "16px", color: "#a78bfa" }} />
-                            <span style={{ fontSize: "clamp(11px, 2.2vw, 14px)", fontWeight: 700, color: "#a78bfa" }}>
-                              {displayNum((data?.prize?.threshold || 0) - (data?.prize?.progress || 0))} more to unlock!
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                      
-                      <div style={{ fontSize: "clamp(10px, 2vw, 12px)", color: "#94a3b8", fontStyle: "italic", marginBottom: "12px" }}>
-                        {data?.prize?.sublabel || 'Funded by VibraXX, not pooled'}
-                      </div>
-                      
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "clamp(11px, 2.2vw, 14px)", color: "#cbd5e1" }}>
-                        <Clock style={{ width: "16px", height: "16px" }} />
-                        <span>Resets in {data?.countdown?.days || 0}d {data?.countdown?.hours || 0}h {data?.countdown?.minutes || 0}m</span>
-                      </div>
-                    </div>
+                  <div style={{ fontSize: "clamp(11px, 2vw, 13px)", color: "#94a3b8", marginBottom: "12px" }}>
+                    Top the daily rankings and claim your spot as today's champion.
+                  </div>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "6px 14px", borderRadius: "999px", background: "rgba(139,92,246,0.2)", border: "1px solid rgba(139,92,246,0.4)", fontSize: "clamp(10px, 2vw, 12px)", color: "#c4b5fd", fontWeight: 700 }}>
+                    <Clock style={{ width: "12px", height: "12px" }} />
+                    Resets in {data?.countdown?.days || 0}d {data?.countdown?.hours || 0}h {data?.countdown?.minutes || 0}m
                   </div>
                 </div>
-              ) : (
-                /* Weekly: 15 Credits */
-                <div style={{ padding: "clamp(14px, 2.5vw, 20px) clamp(14px, 3vw, 24px)", borderRadius: "clamp(14px, 3vw, 20px)", background: "linear-gradient(135deg, rgba(139,92,246,0.25), rgba(124,58,237,0.2))", border: "3px solid rgba(139,92,246,0.6)", marginBottom: "clamp(24px, 5vw, 32px)", position: "relative", overflow: "hidden", textAlign: "center" as const }}>
+              )}
+
+              {activeTab === 'weekly' && (
+                /* Weekly: 15 Free Rounds (paid entry kaydıyla) */
+                <div style={{ padding: "clamp(14px, 2.5vw, 20px) clamp(14px, 3vw, 24px)", borderRadius: "clamp(12px, 2.5vw, 16px)", background: "linear-gradient(135deg, rgba(139,92,246,0.2), rgba(124,58,237,0.15))", border: "2px solid rgba(139,92,246,0.5)", marginBottom: "clamp(12px, 2.5vw, 18px)", position: "relative", overflow: "hidden", textAlign: "center" as const }}>
                   <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "radial-gradient(circle at 50% 50%, rgba(139,92,246,0.15) 0%, transparent 70%)", pointerEvents: "none" }} />
-                  
-                  <div style={{ fontSize: "clamp(13px, 2.5vw, 16px)", fontWeight: 900, background: "linear-gradient(90deg, #a78bfa, #d946ef, #a78bfa)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "clamp(16px, 3vw, 24px)", position: "relative", zIndex: 1 }}>
-                    🏆 {data?.prize?.label || 'Weekly Champion Reward'}
+                  <div style={{ fontSize: "clamp(18px, 3.5vw, 22px)", fontWeight: 900, background: "linear-gradient(90deg, #a78bfa, #d946ef, #a78bfa)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "clamp(10px, 2vw, 14px)", position: "relative", zIndex: 1 }}>
+                    🏆 {displayNum(data?.prize?.amount)} Free Rounds
                   </div>
-                  
-                  <div style={{ fontSize: "clamp(32px, 6vw, 48px)", marginBottom: "clamp(8px, 1.5vw, 12px)", position: "relative", zIndex: 1, animation: "float 3s ease-in-out infinite" }}>
-                    🎁
-                  </div>
-                  
-                  <div style={{ fontSize: "clamp(28px, 5vw, 40px)", fontWeight: 900, background: "linear-gradient(90deg, #a78bfa, #f0abfc)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1, marginBottom: "12px", position: "relative", zIndex: 1 }}>
+                  <div style={{ fontSize: "clamp(36px, 7vw, 48px)", marginBottom: "clamp(8px, 1.5vw, 10px)", position: "relative", zIndex: 1 }}>🎟️</div>
+                  <div style={{ fontSize: "clamp(24px, 5vw, 32px)", fontWeight: 900, background: "linear-gradient(90deg, #a78bfa, #f0abfc)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1, marginBottom: "8px", position: "relative", zIndex: 1 }}>
                     {displayNum(data?.prize?.amount)} Credits
                   </div>
-                  
-                  <div style={{ fontSize: "clamp(11px, 2vw, 13px)", color: "#c4b5fd", fontWeight: 600, marginBottom: "clamp(8px, 1.5vw, 12px)", position: "relative", zIndex: 1 }}>
-                    {data?.prize?.sublabel || 'Free Live Arena Rounds'}
+                  <div style={{ fontSize: "clamp(10px, 2vw, 12px)", color: "#94a3b8", marginBottom: "10px", position: "relative", zIndex: 1, fontStyle: "italic" }}>
+                    Awarded to the weekly champion who has made at least one paid entry.
                   </div>
-                  
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "10px 20px", borderRadius: "999px", background: "rgba(139,92,246,0.2)", border: "1px solid rgba(139,92,246,0.5)", fontSize: "clamp(11px, 2.2vw, 14px)", color: "#cbd5e1", position: "relative", zIndex: 1 }}>
-                    <Clock style={{ width: "16px", height: "16px" }} />
-                    <span>Resets in {data?.countdown?.days || 0}d {data?.countdown?.hours || 0}h {data?.countdown?.minutes || 0}m</span>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "6px 14px", borderRadius: "999px", background: "rgba(139,92,246,0.2)", border: "1px solid rgba(139,92,246,0.4)", fontSize: "clamp(10px, 2vw, 12px)", color: "#c4b5fd", fontWeight: 700, position: "relative", zIndex: 1 }}>
+                    <Clock style={{ width: "12px", height: "12px" }} />
+                    Resets in {data?.countdown?.days || 0}d {data?.countdown?.hours || 0}h {data?.countdown?.minutes || 0}m
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'monthly' && (
+                /* Monthly: £1,000 — kilit sistemi */
+                <div className="animate-glow" style={{ padding: "clamp(14px, 2.5vw, 20px) clamp(14px, 3vw, 24px)", borderRadius: "clamp(12px, 2.5vw, 16px)", background: "linear-gradient(135deg, rgba(251,191,36,0.2), rgba(245,158,11,0.15))", border: "2px solid rgba(251,191,36,0.5)", marginBottom: "clamp(12px, 2.5vw, 18px)", position: "relative", overflow: "hidden", textAlign: "center" as const }}>
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "radial-gradient(circle at 50% 50%, rgba(251,191,36,0.12) 0%, transparent 70%)", pointerEvents: "none" }} />
+
+                  <div style={{ fontSize: "clamp(13px, 2.2vw, 15px)", color: "#fcd34d", fontWeight: 800, marginBottom: "clamp(10px, 2vw, 14px)", textTransform: "uppercase", letterSpacing: "1.5px", position: "relative", zIndex: 1 }}>
+                    💰 Monthly Cash Prize
+                  </div>
+
+                  <div style={{ fontSize: "clamp(32px, 6vw, 44px)", fontWeight: 900, background: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1, marginBottom: "10px", position: "relative", zIndex: 1 }}>
+                    £{displayNum(data?.prize?.amount)}
+                  </div>
+
+                  {/* Kilit durumu */}
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "8px 16px", borderRadius: "999px", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.4)", marginBottom: "10px", position: "relative", zIndex: 1 }}>
+                    <span style={{ fontSize: "14px" }}>🔒</span>
+                    <span style={{ fontSize: "clamp(10px, 2vw, 12px)", fontWeight: 800, color: "#fca5a5", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                      Prize Pool Locked — Activates via Sales Milestone
+                    </span>
+                  </div>
+
+                  <div style={{ fontSize: "clamp(10px, 2vw, 12px)", color: "#94a3b8", marginBottom: "10px", fontStyle: "italic", position: "relative", zIndex: 1 }}>
+                    {data?.prize?.sublabel || 'Funded by VibraXX. Full terms on the Legal page.'}
+                  </div>
+
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "6px 14px", borderRadius: "999px", background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.3)", fontSize: "clamp(10px, 2vw, 12px)", color: "#fcd34d", fontWeight: 700, position: "relative", zIndex: 1 }}>
+                    <Clock style={{ width: "12px", height: "12px" }} />
+                    Resets in {data?.countdown?.days || 0}d {data?.countdown?.hours || 0}h {data?.countdown?.minutes || 0}m
                   </div>
                 </div>
               )}
 
               {/* Stats Cards */}
-              <div className="mobile-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "clamp(8px, 2vw, 12px)" }}>
+              <div className="mobile-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "clamp(8px, 2vw, 12px)" }}>
                 <div style={{ padding: "clamp(10px, 2vw, 14px)", borderRadius: "12px", background: "linear-gradient(135deg, rgba(139,92,246,0.2), rgba(124,58,237,0.15))", border: "2px solid rgba(139,92,246,0.5)", transition: "all 0.3s", cursor: "pointer" }}
                   onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(139,92,246,0.4)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}>
                   <Users style={{ width: "clamp(16px, 3vw, 20px)", height: "clamp(16px, 3vw, 20px)", color: "#a78bfa", margin: "0 auto 6px" }} />
-                  <div style={{ fontSize: "clamp(16px, 3vw, 22px)", fontWeight: 900, color: "#a78bfa", lineHeight: 1, marginBottom: "4px" }}>
-                    {displayNum(data?.stats?.total_players)}
-                  </div>
+                  <div style={{ fontSize: "clamp(16px, 3vw, 22px)", fontWeight: 900, color: "#a78bfa", lineHeight: 1, marginBottom: "4px" }}>{displayNum(data?.stats?.total_players)}</div>
                   <div style={{ fontSize: "clamp(10px, 2vw, 12px)", color: "#c4b5fd", fontWeight: 600, textTransform: "uppercase" }}>Players</div>
                 </div>
-                
                 <div style={{ padding: "clamp(10px, 2vw, 14px)", borderRadius: "12px", background: "linear-gradient(135deg, rgba(34,197,94,0.2), rgba(21,128,61,0.15))", border: "2px solid rgba(34,197,94,0.5)", transition: "all 0.3s", cursor: "pointer" }}
                   onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(34,197,94,0.4)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}>
                   <Star style={{ width: "clamp(16px, 3vw, 20px)", height: "clamp(16px, 3vw, 20px)", color: "#22c55e", margin: "0 auto 6px" }} />
-                  <div style={{ fontSize: "clamp(16px, 3vw, 22px)", fontWeight: 900, color: "#22c55e", lineHeight: 1, marginBottom: "4px" }}>
-                    {displayNum(data?.stats?.top_score)}
-                  </div>
+                  <div style={{ fontSize: "clamp(16px, 3vw, 22px)", fontWeight: 900, color: "#22c55e", lineHeight: 1, marginBottom: "4px" }}>{displayNum(data?.stats?.top_score)}</div>
                   <div style={{ fontSize: "clamp(10px, 2vw, 12px)", color: "#86efac", fontWeight: 600, textTransform: "uppercase" }}>Top Score</div>
                 </div>
-                
                 <div style={{ padding: "clamp(10px, 2vw, 14px)", borderRadius: "12px", background: "linear-gradient(135deg, rgba(56,189,248,0.2), rgba(14,165,233,0.15))", border: "2px solid rgba(56,189,248,0.5)", transition: "all 0.3s", cursor: "pointer" }}
                   onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(56,189,248,0.4)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}>
                   <Target style={{ width: "clamp(16px, 3vw, 20px)", height: "clamp(16px, 3vw, 20px)", color: "#38bdf8", margin: "0 auto 6px" }} />
-                  <div style={{ fontSize: "clamp(16px, 3vw, 22px)", fontWeight: 900, color: "#38bdf8", lineHeight: 1, marginBottom: "4px" }}>
-                    {displayNum(data?.stats?.avg_accuracy)}%
-                  </div>
+                  <div style={{ fontSize: "clamp(16px, 3vw, 22px)", fontWeight: 900, color: "#38bdf8", lineHeight: 1, marginBottom: "4px" }}>{displayNum(data?.stats?.avg_accuracy)}%</div>
                   <div style={{ fontSize: "clamp(10px, 2vw, 12px)", color: "#7dd3fc", fontWeight: 600, textTransform: "uppercase" }}>Avg Accuracy</div>
                 </div>
               </div>
