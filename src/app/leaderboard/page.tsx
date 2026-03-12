@@ -6,6 +6,7 @@ import {
   Crown, Trophy, Star, Target, Clock, Users,
   Sparkles, Volume2, VolumeX, ChevronRight,
 } from "lucide-react";
+import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import Footer from "@/components/Footer";
 
@@ -203,7 +204,9 @@ export default function LeaderboardPage() {
               onClick={() => router.push("/")}
               style={{ display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", flexShrink: 0 }}
             >
-              <img src="/logo.png" alt="VibraXX" width={44} height={44} style={{ borderRadius: "10px", display: "block", width: 44, height: 44, objectFit: "contain" }} />
+              <div style={{ position: "relative", width: 44, height: 44, borderRadius: "10px", overflow: "hidden", flexShrink: 0 }}>
+                <Image src="/images/logo.png" alt="VibraXX Logo" fill sizes="44px" style={{ objectFit: "contain" }} />
+              </div>
               <span style={{ fontSize: "clamp(16px,2.5vw,20px)", fontWeight: 900, background: "linear-gradient(90deg, #fbbf24, #f59e0b)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", letterSpacing: "1px", whiteSpace: "nowrap" }}>
                 Leaderboard
               </span>
