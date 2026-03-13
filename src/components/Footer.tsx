@@ -81,19 +81,20 @@ export default function Footer() {
 
       <footer className="vx-footer">
         <div className="vx-container">
+
           <div className="vx-footer-legal">
-            <strong style={{ color: "#94a3b8" }}>Educational Quiz Competition.</strong> 18+ only. This is a 100% skill-based
-            knowledge competition with no element of chance. Entry fees apply. Prize pool activates with 3000+ monthly participants. See{" "}
-            <a href="/terms" style={{ color: "#a78bfa", textDecoration: "underline" }}>
-              Terms & Conditions
-            </a>{" "}
-            for full details.
+            <strong style={{ color: "#94a3b8" }}>18+ · Knowledge Competition · Not Gambling.</strong>{" "}
+            VibraXX is a paid-entry, skill-based quiz. No element of chance. Entry fees non-refundable except where required by law.
+            The £1,000 monthly prize activates upon reaching the sales milestone — see{" "}
+            <a href="/terms" style={{ color: "#a78bfa", textDecoration: "underline" }}>Terms &amp; Conditions</a>.
+            One free round credited daily, resets at midnight UTC.
+            Not affiliated with or endorsed by Google.
           </div>
 
           <nav className="vx-footer-links" aria-label="Footer navigation">
             <a href="/privacy">Privacy Policy</a>
             <span className="vx-footer-divider" />
-            <a href="/terms">Terms & Conditions</a>
+            <a href="/terms">Terms &amp; Conditions</a>
             <span className="vx-footer-divider" />
             <a href="/cookies">Cookie Policy</a>
             <span className="vx-footer-divider" />
@@ -114,12 +115,15 @@ export default function Footer() {
 
           <div className="vx-footer-company">
             <div style={{ marginBottom: 8, textAlign: "center" }}>
-              © 2025 VibraXX. Operated by Sermin Limited (UK)
+              © {new Date().getFullYear()} VibraXX. Operated by Sermin Limited
+            </div>
+            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 6, textAlign: "center" }}>
+              Company No. 16778648 · Registered in England &amp; Wales
             </div>
             <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8, textAlign: "center" }}>
-              Registered in England & Wales | All rights reserved
+              71-75 Shelton Street, Covent Garden, London, WC2H 9JQ, United Kingdom
             </div>
-            <div style={{ marginBottom: 10, textAlign: "center" }}>
+            <div style={{ marginBottom: 6, textAlign: "center" }}>
               <a
                 href="mailto:team@vibraxx.com"
                 style={{ color: "#a78bfa", textDecoration: "none", fontSize: 12, fontWeight: 600 }}
@@ -127,14 +131,28 @@ export default function Footer() {
                 team@vibraxx.com
               </a>
             </div>
+            <div style={{ marginBottom: 10, textAlign: "center" }}>
+              <a
+                href="mailto:contact@sermin.uk"
+                style={{ color: "#64748b", textDecoration: "none", fontSize: 11 }}
+              >
+                contact@sermin.uk
+              </a>
+            </div>
             <div style={{ fontSize: 11, textAlign: "center" }}>
               Payment processing by{" "}
-              <a href="https://stripe.com" target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa", textDecoration: "none" }}>
+              <a
+                href="https://stripe.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "#a78bfa", textDecoration: "none" }}
+              >
                 Stripe
               </a>{" "}
-              | Secure SSL encryption | Skill-based competition - Not gambling
+              · SSL encrypted · This is not gambling
             </div>
           </div>
+
         </div>
       </footer>
     </>
