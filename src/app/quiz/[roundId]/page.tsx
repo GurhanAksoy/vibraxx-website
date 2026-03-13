@@ -409,6 +409,9 @@ export default function QuizGamePage() {
         setIsCorrect(false);
         setCurrentIndex((p) => p + 1);
       } else {
+        try {
+          await supabase.rpc("finalize_user_round", { p_round_id: roundId });
+        } catch (_) {}
         await loadFinalResults();
         setShowFinalScore(true);
       }
