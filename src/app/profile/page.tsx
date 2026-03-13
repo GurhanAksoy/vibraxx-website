@@ -164,7 +164,7 @@ export default function ProfilePage() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        const { data, error } = await supabase.rpc("get_user_profile_data", { p_user_id: user.id });
+        const { data, error } = await supabase.rpc("get_user_profile_data");
         if (error || !data || !data.stats?.tier || !data.profile) {
           setIsLoading(false);
           return;
@@ -190,7 +190,7 @@ export default function ProfilePage() {
     const debouncedRefresh = () => {
       clearTimeout(refreshTimeout);
       refreshTimeout = setTimeout(async () => {
-        const { data, error } = await supabase.rpc("get_user_profile_data", { p_user_id: userId });
+        const { data, error } = await supabase.rpc("get_user_profile_data");
         if (!error && data) setProfileData(data);
       }, 500);
     };
