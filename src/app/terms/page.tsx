@@ -949,15 +949,23 @@ export default function TermsPage() {
             </h2>
 
             <h3 className="subsection-title">11.1 Question Error Policy</h3>
-            <p>
-              If a question contains a factual mistake, display error, material ambiguity, or other defect that affects answer validity, VibraXX may review the issue and decide an appropriate remedy.
-            </p>
-            <ul>
-              <li><strong>Error Review:</strong> Reports should be submitted as soon as reasonably possible after the round</li>
-              <li><strong>Question Cancellation:</strong> If an affected question is invalidated, it may be excluded from scoring calculations</li>
-              <li><strong>Score Recalculation:</strong> If one question is cancelled from a 15-question round, the remaining maximum score may become <strong>140 points</strong></li>
-              <li><strong>No Automatic Refund:</strong> Question correction or cancellation does not automatically entitle a player to a refund</li>
-            </ul>
+<p>
+  If a question contains a factual mistake, display error, material ambiguity, or any defect that could affect the validity of answers, VibraXX may review the issue and determine an appropriate remedy.
+</p>
+<ul>
+  <li>
+    <strong>Error Review:</strong> Reports should be submitted as soon as reasonably possible after the round.
+  </li>
+  <li>
+    <strong>Question Cancellation:</strong> If a question is determined to be invalid, VibraXX may cancel the question or exclude it from scoring calculations.
+  </li>
+  <li>
+    <strong>Score Adjustment:</strong> Where a question is cancelled, VibraXX may either exclude the question from the round score or award the question as correct to all participants, depending on what is considered the fairest resolution.
+  </li>
+  <li>
+    <strong>No Automatic Refund:</strong> Question correction, cancellation, or score adjustments do not automatically entitle a player to a refund.
+  </li>
+</ul>
 
             <h3 className="subsection-title">11.2 Technical Issues Beyond Our Control</h3>
             <p>
