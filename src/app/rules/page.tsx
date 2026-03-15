@@ -590,28 +590,28 @@ export default function QuizRulesPage() {
                   <Zap style={{ width: 18, height: 18 }} />
                   Frequency
                 </h4>
-                <p>New live quiz every 15 minutes, 24/7 (96 rounds daily)</p>
+                <p>New live quiz every 5 minutes, 24/7 (288 rounds daily)</p>
               </div>
               <div className="rule-card">
                 <h4>
                   <Target style={{ width: 18, height: 18 }} />
                   Questions
                 </h4>
-                <p>20 multiple-choice questions per round</p>
+                <p>15 multiple-choice questions per round</p>
               </div>
               <div className="rule-card">
                 <h4>
                   <Zap style={{ width: 18, height: 18 }} />
                   Answer Time
                 </h4>
-                <p>6 seconds per question to select your answer</p>
+                <p>9 seconds per question to select your answer</p>
               </div>
               <div className="rule-card">
                 <h4>
                   <BookOpen style={{ width: 18, height: 18 }} />
                   Explanation
                 </h4>
-                <p>6-second explanation after each answer</p>
+                <p>9-second explanation after each answer</p>
               </div>
             </div>
 
@@ -620,14 +620,21 @@ export default function QuizRulesPage() {
 
             <h3 className="subsection-title">Topics Covered</h3>
             <ul>
-              <li>General Knowledge</li>
-              <li>History and Geography</li>
-              <li>Science and Technology</li>
-              <li>Current Affairs</li>
-              <li>Arts and Entertainment</li>
-              <li>Sports and Games</li>
-              <li>Mathematics and Logic</li>
-              <li>Language and Literature</li>
+              <li>Psychology & Human Behavior</li>
+              <li>Logic & Puzzles</li>
+              <li>Earth & Natural Systems</li>
+              <li>Engineering & Technology</li>
+              <li>Life Sciences & Medicine</li>
+              <li>Physical Sciences & Mathematics</li>
+              <li>Information & Computation</li>
+              <li>Sports & Entertainment</li>
+              <li>History</li>
+              <li>Geography</li>
+              <li>Science</li>
+              <li>Technology</li>
+              <li>Nature & Animals</li>
+              <li>Human Body & Health</li>
+              <li>Language & Communication</li>
             </ul>
           </div>
 
@@ -640,13 +647,13 @@ export default function QuizRulesPage() {
             <div className="highlight-box">
               <strong>Points Per Question</strong>
               <p>
-                Each correct answer earns exactly 5 points. Wrong answers or no answer earn 0 points. There are no negative points.
+                Each correct answer earns exactly 10 points. Wrong answers or no answer earn 0 points. There are no negative points.
               </p>
             </div>
 
             <h3 className="subsection-title">Maximum Score</h3>
             <p>
-              With 20 questions per round and 5 points per correct answer, the maximum possible score per round is <strong>100 points</strong>.
+              With 15 questions per round and 10 points per correct answer, the maximum possible score per round is <strong>150 points</strong>.
             </p>
 
             <h3 className="subsection-title">Monthly Accumulation</h3>
@@ -659,7 +666,7 @@ export default function QuizRulesPage() {
 
             <h3 className="subsection-title">No Bonus Points</h3>
             <p>
-              There are no bonus points for speed, consecutive correct answers, or difficulty. Every correct answer is worth exactly 5 points.
+              There are no bonus points for speed, consecutive correct answers, or difficulty. Every correct answer is worth exactly 10 points.
             </p>
           </div>
 
@@ -680,7 +687,7 @@ export default function QuizRulesPage() {
             <div className="warning-box">
               <strong>No Late Entry</strong>
               <p>
-                Once a quiz begins, entry is locked. Even if you're one second late, you cannot join. You must wait for the next round in 15 minutes.
+                Once a quiz begins, entry is locked. Even if you're one second late, you cannot join. You must wait for the next round in 5 minutes.
               </p>
             </div>
 
@@ -697,10 +704,17 @@ export default function QuizRulesPage() {
 
             <h3 className="subsection-title">Answer Selection</h3>
             <ul>
-              <li>Click or tap your chosen answer (A, B, C, or D) within 6 seconds</li>
+              <li>Click or tap your chosen answer (A, B, C, or D) within 9 seconds</li>
               <li>Your selection is immediately locked—you cannot change it</li>
               <li>If time runs out, it counts as no answer (0 points)</li>
               <li>You cannot pause, replay, or skip questions</li>
+            </ul>
+
+            <h3 className="subsection-title">Explanation Flow</h3>
+            <ul>
+              <li>Each question is followed by a 9-second explanation card</li>
+              <li>The explanation card may show the correct answer and a short educational explanation</li>
+              <li>The round continues automatically to the next question</li>
             </ul>
 
             <h3 className="subsection-title">No Assistance Allowed</h3>
@@ -802,7 +816,7 @@ export default function QuizRulesPage() {
 
             <h3 className="subsection-title">Question Errors</h3>
             <p>
-              If a question contains a factual error, typo, or technical problem, that specific question will be cancelled and removed from scoring for all participants in that round.
+              If a question contains a factual error, typo, or technical problem, that specific question may be cancelled and removed from scoring for all participants in that round after review.
             </p>
 
             <h3 className="subsection-title">Connection Problems</h3>
@@ -844,10 +858,10 @@ export default function QuizRulesPage() {
             <p>We employ multiple methods to detect and prevent cheating:</p>
 
             <ul>
-              <li>Answer pattern analysis (impossibly fast or accurate answers)</li>
+              <li>Answer pattern analysis (impossibly fast or suspicious answer behavior)</li>
               <li>Device and browser fingerprinting</li>
               <li>IP address monitoring</li>
-              <li>Timing analysis (detecting tab switches)</li>
+              <li>Timing analysis (including suspicious switching behavior where permitted)</li>
               <li>Statistical anomaly detection</li>
               <li>Manual review of suspicious activity</li>
             </ul>
@@ -885,9 +899,9 @@ export default function QuizRulesPage() {
 
             <h3 className="subsection-title">Threshold Requirement</h3>
             <div className="info-box">
-              <strong>3000+ Paid Round Purchases Required</strong>
+              <strong>999 Paid Round Packages Required</strong>
               <p>
-                The £1000 prize pool activates only when a minimum of 3000 paid round purchases are completed during the calendar month. This threshold covers platform operational costs including payment processing fees, infrastructure, security, and support services.
+                The £1000 prize pool activates only when a minimum of 999 paid round packages are completed during the calendar month. This threshold covers platform operational costs including payment processing fees, infrastructure, security, and support services.
                 <br /><br />
                 <strong style={{ color: "#60a5fa" }}>If the threshold is not met:</strong> No prize is awarded and funds do not carry over to the next month. Entry fees are not refunded as the platform service (quiz participation, scoring, leaderboards) has been provided.
               </p>
@@ -911,14 +925,16 @@ export default function QuizRulesPage() {
             </p>
           </div>
 
-          <div style={{
-            padding: 24,
-            borderRadius: 16,
-            background: "rgba(168, 85, 247, 0.1)",
-            border: "1px solid rgba(168, 85, 247, 0.3)",
-            textAlign: "center",
-            marginTop: 40
-          }}>
+          <div
+            style={{
+              padding: 24,
+              borderRadius: 16,
+              background: "rgba(168, 85, 247, 0.1)",
+              border: "1px solid rgba(168, 85, 247, 0.3)",
+              textAlign: "center",
+              marginTop: 40
+            }}
+          >
             <Shield style={{ width: 28, height: 28, color: "#c084fc", margin: "0 auto 12px" }} />
             <p style={{ fontSize: 15, color: "#cbd5e1", margin: 0, lineHeight: 1.7 }}>
               <strong style={{ color: "#c084fc" }}>Fair Play Commitment</strong>
@@ -951,7 +967,7 @@ export default function QuizRulesPage() {
             <a href="/faq">FAQ</a>
           </div>
           <div style={{ marginTop: 20, fontSize: 12, color: "#64748b" }}>
-            © 2025 VibraXX. Operated by Sermin Limited | Company No. 16778648
+            © 2026 VibraXX. Operated by Sermin Limited | Company No. 16778648
             <br />
             Registered in England & Wales | 71-75 Shelton Street, London, WC2H 9JQ, UK
           </div>
