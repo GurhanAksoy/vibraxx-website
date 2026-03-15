@@ -598,7 +598,7 @@ export default function AboutPage() {
             </div>
             <h1 className="hero-title animate-shimmer">About VibraXX</h1>
             <p className="hero-subtitle">
-              The world's first 24/7 global live quiz competition platform where knowledge meets speed, skill meets reward, and players from every corner of the world compete in real-time.
+              A new generation 24/7 global live quiz competition platform where knowledge meets speed, skill meets reward, and players from every corner of the world compete in real-time.
             </p>
           </div>
 
@@ -611,7 +611,7 @@ export default function AboutPage() {
               VibraXX was created with a simple yet powerful vision: to build the world's most exciting and accessible knowledge competition platform. We believe that everyone, regardless of location or background, should have the opportunity to test their knowledge, challenge themselves, and win real prizes based purely on skill.
             </p>
             <p>
-              Unlike traditional quiz shows limited to TV studios or local venues, VibraXX breaks down geographical barriers. Whether you're in London, Tokyo, New York, or Mumbai, you can compete alongside players worldwide in synchronized live quiz battles every 15 minutes, 24 hours a day, 7 days a week.
+              Unlike traditional quiz shows limited to TV studios or local venues, VibraXX breaks down geographical barriers. Whether you're in London, Tokyo, New York, or Mumbai, you can compete alongside players worldwide in synchronized live quiz rounds every 5 minutes, 24 hours a day, 7 days a week.
             </p>
             <div className="highlight-box">
               <strong>The Next Generation of Quiz Competitions</strong>
@@ -651,7 +651,7 @@ export default function AboutPage() {
                 </div>
                 <div className="value-title">24/7 Live Competitions</div>
                 <p className="value-description">
-                  New quiz rounds every 15 minutes, around the clock. No matter your timezone or schedule, there's always a competition ready for you.
+                  New quiz rounds every 5 minutes, around the clock. No matter your timezone or schedule, there's always a competition ready for you.
                 </p>
               </div>
 
@@ -681,7 +681,7 @@ export default function AboutPage() {
                 </div>
                 <div className="value-title">Real Cash Prizes</div>
                 <p className="value-description">
-                  Win £1000 every month as the top scorer. Clear rules, transparent leaderboards, and guaranteed prize distribution.
+                  Win £1000 every month as the top scorer. Clear rules, transparent leaderboards, and prize distribution according to the platform rules.
                 </p>
               </div>
 
@@ -716,7 +716,7 @@ export default function AboutPage() {
               Fair competition is the foundation of VibraXX. We take extensive measures to ensure every player has an equal and honest chance to succeed:
             </p>
             <ul>
-              <li><strong>No Gambling Classification:</strong> VibraXX is a skill-based competition platform, not a gambling service, as recognized under UK law</li>
+              <li><strong>No Gambling Classification:</strong> VibraXX is designed as a skill-based knowledge competition platform and is not intended to operate as a gambling service.</li>
               <li><strong>Anti-Cheating Systems:</strong> Advanced monitoring to detect and prevent unfair advantages, bots, or external tools</li>
               <li><strong>One Account Rule:</strong> Strictly enforced to prevent manipulation and maintain competition integrity</li>
               <li><strong>Transparent Leaderboards:</strong> Real-time score tracking visible to all participants</li>
@@ -757,7 +757,9 @@ export default function AboutPage() {
               <li><strong>Robust Infrastructure:</strong> Handling thousands of concurrent players without lag or delays</li>
               <li><strong>Secure Payment Systems:</strong> Integration with Stripe for safe, reliable transactions</li>
               <li><strong>Mobile Optimization:</strong> Full functionality across all devices—desktop, tablet, and smartphone</li>
-              <li><strong>AI-Powered Questions:</strong> Questions curated and generated using advanced AI technology to maintain freshness, variety, and quality</li>
+              <li>
+<strong>AI-Driven Question Engine:</strong> VibraXX uses advanced AI systems to generate and expand its question database, enabling a constantly evolving pool of diverse and high-quality quiz questions.
+</li>
               <li><strong>Live Broadcasting Capability:</strong> 24/7 YouTube streaming infrastructure ready to launch</li>
             </ul>
             <p>
@@ -803,7 +805,7 @@ export default function AboutPage() {
             <div className="info-row">
               <span className="info-label">Jurisdiction</span>
               <span className="info-value">
-                VibraXX operates in compliance with UK laws and regulations, including the Gambling Act 2005 classification of skill-based competitions.
+                VibraXX is designed as a skill-based knowledge competition platform and is not intended to operate as a gambling service under UK law. Participation outcomes are determined by knowledge, accuracy, and speed rather than chance.
               </span>
             </div>
           </div>
