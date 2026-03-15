@@ -124,11 +124,17 @@ interface WeeklyChallenge {
 // ─────────────────────────────────────────────
 
 const countryToFlag = (code: string): string => {
-  if (!code || code === '🌍') return '🌍';
-  if (code.length !== 2) return code;
-  return code.toUpperCase().split('').map(c =>
-    String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)
-  ).join('');
+  if (!code) return '🌍';
+  const clean = code.trim().toUpperCase();
+  // Zaten emoji ise direkt dön
+  if (clean === '🌍' || clean.length > 2) return code;
+  // ISO 2 harf kodu → bayrak emoji
+  if (clean.length === 2 && /^[A-Z]{2}$/.test(clean)) {
+    return clean.split('').map(c =>
+      String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)
+    ).join('');
+  }
+  return code;
 };
 
 // ─────────────────────────────────────────────
@@ -345,12 +351,12 @@ export default function ProfilePage() {
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               {/* Logo — ana sayfaya dönüş */}
               <div onClick={() => router.push("/")} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                <div style={{ position: "relative", width: 44, height: 44, borderRadius: "50%", padding: 3, background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)", boxShadow: "0 0 16px rgba(124,58,237,.5)", flexShrink: 0, overflow: "hidden" }}>
+                <div style={{ position: "relative", width: "clamp(48px,9vw,64px)", height: "clamp(48px,9vw,64px)", borderRadius: "50%", padding: 3, background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)", boxShadow: "0 0 20px rgba(124,58,237,.5)", flexShrink: 0, overflow: "hidden" }}>
                   <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: "50%", background: "#020817", overflow: "hidden" }}>
-                    <Image src="/images/logo.png" alt="VibraXX" fill sizes="44px" style={{ objectFit: "contain", padding: "12%" }} />
+                    <Image src="/images/logo.png" alt="VibraXX" fill sizes="60px" style={{ objectFit: "contain", padding: "12%" }} />
                   </div>
                 </div>
-                <span className="mobile-hide" style={{ fontSize: "clamp(13px,2.5vw,16px)", fontWeight: 900, background: "linear-gradient(90deg,#fbbf24,#f59e0b)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: "clamp(16px,3vw,22px)", fontWeight: 900, background: "linear-gradient(90deg,#fbbf24,#f59e0b)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", whiteSpace: "nowrap" }}>
                   Profile
                 </span>
               </div>
