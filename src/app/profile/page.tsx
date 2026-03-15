@@ -17,7 +17,7 @@ import Footer from "@/components/Footer";
 import {
   User, Mail, Trophy, Target, TrendingUp, Calendar, Crown,
   LogOut, Edit, Save, X, Send, CheckCircle, BarChart3, Zap,
-  Gift, ChevronRight, Activity, Sparkles, ShoppingCart,
+  Gift, Activity, Sparkles, ShoppingCart,
   AlertCircle, Volume2, VolumeX, Clock, Star, Flame,
 } from "lucide-react";
 
@@ -118,6 +118,18 @@ interface WeeklyChallenge {
   target: number;
   completed: boolean;
 }
+
+// ─────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────
+
+const countryToFlag = (code: string): string => {
+  if (!code || code === '🌍') return '🌍';
+  if (code.length !== 2) return code;
+  return code.toUpperCase().split('').map(c =>
+    String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)
+  ).join('');
+};
 
 // ─────────────────────────────────────────────
 // COMPONENT
@@ -264,7 +276,7 @@ export default function ProfilePage() {
       await supabase.auth.updateUser({ data: { full_name: editName.trim(), country: editCountry } });
       const { error } = await supabase
         .from("v2_users_public")
-        .update({ full_name: editName.trim(), country: editCountry, updated_at: new Date().toISOString() })
+        .update({ full_name: editName.trim(), updated_at: new Date().toISOString() })
         .eq("user_id", profileData.profile.id);
       if (!error) {
         setProfileData({ ...profileData, profile: { ...profileData.profile, full_name: editName.trim(), country: editCountry } });
@@ -331,13 +343,17 @@ export default function ProfilePage() {
           {/* ── HEADER ── */}
           <header className="profile-header" style={{ maxWidth: "min(1200px,100%)", margin: "0 auto clamp(24px,5vw,40px)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <button onClick={() => router.push("/")}
-                style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 12, border: "2px solid rgba(139,92,246,.5)", background: "rgba(15,23,42,.8)", color: "white", fontSize: 14, fontWeight: 700, cursor: "pointer", transition: "all .3s" }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = "#a78bfa"; e.currentTarget.style.background = "rgba(139,92,246,.2)"; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(139,92,246,.5)"; e.currentTarget.style.background = "rgba(15,23,42,.8)"; }}>
-                <ChevronRight style={{ width: 18, height: 18, transform: "rotate(180deg)" }} />
-                <span>Back to Home</span>
-              </button>
+              {/* Logo — ana sayfaya dönüş */}
+              <div onClick={() => router.push("/")} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                <div style={{ position: "relative", width: 44, height: 44, borderRadius: "50%", padding: 3, background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)", boxShadow: "0 0 16px rgba(124,58,237,.5)", flexShrink: 0, overflow: "hidden" }}>
+                  <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: "50%", background: "#020817", overflow: "hidden" }}>
+                    <Image src="/images/logo.png" alt="VibraXX" fill sizes="44px" style={{ objectFit: "contain", padding: "12%" }} />
+                  </div>
+                </div>
+                <span className="mobile-hide" style={{ fontSize: "clamp(13px,2.5vw,16px)", fontWeight: 900, background: "linear-gradient(90deg,#fbbf24,#f59e0b)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", whiteSpace: "nowrap" }}>
+                  Profile
+                </span>
+              </div>
               <button onClick={toggleMusic}
                 style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 10, border: "2px solid rgba(139,92,246,.5)", background: isMusicPlaying ? "linear-gradient(135deg,rgba(139,92,246,.95),rgba(124,58,237,.95))" : "rgba(15,23,42,.8)", cursor: "pointer", transition: "all .3s", boxShadow: isMusicPlaying ? "0 0 15px rgba(139,92,246,.5)" : "none" }}
                 title={isMusicPlaying ? "Mute" : "Play Music"}>
@@ -392,7 +408,7 @@ export default function ProfilePage() {
                     </>
                   ) : (
                     <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-                      <span style={{ fontSize: "clamp(32px,6vw,40px)" }}>{profile.country}</span>
+                      <span style={{ fontSize: "clamp(32px,6vw,40px)" }}>{countryToFlag(profile.country)}</span>
                       <h1 style={{ fontSize: "clamp(20px,4vw,28px)", fontWeight: 900, background: "linear-gradient(90deg,#fbbf24,#f59e0b)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                         {profile.full_name}
                       </h1>
@@ -584,7 +600,7 @@ export default function ProfilePage() {
                   {[
                     { label: "Weekly Rank", value: rankings.weekly_rank ? `#${rankings.weekly_rank}` : "-", bg: "rgba(139,92,246,.15)", border: "rgba(139,92,246,.3)", color: "#a78bfa" },
                     { label: "Monthly Rank", value: rankings.monthly_rank ? `#${rankings.monthly_rank}` : "-", bg: "rgba(56,189,248,.15)", border: "rgba(56,189,248,.3)", color: "#38bdf8" },
-                    { label: "Country", value: profile.country, bg: "rgba(34,197,94,.15)", border: "rgba(34,197,94,.3)", color: "white" },
+                    { label: "Country", value: countryToFlag(profile.country), bg: "rgba(34,197,94,.15)", border: "rgba(34,197,94,.3)", color: "white" },
                   ].map(({ label, value, bg, border, color }) => (
                     <div key={label} style={{ padding: 12, borderRadius: 10, background: bg, border: `1px solid ${border}` }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
