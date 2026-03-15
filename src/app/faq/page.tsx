@@ -19,199 +19,201 @@ export default function FAQPage() {
       questions: [
         {
           q: "What is VibraXX?",
-          a: "VibraXX is a global live quiz competition platform operated by Sermin Limited. Players compete in real-time quiz battles every 15 minutes, testing their knowledge and speed to win prizes. It's 100% skill-based with no element of chance."
+          a: "VibraXX is a global live quiz competition platform operated by Sermin Limited. Players compete in real-time quiz rounds every 5 minutes, testing their knowledge and accuracy in a synchronized live arena. VibraXX is designed as a skill-based knowledge competition platform and is not intended to operate as a gambling service.",
         },
         {
           q: "How do I sign up?",
-          a: "Simply click 'Sign In with Google' on the homepage. We use Google authentication for quick, secure registration. No passwords to remember, and you'll be ready to compete in seconds."
+          a: "Simply click 'Sign In with Google' on the homepage. We use Google authentication for quick, secure registration. No separate password setup is required, and you can get started in moments.",
         },
         {
           q: "Is VibraXX free to play?",
-          a: "Every registered user gets one free daily practice quiz (20 questions). This practice quiz does not affect rankings, rewards, or prize eligibility or leaderboards and is purely for learning. To compete for the monthly £1000 prize, you need to purchase quiz rounds: £2.00 per round or £49.00 for 30 rounds (18% savings)."
+          a: "Every registered user receives one free daily practice opportunity. Practice play does not affect leaderboards, prize eligibility, or monthly rankings and is intended for learning the format. To compete in paid live rounds and build an eligible monthly score, you need purchased round packages.",
         },
         {
           q: "Do I need to download an app?",
-          a: "No. VibraXX is fully web-based and works on any device—desktop, tablet, or mobile. Just visit our website and sign in."
-        }
-      ]
+          a: "No. VibraXX is fully web-based and works on desktop, tablet, and mobile devices. Just visit the website and sign in with Google.",
+        },
+      ],
     },
     {
       category: "How the Quiz Works",
       questions: [
         {
           q: "How often do quiz rounds start?",
-          a: "New quiz rounds start automatically every 15 minutes, 24/7. You can join the lobby and wait for the next round to begin."
+          a: "New live quiz rounds start automatically every 5 minutes, 24 hours a day, 7 days a week. You can join the lobby and wait for the next synchronized round to begin.",
         },
         {
           q: "How many questions are in each round?",
-          a: "Each round contains exactly 20 questions. You have 6 seconds to answer each question, followed by a 6-second explanation. The entire round takes approximately 10 minutes."
+          a: "Each live round contains exactly 15 multiple-choice questions. Each question is shown with a 9-second answer window, followed by a 9-second explanation card.",
         },
         {
-          q: "What happens if I don't answer in time?",
-          a: "If you don't select an answer within 6 seconds, it's automatically marked as incorrect (0 points). The quiz then moves to the next question."
+          q: "What happens if I do not answer in time?",
+          a: "If you do not select an answer within the answer window, that question is treated as unanswered and earns 0 points. The round then continues automatically.",
         },
         {
           q: "Can I join a round after it has started?",
-          a: "No. Once a round begins, no one can join. This ensures fairness—everyone starts at the same time with the same questions."
+          a: "No. Once a round goes live, late entry is not allowed. This helps ensure fairness because all players start the round together under the same conditions.",
         },
         {
           q: "What topics are covered in the quizzes?",
-          a: "Questions cover a wide range of general knowledge topics including history, science, geography, arts, sports, current events, and more. The variety ensures that well-rounded knowledge is rewarded."
-        }
-      ]
+          a: "VibraXX currently uses 15 categories: Psychology & Human Behavior, Logic & Puzzles, Earth & Natural Systems, Engineering & Technology, Life Sciences & Medicine, Physical Sciences & Mathematics, Information & Computation, Sports & Entertainment, History, Geography, Science, Technology, Nature & Animals, Human Body & Health, and Language & Communication.",
+        },
+      ],
     },
     {
       category: "Scoring & Prizes",
       questions: [
         {
           q: "How is scoring calculated?",
-          a: "Every correct answer earns you 5 points. Maximum score per round is 100 points (20 questions × 5 points). Your monthly total score is the sum of all rounds you've played that month."
+          a: "Every correct answer earns 10 points. A fully correct 15-question round therefore has a maximum score of 150 points. Your monthly score is based on the total of your eligible round results for that month.",
         },
         {
           q: "How do I win the £1000 prize?",
-          a: "The player with the highest cumulative score for the calendar month wins £1000. You can play as many rounds as you want to increase your total. The more rounds you play correctly, the higher your score."
+          a: "Subject to the platform rules and eligibility checks, the participant with the highest cumulative eligible score for the relevant calendar month wins the monthly £1000 prize.",
         },
         {
-          q: "What is the 3000 participant threshold?",
-          a: "The prize pool activates only if at least 3000 paid round purchases are completed during the month. This threshold covers platform operational costs. If this threshold is not met, no prize is awarded, as the competition service, including quiz participation, scoring, and leaderboards, has still been provided."
+          q: "What is the monthly prize activation threshold?",
+          a: "The monthly prize activates only if at least 999 paid package purchases are completed during that calendar month. If that activation threshold is not met, the monthly prize is not activated for that month unless VibraXX expressly announces otherwise.",
         },
         {
-          q: "What happens if there's a tie for first place?",
-          a: "If multiple players have the same top score: (1) The player with fewer incorrect answers wins. (2) If still tied, highest accuracy rate wins. (3) If still tied, the prize is split equally among all tied participants."
+          q: "What happens if there is a tie for first place?",
+          a: "If multiple participants finish with the same top cumulative score, tie-breakers apply in this order: fewest incorrect answers, highest accuracy rate, and highest average score per round. If a tie still remains, VibraXX may apply an equal split or another fair resolution under the platform rules.",
         },
         {
-          q: "Does the free daily quiz count toward my score?",
-          a: "No. The free daily practice quiz does not contribute to leaderboard scores and does not qualify for prizes. It's only for practice."
+          q: "Does the free daily practice count toward my score?",
+          a: "No. Free daily practice does not affect leaderboards, monthly prize rankings, or prize eligibility. It is intended only for practice and familiarization.",
         },
         {
           q: "When do scores reset?",
-          a: "Scores reset at the beginning of each calendar month (00:00 UTC on the 1st). Everyone starts fresh each month with equal opportunity to win."
-        }
-      ]
+          a: "Monthly scores reset at the end of each calendar month according to the platform’s official reset schedule.",
+        },
+      ],
     },
     {
       category: "Payments & Pricing",
       questions: [
         {
           q: "How much does it cost to play?",
-          a: "Individual rounds cost £2.00 each. We also offer a value pack: 30 rounds for £49.00, saving you 18%."
+          a: "Current package pricing is £3.00 for a 3-round bundle and £18.00 for a 30-round bundle, unless VibraXX states otherwise on the platform at the time of purchase.",
         },
         {
           q: "What payment methods do you accept?",
-          a: "All payments are processed securely through Stripe. We accept all major credit/debit cards (Visa, Mastercard, American Express, etc.). We never store your card details."
+          a: "Payments are processed securely through Stripe. Available payment methods may vary depending on your region and Stripe checkout availability. We do not store your full card details on our own systems.",
         },
         {
           q: "Can I get a refund?",
-          a: "All quiz round purchases are final. Digital content is delivered immediately upon payment. Refunds are available only in exceptional circumstances where VibraXX is demonstrably at fault (such as verified platform technical errors or duplicate/incorrect charges). If the monthly prize threshold is not met, no refunds are issued, as the competition service has been fully delivered. See our Refund Policy for full details."
+          a: "Quiz round purchases are generally final because they are digital services made available immediately after purchase. Refunds are considered only in limited circumstances such as duplicate billing, clear payment processing error, or a verified platform-side fault that materially prevented use of purchased access. Please see the Refund Policy for full details.",
         },
         {
           q: "Do round credits expire?",
-          a: "No. Purchased round credits never expire. Use them at your own pace—today, next week, or next month."
+          a: "Unless expressly stated otherwise in a product-specific rule or promotion, purchased round access is intended to remain available on your account until used.",
         },
         {
           q: "What currency are prices in?",
-          a: "All prices are in British Pounds (GBP). If you're paying from outside the UK, your bank or card provider will handle currency conversion."
-        }
-      ]
+          a: 'All prices are displayed in British Pounds (GBP) unless stated otherwise. If you pay in another currency, your payment provider or card issuer handles the currency conversion.',
+        },
+      ],
     },
     {
       category: "Rules & Fair Play",
       questions: [
         {
           q: "What are the age requirements?",
-          a: "You must be at least 18 years old to participate in VibraXX competitions and be eligible for prizes."
+          a: "You must be at least 18 years old to use VibraXX and to be eligible for prizes.",
         },
         {
           q: "Can I have multiple accounts?",
-          a: "No. Each person is allowed only one account. Creating multiple accounts to gain unfair advantage will result in permanent ban and forfeiture of any prizes."
+          a: "No. Each person is allowed only one account. Creating or controlling multiple accounts may result in suspension, termination, cancellation of scores, or loss of prize eligibility.",
         },
         {
           q: "Is using external help or tools allowed?",
-          a: "No. You must answer all questions yourself without external assistance, search engines, AI tools, or help from others. VibraXX is a test of your own knowledge and speed. Cheating results in immediate disqualification."
+          a: "No. Players must answer using their own knowledge, reasoning, and judgment. External help, bots, scripts, automation, coordinated assistance, or other unfair methods are prohibited.",
         },
         {
           q: "Can I use a VPN?",
-          a: "VPNs are prohibited if used to bypass geographic restrictions. If we detect VPN usage to access the platform from restricted regions, your account will be banned and any prizes forfeited."
+          a: "Using VPNs, proxies, or location-masking tools to bypass geographic restrictions or platform rules is prohibited. If prohibited location masking is detected, your account may be restricted and prize eligibility may be cancelled.",
         },
         {
           q: "Which countries can participate?",
-          a: "VibraXX is available in 40+ countries worldwide. However, due to local gambling and competition laws, some regions may be restricted. Check our Terms & Conditions for the complete list of permitted countries."
-        }
-      ]
+          a: "VibraXX is offered only in territories and jurisdictions where the service is lawfully made available by us. Availability may change over time. Please check the Terms & Conditions for the latest permitted-jurisdiction rules.",
+        },
+      ],
     },
     {
       category: "Technical & Account",
       questions: [
         {
           q: "What if I experience technical issues during a quiz?",
-          a: "If you encounter technical problems (internet disconnection, browser crash, etc.) on your end, unfortunately the round cannot be restarted or refunded. If the issue is caused by our platform, contact us immediately. We recommend using a stable internet connection and a modern browser for the best experience."
+          a: "If you experience a problem during a round, contact us as soon as reasonably possible with the date, time, and details of the issue. Platform-side faults may be reviewed under our Terms, Complaints Procedure, and Refund Policy where applicable. Problems caused by your own internet connection, device, browser, or third-party service issues may not qualify for any remedy.",
         },
         {
           q: "Which browsers are supported?",
-          a: "VibraXX works best on modern browsers: Chrome, Firefox, Safari, and Edge (latest versions). Make sure your browser is up to date for optimal performance."
+          a: "VibraXX works best on modern versions of major browsers such as Chrome, Edge, Firefox, and Safari. Keeping your browser updated is strongly recommended.",
         },
         {
           q: "Is VibraXX mobile-friendly?",
-          a: "Yes. VibraXX is fully responsive and works seamlessly on smartphones and tablets. You can compete from any device with an internet connection."
+          a: "Yes. VibraXX is designed to work across desktop, tablet, and mobile devices.",
         },
         {
           q: "How do I update my account information?",
-          a: "Visit your Profile page after signing in. You can update your display name and view your competition history. Since we use Google authentication, your email is managed through your Google account."
+          a: "Some account details are linked to your Google sign-in. Platform-specific profile information may be managed through your account area where available.",
         },
         {
           q: "How do I delete my account?",
-          a: "Contact us at team@vibraxx.com with your account deletion request. We'll process it within 7 business days in accordance with GDPR and UK data protection laws."
-        }
-      ]
+          a: "Contact us at team@vibraxx.com using your registered email address and request account closure. We will review and process the request in accordance with applicable legal and data-retention requirements.",
+        },
+      ],
     },
     {
       category: "Prizes & Payouts",
       questions: [
         {
           q: "How are winners paid?",
-          a: "Monthly winners are contacted via their registered email within 3 business days after month-end. After identity verification (up to 10 business days), prizes are paid within 7 business days via bank transfer to your verified account."
+          a: "Eligible winners are contacted using their registered contact details after the relevant month ends. Prize payment is made only after verification, eligibility review, and any required compliance checks are completed.",
         },
         {
           q: "How long does it take to receive my prize?",
-          a: "Once you've provided your payment details and completed identity verification, prizes are typically paid within 21 calendar days from month-end (maximum total timeline)."
+          a: "Winner notification is usually sent within 3 business days after the end of the relevant month. Payment timing depends on how quickly verification and compliance checks are completed.",
         },
         {
           q: "Are prizes taxable?",
-          a: "Prize winners are responsible for any applicable taxes in their jurisdiction. In the UK, competition prizes are generally not subject to income tax, but you should consult a tax professional for your specific situation."
+          a: "Prize winners are responsible for their own tax obligations where applicable. VibraXX does not provide personal tax advice, so you should consult a qualified adviser if needed.",
         },
         {
-          q: "What if I can't claim my prize?",
-          a: "Winners must complete identity verification within the timeframe specified in the winner notification email. Failure to verify or provide required documentation may result in prize forfeiture."
-        }
-      ]
+          q: "What if I cannot complete prize verification?",
+          a: "If required identity, ownership, jurisdiction, or compliance checks cannot be completed successfully, the prize may be delayed, withheld, or refused in accordance with the platform rules.",
+        },
+      ],
     },
     {
       category: "About VibraXX",
       questions: [
         {
           q: "Who operates VibraXX?",
-          a: "VibraXX is operated by Sermin Limited, a company registered in England & Wales (Company Number: 16778648). Registered office: 71-75 Shelton Street, Covent Garden, London, WC2H 9JQ, UK."
+          a: "VibraXX is operated by Sermin Limited, a company registered in England and Wales under company number 16778648. Registered office: 71-75 Shelton Street, Covent Garden, London, WC2H 9JQ, United Kingdom.",
         },
         {
           q: "Is VibraXX gambling or a game of chance?",
-          a: "No. VibraXX is a 100% skill-based competition. Success depends entirely on your knowledge, speed, and accuracy—not luck. Under UK law, skill-based competitions are not classified as gambling."
+          a: "No. VibraXX is designed as a skill-based knowledge competition platform. Outcomes are determined by knowledge, accuracy, and performance rather than chance.",
         },
         {
           q: "Can I watch quiz competitions live?",
-          a: "24/7 YouTube streaming with live overlay launching soon. You'll be able to watch real-time quiz action, see questions and explanations, and follow leaderboards even when you're not playing."
+          a: "Live broadcast features may be introduced or expanded by VibraXX over time. Any currently available or upcoming viewing features will be announced on the platform.",
         },
         {
           q: "How can I contact support?",
-          a: "Email us at team@vibraxx.com for any questions, technical issues, or support requests. We typically respond within 24-48 hours."
-        }
-      ]
-    }
+          a: "Email us at team@vibraxx.com for support, technical issues, complaints, or general platform questions. For corporate matters, you can also use contact@sermin.uk.",
+        },
+      ],
+    },
   ];
 
   return (
     <>
       {/* ⚡ CRITICAL CSS - Prevents layout shift during hydration */}
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         :root {
           color-scheme: dark;
           background-color: #020817;
@@ -240,7 +242,9 @@ export default function FAQPage() {
           margin: 0 auto;
           padding: 40px 20px 80px;
         }
-      `}} />
+      `,
+        }}
+      />
 
       <style jsx global>{`
         :root {
@@ -257,18 +261,27 @@ export default function FAQPage() {
         body {
           background-color: #020817;
           color: white;
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
           line-height: 1.7;
         }
 
         @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-20px); }
+          0%,
+          100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-20px);
+          }
         }
 
         @keyframes shimmer {
-          0% { background-position: -200% center; }
-          100% { background-position: 200% center; }
+          0% {
+            background-position: -200% center;
+          }
+          100% {
+            background-position: 200% center;
+          }
         }
 
         .animate-float {
@@ -422,7 +435,11 @@ export default function FAQPage() {
           margin-bottom: 48px;
           padding: 48px 24px;
           border-radius: 24px;
-          background: linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(14, 165, 233, 0.1));
+          background: linear-gradient(
+            135deg,
+            rgba(6, 182, 212, 0.15),
+            rgba(14, 165, 233, 0.1)
+          );
           border: 1px solid rgba(6, 182, 212, 0.3);
           position: relative;
           overflow: hidden;
@@ -432,7 +449,11 @@ export default function FAQPage() {
           content: "";
           position: absolute;
           inset: 0;
-          background: radial-gradient(circle at 50% 0%, rgba(6, 182, 212, 0.2), transparent 70%);
+          background: radial-gradient(
+            circle at 50% 0%,
+            rgba(6, 182, 212, 0.2),
+            transparent 70%
+          );
           pointer-events: none;
         }
 
@@ -547,6 +568,7 @@ export default function FAQPage() {
           color: #94a3b8;
           font-size: 15px;
           line-height: 1.8;
+          white-space: pre-line;
         }
 
         .faq-answer.open {
@@ -708,32 +730,30 @@ export default function FAQPage() {
             </div>
             <h1 className="hero-title animate-shimmer">Frequently Asked Questions</h1>
             <p className="hero-subtitle">
-              Find answers to common questions about VibraXX. Can't find what you're looking for? Contact us!
+              Find answers to common questions about VibraXX. If anything here differs from our
+              formal legal documents, the Terms & Conditions and related policies will prevail.
             </p>
           </div>
 
           {faqs.map((category, catIndex) => (
             <div key={catIndex} className="faq-category">
               <h2 className="category-title">{category.category}</h2>
+
               {category.questions.map((item, qIndex) => {
                 const uniqueIndex = catIndex * 100 + qIndex;
                 const isOpen = openIndex === uniqueIndex;
-                
+
                 return (
                   <div key={qIndex} className="faq-item">
-                    <div 
-                      className="faq-question"
-                      onClick={() => toggleFAQ(uniqueIndex)}
-                    >
+                    <div className="faq-question" onClick={() => toggleFAQ(uniqueIndex)}>
                       <span className="faq-question-text">{item.q}</span>
-                      <ChevronDown 
-                        className={`faq-icon ${isOpen ? 'open' : ''}`}
+                      <ChevronDown
+                        className={`faq-icon ${isOpen ? "open" : ""}`}
                         style={{ width: 20, height: 20 }}
                       />
                     </div>
-                    <div className={`faq-answer ${isOpen ? 'open' : ''}`}>
-                      {item.a}
-                    </div>
+
+                    <div className={`faq-answer ${isOpen ? "open" : ""}`}>{item.a}</div>
                   </div>
                 );
               })}
@@ -743,9 +763,11 @@ export default function FAQPage() {
           <div className="contact-box">
             <h3>Still Have Questions?</h3>
             <p>
-              If you couldn't find the answer you were looking for, our support team is here to help.
+              If you could not find the answer you were looking for, our support team is here to
+              help.
               <br />
-              Email us at <a href="mailto:team@vibraxx.com">team@vibraxx.com</a> and we'll get back to you within 24-48 hours.
+              Email us at <a href="mailto:team@vibraxx.com">team@vibraxx.com</a> and we will reply
+              as soon as reasonably possible.
             </p>
             <p style={{ marginTop: 24, fontSize: 14, color: "#64748b" }}>
               <strong>Company Information:</strong>
@@ -782,7 +804,7 @@ export default function FAQPage() {
             <a href="/faq">FAQ</a>
           </div>
           <div style={{ marginTop: 20, fontSize: 12, color: "#64748b" }}>
-            © 2025 VibraXX. Operated by Sermin Limited | Company No. 16778648
+            © 2026 VibraXX. Operated by Sermin Limited | Company No. 16778648
             <br />
             Registered in England & Wales | 71-75 Shelton Street, London, WC2H 9JQ, UK
           </div>
