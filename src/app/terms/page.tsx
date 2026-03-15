@@ -822,7 +822,7 @@ export default function TermsPage() {
               All payments are processed securely through Stripe. By purchasing on VibraXX, you also agree to any applicable Stripe checkout, billing, payment, and fraud-screening requirements used to complete your transaction.
             </p>
             <p style={{ marginTop: 16 }}>
-              VibraXX does not store full payment card details on its own systems. Stripe is a PCI-compliant payment processor and payment information is processed through Stripe’s infrastructure. Stripe states that merchants remain responsible for compliance with applicable laws, regulations, and network rules, while Stripe’s systems help reduce direct handling of sensitive card data. :contentReference[oaicite:2]{index=2}
+              VibraXX does not store full payment card details on its own systems. Stripe is a PCI-compliant payment processor and payment information is processed through Stripe’s infrastructure. Stripe states that merchants remain responsible for compliance with applicable laws, regulations, and network rules, while Stripe’s systems help reduce direct handling of sensitive card data.
             </p>
             <p style={{ marginTop: 16 }}>
               Payment processing fees, issuer fees, exchange-rate differences, banking charges, and similar third-party costs may apply and may be non-refundable where the charge has already been incurred by the payment network or processor.
