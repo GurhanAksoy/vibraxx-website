@@ -774,10 +774,10 @@ export default function TermsPage() {
                 VibraXX is a knowledge-based global competition platform. Success depends on a player's knowledge, reasoning ability, concentration, and response speed. No random draw, betting mechanism, roulette-style mechanic, or other element of chance determines the outcome.
               </p>
               <p style={{ marginTop: 16 }}>
-                VibraXX is designed and operated as a <strong>skill-based knowledge competition</strong> and not as gambling, betting, or a lottery. Under the UK Gambling Commission’s guidance on prize competitions and free draws, a competition in which success depends on knowledge or skill is treated differently from gambling arrangements. :contentReference[oaicite:0]{index=0}
+                VibraXX is designed and operated as a <strong>skill-based knowledge competition</strong> and not as gambling, betting, or a lottery. Under the UK Gambling Commission’s guidance on prize competitions and free draws, a competition in which success depends on knowledge or skill is treated differently from ...gambling arrangements.
               </p>
               <p style={{ marginTop: 16 }}>
-                In the United States and other jurisdictions, contests and promotions are generally also subject to local rules and consumer protection requirements. Participation is void where prohibited, and users remain responsible for complying with the laws that apply to them. :contentReference[oaicite:1]{index=1}
+                In the United States and other jurisdictions, contests and promotions are generally also subject to local rules and consumer protection requirements. Participation is void where prohibited, and users remain responsible for complying with the ...laws that apply to them.
               </p>
             </div>
           </div>
