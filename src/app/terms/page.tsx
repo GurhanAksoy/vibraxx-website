@@ -771,13 +771,13 @@ export default function TermsPage() {
             <div className="highlight-box">
               <strong>Knowledge-Based Competition (Skill-Based)</strong>
               <p>
-                VibraXX is a knowledge-based global competition platform. Success depends on a player's knowledge, reasoning ability, concentration, and response speed. No random draw, betting mechanism, roulette-style mechanic, or other element of chance determines the outcome.
+                VibraXX is a knowledge-based global competition platform. Success depends primarily on knowledge, reasoning ability, and accuracy. No random draw, betting mechanism, roulette-style mechanic, or other element of chance determines the outcome.
               </p>
               <p style={{ marginTop: 16 }}>
-                VibraXX is designed and operated as a <strong>skill-based knowledge competition</strong> and not as gambling, betting, or a lottery. Under the UK Gambling Commission’s guidance on prize competitions and free draws, a competition in which success depends on knowledge or skill is treated differently from ...gambling arrangements.
+                VibraXX is designed and operated as a <strong>skill-based knowledge competition</strong> and not as gambling, betting, or a lottery. Under the UK Gambling Commission’s guidance on prize competitions and free draws, a competition in which success depends on knowledge or skill is treated differently from gambling arrangements.
               </p>
               <p style={{ marginTop: 16 }}>
-                In the United States and other jurisdictions, contests and promotions are generally also subject to local rules and consumer protection requirements. Participation is void where prohibited, and users remain responsible for complying with the ...laws that apply to them.
+                In the United States and other jurisdictions, contests and promotions are generally also subject to local rules and consumer protection requirements. Participation is void where prohibited, and users remain responsible for complying with the laws that apply to them.
               </p>
             </div>
           </div>
@@ -811,10 +811,10 @@ export default function TermsPage() {
               <span>6.</span> Pricing & Payment
             </h2>
 
-            <h3 className="subsection-title">6.1 Round Prices</h3>
+            <h3 className="subsection-title">6.1 Competition Access Packages</h3>
             <ul>
-              <li><strong>Single Round:</strong> £2.00</li>
-              <li><strong>30 Round Bundle:</strong> £49.00</li>
+              <li><strong>3 Round Bundle:</strong> £3.00</li>
+              <li><strong>30 Round Bundle:</strong> £18.00</li>
             </ul>
 
             <h3 className="subsection-title">6.2 Payment Processing</h3>
@@ -848,7 +848,7 @@ export default function TermsPage() {
             <div className="warning-box">
               <strong>999 Paid Package Sales Required</strong>
               <p>
-                The monthly £1000 prize pool activates only if at least <strong>999 paid competition packages</strong> are sold during that calendar month.
+                The monthly £1000 prize pool activates only if at least <strong>999 paid round packages</strong> are sold during that calendar month.
                 <br />
                 <br />
                 This threshold is intended to support the sustainability of the platform, including infrastructure expenses, hosting, platform security, fraud prevention, support operations, and payment processing costs.
