@@ -659,7 +659,7 @@ export default function CookiePolicyPage() {
             </p>
             <div className="last-updated-badge">
               <CheckCircle style={{ width: 16, height: 16 }} />
-              Last Updated: December 11, 2025
+              Last Updated: March 15, 2026
             </div>
           </div>
 
@@ -729,7 +729,7 @@ export default function CookiePolicyPage() {
                       <span className="cookie-type-badge badge-marketing">Marketing</span>
                     </td>
                     <td>Deliver relevant content and measure advertising effectiveness.</td>
-                    <td>Up to 13 months</td>
+                    <td>Up to 14 months</td>
                   </tr>
                 </tbody>
               </table>
@@ -841,24 +841,27 @@ export default function CookiePolicyPage() {
               <span>5. Managing Cookies</span>
             </h2>
 
-            <h3 className="subsection-title">Cookie Consent</h3>
-            <p>
-              When you first visit our website, we display a cookie consent banner. You can:
-            </p>
-            <ul>
-              <li>Accept all cookies for the best experience</li>
-              <li>Customize your cookie preferences</li>
-              <li>Reject non-essential cookies</li>
-            </ul>
+           <h3 className="subsection-title">Cookie Consent</h3>
+<p>
+  When you first visit our website, a cookie consent banner may appear allowing you
+  to choose how cookies are used on the platform. You can:
+</p>
+<ul>
+  <li>Accept all cookies</li>
+  <li>Customize your cookie preferences</li>
+  <li>Reject non-essential cookies</li>
+</ul>
 
-            <div className="highlight-box">
-              <strong>Essential Cookies Notice</strong>
-              <p>
-                Strictly necessary cookies cannot be disabled as they are essential for the
-                platform to function. Disabling other cookies may affect your user experience but
-                will not prevent you from using core features.
-              </p>
-            </div>
+<div className="highlight-box">
+  <strong>Essential Cookies Notice</strong>
+  <p>
+    Strictly necessary cookies are required for the platform to operate properly
+    and cannot be disabled. These cookies support core functionality such as
+    authentication, security, and session management. Disabling other categories
+    of cookies may affect certain features or user experience but will not prevent
+    you from accessing the main services of the platform.
+  </p>
+</div>
 
             <h3 className="subsection-title">Browser Cookie Controls</h3>
             <p>You can also manage cookies directly through your browser settings:</p>
@@ -888,25 +891,31 @@ export default function CookiePolicyPage() {
             </div>
           </div>
 
-          {/* Section 6 - Do Not Track */}
-          <div className="content-card">
-            <h2 className="section-title">
-              <Eye style={{ width: 24, height: 24 }} />
-              <span>6. Do Not Track (DNT)</span>
-            </h2>
-            <p>
-              We respect Do Not Track (DNT) browser signals. When DNT is enabled, we limit the
-              use of non-essential cookies and tracking technologies while maintaining core
-              functionality.
-            </p>
-            <div className="info-box">
-              <strong>How to Enable DNT</strong>
-              <p>
-                Most modern browsers allow you to enable Do Not Track in privacy settings. This
-                sends a signal to websites requesting not to be tracked.
-              </p>
-            </div>
-          </div>
+         {/* Section 6 - Do Not Track */}
+<div className="content-card">
+  <h2 className="section-title">
+    <Eye style={{ width: 24, height: 24 }} />
+    <span>6. Do Not Track (DNT)</span>
+  </h2>
+  <p>
+    Some web browsers include a “Do Not Track” (DNT) feature that signals to websites that you
+    do not wish to have your online activity tracked. Currently, there is no universally
+    accepted standard for how websites should respond to DNT signals.
+  </p>
+  <p>
+    As a result, VibraXX does not currently alter its data collection or cookie practices in
+    response to DNT signals. However, you can still manage cookies and tracking technologies
+    through your browser settings or cookie preferences.
+  </p>
+  <div className="info-box">
+    <strong>How to Enable DNT</strong>
+    <p>
+      Most modern browsers allow you to enable Do Not Track in their privacy settings. When
+      enabled, your browser sends a signal to websites indicating that you prefer not to be
+      tracked across websites.
+    </p>
+  </div>
+</div>
 
           {/* Section 7 - Cookie Duration */}
           <div className="content-card">
