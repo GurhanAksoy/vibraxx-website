@@ -618,7 +618,7 @@ export default function HowItWorksPage() {
             </div>
             <h1 className="hero-title animate-shimmer">How VibraXX Works</h1>
             <p className="hero-subtitle">
-              Everything you need to know about competing in the world's most exciting live quiz arena
+              Everything you need to know about VibraXX, the global live knowledge competition platform where skill, focus, and accuracy decide the outcome.
             </p>
           </div>
 
@@ -628,12 +628,17 @@ export default function HowItWorksPage() {
               <span>What is VibraXX?</span>
             </h2>
             <p>
-              VibraXX is a global live quiz competition platform where knowledge meets speed. Compete against players from around the world in real-time quiz battles, test your knowledge across diverse topics, and win real prizes.
+              VibraXX is a global live quiz competition platform built around knowledge-based play.
+              Players compete in synchronized live rounds, answer high-quality multiple-choice
+              questions, learn through built-in explanation cards, and build their monthly score
+              on the leaderboard.
             </p>
             <div className="highlight-box">
               <strong>100% Skill-Based Competition</strong>
               <p>
-                Success depends entirely on your knowledge, quick thinking, and accuracy. There is no luck or chance involved—just pure skill.
+                VibraXX is designed as a skill-based knowledge competition. Success depends on your
+                knowledge, concentration, and accuracy. There is no luck-based draw, no betting
+                mechanic, and no chance-based outcome.
               </p>
             </div>
           </div>
@@ -649,23 +654,23 @@ export default function HowItWorksPage() {
                 <div className="step-number">1</div>
                 <div className="step-title">Sign In with Google</div>
                 <p className="step-description">
-                  Quick and secure registration using your Google account. No passwords to remember.
+                  Registration is quick and secure through your Google account. VibraXX currently uses Google sign-in for account access.
                 </p>
               </div>
 
               <div className="step-card">
                 <div className="step-number">2</div>
-                <div className="step-title">Try Free Practice Quiz</div>
+                <div className="step-title">Claim Your Daily Free Entry</div>
                 <p className="step-description">
-                  Get one free daily quiz (20 questions) to practice. No prizes, just pure learning.
+                  Every registered user receives one free daily entry. It lets you play and experience the live system without needing to purchase access first.
                 </p>
               </div>
 
               <div className="step-card">
                 <div className="step-number">3</div>
-                <div className="step-title">Purchase Rounds</div>
+                <div className="step-title">Buy Round Packages</div>
                 <p className="step-description">
-                  Buy quiz rounds: £2.00 per round or save 18% with the 30-round bundle for £49.00.
+                  Purchase competition access through our current packages: 3 rounds for £3.00 or 30 rounds for £18.00.
                 </p>
               </div>
 
@@ -673,23 +678,23 @@ export default function HowItWorksPage() {
                 <div className="step-number">4</div>
                 <div className="step-title">Join the Lobby</div>
                 <p className="step-description">
-                  Enter the live quiz lobby. New competitions start every 15 minutes.
+                  Enter the live lobby and wait for the next synchronized round. VibraXX creates a new global live round every 5 minutes.
                 </p>
               </div>
 
               <div className="step-card">
                 <div className="step-number">5</div>
-                <div className="step-title">Compete & Score</div>
+                <div className="step-title">Answer, Learn, Compete</div>
                 <p className="step-description">
-                  Answer 20 questions in 6 seconds each. Every correct answer earns 5 points.
+                  Each round contains 15 questions. You answer under time pressure, then see an explanation card after each question.
                 </p>
               </div>
 
               <div className="step-card">
                 <div className="step-number">6</div>
-                <div className="step-title">Win Prizes</div>
+                <div className="step-title">Build Your Monthly Score</div>
                 <p className="step-description">
-                  Top scorer for the month wins £1000. Accumulate points across all your rounds.
+                  Your eligible scores accumulate across the month. The top performer wins the monthly £1000 prize if the activation threshold is met.
                 </p>
               </div>
             </div>
@@ -703,41 +708,49 @@ export default function HowItWorksPage() {
 
             <div className="stat-grid">
               <div className="stat-card">
-                <div className="stat-value">15min</div>
-                <div className="stat-label">Between Rounds</div>
+                <div className="stat-value">5min</div>
+                <div className="stat-label">Between Live Rounds</div>
               </div>
               <div className="stat-card">
-                <div className="stat-value">20</div>
+                <div className="stat-value">15</div>
                 <div className="stat-label">Questions Per Round</div>
               </div>
               <div className="stat-card">
-                <div className="stat-value">6sec</div>
-                <div className="stat-label">Per Question</div>
+                <div className="stat-value">9sec</div>
+                <div className="stat-label">Per Question Card</div>
               </div>
               <div className="stat-card">
-                <div className="stat-value">6sec</div>
-                <div className="stat-label">Answer Explanation</div>
+                <div className="stat-value">9sec</div>
+                <div className="stat-label">Per Explanation Card</div>
               </div>
               <div className="stat-card">
-                <div className="stat-value">5pts</div>
+                <div className="stat-value">10pts</div>
                 <div className="stat-label">Per Correct Answer</div>
               </div>
               <div className="stat-card">
-                <div className="stat-value">100pts</div>
+                <div className="stat-value">150pts</div>
                 <div className="stat-label">Maximum Per Round</div>
               </div>
             </div>
 
             <h3 className="subsection-title">How Each Round Works</h3>
             <ol>
-              <li><strong>Lobby Countdown:</strong> Wait in the lobby for the next round to start</li>
-              <li><strong>Competition Begins:</strong> Late arrivals must wait for the next round.</li>
-              <li><strong>Question Appears:</strong> Read and select your answer within 6 seconds</li>
-              <li><strong>Answer Revealed:</strong> See if you were correct with a 6-second explanation</li>
-              <li><strong>Next Question:</strong> Automatically moves to the next question</li>
-              <li><strong>Scorecard:</strong> After 20 questions, view your performance</li>
-              <li><strong>Back to Lobby:</strong> Return to lobby if you have rounds remaining</li>
+              <li><strong>Lobby Countdown:</strong> Wait in the lobby for the next synchronized live round to begin.</li>
+              <li><strong>Round Goes Live:</strong> When the countdown ends, the live round starts for all active participants.</li>
+              <li><strong>Question Card:</strong> Each question appears on screen for 9 seconds.</li>
+              <li><strong>Explanation Card:</strong> After each question, an explanation card is shown for 9 seconds to reveal the correct answer and provide learning context.</li>
+              <li><strong>Automatic Progression:</strong> The round moves automatically from one question to the next.</li>
+              <li><strong>Final Score Card:</strong> After the round ends, a final score card is displayed for approximately 15 seconds.</li>
+              <li><strong>Return to Lobby:</strong> You can return to the lobby and continue competing if you still have available entries.</li>
             </ol>
+
+            <div className="info-box">
+              <strong>Educational Competitive Format</strong>
+              <p>
+                VibraXX is not built around ultra-simple trivia. The platform is designed to be both
+                competitive and educational, with explanation cards helping players learn while they play.
+              </p>
+            </div>
           </div>
 
           <div className="content-card">
@@ -749,35 +762,41 @@ export default function HowItWorksPage() {
             <div className="highlight-box">
               <strong>Monthly Prize: £1000</strong>
               <p>
-                The participant with the highest cumulative score for the calendar month wins £1000 (GBP).
+                Subject to the platform rules and verification requirements, the participant with the
+                highest eligible cumulative monthly score wins £1000 (GBP).
               </p>
             </div>
 
             <h3 className="subsection-title">How Scoring Works</h3>
             <ul>
-              <li><strong>Accumulation:</strong> Your score accumulates across all rounds you play in a month</li>
-              <li><strong>Multiple Rounds:</strong> Play as many rounds as you want to increase your total score</li>
-              <li><strong>Leaderboard:</strong> Track your position in real-time</li>
-              <li><strong>Monthly Reset:</strong> Scores reset at the start of each calendar month</li>
+              <li><strong>Round Scoring:</strong> Each correct answer is worth 10 points.</li>
+              <li><strong>Maximum Per Round:</strong> A perfect round score is 150 points.</li>
+              <li><strong>Accumulation:</strong> Your eligible scores build throughout the calendar month.</li>
+              <li><strong>Monthly Leaderboard:</strong> Your rank depends on your total eligible monthly performance.</li>
+              <li><strong>Monthly Reset:</strong> Leaderboard standings reset at the start of each new calendar month.</li>
             </ul>
 
             <h3 className="subsection-title">Important Threshold</h3>
             <div className="info-box">
-              <strong>3000+ Paid Round Purchases Required</strong>
+              <strong>999 Paid Package Sales Required</strong>
               <p>
-               The £1000 prize pool activates only when a minimum of 3000 paid round purchases are completed during the calendar month. The number of individual participants is not relevant, as long as the total number of paid round purchases reaches this threshold. This threshold covers platform operational costs including payment processing fees, infrastructure, security, and support services.
+                The monthly £1000 prize activates only if at least 999 paid packages are sold during
+                the calendar month. This threshold exists to support the platform’s sustainability,
+                including infrastructure costs, payment processing fees, security, fraud prevention,
+                and long-term system operation.
                 <br /><br />
-                <strong style={{ color: "#a78bfa" }}>If the threshold is not met:</strong> No prize is awarded and funds do not carry over to the next month. Entry fees are not refunded as the platform service (quiz participation, scoring, leaderboards) has been provided.
+                <strong style={{ color: "#a78bfa" }}>If the threshold is not met:</strong> the monthly
+                £1000 prize is not activated for that month unless VibraXX announces otherwise.
               </p>
             </div>
 
             <h3 className="subsection-title">Tie-Breaking</h3>
-            <p>If multiple players have the same top score:</p>
+            <p>If multiple players finish with the same top score, the following tie-breakers apply in order:</p>
             <ol>
-              <li><strong>Fewest Incorrect Answers:</strong> The player with fewer wrong answers wins</li>
-              <li><strong>Highest Accuracy Rate:</strong> If still tied, highest overall accuracy percentage wins</li>
-              <li><strong>Highest Average Score Per Round:</strong> If still tied, highest average score wins</li>
-              <li><strong>Prize Split:</strong> If all criteria are equal, the prize is divided equally</li>
+              <li><strong>Fewest Incorrect Answers</strong></li>
+              <li><strong>Highest Accuracy Rate</strong></li>
+              <li><strong>Highest Average Score Per Round</strong></li>
+              <li><strong>Equal Split or Other Fair Resolution</strong> if prior criteria do not resolve the tie</li>
             </ol>
           </div>
 
@@ -796,7 +815,7 @@ export default function HowItWorksPage() {
                   textTransform: "uppercase",
                   letterSpacing: "0.05em"
                 }}>
-                  Single Round
+                  Starter Pack
                 </div>
                 <div style={{
                   fontSize: 36,
@@ -804,10 +823,10 @@ export default function HowItWorksPage() {
                   color: "#fbbf24",
                   marginBottom: 8
                 }}>
-                  £2.00
+                  £3.00
                 </div>
                 <p className="step-description">
-                  Perfect for trying out the competition. One round, one chance to compete.
+                  Includes 3 rounds of competition access. A simple option for getting started.
                 </p>
               </div>
 
@@ -827,10 +846,10 @@ export default function HowItWorksPage() {
                   color: "#fbbf24",
                   marginBottom: 8
                 }}>
-                  £49.00
+                  £18.00
                 </div>
                 <p className="step-description">
-                  30 rounds - Save 18%. Best value for serious competitors.
+                  Includes 30 rounds of competition access. Built for players who want to compete regularly.
                 </p>
               </div>
             </div>
@@ -838,7 +857,8 @@ export default function HowItWorksPage() {
             <div className="info-box" style={{ marginTop: 24 }}>
               <strong>Secure Payment via Stripe</strong>
               <p>
-                All payments are processed securely through Stripe. We never store your card details. Payments are in GBP—your bank handles currency conversion if needed.
+                All payments are processed securely through Stripe. VibraXX does not store your full card details.
+                Prices are shown in GBP, and your bank or payment provider handles any currency conversion where applicable.
               </p>
             </div>
           </div>
@@ -846,21 +866,22 @@ export default function HowItWorksPage() {
           <div className="content-card">
             <h2 className="section-title">
               <Gift style={{ width: 24, height: 24 }} />
-              <span>Free Daily Practice</span>
+              <span>Daily Free Entry</span>
             </h2>
             <p>
-              Every registered user gets one free practice quiz daily. This helps you:
+              Every registered user receives one free daily entry. This helps you:
             </p>
             <ul>
-              <li>Learn the quiz format without spending money</li>
-              <li>Practice your speed and accuracy</li>
-              <li>Discover your strengths and weaknesses</li>
-              <li>Build confidence before competing for prizes</li>
+              <li>Experience the live format before purchasing round packages</li>
+              <li>Practice your timing, focus, and answer accuracy</li>
+              <li>Learn from the explanation-card system</li>
+              <li>Understand how VibraXX works in real competitive conditions</li>
             </ul>
             <div className="info-box">
-              <strong>Free Quiz = Practice Only</strong>
+              <strong>One Free Daily Entry</strong>
               <p>
-                Free quizzes are for practice only and have no impact on rankings, rewards, or prize eligibility.
+                Each eligible user receives one free daily entry according to the platform rules.
+                Additional competition access requires an available free entry, bonus entry, or paid package balance.
               </p>
             </div>
           </div>
@@ -871,21 +892,26 @@ export default function HowItWorksPage() {
               <span>Global Competition</span>
             </h2>
             <p>
-              VibraXX brings together knowledge enthusiasts from around the world. Compete against players from 40+ countries in synchronized live quizzes.
+              VibraXX is designed as a global live knowledge arena. Players from permitted
+              jurisdictions can compete in synchronized live rounds throughout the day.
             </p>
 
-            <h3 className="subsection-title">Live Broadcasts</h3>
-            <p>
-              Watch live quiz action 24/7 on our YouTube channel. See questions, explanations, and leaderboard updates in real-time—even if you're not competing.
-            </p>
-
-            <h3 className="subsection-title">Community Features</h3>
+            <h3 className="subsection-title">Why VibraXX Is Different</h3>
             <ul>
-              <li>Real-time leaderboard rankings</li>
-              <li>Monthly champion hall of fame</li>
-              <li>Performance statistics and history</li>
-              <li>YouTube live broadcast viewing</li>
+              <li>Live global rounds every 5 minutes</li>
+              <li>Skill-based scoring with no luck-based outcome</li>
+              <li>Educational explanation cards after every question</li>
+              <li>Monthly leaderboard competition for the top prize</li>
+              <li>Simple entry model through free daily access and paid round packages</li>
             </ul>
+
+            <div className="highlight-box">
+              <strong>Knowledge First</strong>
+              <p>
+                VibraXX is built around meaningful knowledge challenges. The goal is not only to compete,
+                but also to learn, improve, and develop stronger reasoning through repeated play.
+              </p>
+            </div>
           </div>
 
           <div className="content-card">
@@ -894,12 +920,12 @@ export default function HowItWorksPage() {
               <span>Important Rules</span>
             </h2>
             <ul>
-              <li><strong>Age Requirement:</strong> Must be 18 years or older</li>
-              <li><strong>One Account:</strong> Only one account per person</li>
-              <li><strong>No Cheating:</strong> External help or tools are forbidden</li>
-              <li><strong>Fair Play:</strong> Automated tools, bots, or scripts result in immediate ban</li>
-              <li><strong>Geographic Restrictions:</strong> Only permitted countries can participate</li>
-              <li><strong>VPN Prohibited:</strong> Using VPN to bypass restrictions forfeits any prizes</li>
+              <li><strong>Age Requirement:</strong> You must be 18 years or older.</li>
+              <li><strong>One Account:</strong> Only one account per person is permitted.</li>
+              <li><strong>No Cheating:</strong> External help, collusion, or unfair assistance is prohibited.</li>
+              <li><strong>No Bots or Automation:</strong> Scripts, automation tools, and artificial interaction tools are forbidden.</li>
+              <li><strong>Permitted Jurisdictions Only:</strong> Participation is allowed only where VibraXX is lawfully made available.</li>
+              <li><strong>VPN / Proxy Restrictions:</strong> Attempting to bypass location or access controls may result in suspension, termination, or prize disqualification.</li>
             </ul>
           </div>
 
@@ -915,7 +941,7 @@ export default function HowItWorksPage() {
             <p style={{ fontSize: 15, color: "#cbd5e1", margin: 0, lineHeight: 1.7 }}>
               <strong style={{ color: "#fbbf24" }}>Ready to Compete?</strong>
               <br />
-              Join thousands of players worldwide in the ultimate test of knowledge and speed. Sign in with Google and start your journey to becoming a VibraXX champion!
+              Sign in with Google, enter the live lobby, and start building your VibraXX score through skill, speed, and knowledge.
             </p>
           </div>
         </div>
@@ -943,7 +969,7 @@ export default function HowItWorksPage() {
             <a href="/faq">FAQ</a>
           </div>
           <div style={{ marginTop: 20, fontSize: 12, color: "#64748b" }}>
-            © 2025 VibraXX. Operated by Sermin Limited | Company No. 16778648
+            © 2026 VibraXX. Operated by Sermin Limited | Company No. 16778648
             <br />
             Registered in England & Wales | 71-75 Shelton Street, London, WC2H 9JQ, UK
           </div>
