@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, MessageSquare, CheckCircle, Clock, AlertTriangle, Mail, Phone } from "lucide-react";
+import { ArrowLeft, MessageSquare, CheckCircle, Clock, AlertTriangle, Mail } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
@@ -690,7 +690,7 @@ export default function ComplaintsPage() {
               <div className="timeline-item">
                 <div className="timeline-step">Step 2: Investigation</div>
                 <div className="timeline-content">
-                  Our team will investigate your complaint thoroughly, reviewing logs, recordings, and any relevant evidence. This typically takes <strong>1-3 business days</strong>.
+                  Our team will investigate your complaint thoroughly, reviewing system logs, round data, and any relevant evidence. This typically takes <strong>1-3 business days</strong>.
                 </div>
               </div>
 
@@ -717,7 +717,7 @@ export default function ComplaintsPage() {
             <ul>
               <li><strong>Technical Issues:</strong> Platform errors, crashes, or malfunctions</li>
               <li><strong>Payment Problems:</strong> Charges, refunds, or billing issues</li>
-              <li><strong>Quiz Content:</strong> Incorrect questions or answers</li>
+              <li><strong>Quiz Content:</strong> Concerns regarding question clarity, accuracy, or interpretation</li>
               <li><strong>Scoring Disputes:</strong> Disagreements about quiz results</li>
               <li><strong>Account Issues:</strong> Access problems or suspension concerns</li>
               <li><strong>Prize Distribution:</strong> Delays or errors in prize payments</li>
@@ -726,21 +726,21 @@ export default function ComplaintsPage() {
             </ul>
           </div>
 
-          <div className="content-card">
-            <h2 className="section-title">
-              <span>6. Possible Outcomes</span>
-            </h2>
-            <p>Depending on the nature of your complaint, we may offer:</p>
-            <ul>
-              <li><strong>Apology</strong> and explanation</li>
-              <li><strong>Refund</strong> of entry fees or rounds (only in cases of verified platform error or wrongful charge, in strict accordance with our Refund Policy)</li>
-              <li><strong>Replacement rounds</strong> at no cost</li>
-              <li><strong>Account reinstatement</strong> (if wrongly suspended)</li>
-              <li><strong>Quiz replay opportunity</strong> (in case of technical fault)</li>
-              <li><strong>Goodwill gestures</strong> (in exceptional circumstances)</li>
-              <li><strong>Policy clarification</strong> or correction</li>
-            </ul>
-          </div>
+         <div className="content-card">
+  <h2 className="section-title">
+    <span>6. Possible Outcomes</span>
+  </h2>
+  <p>Depending on the nature of your complaint, we may offer:</p>
+  <ul>
+    <li><strong>Apology</strong> and explanation</li>
+    <li><strong>Refund</strong> of purchased rounds (only in cases of verified platform error or wrongful charge, strictly in accordance with our Refund Policy)</li>
+    <li><strong>Replacement rounds</strong> at no cost (where a verified platform fault prevented participation)</li>
+    <li><strong>Account reinstatement</strong> (if wrongly suspended)</li>
+    <li><strong>Technical review</strong> of the affected quiz round</li>
+    <li><strong>Goodwill gestures</strong> (in exceptional circumstances)</li>
+    <li><strong>Policy clarification</strong> or correction</li>
+  </ul>
+</div>
 
           <div className="content-card">
             <h2 className="section-title">
@@ -766,7 +766,7 @@ export default function ComplaintsPage() {
               <span>8. Alternative Dispute Resolution</span>
             </h2>
             <p>
-              If we cannot resolve your complaint internally and you are a consumer in the UK or EU, you may access alternative dispute resolution:
+              If a complaint cannot be resolved internally, consumers in the UK or EU may seek independent advice or use alternative dispute resolution services where applicable.
             </p>
 
             <h3 className="subsection-title">For UK Consumers</h3>
@@ -777,7 +777,12 @@ export default function ComplaintsPage() {
 
             <h3 className="subsection-title">For EU Consumers</h3>
             <ul>
-              <li><strong>European Online Dispute Resolution:</strong> ec.europa.eu/consumers/odr</li>
+              <li>
+<strong>European Online Dispute Resolution:</strong>{" "}
+<a href="https://ec.europa.eu/consumers/odr" target="_blank" rel="noopener noreferrer" style={{color:"#f472b6"}}>
+ec.europa.eu/consumers/odr
+</a>
+</li>
             </ul>
 
             <h3 className="subsection-title">Other Jurisdictions</h3>
@@ -888,7 +893,7 @@ export default function ComplaintsPage() {
             <a href="/faq">FAQ</a>
           </div>
           <div style={{ marginTop: 20, fontSize: 12, color: "#64748b" }}>
-            © 2025 VibraXX. Operated by Sermin Limited | Company No. 16778648
+            © 2026 VibraXX. Operated by Sermin Limited | Company No. 16778648
             <br />
             Registered in England & Wales | 71-75 Shelton Street, London, WC2H 9JQ, UK
           </div>
