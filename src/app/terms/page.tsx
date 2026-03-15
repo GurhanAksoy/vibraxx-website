@@ -10,7 +10,9 @@ export default function TermsPage() {
   return (
     <>
       {/* ⚡ CRITICAL CSS - Prevents layout shift during hydration */}
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         :root {
           color-scheme: dark;
           background-color: #020817;
@@ -39,7 +41,9 @@ export default function TermsPage() {
           margin: 0 auto;
           padding: 40px 20px 80px;
         }
-      `}} />
+      `,
+        }}
+      />
 
       <style jsx global>{`
         :root {
@@ -56,18 +60,27 @@ export default function TermsPage() {
         body {
           background-color: #020817;
           color: white;
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
           line-height: 1.7;
         }
 
         @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-20px); }
+          0%,
+          100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-20px);
+          }
         }
 
         @keyframes shimmer {
-          0% { background-position: -200% center; }
-          100% { background-position: 200% center; }
+          0% {
+            background-position: -200% center;
+          }
+          100% {
+            background-position: 200% center;
+          }
         }
 
         .animate-float {
@@ -221,7 +234,11 @@ export default function TermsPage() {
           margin-bottom: 48px;
           padding: 48px 24px;
           border-radius: 24px;
-          background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(217, 70, 239, 0.1));
+          background: linear-gradient(
+            135deg,
+            rgba(139, 92, 246, 0.15),
+            rgba(217, 70, 239, 0.1)
+          );
           border: 1px solid rgba(139, 92, 246, 0.3);
           position: relative;
           overflow: hidden;
@@ -231,7 +248,11 @@ export default function TermsPage() {
           content: "";
           position: absolute;
           inset: 0;
-          background: radial-gradient(circle at 50% 0%, rgba(124, 58, 237, 0.2), transparent 70%);
+          background: radial-gradient(
+            circle at 50% 0%,
+            rgba(124, 58, 237, 0.2),
+            transparent 70%
+          );
           pointer-events: none;
         }
 
@@ -591,7 +612,7 @@ export default function TermsPage() {
             </p>
             <div className="last-updated-badge">
               <CheckCircle style={{ width: 16, height: 16 }} />
-              Last Updated: December 11, 2025
+              Last Updated: March 15, 2026
             </div>
           </div>
 
@@ -629,7 +650,7 @@ export default function TermsPage() {
             <div>
               <div className="age-warning-title">18+ Age Restriction</div>
               <p className="age-warning-text">
-                You must be at least 18 years old to use VibraXX. By accessing this platform, you confirm you are 18 or over and agree to these Terms.
+                You must be at least 18 years old to use VibraXX. By accessing this platform, you confirm that you are 18 or over, have legal capacity to enter into a binding agreement, and agree to these Terms.
               </p>
             </div>
           </div>
@@ -639,26 +660,32 @@ export default function TermsPage() {
               <span>1.</span> Agreement to Terms
             </h2>
             <p>
-              By accessing or using VibraXX, you agree to be bound by these Terms & Conditions, our Privacy Policy, and all applicable laws. If you do not agree, you must not use our Services.
+              By accessing or using VibraXX, you agree to be bound by these Terms & Conditions, our Privacy Policy, and all applicable laws and regulations. If you do not agree, you must not use our Services.
             </p>
             <p style={{ marginTop: 16 }}>
-              For information about how we handle your personal data, including data retention periods and international transfers, please see our <a href="/privacy" style={{ color: "#a78bfa", fontWeight: 600 }}>Privacy Policy</a>.
+              For information about how we collect, use, store, and protect personal information, including retention periods and international transfers, please review our{" "}
+              <a href="/privacy" style={{ color: "#a78bfa", fontWeight: 600 }}>
+                Privacy Policy
+              </a>
+              .
             </p>
           </div>
 
           <div className="content-card">
             <h2 className="section-title">
               <Globe style={{ width: 24, height: 24 }} />
-              <span>2.</span> Geographic Restrictions - Whitelist Policy
+              <span>2.</span> Geographic Restrictions - Availability by Jurisdiction
             </h2>
+
             <div className="warning-box">
-              <strong>Whitelist Approach - Approved Countries Only</strong>
+              <strong>Availability Only Where Lawful</strong>
               <p>
-                VibraXX is available ONLY to residents of the countries listed below. All other countries are prohibited.
+                VibraXX is offered only in territories and jurisdictions where the platform is lawfully made available by us. Access or participation from any jurisdiction where use of the service would be unlawful or restricted is strictly prohibited.
               </p>
             </div>
 
-            <h3 className="subsection-title">Permitted Countries</h3>
+            <h3 className="subsection-title">Currently Supported Countries</h3>
+
             <div className="country-list">
               <div className="country-item">🇬🇧 United Kingdom</div>
               <div className="country-item">🇹🇷 Turkey</div>
@@ -705,14 +732,20 @@ export default function TermsPage() {
               <div className="country-item">🇮🇳 India</div>
             </div>
 
+            <p>
+              Where United States federal, state, or local law would prohibit or restrict participation, the service is void where prohibited and must not be used. Users are solely responsible for ensuring that use of VibraXX is lawful in their location.
+            </p>
+
             <div className="warning-box" style={{ marginTop: 24 }}>
               <strong>VPN & Proxy Detection Policy</strong>
               <p>
-                Using VPN, proxy servers, or any method to bypass geographic restrictions is strictly prohibited. We detect VPN usage through IP address analysis and ASN (Autonomous System Number) checks against known VPN provider ranges.
-                <br /><br />
-                <strong style={{ color: "#fbbf24" }}>Consequences:</strong> If VPN usage is detected, your account will be immediately terminated and all prizes forfeited—even if legitimately won.
-                <br /><br />
-                <strong style={{ color: "#fbbf24" }}>False Positives:</strong> If you believe your account was incorrectly flagged (e.g., corporate VPN, shared network), you may appeal by contacting team@vibraxx.com with proof of residency (utility bill, government ID). Appeals are reviewed within 5 business days.
+                Using VPNs, proxies, location-masking tools, or any method intended to bypass geographic or jurisdictional restrictions is strictly prohibited. We may use IP analysis, network intelligence, device signals, and fraud screening tools to detect such activity.
+                <br />
+                <br />
+                <strong style={{ color: "#fbbf24" }}>Consequences:</strong> If prohibited location masking or jurisdiction bypass is detected, your account may be suspended or terminated and any promotional or prize eligibility may be cancelled.
+                <br />
+                <br />
+                <strong style={{ color: "#fbbf24" }}>Appeals:</strong> If you believe your account was incorrectly flagged, you may contact team@vibraxx.com and we may request supporting evidence, including proof of residence or lawful location.
               </p>
             </div>
           </div>
@@ -724,10 +757,10 @@ export default function TermsPage() {
             <p>To use VibraXX, you must:</p>
             <ul>
               <li>Be at least 18 years of age</li>
-              <li>Reside in a permitted country (see Section 2)</li>
+              <li>Reside in or access the service only from a permitted jurisdiction</li>
               <li>Have a valid Google account</li>
               <li>Provide accurate registration information</li>
-              <li>Comply with all applicable laws</li>
+              <li>Comply with all applicable laws and these Terms</li>
             </ul>
           </div>
 
@@ -736,9 +769,15 @@ export default function TermsPage() {
               <span>4.</span> Skill-Based Competition
             </h2>
             <div className="highlight-box">
-              <strong>100% Skill-Based - Not Gambling</strong>
+              <strong>Knowledge-Based Competition (Skill-Based)</strong>
               <p>
-                VibraXX is a knowledge-based competition platform. Success depends entirely on your knowledge, speed, and accuracy—with no element of chance. This is not gambling under UK law (Gambling Act 2005).
+                VibraXX is a knowledge-based global competition platform. Success depends on a player's knowledge, reasoning ability, concentration, and response speed. No random draw, betting mechanism, roulette-style mechanic, or other element of chance determines the outcome.
+              </p>
+              <p style={{ marginTop: 16 }}>
+                VibraXX is designed and operated as a <strong>skill-based knowledge competition</strong> and not as gambling, betting, or a lottery. Under the UK Gambling Commission’s guidance on prize competitions and free draws, a competition in which success depends on knowledge or skill is treated differently from gambling arrangements. :contentReference[oaicite:0]{index=0}
+              </p>
+              <p style={{ marginTop: 16 }}>
+                In the United States and other jurisdictions, contests and promotions are generally also subject to local rules and consumer protection requirements. Participation is void where prohibited, and users remain responsible for complying with the laws that apply to them. :contentReference[oaicite:1]{index=1}
               </p>
             </div>
           </div>
@@ -748,37 +787,50 @@ export default function TermsPage() {
               <span>5.</span> How VibraXX Works
             </h2>
             <ul>
-              <li><strong>Registration:</strong> Sign in with Google only</li>
-              <li><strong>Free Practice:</strong> One free daily quiz (20 questions) - no prizes</li>
-              <li><strong>Live Competitions:</strong> Purchase rounds to compete for the monthly £1000 prize</li>
-              <li><strong>Frequency:</strong> Live quiz every 15 minutes (96 rounds daily)</li>
-              <li><strong>Format:</strong> 20 multiple-choice questions</li>
-              <li><strong>Timing:</strong> 6 seconds per question + 6 seconds for answer explanation</li>
-              <li><strong>Scoring:</strong> 5 points per correct answer (100 points maximum per round)</li>
+              <li><strong>Registration:</strong> Sign in with Google only.</li>
+              <li><strong>Global Live Competitions:</strong> VibraXX automatically creates a new global live round every <strong>5 minutes</strong>.</li>
+              <li><strong>Round Format:</strong> Each round contains <strong>15 multiple-choice questions</strong>.</li>
+              <li><strong>Question Card Timing:</strong> Each question card remains on screen for <strong>9 seconds</strong>.</li>
+              <li><strong>Explanation Card Timing:</strong> Each question is followed by a <strong>9-second explanation card</strong> showing the correct answer and educational explanation.</li>
+              <li><strong>Final Score Card:</strong> At the end of each completed round, a final score card is displayed for approximately <strong>15 seconds</strong>.</li>
+              <li><strong>Scoring:</strong> Each correct answer awards <strong>10 points</strong>.</li>
+              <li><strong>Maximum Score:</strong> The maximum score for a round is <strong>150 points</strong>.</li>
+              <li><strong>Educational Focus:</strong> VibraXX is designed to be both competitive and educational. The platform does not focus on trivial or ultra-simple questions; the explanation-card system is intended to help players learn while competing.</li>
             </ul>
+
+            <div className="highlight-box">
+              <strong>Live Synchronised Arena</strong>
+              <p>
+                VibraXX is a synchronised live global arena. Once a round goes live, late entry may be restricted or unavailable. Availability, eligibility, and access are determined by the platform rules in force at the time of the round.
+              </p>
+            </div>
           </div>
 
           <div className="content-card">
             <h2 className="section-title">
               <span>6.</span> Pricing & Payment
             </h2>
+
             <h3 className="subsection-title">6.1 Round Prices</h3>
             <ul>
               <li><strong>Single Round:</strong> £2.00</li>
-              <li><strong>30 Round Bundle:</strong> £49.00 (18% savings)</li>
+              <li><strong>30 Round Bundle:</strong> £49.00</li>
             </ul>
 
             <h3 className="subsection-title">6.2 Payment Processing</h3>
             <p>
-              All payments are processed securely through Stripe. By purchasing, you agree to Stripe's terms. We do not store payment card details.
+              All payments are processed securely through Stripe. By purchasing on VibraXX, you also agree to any applicable Stripe checkout, billing, payment, and fraud-screening requirements used to complete your transaction.
             </p>
             <p style={{ marginTop: 16 }}>
-              <strong>Payment processing fees (approximately 1.5% + 20p per transaction) are non-refundable.</strong> These fees are charged by Stripe and deducted immediately upon transaction completion.
+              VibraXX does not store full payment card details on its own systems. Stripe is a PCI-compliant payment processor and payment information is processed through Stripe’s infrastructure. Stripe states that merchants remain responsible for compliance with applicable laws, regulations, and network rules, while Stripe’s systems help reduce direct handling of sensitive card data. :contentReference[oaicite:2]{index=2}
+            </p>
+            <p style={{ marginTop: 16 }}>
+              Payment processing fees, issuer fees, exchange-rate differences, banking charges, and similar third-party costs may apply and may be non-refundable where the charge has already been incurred by the payment network or processor.
             </p>
 
             <h3 className="subsection-title">6.3 Currency</h3>
             <p>
-              All prices are in British Pounds (GBP). If you pay in a different currency, your bank or payment provider handles the conversion. We are not responsible for exchange rate differences or conversion fees charged during purchase transactions.
+              All prices are displayed in British Pounds (GBP) unless stated otherwise. If you pay in another currency, currency conversion is handled by your payment provider or card issuer. VibraXX is not responsible for foreign exchange losses or conversion fees applied by third parties.
             </p>
           </div>
 
@@ -786,39 +838,43 @@ export default function TermsPage() {
             <h2 className="section-title">
               <span>7.</span> Prize Pool & Distribution
             </h2>
+
             <h3 className="subsection-title">7.1 Monthly Prize</h3>
             <p>
-              The monthly prize is <strong>£1000 (GBP)</strong>, awarded to the participant with the highest cumulative score for that calendar month.
+              Subject to these Terms and all eligibility checks, the monthly prize is <strong>£1000 (GBP)</strong>, awarded to the participant with the highest cumulative eligible score for the applicable calendar month.
             </p>
 
-            <h3 className="subsection-title">7.2 Minimum Participation Threshold</h3>
+            <h3 className="subsection-title">7.2 Minimum Activation Threshold</h3>
             <div className="warning-box">
-              <strong>3000+ Paid Rounds Required</strong>
+              <strong>999 Paid Package Sales Required</strong>
               <p>
-                The prize pool activates only if <strong>At least 3000 paid competition rounds must be purchased during the calendar month.</strong>This threshold covers platform operational costs including payment processing fees, infrastructure, security, and support services. If the threshold is not met, no prize is awarded and funds do not carry over to the next month.
-                <br /><br />
-                <strong style={{ color: "#fbbf24" }}>Clarification:</strong> "Paid competition rounds" refers to the total number of successfully completed purchase transactions for competition access during the month. Free practice rounds do not count toward this threshold.
+                The monthly £1000 prize pool activates only if at least <strong>999 paid competition packages</strong> are sold during that calendar month.
+                <br />
+                <br />
+                This threshold is intended to support the sustainability of the platform, including infrastructure expenses, hosting, platform security, fraud prevention, support operations, and payment processing costs.
+                <br />
+                <br />
+                If the threshold is not met during a month, the monthly prize will not be activated for that month unless VibraXX expressly announces otherwise.
               </p>
             </div>
 
             <h3 className="subsection-title">7.3 Tie-Breaking Rules</h3>
-            <p>If multiple participants have the same highest cumulative score, the following tie-breaking rules apply in order:</p>
+            <p>If multiple participants have the same highest cumulative score, the following tie-breakers apply in this order:</p>
             <ol>
-              <li><strong>Fewest Incorrect Answers:</strong> The participant with the fewest total wrong answers wins</li>
-              <li><strong>Highest Accuracy Rate:</strong> If still tied, the participant with the highest overall accuracy percentage wins</li>
-              <li><strong>Highest Average Score Per Round:</strong> If still tied, the participant with the highest average score across all rounds played wins</li>
-              <li><strong>Prize Split:</strong> If all above criteria are equal, the prize is divided equally among all tied participants</li>
+              <li><strong>Fewest Incorrect Answers</strong></li>
+              <li><strong>Highest Accuracy Rate</strong></li>
+              <li><strong>Highest Average Score Per Round</strong></li>
+              <li><strong>Equal Split or Other Fair Resolution</strong>, where required by platform rules or where the prior criteria do not resolve the tie</li>
             </ol>
 
             <h3 className="subsection-title">7.4 Prize Payment Timeline</h3>
             <ul>
-              <li><strong>Winner Notification:</strong> Winners are notified by email within <strong>3 business days</strong> of month-end</li>
-              <li><strong>Identity Verification:</strong> Up to <strong>10 business days</strong> for document review and approval</li>
-              <li><strong>Payment Processing:</strong> <strong>7 business days</strong> after verification approval</li>
-              <li><strong>Maximum Total Timeline:</strong> <strong>21 calendar days</strong> from month-end to payment completion</li>
+              <li><strong>Winner Notification:</strong> Usually within 3 business days after the end of the relevant month</li>
+              <li><strong>Identity Verification:</strong> Timing depends on the completeness and accuracy of documents submitted</li>
+              <li><strong>Payment Processing:</strong> After verification approval and compliance checks are completed</li>
             </ul>
             <p>
-              Prize payments are made via bank transfer or other payment methods selected by VibraXX. Stripe is used only for processing user purchases and is not responsible for prize distribution. If you require payment in a different currency, currency conversion fees and exchange rate differences are your responsibility.
+              Prize payments are made by VibraXX or its operator using a lawful payment method chosen by us. Stripe is used for customer purchase processing and is not responsible for prize distribution.
             </p>
           </div>
 
@@ -826,17 +882,18 @@ export default function TermsPage() {
             <h2 className="section-title">
               <span>8.</span> Winner Verification
             </h2>
-            <p>To receive prize payments, winners must:</p>
+            <p>To receive a prize, a winner may be required to:</p>
             <ul>
-              <li>Provide government-issued photo ID (passport or national ID card)</li>
-              <li>Confirm they are 18 years or older</li>
-              <li>Provide bank account details (IBAN) matching the ID name</li>
-              <li>Verify their Google account matches registration details</li>
+              <li>Provide government-issued photo identification</li>
+              <li>Confirm that they are 18 or older</li>
+              <li>Provide lawful and accurate payment details</li>
+              <li>Verify that their account ownership and submitted information are genuine</li>
+              <li>Complete any anti-fraud, anti-money laundering, sanctions, or jurisdictional checks that we reasonably require</li>
             </ul>
             <div className="warning-box">
               <strong>Identity Verification Required</strong>
               <p>
-                If identity verification fails or documents do not match, the prize will not be paid. Fraudulent information results in immediate account termination and potential legal action.
+                If identity checks fail, if documents are inconsistent, if jurisdictional restrictions apply, or if fraud is suspected, a prize may be withheld, delayed, or refused.
               </p>
             </div>
           </div>
@@ -846,23 +903,20 @@ export default function TermsPage() {
               <span>9.</span> Refund Policy
             </h2>
             <div className="warning-box">
-              <strong>All Purchases Are Final</strong>
+              <strong>All Purchases Are Generally Final</strong>
               <p>
-                Quiz round purchases are for digital content that is delivered immediately upon payment. By purchasing, you expressly agree that the digital service begins immediately, and you waive your right to the 14-day cancellation period under the UK Consumer Rights Act 2015.
+                Quiz round purchases and competition access are digital services supplied immediately after purchase or made available for immediate use. By completing a purchase, you expressly request immediate performance of the service.
               </p>
             </div>
             <p>
-              Refunds are available <strong>only in exceptional circumstances</strong> where VibraXX is at fault, including:
+              Refunds may be considered only in limited circumstances, such as duplicate billing, clear payment processing error, or a verified platform-side fault that materially prevented use of purchased access.
             </p>
-            <ul>
-              <li>Verified platform technical error preventing round usage</li>
-              <li>Wrongful or duplicate payment charges</li>
-              <li>Account wrongfully restricted due to our error</li>
-              <li>Widespread platform outage preventing competition access</li>
-              <li>Billing error (incorrect amount charged)</li>
-            </ul>
             <p style={{ marginTop: 16 }}>
-              For full details on refund eligibility, the request process, and processing times, see our <a href="/refunds" style={{ color: "#a78bfa", fontWeight: 600 }}>Refund Policy</a>.
+              For complete details, see our{" "}
+              <a href="/refunds" style={{ color: "#a78bfa", fontWeight: 600 }}>
+                Refund Policy
+              </a>
+              .
             </p>
           </div>
 
@@ -870,21 +924,21 @@ export default function TermsPage() {
             <h2 className="section-title">
               <span>10.</span> Prohibited Conduct
             </h2>
-            <p>The following activities are strictly forbidden:</p>
+            <p>The following conduct is prohibited:</p>
             <ul>
-              <li>Cheating or using external assistance during quizzes</li>
-              <li>Creating multiple accounts</li>
-              <li>Using bots, scripts, or automated tools</li>
-              <li>Sharing quiz questions or answers</li>
-              <li>Account sharing or credential trading</li>
-              <li>Using VPN or proxy to bypass geographic restrictions</li>
-              <li>Harassment or abusive behavior</li>
-              <li>Attempting to exploit or hack the platform</li>
+              <li>Cheating, collusion, or external assistance during play</li>
+              <li>Using bots, automation, scripts, macros, or artificial interaction tools</li>
+              <li>Creating or controlling multiple accounts</li>
+              <li>Sharing account access or login credentials</li>
+              <li>Using VPN, proxy, or location masking to bypass restrictions</li>
+              <li>Attempting to exploit vulnerabilities, latency, scoring rules, or payment flows</li>
+              <li>Sharing protected quiz content, answer keys, or internal mechanics</li>
+              <li>Harassment, abuse, threats, or unlawful use of the service</li>
             </ul>
             <div className="warning-box">
               <strong>Consequences of Violations</strong>
               <p>
-                Violation of these rules results in immediate account termination and forfeiture of all rounds and prizes—no exceptions.
+                Violations may result in suspension, termination, voiding of scores, cancellation of prize eligibility, forfeiture of purchased benefits where allowed by law, and legal action where appropriate.
               </p>
             </div>
           </div>
@@ -893,20 +947,21 @@ export default function TermsPage() {
             <h2 className="section-title">
               <span>11.</span> Technical Issues & Question Errors
             </h2>
+
             <h3 className="subsection-title">11.1 Question Error Policy</h3>
             <p>
-              If a quiz question contains a factual error, ambiguous wording, or technical display issue that affects answer validity, the following process applies:
+              If a question contains a factual mistake, display error, material ambiguity, or other defect that affects answer validity, VibraXX may review the issue and decide an appropriate remedy.
             </p>
             <ul>
-              <li><strong>Error Validation:</strong> Errors must be reported within 24 hours of the round completion via team@vibraxx.com. Our admin team will review the question and validate the error.</li>
-              <li><strong>Question Cancellation:</strong> If an error is confirmed, that specific question will be cancelled and excluded from all participants' scores for that round.</li>
-              <li><strong>Score Recalculation:</strong> The round score will be recalculated based on the remaining 19 questions (maximum score becomes 95 points).</li>
-              <li><strong>No Refunds:</strong> Cancelled questions do not entitle participants to refunds. The competition continues normally with adjusted scoring.</li>
+              <li><strong>Error Review:</strong> Reports should be submitted as soon as reasonably possible after the round</li>
+              <li><strong>Question Cancellation:</strong> If an affected question is invalidated, it may be excluded from scoring calculations</li>
+              <li><strong>Score Recalculation:</strong> If one question is cancelled from a 15-question round, the remaining maximum score may become <strong>140 points</strong></li>
+              <li><strong>No Automatic Refund:</strong> Question correction or cancellation does not automatically entitle a player to a refund</li>
             </ul>
 
             <h3 className="subsection-title">11.2 Technical Issues Beyond Our Control</h3>
             <p>
-              We are not liable for issues caused by your internet connection, device problems, browser incompatibility, or third-party service outages (Google OAuth, Stripe, Supabase).
+              We are not responsible for your device failure, browser issues, connection instability, ISP issues, third-party outages, or problems caused by Google account services, payment processors, hosting providers, or infrastructure providers where the issue is outside our reasonable control.
             </p>
           </div>
 
@@ -915,7 +970,10 @@ export default function TermsPage() {
               <span>12.</span> Complaints & Disputes
             </h2>
             <p>
-              Complaints must be submitted within 7 days of the incident via email to team@vibraxx.com. We will respond within 3 business days. See our Complaints Procedure for full details.
+              Complaints should be submitted promptly to team@vibraxx.com. We will review complaints in good faith and respond within a reasonable period.
+            </p>
+            <p>
+              Additional information may be requested before a complaint can be resolved.
             </p>
           </div>
 
@@ -924,23 +982,23 @@ export default function TermsPage() {
               <span>13.</span> Limitation of Liability
             </h2>
             <p>
-              <strong>Nothing in these Terms excludes liability for:</strong>
+              <strong>Nothing in these Terms excludes or limits liability for:</strong>
             </p>
             <ul>
               <li>Death or personal injury caused by negligence</li>
               <li>Fraud or fraudulent misrepresentation</li>
-              <li>Any liability that cannot be excluded under UK law</li>
+              <li>Any liability that cannot lawfully be excluded or limited</li>
             </ul>
             <p style={{ marginTop: 16 }}>
-              <strong>Subject to the above, we are not liable for:</strong>
+              <strong>Subject to the above, VibraXX is not liable for:</strong>
             </p>
             <ul>
-              <li>Loss of profits, revenue, or business</li>
-              <li>Loss of data or business interruption</li>
-              <li>Any indirect or consequential losses</li>
+              <li>Loss of profit, revenue, goodwill, opportunity, or business</li>
+              <li>Indirect, incidental, or consequential losses</li>
+              <li>Losses caused by events outside our reasonable control</li>
             </ul>
             <p style={{ marginTop: 16 }}>
-              <strong>Maximum Liability:</strong> Our total liability shall not exceed the total amount you paid to us in the 12 months before the claim.
+              <strong>Maximum Liability:</strong> To the extent permitted by law, our aggregate liability to you shall not exceed the total amount paid by you to VibraXX during the 12 months preceding the event giving rise to the claim.
             </p>
           </div>
 
@@ -949,39 +1007,40 @@ export default function TermsPage() {
               <span>14.</span> Intellectual Property
             </h2>
             <p>
-              All content on VibraXX, including quiz questions, design, software, logos, and trademarks, is owned by or licensed to Sermin Limited and protected by UK and international intellectual property laws.
+              All content, software, branding, quiz material, platform design, text, graphics, databases, and related intellectual property on VibraXX are owned by or licensed to Sermin Limited and are protected by UK and international intellectual property laws.
             </p>
             <p>
-              You may not copy, reproduce, distribute, or create derivative works without our written permission.
+              You may not copy, scrape, reproduce, republish, distribute, modify, reverse engineer, or create derivative works from the service or its content without our prior written permission, except where mandatory law allows otherwise.
             </p>
           </div>
 
           <div className="content-card">
             <h2 className="section-title">
-              <span>15.</span> Account Termination & Inactive Accounts
+              <span>15.</span> Account Suspension, Termination & Inactive Accounts
             </h2>
-            <h3 className="subsection-title">15.1 Termination by VibraXX</h3>
-            <p>We may suspend or terminate your account if:</p>
+
+            <h3 className="subsection-title">15.1 Suspension or Termination by VibraXX</h3>
+            <p>We may suspend, restrict, or terminate your account if:</p>
             <ul>
               <li>You breach these Terms</li>
-              <li>We suspect fraud or illegal activity</li>
-              <li>Required by law</li>
-              <li>Your account meets the inactive account criteria (see below)</li>
+              <li>We suspect fraud, abuse, evasion, or unlawful activity</li>
+              <li>We are required to do so by law, court order, regulator, or payment provider</li>
+              <li>Your account is inactive for an extended period</li>
             </ul>
 
             <h3 className="subsection-title">15.2 Inactive Account Policy</h3>
             <p>
-              An account is considered inactive if there has been <strong>no login activity for 36 consecutive months</strong> (3 years).
+              An account may be considered inactive if there has been no login activity for 36 consecutive months.
             </p>
             <ul>
-              <li><strong>Warning Notice:</strong> We will send an email notification to your registered address 30 days before account closure.</li>
-              <li><strong>Remaining Rounds:</strong> Any unused purchased rounds will expire and will <strong>not be refunded</strong> upon account closure due to inactivity.</li>
-              <li><strong>Reactivation:</strong> To prevent closure, simply log in within the 30-day warning period.</li>
+              <li><strong>Notice:</strong> We may notify you before permanent closure where practicable</li>
+              <li><strong>Unused Benefits:</strong> Treatment of unused rounds or credits will be subject to the applicable product rules and refund policy</li>
+              <li><strong>Reactivation:</strong> Logging in before closure may prevent the account from being closed</li>
             </ul>
 
             <h3 className="subsection-title">15.3 Voluntary Account Closure</h3>
             <p>
-              You may close your account anytime by contacting team@vibraxx.com. Account closure does not affect obligations already incurred or prizes already won. Unused rounds are subject to our standard refund policy (see Section 9).
+              You may request account closure by contacting team@vibraxx.com. Closing an account does not remove obligations already incurred or invalidate prior lawful verification requirements.
             </p>
           </div>
 
@@ -990,15 +1049,15 @@ export default function TermsPage() {
               <span>16.</span> Governing Law
             </h2>
             <p>
-              These Terms are governed by the laws of England and Wales. Disputes will be subject to the exclusive jurisdiction of the courts of England and Wales.
+              These Terms are governed by the laws of England and Wales.
             </p>
             <p style={{ marginTop: 16 }}>
-              EU residents may also bring proceedings in their country of residence. Nothing in these Terms affects your statutory consumer rights.
+              Subject to mandatory consumer protection laws that may apply in your place of residence, disputes relating to these Terms or the service shall be handled by the courts of England and Wales unless another forum is required by applicable law.
             </p>
             <div className="highlight-box" style={{ marginTop: 24 }}>
               <strong>Your Statutory Rights</strong>
               <p>
-                Nothing in these Terms limits or excludes your statutory rights where applicable. These Terms set out our commercial practices but do not override rights granted to you by law.
+                Nothing in these Terms is intended to override any mandatory consumer rights that apply to you under applicable law.
               </p>
             </div>
           </div>
@@ -1008,10 +1067,10 @@ export default function TermsPage() {
               <span>17.</span> Changes to Terms
             </h2>
             <p>
-              We may update these Terms from time to time. Material changes will be notified via email and prominent website notice at least 30 days in advance.
+              We may update these Terms from time to time to reflect operational, legal, security, product, or regulatory changes.
             </p>
             <p style={{ marginTop: 16 }}>
-              Continued use after notification constitutes acceptance. If you disagree with changes, stop using VibraXX.
+              Where required, material changes will be communicated through the website, email, or in-app notice. Continued use of VibraXX after changes take effect means you accept the revised Terms.
             </p>
           </div>
 
@@ -1047,14 +1106,16 @@ export default function TermsPage() {
             </div>
           </div>
 
-          <div style={{
-            padding: 24,
-            borderRadius: 16,
-            background: "rgba(34, 197, 94, 0.1)",
-            border: "1px solid rgba(34, 197, 94, 0.3)",
-            textAlign: "center",
-            marginTop: 40
-          }}>
+          <div
+            style={{
+              padding: 24,
+              borderRadius: 16,
+              background: "rgba(34, 197, 94, 0.1)",
+              border: "1px solid rgba(34, 197, 94, 0.3)",
+              textAlign: "center",
+              marginTop: 40,
+            }}
+          >
             <CheckCircle style={{ width: 28, height: 28, color: "#4ade80", margin: "0 auto 12px" }} />
             <p style={{ fontSize: 15, color: "#cbd5e1", margin: 0, lineHeight: 1.7 }}>
               <strong style={{ color: "#4ade80" }}>Acceptance of Terms</strong>
@@ -1087,7 +1148,7 @@ export default function TermsPage() {
             <a href="/faq">FAQ</a>
           </div>
           <div style={{ marginTop: 20, fontSize: 12, color: "#64748b" }}>
-            © 2025 VibraXX. Operated by Sermin Limited | Company No. 16778648
+            © 2026 VibraXX. Operated by Sermin Limited | Company No. 16778648
             <br />
             Registered in England & Wales | 71-75 Shelton Street, London, WC2H 9JQ, UK
           </div>
