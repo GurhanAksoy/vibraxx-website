@@ -619,7 +619,7 @@ export default function RefundPolicyPage() {
               <p>
                 Quiz round purchases are for digital content that is supplied immediately upon payment. Under the UK Consumer Rights Act 2015, the 14-day cooling-off period does not apply to digital content once delivery has begun with your express consent.
                 <br /><br />
-                By purchasing quiz rounds, you expressly agree that the digital service begins immediately, and you waive your right to the 14-day cancellation period.
+                By purchasing quiz rounds, you expressly agree that the digital service begins immediately and that the statutory cooling-off period does not apply once delivery has started.
               </p>
             </div>
 
@@ -693,32 +693,30 @@ export default function RefundPolicyPage() {
           </div>
 
           <div className="content-card">
-            <h2 className="section-title">
-              <span>3. When Refunds Are NOT Available</span>
-            </h2>
-            <div className="warning-box">
-              <strong>No Refunds For</strong>
-              <p>
-                • Change of mind after purchase
-                <br />
-                • Rounds you chose not to use
-                <br />
-                • Poor quiz performance or low scores
-                <br />
-                • Account banned for cheating or Terms violations
-                <br />
-                • Internet connection problems on your end
-                <br />
-                • Monthly threshold (3000+ participants) not being met
-                <br />
-                • Disagreement with quiz questions or answers
-                <br />
-                • Device compatibility issues on your end
-                <br />
-                • Misunderstanding of how the service works
-              </p>
-            </div>
-          </div>
+  <h2 className="section-title">
+    <span>3. When Refunds Are NOT Available</span>
+  </h2>
+  <div className="warning-box">
+    <strong>No Refunds For</strong>
+    <p>
+      • Change of mind after purchase
+      <br />
+      • Rounds you chose not to use
+      <br />
+      • Poor quiz performance or low scores
+      <br />
+      • Account banned for cheating or Terms violations
+      <br />
+      • Internet connection problems on your end
+      <br />
+      • Disagreement with quiz questions or answers
+      <br />
+      • Device compatibility issues on your end
+      <br />
+      • Misunderstanding of how the service works
+    </p>
+  </div>
+</div>
 
           <div className="content-card">
             <h2 className="section-title">
@@ -910,7 +908,7 @@ export default function RefundPolicyPage() {
             <a href="/faq">FAQ</a>
           </div>
           <div style={{ marginTop: 20, fontSize: 12, color: "#64748b" }}>
-            © 2025 VibraXX. Operated by Sermin Limited | Company No. 16778648
+            © 2026 VibraXX. Operated by Sermin Limited | Company No. 16778648
             <br />
             Registered in England & Wales | 71-75 Shelton Street, London, WC2H 9JQ, UK
           </div>
