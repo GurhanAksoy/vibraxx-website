@@ -643,7 +643,7 @@ export default function PrivacyPage() {
               </a>
             </p>
             <p style={{ marginTop: 12, fontSize: 13, color: "#94a3b8" }}>
-              Last Updated: December 11, 2025
+              Last Updated: March 15, 2026
             </p>
           </div>
 
@@ -807,7 +807,7 @@ export default function PrivacyPage() {
             <ul>
               <li><strong>Encryption:</strong> All data in transit is protected with TLS 1.3 encryption. Sensitive data at rest is encrypted using AES-256.</li>
               <li><strong>Access Controls:</strong> Role-based access restrictions ensure only authorized personnel can access personal data.</li>
-              <li><strong>Password Security:</strong> Passwords are hashed using bcrypt with individual salts (never stored in plain text).</li>
+              <li><strong>Password Security:</strong> User authentication is handled through secure OAuth providers (e.g., Google). Where passwords are used by integrated authentication systems, they are hashed using industry-standard cryptographic methods and are never stored in plain text.</li>
               <li><strong>PCI-DSS Compliance:</strong> Payment processing adheres to Payment Card Industry Data Security Standards via Stripe.</li>
               <li><strong>Regular Audits:</strong> We conduct periodic security assessments and vulnerability testing.</li>
               <li><strong>Incident Response:</strong> In the event of a data breach, we will notify affected users and relevant authorities within 72 hours as required by GDPR.</li>
@@ -971,7 +971,7 @@ export default function PrivacyPage() {
 
         <footer className="vx-footer">
           <div className="vx-footer-links">
-            <a href="/privacy">Privacy Policy</a>
+            <span>Privacy Policy</span>
             <span className="vx-footer-divider" />
             <a href="/terms">Terms & Conditions</a>
             <span className="vx-footer-divider" />
