@@ -264,7 +264,7 @@ export default function ProfilePage() {
       await supabase.auth.updateUser({ data: { full_name: editName.trim(), country: editCountry } });
       const { error } = await supabase
         .from("v2_users_public")
-        .update({ full_name: editName.trim(), updated_at: new Date().toISOString() })
+        .update({ full_name: editName.trim(), country: editCountry, updated_at: new Date().toISOString() })
         .eq("user_id", profileData.profile.id);
       if (!error) {
         setProfileData({ ...profileData, profile: { ...profileData.profile, full_name: editName.trim(), country: editCountry } });
