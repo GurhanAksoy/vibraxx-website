@@ -848,14 +848,14 @@ export default function HomePage() {
           position: relative; padding: 14px 28px; border-radius: 14px;
           border: none; cursor: pointer;
           display: inline-flex; align-items: center; justify-content: center;
-          gap: 10px; font-weight: 700; font-size: 16px;
+          gap: 10px; font-weight: 700; font-size: 15px;
           overflow: hidden; transition: transform 0.2s, box-shadow 0.2s;
-          width: 100%; max-width: 320px; color: white;
+          width: auto; min-width: clamp(180px, 50vw, 260px); color: white;
         }
         .vx-cta-btn:hover { transform: translateY(-2px); }
         .vx-cta-btn:active { transform: translateY(0); }
         @media (min-width: 640px) {
-          .vx-cta-btn { padding: 18px 34px; font-size: 18px; width: auto; min-width: 260px; }
+          .vx-cta-btn { padding: 18px 34px; font-size: 18px; min-width: 260px; }
         }
         .vx-cta-live { box-shadow: 0 20px 40px -16px rgba(139, 92, 246, 0.6); }
 
@@ -867,19 +867,22 @@ export default function HomePage() {
         .vx-stat-card {
           position: relative; display: flex; flex-direction: column;
           align-items: center; justify-content: center; text-align: center;
-          border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.08);
-          background: linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+          border-radius: 16px;
+          border: 1px solid rgba(34, 197, 94, 0.35);
+          background: linear-gradient(135deg, rgba(34, 197, 94, 0.04), rgba(255, 255, 255, 0.01));
           backdrop-filter: blur(20px); min-height: 120px; padding: 1.5rem;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden;
+          box-shadow: 0 0 18px rgba(34, 197, 94, 0.12), inset 0 1px 0 rgba(34, 197, 94, 0.08);
         }
         .vx-stat-card::before {
           content: ""; position: absolute; top: 0; left: -100px; right: -100px; height: 1px;
-          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+          background: linear-gradient(90deg, transparent, rgba(34, 197, 94, 0.4), transparent);
         }
         .vx-stat-card:hover {
-          transform: translateY(-2px); border-color: rgba(255, 255, 255, 0.12);
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-          background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+          transform: translateY(-2px);
+          border-color: rgba(34, 197, 94, 0.6);
+          box-shadow: 0 0 28px rgba(34, 197, 94, 0.25), inset 0 1px 0 rgba(34, 197, 94, 0.12);
+          background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(255, 255, 255, 0.02));
         }
         @media (min-width: 640px) { .vx-stat-card { min-height: 150px; padding: 1.75rem; } }
         .vx-stat-label { color: #6b7280; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; }
@@ -925,8 +928,8 @@ export default function HomePage() {
           .vx-countdown-time { font-size: 34px !important; }
           .vx-hero-title { font-size: 36px !important; line-height: 1.2 !important; padding: 0 8px; }
           .vx-hero-subtitle { font-size: 16px !important; padding: 0 12px; }
-          .vx-cta-wrap { flex-direction: column !important; gap: 12px !important; width: 100%; padding: 0 4px; }
-          .vx-cta-btn { width: 100% !important; max-width: 100% !important; font-size: 14px !important; }
+          .vx-cta-wrap { flex-direction: column !important; gap: 12px !important; width: 100%; padding: 0 16px; }
+          .vx-cta-btn { width: auto !important; min-width: clamp(200px, 70vw, 300px) !important; font-size: 14px !important; }
           .vx-livebar { padding: 10px 0 !important; }
           .vx-livebar-inner { font-size: 11px !important; gap: 6px !important; flex-wrap: wrap; justify-content: center; }
           .vx-stats-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
