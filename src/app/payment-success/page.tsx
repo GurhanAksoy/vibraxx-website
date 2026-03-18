@@ -526,21 +526,21 @@ function SuccessContent() {
             border: "1px solid rgba(251,191,36,.3)",
             marginBottom: "clamp(20px,4vw,28px)",
             animation: "slideUp .5s ease-out .5s both",
+            textAlign: "center",
           }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 12 }}>
               <Trophy style={{ width: 20, height: 20, color: "#fbbf24", flexShrink: 0 }} />
               <span style={{ fontSize: "clamp(14px,3vw,16px)", fontWeight: 800, color: "#fbbf24" }}>
                 Monthly Prize Pool
               </span>
             </div>
-            <p style={{ fontSize: "clamp(12px,2.5vw,14px)", color: "#94a3b8", lineHeight: 1.6, margin: 0 }}>
+            <p style={{ fontSize: "clamp(12px,2.5vw,14px)", color: "#94a3b8", lineHeight: 1.7, margin: "0 auto", maxWidth: 560 }}>
               The up to <strong style={{ color: "#fbbf24" }}>£1,000 prize pool</strong> activates once the monthly paid entry threshold is reached.
               Participation fees are non-refundable as the quiz service is fully provided regardless of prize pool activation.{" "}
               <strong style={{ color: "#cbd5e1" }}>Terms & Conditions apply.</strong>
-              <br />
-              <span style={{ fontSize: "clamp(10px,2vw,11px)", color: "#334155", marginTop: 6, display: "block" }}>
-                Skill-based competition. No element of chance.
-              </span>
+            </p>
+            <p style={{ fontSize: "clamp(10px,2vw,12px)", color: "#334155", marginTop: 10, fontStyle: "italic" }}>
+              Skill-based competition. No element of chance.
             </p>
           </div>
 
