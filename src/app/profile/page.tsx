@@ -16,7 +16,7 @@ const CountryPicker = dynamicImport(
 import Footer from "@/components/Footer";
 import {
   User, Mail, Trophy, Target, TrendingUp, Calendar, Crown,
-  LogOut, Edit, Save, X, Send, CheckCircle, BarChart3, Zap,
+  Edit, Save, X, Send, CheckCircle, BarChart3, Zap,
   Gift, Activity, Sparkles, ShoppingCart,
   AlertCircle, Volume2, VolumeX, Clock, Star, Flame,
 } from "lucide-react";
@@ -364,28 +364,21 @@ export default function ProfilePage() {
           <header className="profile-header" style={{ maxWidth: "min(1200px,100%)", margin: "0 auto clamp(24px,5vw,40px)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             {/* Sol: Logo */}
             <div onClick={() => router.push("/")} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-              <div style={{ position: "relative", width: "clamp(48px,9vw,64px)", height: "clamp(48px,9vw,64px)", borderRadius: "50%", padding: 3, background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)", boxShadow: "0 0 20px rgba(124,58,237,.5)", flexShrink: 0, overflow: "hidden" }}>
+              <div style={{ position: "relative", width: "clamp(64px,10vw,80px)", height: "clamp(64px,10vw,80px)", borderRadius: "50%", padding: 4, background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)", boxShadow: "0 0 24px rgba(124,58,237,.6)", flexShrink: 0, overflow: "hidden" }}>
                 <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: "50%", background: "#020817", overflow: "hidden" }}>
-                  <Image src="/images/logo.png" alt="VibraXX" fill sizes="60px" style={{ objectFit: "contain", padding: "12%" }} />
+                  <Image src="/images/logo.png" alt="VibraXX" fill sizes="80px" style={{ objectFit: "contain", padding: "12%" }} />
                 </div>
               </div>
               <span style={{ fontSize: "clamp(16px,3vw,22px)", fontWeight: 900, background: "linear-gradient(90deg,#fbbf24,#f59e0b)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", whiteSpace: "nowrap" }}>
                 Profile
               </span>
             </div>
-            {/* Sağ: Ses + Logout */}
+            {/* Sağ: Ses */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
               <button onClick={toggleMusic}
                 style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 10, border: "2px solid rgba(139,92,246,.5)", background: isMusicPlaying ? "linear-gradient(135deg,rgba(139,92,246,.95),rgba(124,58,237,.95))" : "rgba(15,23,42,.8)", cursor: "pointer", transition: "all .3s", boxShadow: isMusicPlaying ? "0 0 15px rgba(139,92,246,.5)" : "none" }}
                 title={isMusicPlaying ? "Mute" : "Play Music"}>
                 {isMusicPlaying ? <Volume2 style={{ width: 18, height: 18, color: "white" }} /> : <VolumeX style={{ width: 18, height: 18, color: "#94a3b8" }} />}
-              </button>
-              <button onClick={handleLogout}
-                style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 12, border: "2px solid rgba(239,68,68,.5)", background: "rgba(15,23,42,.8)", color: "#fca5a5", fontSize: 14, fontWeight: 700, cursor: "pointer", transition: "all .3s" }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = "#ef4444"; e.currentTarget.style.background = "rgba(239,68,68,.2)"; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(239,68,68,.5)"; e.currentTarget.style.background = "rgba(15,23,42,.8)"; }}>
-                <LogOut style={{ width: 18, height: 18 }} />
-                <span className="mobile-hide">Logout</span>
               </button>
             </div>
           </header>
