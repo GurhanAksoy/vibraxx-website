@@ -123,18 +123,32 @@ interface WeeklyChallenge {
 // HELPERS
 // ─────────────────────────────────────────────
 
+const FLAG_MAP: Record<string, string> = {
+  AF:"🇦🇫",AL:"🇦🇱",DZ:"🇩🇿",AD:"🇦🇩",AO:"🇦🇴",AG:"🇦🇬",AR:"🇦🇷",AM:"🇦🇲",AU:"🇦🇺",AT:"🇦🇹",
+  AZ:"🇦🇿",BS:"🇧🇸",BH:"🇧🇭",BD:"🇧🇩",BB:"🇧🇧",BY:"🇧🇾",BE:"🇧🇪",BZ:"🇧🇿",BJ:"🇧🇯",BT:"🇧🇹",
+  BO:"🇧🇴",BA:"🇧🇦",BW:"🇧🇼",BR:"🇧🇷",BN:"🇧🇳",BG:"🇧🇬",BF:"🇧🇫",BI:"🇧🇮",CV:"🇨🇻",KH:"🇰🇭",
+  CM:"🇨🇲",CA:"🇨🇦",CF:"🇨🇫",TD:"🇹🇩",CL:"🇨🇱",CN:"🇨🇳",CO:"🇨🇴",KM:"🇰🇲",CG:"🇨🇬",CD:"🇨🇩",
+  CR:"🇨🇷",CI:"🇨🇮",HR:"🇭🇷",CU:"🇨🇺",CY:"🇨🇾",CZ:"🇨🇿",DK:"🇩🇰",DJ:"🇩🇯",DM:"🇩🇲",DO:"🇩🇴",
+  EC:"🇪🇨",EG:"🇪🇬",SV:"🇸🇻",GQ:"🇬🇶",ER:"🇪🇷",EE:"🇪🇪",SZ:"🇸🇿",ET:"🇪🇹",FJ:"🇫🇯",FI:"🇫🇮",
+  FR:"🇫🇷",GA:"🇬🇦",GM:"🇬🇲",GE:"🇬🇪",DE:"🇩🇪",GH:"🇬🇭",GR:"🇬🇷",GD:"🇬🇩",GT:"🇬🇹",GN:"🇬🇳",
+  GW:"🇬🇼",GY:"🇬🇾",HT:"🇭🇹",HN:"🇭🇳",HU:"🇭🇺",IS:"🇮🇸",IN:"🇮🇳",ID:"🇮🇩",IR:"🇮🇷",IQ:"🇮🇶",
+  IE:"🇮🇪",IL:"🇮🇱",IT:"🇮🇹",JM:"🇯🇲",JP:"🇯🇵",JO:"🇯🇴",KZ:"🇰🇿",KE:"🇰🇪",KI:"🇰🇮",KW:"🇰🇼",
+  KG:"🇰🇬",LA:"🇱🇦",LV:"🇱🇻",LB:"🇱🇧",LS:"🇱🇸",LR:"🇱🇷",LY:"🇱🇾",LI:"🇱🇮",LT:"🇱🇹",LU:"🇱🇺",
+  MG:"🇲🇬",MW:"🇲🇼",MY:"🇲🇾",MV:"🇲🇻",ML:"🇲🇱",MT:"🇲🇹",MH:"🇲🇭",MR:"🇲🇷",MU:"🇲🇺",MX:"🇲🇽",
+  FM:"🇫🇲",MD:"🇲🇩",MC:"🇲🇨",MN:"🇲🇳",ME:"🇲🇪",MA:"🇲🇦",MZ:"🇲🇿",MM:"🇲🇲",NA:"🇳🇦",NR:"🇳🇷",
+  NP:"🇳🇵",NL:"🇳🇱",NZ:"🇳🇿",NI:"🇳🇮",NE:"🇳🇪",NG:"🇳🇬",NO:"🇳🇴",OM:"🇴🇲",PK:"🇵🇰",PW:"🇵🇼",
+  PA:"🇵🇦",PG:"🇵🇬",PY:"🇵🇾",PE:"🇵🇪",PH:"🇵🇭",PL:"🇵🇱",PT:"🇵🇹",QA:"🇶🇦",RO:"🇷🇴",RU:"🇷🇺",
+  RW:"🇷🇼",KN:"🇰🇳",LC:"🇱🇨",VC:"🇻🇨",WS:"🇼🇸",SM:"🇸🇲",ST:"🇸🇹",SA:"🇸🇦",SN:"🇸🇳",RS:"🇷🇸",
+  SC:"🇸🇨",SL:"🇸🇱",SG:"🇸🇬",SK:"🇸🇰",SI:"🇸🇮",SB:"🇸🇧",SO:"🇸🇴",ZA:"🇿🇦",SS:"🇸🇸",ES:"🇪🇸",
+  LK:"🇱🇰",SD:"🇸🇩",SR:"🇸🇷",SE:"🇸🇪",CH:"🇨🇭",SY:"🇸🇾",TW:"🇹🇼",TJ:"🇹🇯",TZ:"🇹🇿",TH:"🇹🇭",
+  TL:"🇹🇱",TG:"🇹🇬",TO:"🇹🇴",TT:"🇹🇹",TN:"🇹🇳",TR:"🇹🇷",TM:"🇹🇲",TV:"🇹🇻",UG:"🇺🇬",UA:"🇺🇦",
+  AE:"🇦🇪",GB:"🇬🇧",US:"🇺🇸",UY:"🇺🇾",UZ:"🇺🇿",VU:"🇻🇺",VE:"🇻🇪",VN:"🇻🇳",YE:"🇾🇪",ZM:"🇿🇲",ZW:"🇿🇼",
+};
+
 const countryToFlag = (code: string): string => {
-  if (!code) return '🌍';
+  if (!code || code === '🌍') return '🌍';
   const clean = code.trim().toUpperCase();
-  // Zaten emoji ise direkt dön
-  if (clean === '🌍' || clean.length > 2) return code;
-  // ISO 2 harf kodu → bayrak emoji
-  if (clean.length === 2 && /^[A-Z]{2}$/.test(clean)) {
-    return clean.split('').map(c =>
-      String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)
-    ).join('');
-  }
-  return code;
+  return FLAG_MAP[clean] || code;
 };
 
 // ─────────────────────────────────────────────
@@ -348,31 +362,32 @@ export default function ProfilePage() {
 
           {/* ── HEADER ── */}
           <header className="profile-header" style={{ maxWidth: "min(1200px,100%)", margin: "0 auto clamp(24px,5vw,40px)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              {/* Logo — ana sayfaya dönüş */}
-              <div onClick={() => router.push("/")} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                <div style={{ position: "relative", width: "clamp(48px,9vw,64px)", height: "clamp(48px,9vw,64px)", borderRadius: "50%", padding: 3, background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)", boxShadow: "0 0 20px rgba(124,58,237,.5)", flexShrink: 0, overflow: "hidden" }}>
-                  <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: "50%", background: "#020817", overflow: "hidden" }}>
-                    <Image src="/images/logo.png" alt="VibraXX" fill sizes="60px" style={{ objectFit: "contain", padding: "12%" }} />
-                  </div>
+            {/* Sol: Logo */}
+            <div onClick={() => router.push("/")} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+              <div style={{ position: "relative", width: "clamp(48px,9vw,64px)", height: "clamp(48px,9vw,64px)", borderRadius: "50%", padding: 3, background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)", boxShadow: "0 0 20px rgba(124,58,237,.5)", flexShrink: 0, overflow: "hidden" }}>
+                <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: "50%", background: "#020817", overflow: "hidden" }}>
+                  <Image src="/images/logo.png" alt="VibraXX" fill sizes="60px" style={{ objectFit: "contain", padding: "12%" }} />
                 </div>
-                <span style={{ fontSize: "clamp(16px,3vw,22px)", fontWeight: 900, background: "linear-gradient(90deg,#fbbf24,#f59e0b)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", whiteSpace: "nowrap" }}>
-                  Profile
-                </span>
               </div>
+              <span style={{ fontSize: "clamp(16px,3vw,22px)", fontWeight: 900, background: "linear-gradient(90deg,#fbbf24,#f59e0b)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", whiteSpace: "nowrap" }}>
+                Profile
+              </span>
+            </div>
+            {/* Sağ: Ses + Logout */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
               <button onClick={toggleMusic}
                 style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 10, border: "2px solid rgba(139,92,246,.5)", background: isMusicPlaying ? "linear-gradient(135deg,rgba(139,92,246,.95),rgba(124,58,237,.95))" : "rgba(15,23,42,.8)", cursor: "pointer", transition: "all .3s", boxShadow: isMusicPlaying ? "0 0 15px rgba(139,92,246,.5)" : "none" }}
                 title={isMusicPlaying ? "Mute" : "Play Music"}>
                 {isMusicPlaying ? <Volume2 style={{ width: 18, height: 18, color: "white" }} /> : <VolumeX style={{ width: 18, height: 18, color: "#94a3b8" }} />}
               </button>
+              <button onClick={handleLogout}
+                style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 12, border: "2px solid rgba(239,68,68,.5)", background: "rgba(15,23,42,.8)", color: "#fca5a5", fontSize: 14, fontWeight: 700, cursor: "pointer", transition: "all .3s" }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = "#ef4444"; e.currentTarget.style.background = "rgba(239,68,68,.2)"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(239,68,68,.5)"; e.currentTarget.style.background = "rgba(15,23,42,.8)"; }}>
+                <LogOut style={{ width: 18, height: 18 }} />
+                <span className="mobile-hide">Logout</span>
+              </button>
             </div>
-            <button onClick={handleLogout}
-              style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 12, border: "2px solid rgba(239,68,68,.5)", background: "rgba(15,23,42,.8)", color: "#fca5a5", fontSize: 14, fontWeight: 700, cursor: "pointer", transition: "all .3s" }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "#ef4444"; e.currentTarget.style.background = "rgba(239,68,68,.2)"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(239,68,68,.5)"; e.currentTarget.style.background = "rgba(15,23,42,.8)"; }}>
-              <LogOut style={{ width: 18, height: 18 }} />
-              <span className="mobile-hide">Logout</span>
-            </button>
           </header>
 
           <main style={{ maxWidth: "min(1200px,100%)", margin: "0 auto" }}>
