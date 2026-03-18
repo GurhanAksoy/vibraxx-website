@@ -1060,29 +1060,37 @@ export default function HomePage() {
                     onClick={handlePWAInstall}
                     aria-label="Install App"
                     style={{
-                      padding: "9px 16px", borderRadius: 12,
-                      border: "1px solid rgba(139,92,246,0.5)",
-                      background: "linear-gradient(135deg, rgba(124,58,237,0.25), rgba(168,85,247,0.2))",
+                      padding: "8px 14px", borderRadius: 12,
+                      border: "1px solid rgba(139,92,246,0.6)",
+                      background: "linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.25))",
                       color: "white", fontSize: 12, fontWeight: 700,
                       cursor: "pointer", display: "inline-flex",
-                      alignItems: "center", gap: 7, transition: "all 0.3s",
-                      boxShadow: "0 0 16px rgba(124,58,237,0.3), inset 0 1px 0 rgba(255,255,255,0.1)",
-                      letterSpacing: "0.04em",
+                      alignItems: "center", gap: 7, transition: "all 0.25s",
+                      boxShadow: "0 0 16px rgba(124,58,237,0.35), inset 0 1px 0 rgba(255,255,255,0.12)",
                       position: "relative", overflow: "hidden",
+                      letterSpacing: "0.03em",
                     }}
                     onMouseEnter={e => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(167,139,250,0.8)";
-                      (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 24px rgba(124,58,237,0.5), inset 0 1px 0 rgba(255,255,255,0.15)";
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(167,139,250,0.9)";
+                      (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 24px rgba(124,58,237,0.55), inset 0 1px 0 rgba(255,255,255,0.18)";
+                      (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
                     }}
                     onMouseLeave={e => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(139,92,246,0.5)";
-                      (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 16px rgba(124,58,237,0.3), inset 0 1px 0 rgba(255,255,255,0.1)";
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(139,92,246,0.6)";
+                      (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 16px rgba(124,58,237,0.35), inset 0 1px 0 rgba(255,255,255,0.12)";
+                      (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
                     }}
                   >
-                    <Smartphone style={{ width: 14, height: 14, color: "#c4b5fd", flexShrink: 0 }} />
+                    <div style={{
+                      position: "absolute", inset: 0, pointerEvents: "none",
+                      background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.07), transparent)",
+                      animation: "slide-shine 3s ease-in-out infinite",
+                    }} />
+                    <Smartphone style={{ width: 14, height: 14, color: "#c4b5fd", flexShrink: 0, position: "relative", zIndex: 1 }} />
                     <span style={{
                       background: "linear-gradient(135deg, #e9d5ff, #c4b5fd)",
                       WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                      fontWeight: 800, position: "relative", zIndex: 1,
                     }}>Install App</span>
                   </button>
                 )}
@@ -1444,6 +1452,82 @@ export default function HomePage() {
                 </div>
               </button>
             </div>
+
+            {/* PWA Install Banner — Premium */}
+            {showPWAPrompt && (
+              <div style={{ textAlign: "center", marginBottom: 40, padding: "0 16px" }}>
+                <button
+                  onClick={handlePWAInstall}
+                  aria-label="Install VibraXX App"
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 14,
+                    padding: "16px 24px", borderRadius: 18, border: "none",
+                    cursor: "pointer", position: "relative", overflow: "hidden",
+                    background: "linear-gradient(135deg, #1e1b4b 0%, #2e1065 50%, #1e1b4b 100%)",
+                    boxShadow: "0 0 0 1px rgba(139,92,246,0.6), 0 8px 32px rgba(124,58,237,0.4), 0 0 60px rgba(139,92,246,0.15)",
+                    transition: "transform 0.2s, box-shadow 0.2s",
+                    width: "100%", maxWidth: 420,
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)";
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 0 1px rgba(167,139,250,0.8), 0 12px 40px rgba(124,58,237,0.6), 0 0 80px rgba(139,92,246,0.2)";
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 0 1px rgba(139,92,246,0.6), 0 8px 32px rgba(124,58,237,0.4), 0 0 60px rgba(139,92,246,0.15)";
+                  }}
+                >
+                  {/* Shine */}
+                  <div style={{
+                    position: "absolute", inset: 0, pointerEvents: "none",
+                    background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent)",
+                    animation: "slide-shine 3s ease-in-out infinite",
+                  }} />
+                  {/* Top line */}
+                  <div style={{
+                    position: "absolute", top: 0, left: 0, right: 0, height: 1,
+                    background: "linear-gradient(90deg, transparent, rgba(167,139,250,0.6), transparent)",
+                    pointerEvents: "none",
+                  }} />
+
+                  {/* Icon */}
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                    background: "linear-gradient(135deg, #7c3aed, #a855f7)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    boxShadow: "0 0 20px rgba(124,58,237,0.6)",
+                    position: "relative", zIndex: 1,
+                  }}>
+                    <Smartphone style={{ width: 22, height: 22, color: "white" }} />
+                  </div>
+
+                  {/* Text */}
+                  <div style={{ textAlign: "left", flex: 1, position: "relative", zIndex: 1 }}>
+                    <div style={{
+                      fontSize: "clamp(14px,3.5vw,16px)", fontWeight: 800,
+                      background: "linear-gradient(135deg, #e9d5ff, #c4b5fd, #a78bfa)",
+                      WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                      marginBottom: 3,
+                    }}>
+                      Install VibraXX App
+                    </div>
+                    <div style={{ fontSize: 11, color: "#7c3aed", fontWeight: 600 }}>
+                      Fast • No browser needed • Always ready
+                    </div>
+                  </div>
+
+                  {/* Badge */}
+                  <div style={{
+                    padding: "5px 10px", borderRadius: 8, flexShrink: 0,
+                    background: "linear-gradient(135deg, rgba(124,58,237,0.4), rgba(168,85,247,0.3))",
+                    border: "1px solid rgba(167,139,250,0.4)",
+                    fontSize: 11, fontWeight: 800, color: "#c4b5fd",
+                    textTransform: "uppercase", letterSpacing: "0.06em",
+                    position: "relative", zIndex: 1,
+                  }}>FREE</div>
+                </button>
+              </div>
+            )}
 
             {/* Stats Cards */}
             <div className="vx-stats-grid">
