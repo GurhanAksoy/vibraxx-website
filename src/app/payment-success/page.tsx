@@ -466,7 +466,7 @@ function SuccessContent() {
           <div className="features-card">
             <div style={{
               display: "flex", alignItems: "center", gap: 10,
-              marginBottom: clamp(16, 3, 20),
+              marginBottom: 16,
             }}>
               <div style={{
                 width: 40, height: 40, borderRadius: 10, flexShrink: 0,
