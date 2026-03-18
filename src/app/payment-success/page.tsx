@@ -308,6 +308,10 @@ function SuccessContent() {
 
         @media (max-width: 640px) {
           .mobile-hide { display: none !important; }
+          .action-grid { grid-template-columns: 1fr !important; }
+          .success-main { padding-top: 32px !important; }
+          .credits-card { padding: 20px 16px !important; }
+          .features-card { padding: 16px !important; }
         }
       `}</style>
 
@@ -386,13 +390,21 @@ function SuccessContent() {
             </h1>
 
             <p className="success-subtitle">
-              Get ready to compete in the Global Live Quiz.{" "}
+              Get ready to compete in the Global Live Quiz.
+            </p>
+            <p style={{
+              fontSize: "clamp(14px,3vw,17px)",
+              fontWeight: 700, marginTop: 8,
+              textAlign: "center", whiteSpace: "nowrap",
+              overflow: "hidden", textOverflow: "ellipsis",
+              maxWidth: "100%", padding: "0 16px",
+            }}>
               <strong style={{ color: "#fbbf24" }}>Compete for up to £1,000.</strong>{" "}
               <strong style={{ color: "#a78bfa" }}>Skill Wins. Not Luck.*</strong>
             </p>
             <div style={{
               fontSize: "clamp(10px,2vw,12px)", color: "#475569",
-              marginTop: 8, fontStyle: "italic",
+              marginTop: 6, fontStyle: "italic", textAlign: "center",
             }}>
               *Terms & Conditions apply.
             </div>
