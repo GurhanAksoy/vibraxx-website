@@ -206,10 +206,29 @@ export default function BuyPage() {
     if (!user) { router.push("/"); return; }
     setProcessingPackageId(pkg.id);
     try {
+      // Para birimi tespiti — locale + timezone birlikte kullan
+      const detectCurrency = (): string => {
+        try {
+          const locale   = navigator.language || "en-GB";
+          const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+
+          if (locale.startsWith("en-AU") || timezone.startsWith("Australia")) return "AUD";
+          if (locale.startsWith("en-CA") || timezone.startsWith("America/Toronto") || timezone.startsWith("America/Vancouver")) return "CAD";
+          if (locale.startsWith("en-US") || timezone.startsWith("America/New_York") || timezone.startsWith("America/Los_Angeles") || timezone.startsWith("America/Chicago")) return "USD";
+          if (["de", "fr", "it", "es", "nl", "pt", "fi", "el"].some(l => locale.startsWith(l))) return "EUR";
+          if (locale.startsWith("en-GB") || timezone.startsWith("Europe/London")) return "GBP";
+          return "GBP"; // default
+        } catch {
+          return "GBP";
+        }
+      };
+
+      const currency = detectCurrency();
+
       const res  = await fetch("/api/create-checkout-session", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ package: pkg.id, user_id: user.id }),
+        body:    JSON.stringify({ package: pkg.id, user_id: user.id, currency }),
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
