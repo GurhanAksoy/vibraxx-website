@@ -15,6 +15,8 @@ import {
   CheckCircle,
   AlertCircle,
   Flame,
+  Gift,
+  Smartphone,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { playMenuMusic, stopMenuMusic } from "@/lib/audioManager";
@@ -33,105 +35,113 @@ const StatCard = memo(({ icon: Icon, value, label }: any) => (
 StatCard.displayName = "StatCard";
 
 const ChampionCard = memo(({ champion }: any) => {
-  const Icon = champion.icon;
+  const isEmpty = !champion.name || champion.name === "TBA" || champion.score === 0;
 
-  if (!champion.name || champion.name === "TBA" || champion.score === 0) {
+  // Period → leaderboard renk/border sistemi
+  const periodStyle = {
+    Today:   { border: "2px solid rgba(249,115,22,0.7)",  bg: "linear-gradient(135deg,rgba(249,115,22,0.18),rgba(234,88,12,0.12))",  glow: "rgba(249,115,22,0.35)",  gradient: "linear-gradient(90deg,#f97316,#ea580c)",  rankBg: "linear-gradient(135deg,#f97316,#ea580c)" },
+    Weekly:  { border: "2px solid rgba(192,132,252,0.7)", bg: "linear-gradient(135deg,rgba(192,132,252,0.18),rgba(139,92,246,0.12))", glow: "rgba(192,132,252,0.3)",  gradient: "linear-gradient(90deg,#c084fc,#a855f7)",  rankBg: "linear-gradient(135deg,#c084fc,#a855f7)" },
+    Monthly: { border: "3px solid rgba(251,191,36,0.8)",  bg: "linear-gradient(135deg,rgba(251,191,36,0.2),rgba(245,158,11,0.14))", glow: "rgba(251,191,36,0.5)",  gradient: "linear-gradient(90deg,#fbbf24,#f59e0b,#fbbf24)", rankBg: "linear-gradient(135deg,#fbbf24,#f59e0b)" },
+  }[champion.period as "Today" | "Weekly" | "Monthly"];
+
+  const periodEmoji = { Today: "🏅", Weekly: "🎟️", Monthly: "👑" }[champion.period as "Today" | "Weekly" | "Monthly"];
+
+  if (isEmpty) {
     return (
-      <div className="vx-champ-card">
-        <div
-          style={{
-            width: 64,
-            height: 64,
-            margin: "0 auto 16px",
-            borderRadius: 16,
-            background: `linear-gradient(135deg, ${champion.color}15, ${champion.color}08)`,
-            border: `1px solid ${champion.color}30`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Icon style={{ width: 28, height: 28, color: champion.color }} />
-        </div>
-        <div
-          style={{
-            fontSize: 10,
-            fontWeight: 600,
-            textTransform: "uppercase",
-            letterSpacing: "0.15em",
-            color: "#6b7280",
-            marginBottom: 8,
-          }}
-        >
+      <div
+        style={{
+          padding: "clamp(16px,3.5vw,24px)",
+          borderRadius: "clamp(14px,4vw,22px)",
+          border: periodStyle.border,
+          background: periodStyle.bg,
+          backdropFilter: "blur(20px)",
+          textAlign: "center",
+          display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+          boxShadow: `0 0 24px ${periodStyle.glow}`,
+        }}
+      >
+        <div style={{ fontSize: 36, lineHeight: 1, marginBottom: 4 }}>{periodEmoji}</div>
+        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", color: "#6b7280" }}>
           {champion.period} Champion
         </div>
-        <div
-          style={{
-            fontSize: 14,
-            fontWeight: 600,
-            marginBottom: 8,
-            color: "#94a3b8",
-            textAlign: "center",
-            lineHeight: 1.4,
-          }}
-        >
-          {champion.period === "Today" && "Today's rankings reset at midnight UTC"}
-          {champion.period === "Weekly" && "Weekly rankings reset every Monday"}
-          {champion.period === "Monthly" && "Monthly rankings reset at month end (UTC)"}
+        <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.5, fontWeight: 500 }}>
+          {champion.period === "Today" && "Resets at midnight UTC"}
+          {champion.period === "Weekly" && "Resets every Monday UTC"}
+          {champion.period === "Monthly" && "Resets at month end UTC"}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="vx-champ-card">
-      <div
-        style={{
-          width: 64,
-          height: 64,
-          margin: "0 auto 16px",
-          borderRadius: 16,
-          background: `linear-gradient(135deg, ${champion.color}15, ${champion.color}08)`,
-          border: `1px solid ${champion.color}30`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Icon style={{ width: 28, height: 28, color: champion.color }} />
+    <div
+      style={{
+        padding: "clamp(16px,3.5vw,24px)",
+        borderRadius: "clamp(14px,4vw,22px)",
+        border: periodStyle.border,
+        background: periodStyle.bg,
+        backdropFilter: "blur(20px)",
+        textAlign: "center",
+        boxShadow: `0 0 32px ${periodStyle.glow}`,
+        transition: "transform 0.3s",
+      }}
+      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = "translateY(-6px)"; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)"; }}
+    >
+      {/* Avatar ring */}
+      <div style={{
+        position: "relative",
+        width: "clamp(64px,14vw,88px)", height: "clamp(64px,14vw,88px)",
+        margin: "0 auto 14px",
+        borderRadius: "50%", padding: 3,
+        background: periodStyle.rankBg,
+        boxShadow: `0 0 24px ${periodStyle.glow}`,
+      }}>
+        <div style={{
+          width: "100%", height: "100%", borderRadius: "50%",
+          background: "#1e293b", display: "flex", alignItems: "center",
+          justifyContent: "center", fontSize: "clamp(26px,6vw,40px)",
+          overflow: "hidden",
+        }}>
+          {champion.avatarUrl ? (
+            <Image src={champion.avatarUrl} alt={champion.name} fill sizes="88px" style={{ objectFit: "cover", borderRadius: "50%" }} />
+          ) : (
+            <span>{periodEmoji}</span>
+          )}
+        </div>
+        {/* Rank badge */}
+        <div style={{
+          position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%)",
+          width: "clamp(22px,5vw,30px)", height: "clamp(22px,5vw,30px)", borderRadius: "50%",
+          background: periodStyle.rankBg,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          border: "2px solid #0f172a", color: "#0f172a", fontWeight: 900,
+          fontSize: "clamp(9px,2vw,12px)",
+        }}>1</div>
       </div>
-      <div
-        style={{
-          fontSize: 10,
-          fontWeight: 600,
-          textTransform: "uppercase",
-          letterSpacing: "0.15em",
-          color: "#6b7280",
-          marginBottom: 8,
-        }}
-      >
+
+      {/* Period label */}
+      <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", color: "#6b7280", marginBottom: 6 }}>
         {champion.period} Champion
       </div>
-      <div
-        style={{
-          fontSize: 18,
-          fontWeight: 700,
-          marginBottom: 8,
-          color: "#ffffff",
-        }}
-      >
+
+      {/* Name */}
+      <div style={{
+        fontSize: "clamp(14px,3vw,18px)", fontWeight: 800, marginBottom: 8,
+        color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+      }}>
         {champion.name}
       </div>
-      <div
-        style={{
-          fontSize: 24,
-          fontWeight: 800,
-          color: champion.color,
-          lineHeight: 1,
-        }}
-      >
-        {champion.score.toLocaleString()} pts
+
+      {/* Score */}
+      <div style={{
+        fontSize: "clamp(20px,5vw,30px)", fontWeight: 900, lineHeight: 1, marginBottom: 10,
+        background: periodStyle.gradient,
+        backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+      }}>
+        {champion.score.toLocaleString()}
       </div>
+      <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em" }}>pts</div>
     </div>
   );
 });
@@ -297,7 +307,7 @@ const NoRoundsModal = memo(({ onBuyRounds, onCancel }: any) => (
         </h3>
         <p style={{ fontSize: 15, color: "#94a3b8", lineHeight: 1.6 }}>
           You need to purchase rounds to enter the Live Quiz lobby and compete for the{" "}
-          <strong style={{ color: "#fbbf24" }}>£1000 monthly prize</strong>!
+          <strong style={{ color: "#fbbf24" }}>up to £1,000 monthly prize pool</strong>!
         </p>
       </div>
       <div
@@ -409,7 +419,10 @@ export default function HomePage() {
       }
       if (!mountedRef.current) return;
 
-      if (data.active_players !== undefined)     setActivePlayers(data.active_players);
+      if (data.active_players !== undefined) {
+        console.log("[Homepage] active_players from RPC:", data.active_players);
+        setActivePlayers(data.active_players);
+      }
       if (data.live_credits !== undefined)       setUserRounds(data.live_credits ?? 0);
       if (data.total_rounds !== undefined)       setTotalRounds(data.total_rounds);
       if (data.total_participants !== undefined) setTotalParticipants(data.total_participants);
@@ -425,6 +438,7 @@ export default function HomePage() {
           period: "Today",
           name: data.today_champion_name || "TBA",
           score: data.today_champion_score || 0,
+          avatarUrl: data.today_champion_avatar || "",
           color: colors[0],
           icon: icons[0],
         },
@@ -432,6 +446,7 @@ export default function HomePage() {
           period: "Weekly",
           name: data.weekly_champion_name || "TBA",
           score: data.weekly_champion_score || 0,
+          avatarUrl: data.weekly_champion_avatar || "",
           color: colors[1],
           icon: icons[1],
         },
@@ -439,6 +454,7 @@ export default function HomePage() {
           period: "Monthly",
           name: data.monthly_champion_name || "TBA",
           score: data.monthly_champion_score || 0,
+          avatarUrl: data.monthly_champion_avatar || "",
           color: colors[2],
           icon: icons[2],
         },
@@ -984,7 +1000,9 @@ export default function HomePage() {
               <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                 <div
                   style={{
-                    position: "relative", width: 80, height: 80, borderRadius: "9999px",
+                    position: "relative",
+                    width: "clamp(48px,10vw,80px)", height: "clamp(48px,10vw,80px)",
+                    borderRadius: "9999px",
                     padding: 4, background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)",
                     boxShadow: "0 0 30px rgba(124,58,237,0.6)", flexShrink: 0,
                   }}
@@ -1037,26 +1055,31 @@ export default function HomePage() {
                   <button
                     onClick={handlePWAInstall}
                     aria-label="Install App"
-                    className="vx-hide-mobile"
                     style={{
-                      padding: "10px 20px", borderRadius: 16, border: "2px solid transparent",
-                      backgroundImage: `linear-gradient(rgba(15,23,42,0.95), rgba(15,23,42,0.95)), linear-gradient(135deg, #7c3aed, #a855f7, #c084fc, #7c3aed)`,
-                      backgroundOrigin: "border-box", backgroundClip: "padding-box, border-box",
-                      color: "white", fontSize: 13, fontWeight: 700, textTransform: "uppercase",
-                      letterSpacing: "0.08em", cursor: "pointer", display: "inline-flex",
-                      alignItems: "center", gap: 8, transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+                      padding: "9px 16px", borderRadius: 12,
+                      border: "1px solid rgba(139,92,246,0.5)",
+                      background: "linear-gradient(135deg, rgba(124,58,237,0.25), rgba(168,85,247,0.2))",
+                      color: "white", fontSize: 12, fontWeight: 700,
+                      cursor: "pointer", display: "inline-flex",
+                      alignItems: "center", gap: 7, transition: "all 0.3s",
+                      boxShadow: "0 0 16px rgba(124,58,237,0.3), inset 0 1px 0 rgba(255,255,255,0.1)",
+                      letterSpacing: "0.04em",
                       position: "relative", overflow: "hidden",
-                      boxShadow: "0 0 20px rgba(124,58,237,0.4), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)",
-                      animation: "pulse-glow 3s ease-in-out infinite",
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(167,139,250,0.8)";
+                      (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 24px rgba(124,58,237,0.5), inset 0 1px 0 rgba(255,255,255,0.15)";
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(139,92,246,0.5)";
+                      (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 16px rgba(124,58,237,0.3), inset 0 1px 0 rgba(255,255,255,0.1)";
                     }}
                   >
+                    <Smartphone style={{ width: 14, height: 14, color: "#c4b5fd", flexShrink: 0 }} />
                     <span style={{
-                      background: "linear-gradient(135deg, #e9d5ff, #c4b5fd, #a78bfa)",
-                      backgroundSize: "200% 200%", WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent", animation: "shimmer 3s ease infinite", fontWeight: 800,
-                    }}>
-                      Install App
-                    </span>
+                      background: "linear-gradient(135deg, #e9d5ff, #c4b5fd)",
+                      WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                    }}>Install App</span>
                   </button>
                 )}
 
@@ -1196,7 +1219,7 @@ export default function HomePage() {
           <div className="vx-container">
             <div className="vx-hero-badge">
               <Crown style={{ width: 16, height: 16, color: "#fbbf24" }} />
-              Skill-based quiz. £1,000 monthly prize
+              Skill-based quiz. Up to £1,000 monthly prize pool*
               <Trophy style={{ width: 16, height: 16, color: "#fbbf24" }} />
             </div>
 
@@ -1209,6 +1232,48 @@ export default function HomePage() {
               }}>
                 <AlertCircle style={{ width: 15, height: 15 }} />
                 *Terms apply
+              </div>
+            </div>
+
+            {/* Free Daily Round Banner */}
+            <div style={{ textAlign: "center", marginBottom: 32, padding: "0 16px" }}>
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 12,
+                padding: "12px 18px", borderRadius: 16,
+                background: "linear-gradient(135deg, rgba(34,197,94,0.15), rgba(16,185,129,0.1))",
+                border: "1px solid rgba(34,197,94,0.4)",
+                boxShadow: "0 0 24px rgba(34,197,94,0.15), inset 0 1px 0 rgba(255,255,255,0.08)",
+                position: "relative", overflow: "hidden",
+                maxWidth: "100%", flexWrap: "wrap",
+              }}>
+                <div style={{
+                  position: "absolute", inset: 0, borderRadius: 16,
+                  background: "linear-gradient(90deg, transparent, rgba(34,197,94,0.06), transparent)",
+                  animation: "badge-shine 4s infinite",
+                  pointerEvents: "none",
+                }} />
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                  background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: "0 0 16px rgba(34,197,94,0.5)",
+                }}>
+                  <Gift style={{ width: 18, height: 18, color: "white" }} />
+                </div>
+                <div style={{ textAlign: "left", minWidth: 0 }}>
+                  <div style={{ fontSize: "clamp(13px,3.5vw,14px)", fontWeight: 800, color: "#4ade80", letterSpacing: "0.02em" }}>
+                    1 Free Round Every Day
+                  </div>
+                  <div style={{ fontSize: "clamp(10px,2.5vw,11px)", color: "#86efac", fontWeight: 500, marginTop: 2 }}>
+                    Credited daily at midnight UTC — no purchase required
+                  </div>
+                </div>
+                <div style={{
+                  padding: "4px 10px", borderRadius: 8,
+                  background: "rgba(34,197,94,0.2)", border: "1px solid rgba(34,197,94,0.4)",
+                  fontSize: 11, fontWeight: 700, color: "#22c55e",
+                  textTransform: "uppercase", letterSpacing: "0.08em", flexShrink: 0,
+                }}>FREE</div>
               </div>
             </div>
 
@@ -1308,11 +1373,83 @@ export default function HomePage() {
                   window.location.href = "/lobby";
                 }}
                 aria-label="Enter Global Live Arena"
+                style={{
+                  position: "relative",
+                  padding: "0",
+                  border: "none",
+                  borderRadius: 18,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 12,
+                  fontWeight: 800,
+                  fontSize: "clamp(15px,3.5vw,18px)",
+                  overflow: "hidden",
+                  color: "white",
+                  width: "100%",
+                  maxWidth: 380,
+                  minHeight: 60,
+                  letterSpacing: "0.02em",
+                  transition: "transform 0.2s, box-shadow 0.2s",
+                  boxShadow: "0 0 0 1px rgba(255,255,255,0.15), 0 8px 32px rgba(124,58,237,0.5), 0 20px 60px rgba(217,70,239,0.3)",
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-3px) scale(1.01)";
+                  (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 0 1px rgba(255,255,255,0.2), 0 12px 40px rgba(124,58,237,0.7), 0 28px 80px rgba(217,70,239,0.4)";
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0) scale(1)";
+                  (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 0 1px rgba(255,255,255,0.15), 0 8px 32px rgba(124,58,237,0.5), 0 20px 60px rgba(217,70,239,0.3)";
+                }}
+                onMouseDown={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0) scale(0.99)"; }}
+                onMouseUp={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-3px) scale(1.01)"; }}
               >
-                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right,#7c3aed,#d946ef)", pointerEvents: "none" }} />
-                <Play style={{ position: "relative", zIndex: 10, width: 20, height: 20 }} />
-                <span style={{ position: "relative", zIndex: 10 }}>Enter Global Live Arena</span>
-                <ArrowRight style={{ position: "relative", zIndex: 10, width: 20, height: 20 }} />
+                {/* Base gradient */}
+                <div style={{
+                  position: "absolute", inset: 0,
+                  background: "linear-gradient(135deg, #6d28d9 0%, #7c3aed 30%, #a855f7 60%, #d946ef 100%)",
+                  borderRadius: 18,
+                }} />
+                {/* Shine sweep */}
+                <div style={{
+                  position: "absolute", inset: 0, borderRadius: 18, overflow: "hidden",
+                  pointerEvents: "none",
+                }}>
+                  <div style={{
+                    position: "absolute", top: 0, left: "-100%", width: "60%", height: "100%",
+                    background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)",
+                    animation: "slide-shine 3s ease-in-out infinite",
+                  }} />
+                </div>
+                {/* Top highlight */}
+                <div style={{
+                  position: "absolute", top: 0, left: 0, right: 0, height: 1,
+                  background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)",
+                  borderRadius: "18px 18px 0 0",
+                  pointerEvents: "none",
+                }} />
+                {/* Content */}
+                <div style={{
+                  position: "relative", zIndex: 10,
+                  display: "flex", alignItems: "center", gap: "clamp(8px,2vw,12px)",
+                  padding: "0 clamp(16px,5vw,32px)", width: "100%", justifyContent: "center",
+                  minHeight: 60,
+                }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 10,
+                    background: "rgba(255,255,255,0.15)",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    backdropFilter: "blur(4px)", flexShrink: 0,
+                  }}>
+                    <Play style={{ width: 16, height: 16, fill: "white", color: "white" }} />
+                  </div>
+                  <span style={{ fontWeight: 800, textShadow: "0 1px 4px rgba(0,0,0,0.3)" }}>
+                    Enter Global Live Arena
+                  </span>
+                  <ArrowRight style={{ width: 20, height: 20, opacity: 0.85, flexShrink: 0 }} />
+                </div>
               </button>
             </div>
 
