@@ -1207,7 +1207,7 @@ export default function HomePage() {
               <div style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#cbd5e1" }}>
                 <Globe style={{ width: 14, height: 14, color: "#a78bfa" }} />
                 <span style={{ fontWeight: 700, color: "white" }}>{activePlayers.toLocaleString()}</span>
-                <span>players online</span>
+                <span>players joined</span>
               </div>
             </div>
           </div>
@@ -1327,7 +1327,7 @@ export default function HomePage() {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 12, color: "#6b7280", fontWeight: 500 }}>
                   <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#22c55e" }} />
                   <span style={{ color: "#ffffff", fontWeight: 600 }}>{activePlayers.toLocaleString()}</span>
-                  <span>players ready</span>
+                  <span>players joined</span>
                 </div>
               </div>
             </div>
