@@ -387,14 +387,14 @@ function SuccessContent() {
 
             <p className="success-subtitle">
               Get ready to compete in the Global Live Quiz.{" "}
-              <strong style={{ color: "#fbbf24" }}>Compete for up to £1,000.*</strong>{" "}
-              <strong style={{ color: "#a78bfa" }}>Skill Wins. Not Luck.</strong>
+              <strong style={{ color: "#fbbf24" }}>Compete for up to £1,000.</strong>{" "}
+              <strong style={{ color: "#a78bfa" }}>Skill Wins. Not Luck.*</strong>
             </p>
             <div style={{
               fontSize: "clamp(10px,2vw,12px)", color: "#475569",
               marginTop: 8, fontStyle: "italic",
             }}>
-              *Skill-based competition. No element of chance. Terms & Conditions apply.
+              *Terms & Conditions apply.
             </div>
           </div>
 
