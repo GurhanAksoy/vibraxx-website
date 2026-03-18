@@ -2,21 +2,22 @@ import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// Supabase service role client — RLS bypass için
+// Global — her request'te yeniden oluşturma
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 export async function POST(req: Request) {
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
-  // Raw body — Stripe imza doğrulaması için şart
   const body = await req.text();
   const sig  = req.headers.get("stripe-signature");
 
   if (!sig) {
+    console.error("[Webhook] No stripe-signature header");
     return NextResponse.json({ error: "No signature" }, { status: 400 });
   }
 
@@ -29,19 +30,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  // Sadece başarılı ödeme event'ini işle
+  console.log("[Webhook] Event:", event.type);
+
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
 
-    // Ödeme gerçekten tamamlandı mı?
+    console.log("[Webhook] Session ID:", session.id);
+    console.log("[Webhook] Payment status:", session.payment_status);
+    console.log("[Webhook] Metadata:", session.metadata);
+
     if (session.payment_status !== "paid") {
+      console.log("[Webhook] Payment not completed, skipping");
       return NextResponse.json({ received: true });
     }
 
     const { user_id, package: pkg, credits } = session.metadata ?? {};
 
     if (!user_id || !credits) {
-      console.error("[Webhook] Missing metadata:", session.metadata);
+      console.error("[Webhook] Missing metadata — user_id:", user_id, "credits:", credits);
       return NextResponse.json({ error: "Missing metadata" }, { status: 400 });
     }
 
@@ -51,11 +57,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid credits" }, { status: 400 });
     }
 
-    // Kredi ekle — RPC üzerinden (ledger'a da yazar)
+    // Idempotency key — session.id Stripe tarafından her ödeme için unique
+    const reason = `stripe_${pkg}_${session.id}`;
+
     const { error } = await supabaseAdmin.rpc("add_paid_credits", {
       p_user_id: user_id,
       p_credits: creditsNum,
-      p_reason:  `stripe_${pkg}_${session.id}`,
+      p_reason:  reason,
     });
 
     if (error) {
@@ -63,13 +71,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Failed to add credits" }, { status: 500 });
     }
 
-    console.log(`[Webhook] ✅ ${creditsNum} credits added to user ${user_id} (${pkg})`);
+    console.log(`[Webhook] ✅ ${creditsNum} credits added → user: ${user_id} | pkg: ${pkg} | reason: ${reason}`);
   }
 
   return NextResponse.json({ received: true });
 }
-
-// Next.js body parser'ı devre dışı bırak — Stripe raw body ister
-export const config = {
-  api: { bodyParser: false },
-};
