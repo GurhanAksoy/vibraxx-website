@@ -7,7 +7,6 @@ import {
   Trophy,
   Zap,
   Play,
-  ArrowRight,
   Volume2,
   VolumeX,
   Globe,
@@ -1219,7 +1218,7 @@ export default function HomePage() {
           <div className="vx-container">
             <div className="vx-hero-badge">
               <Crown style={{ width: 16, height: 16, color: "#fbbf24" }} />
-              Skill-based quiz. Up to £1,000 monthly prize pool*
+              Up to £1,000 monthly prize pool*
               <Trophy style={{ width: 16, height: 16, color: "#fbbf24" }} />
             </div>
 
@@ -1239,41 +1238,31 @@ export default function HomePage() {
             <div style={{ textAlign: "center", marginBottom: 32, padding: "0 16px" }}>
               <div style={{
                 display: "inline-flex", alignItems: "center", gap: 12,
-                padding: "12px 18px", borderRadius: 16,
+                padding: "14px 22px", borderRadius: 16,
                 background: "linear-gradient(135deg, rgba(34,197,94,0.15), rgba(16,185,129,0.1))",
                 border: "1px solid rgba(34,197,94,0.4)",
                 boxShadow: "0 0 24px rgba(34,197,94,0.15), inset 0 1px 0 rgba(255,255,255,0.08)",
                 position: "relative", overflow: "hidden",
-                maxWidth: "100%", flexWrap: "wrap",
               }}>
                 <div style={{
                   position: "absolute", inset: 0, borderRadius: 16,
                   background: "linear-gradient(90deg, transparent, rgba(34,197,94,0.06), transparent)",
-                  animation: "badge-shine 4s infinite",
-                  pointerEvents: "none",
+                  animation: "badge-shine 4s infinite", pointerEvents: "none",
                 }} />
                 <div style={{
-                  width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                  width: 38, height: 38, borderRadius: 10, flexShrink: 0,
                   background: "linear-gradient(135deg, #22c55e, #16a34a)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   boxShadow: "0 0 16px rgba(34,197,94,0.5)",
                 }}>
-                  <Gift style={{ width: 18, height: 18, color: "white" }} />
+                  <Gift style={{ width: 20, height: 20, color: "white" }} />
                 </div>
-                <div style={{ textAlign: "left", minWidth: 0 }}>
-                  <div style={{ fontSize: "clamp(13px,3.5vw,14px)", fontWeight: 800, color: "#4ade80", letterSpacing: "0.02em" }}>
-                    1 Free Round Every Day
-                  </div>
-                  <div style={{ fontSize: "clamp(10px,2.5vw,11px)", color: "#86efac", fontWeight: 500, marginTop: 2 }}>
-                    Credited daily at midnight UTC — no purchase required
-                  </div>
-                </div>
-                <div style={{
-                  padding: "4px 10px", borderRadius: 8,
-                  background: "rgba(34,197,94,0.2)", border: "1px solid rgba(34,197,94,0.4)",
-                  fontSize: 11, fontWeight: 700, color: "#22c55e",
-                  textTransform: "uppercase", letterSpacing: "0.08em", flexShrink: 0,
-                }}>FREE</div>
+                <span style={{
+                  fontSize: "clamp(15px,4vw,18px)", fontWeight: 800, color: "#4ade80",
+                  letterSpacing: "0.01em", position: "relative", zIndex: 1,
+                }}>
+                  1 Free Round Daily
+                </span>
               </div>
             </div>
 
@@ -1372,7 +1361,7 @@ export default function HomePage() {
 
                   window.location.href = "/lobby";
                 }}
-                aria-label="Enter Global Live Arena"
+                aria-label="Enter Arena"
                 style={{
                   position: "relative",
                   padding: "0",
@@ -1382,13 +1371,12 @@ export default function HomePage() {
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: 12,
                   fontWeight: 800,
                   fontSize: "clamp(15px,3.5vw,18px)",
                   overflow: "hidden",
                   color: "white",
-                  width: "100%",
-                  maxWidth: 380,
+                  width: "auto",
+                  minWidth: "clamp(200px,55vw,280px)",
                   minHeight: 60,
                   letterSpacing: "0.02em",
                   transition: "transform 0.2s, box-shadow 0.2s",
@@ -1433,7 +1421,7 @@ export default function HomePage() {
                 <div style={{
                   position: "relative", zIndex: 10,
                   display: "flex", alignItems: "center", gap: "clamp(8px,2vw,12px)",
-                  padding: "0 clamp(16px,5vw,32px)", width: "100%", justifyContent: "center",
+                  padding: "0 clamp(24px,5vw,36px)", width: "100%", justifyContent: "center",
                   minHeight: 60,
                 }}>
                   <div style={{
@@ -1446,9 +1434,8 @@ export default function HomePage() {
                     <Play style={{ width: 16, height: 16, fill: "white", color: "white" }} />
                   </div>
                   <span style={{ fontWeight: 800, textShadow: "0 1px 4px rgba(0,0,0,0.3)" }}>
-                    Enter Global Live Arena
+                    Enter Arena
                   </span>
-                  <ArrowRight style={{ width: 20, height: 20, opacity: 0.85, flexShrink: 0 }} />
                 </div>
               </button>
             </div>
