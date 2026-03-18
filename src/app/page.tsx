@@ -1061,23 +1061,23 @@ export default function HomePage() {
                     aria-label="Install App"
                     style={{
                       padding: "8px 14px", borderRadius: 12,
-                      border: "1px solid rgba(139,92,246,0.6)",
+                      border: "1px solid rgba(251,191,36,0.6)",
                       background: "linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.25))",
                       color: "white", fontSize: 12, fontWeight: 700,
                       cursor: "pointer", display: "inline-flex",
                       alignItems: "center", gap: 7, transition: "all 0.25s",
-                      boxShadow: "0 0 16px rgba(124,58,237,0.35), inset 0 1px 0 rgba(255,255,255,0.12)",
+                      boxShadow: "0 0 16px rgba(124,58,237,0.35), 0 0 8px rgba(251,191,36,0.2), inset 0 1px 0 rgba(255,255,255,0.12)",
                       position: "relative", overflow: "hidden",
                       letterSpacing: "0.03em",
                     }}
                     onMouseEnter={e => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(167,139,250,0.9)";
-                      (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 24px rgba(124,58,237,0.55), inset 0 1px 0 rgba(255,255,255,0.18)";
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(251,191,36,0.9)";
+                      (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 24px rgba(124,58,237,0.55), 0 0 16px rgba(251,191,36,0.35), inset 0 1px 0 rgba(255,255,255,0.18)";
                       (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
                     }}
                     onMouseLeave={e => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(139,92,246,0.6)";
-                      (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 16px rgba(124,58,237,0.35), inset 0 1px 0 rgba(255,255,255,0.12)";
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(251,191,36,0.6)";
+                      (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 16px rgba(124,58,237,0.35), 0 0 8px rgba(251,191,36,0.2), inset 0 1px 0 rgba(255,255,255,0.12)";
                       (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
                     }}
                   >
@@ -1464,17 +1464,17 @@ export default function HomePage() {
                     padding: "16px 24px", borderRadius: 18, border: "none",
                     cursor: "pointer", position: "relative", overflow: "hidden",
                     background: "linear-gradient(135deg, #1e1b4b 0%, #2e1065 50%, #1e1b4b 100%)",
-                    boxShadow: "0 0 0 1px rgba(139,92,246,0.6), 0 8px 32px rgba(124,58,237,0.4), 0 0 60px rgba(139,92,246,0.15)",
+                    boxShadow: "0 0 0 1px rgba(251,191,36,0.5), 0 8px 32px rgba(124,58,237,0.4), 0 0 60px rgba(139,92,246,0.15)",
                     transition: "transform 0.2s, box-shadow 0.2s",
                     width: "100%", maxWidth: 420,
                   }}
                   onMouseEnter={e => {
                     (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)";
-                    (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 0 1px rgba(167,139,250,0.8), 0 12px 40px rgba(124,58,237,0.6), 0 0 80px rgba(139,92,246,0.2)";
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 0 1px rgba(251,191,36,0.8), 0 12px 40px rgba(124,58,237,0.6), 0 0 80px rgba(139,92,246,0.2)";
                   }}
                   onMouseLeave={e => {
                     (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
-                    (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 0 1px rgba(139,92,246,0.6), 0 8px 32px rgba(124,58,237,0.4), 0 0 60px rgba(139,92,246,0.15)";
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 0 1px rgba(251,191,36,0.5), 0 8px 32px rgba(124,58,237,0.4), 0 0 60px rgba(139,92,246,0.15)";
                   }}
                 >
                   {/* Shine */}
