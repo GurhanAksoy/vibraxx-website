@@ -2,10 +2,11 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
+import { playMenuMusic, stopMenuMusic } from "@/lib/audioManager";
 import dynamicImport from "next/dynamic";
 
 const CountryPicker = dynamicImport(
@@ -170,7 +171,6 @@ export default function ProfilePage() {
   const [showContact,    setShowContact]    = useState(false);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const [hasInteracted,  setHasInteracted]  = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // ── Auth check ──
   useEffect(() => {
@@ -252,41 +252,40 @@ export default function ProfilePage() {
 
   // ── Music ──
   useEffect(() => {
-    if (!audioRef.current) {
-      const audio = new Audio("/sounds/vibraxx.mp3");
-      audio.loop = true; audio.volume = 0.3;
-      audioRef.current = audio;
-    }
-    if (localStorage.getItem("vibraxx_music_enabled") === "true") setIsMusicPlaying(true);
-    return () => { audioRef.current?.pause(); audioRef.current = null; };
+    const musicPref = localStorage.getItem("vibraxx_music");
+    if (musicPref === "true") setIsMusicPlaying(true);
+    return () => stopMenuMusic();
   }, []);
 
   useEffect(() => {
-    const onFirst = () => {
-      if (hasInteracted) return;
+    const handleFirstInteraction = () => {
+      const savedPref = localStorage.getItem("vibraxx_music");
+      if (savedPref !== "false") {
+        playMenuMusic();
+        setIsMusicPlaying(true);
+        localStorage.setItem("vibraxx_music", "true");
+      }
       setHasInteracted(true);
-      if (localStorage.getItem("vibraxx_music_enabled") !== "false" && audioRef.current)
-        audioRef.current.play().catch(() => {});
     };
-    document.addEventListener("pointerdown", onFirst, { once: true });
-    return () => document.removeEventListener("pointerdown", onFirst);
-  }, [hasInteracted]);
-
-  useEffect(() => {
-    if (!audioRef.current || !hasInteracted) return;
-    if (isMusicPlaying) {
-      audioRef.current.play().catch(() => {});
-      localStorage.setItem("vibraxx_music_enabled", "true");
-    } else {
-      audioRef.current.pause();
-      localStorage.setItem("vibraxx_music_enabled", "false");
-    }
-  }, [isMusicPlaying, hasInteracted]);
+    document.addEventListener("click", handleFirstInteraction, { once: true });
+    document.addEventListener("touchstart", handleFirstInteraction, { once: true });
+    return () => {
+      document.removeEventListener("click", handleFirstInteraction);
+      document.removeEventListener("touchstart", handleFirstInteraction);
+    };
+  }, []); // boş dependency — sadece mount'ta bir kez
 
   const toggleMusic = useCallback(() => {
-    setHasInteracted(true);
-    setIsMusicPlaying(p => !p);
-  }, []);
+    if (isMusicPlaying) {
+      stopMenuMusic();
+      setIsMusicPlaying(false);
+      localStorage.setItem("vibraxx_music", "false");
+    } else {
+      playMenuMusic();
+      setIsMusicPlaying(true);
+      localStorage.setItem("vibraxx_music", "true");
+    }
+  }, [isMusicPlaying]);
 
   // ── Save profile ──
   const handleSaveProfile = useCallback(async () => {

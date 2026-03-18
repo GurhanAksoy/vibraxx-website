@@ -598,16 +598,20 @@ export default function HomePage() {
   // MUSIC
   // ============================================
   useEffect(() => {
+    const musicPref = localStorage.getItem("vibraxx_music");
+    if (musicPref === "true") setIsPlaying(true);
+    return () => stopMenuMusic();
+  }, []);
+
+  useEffect(() => {
     const handleFirstInteraction = () => {
-      if (!hasInteracted) {
-        setHasInteracted(true);
-        const savedPref = localStorage.getItem("vibraxx_music");
-        if (savedPref !== "false") {
-          playMenuMusic();
-          setIsPlaying(true);
-          localStorage.setItem("vibraxx_music", "true");
-        }
+      const savedPref = localStorage.getItem("vibraxx_music");
+      if (savedPref !== "false") {
+        playMenuMusic();
+        setIsPlaying(true);
+        localStorage.setItem("vibraxx_music", "true");
       }
+      setHasInteracted(true);
     };
     document.addEventListener("click", handleFirstInteraction, { once: true });
     document.addEventListener("touchstart", handleFirstInteraction, { once: true });
@@ -615,7 +619,7 @@ export default function HomePage() {
       document.removeEventListener("click", handleFirstInteraction);
       document.removeEventListener("touchstart", handleFirstInteraction);
     };
-  }, [hasInteracted]);
+  }, []); // boş dependency — sadece mount'ta bir kez
 
   const toggleMusic = useCallback(() => {
     if (isPlaying) {
@@ -628,12 +632,6 @@ export default function HomePage() {
       localStorage.setItem("vibraxx_music", "true");
     }
   }, [isPlaying]);
-
-  useEffect(() => {
-    const musicPref = localStorage.getItem("vibraxx_music");
-    if (musicPref === "true") setIsPlaying(true);
-    return () => stopMenuMusic();
-  }, []);
 
   // ============================================
   // AUTH ACTIONS
