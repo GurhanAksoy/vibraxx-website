@@ -1134,27 +1134,56 @@ export default function HomePage() {
                       onClick={() => { window.location.href = "/profile"; }}
                       aria-label="View profile"
                       style={{
-                        padding: "8px 16px", borderRadius: 12,
-                        border: "1px solid rgba(148,163,253,0.26)",
-                        background: "rgba(9,9,13,0.96)", color: "white", fontSize: 13,
+                        padding: "6px 12px 6px 6px",
+                        borderRadius: 999,
+                        border: "1px solid rgba(167,139,250,0.4)",
+                        background: "linear-gradient(135deg, rgba(124,58,237,0.2), rgba(15,23,42,0.95))",
                         cursor: "pointer", display: "inline-flex", alignItems: "center",
-                        gap: 8, transition: "all 0.2s",
+                        gap: 8, transition: "all 0.25s",
+                        boxShadow: "0 0 12px rgba(124,58,237,0.25), inset 0 1px 0 rgba(255,255,255,0.08)",
+                        position: "relative", overflow: "hidden",
+                      }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(167,139,250,0.8)";
+                        (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 20px rgba(124,58,237,0.5), inset 0 1px 0 rgba(255,255,255,0.12)";
+                        (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(167,139,250,0.4)";
+                        (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 12px rgba(124,58,237,0.25), inset 0 1px 0 rgba(255,255,255,0.08)";
+                        (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
                       }}
                     >
+                      {/* Shine sweep */}
                       <div style={{
-                        width: 20, height: 20, borderRadius: "9999px", overflow: "hidden",
-                        backgroundColor: "#020817", border: "1px solid rgba(148,163,253,0.26)",
+                        position: "absolute", inset: 0, pointerEvents: "none",
+                        background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent)",
+                        animation: "slide-shine 4s ease-in-out infinite",
+                      }} />
+                      {/* Avatar ring */}
+                      <div style={{
+                        width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
+                        padding: 2, position: "relative", zIndex: 1,
+                        background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+                        boxShadow: "0 0 10px rgba(124,58,237,0.6)",
                       }}>
-                        <Image
-                          src={user?.user_metadata?.avatar_url || "/images/logo.png"}
-                          alt="User avatar" width={20} height={20} style={{ objectFit: "cover" }}
-                        />
+                        <div style={{
+                          width: "100%", height: "100%", borderRadius: "50%",
+                          overflow: "hidden", background: "#020817",
+                        }}>
+                          <Image
+                            src={user?.user_metadata?.avatar_url || "/images/logo.png"}
+                            alt="User avatar" width={24} height={24} style={{ objectFit: "cover" }}
+                          />
+                        </div>
                       </div>
-                      <span className="vx-hide-mobile" style={{
-                        fontSize: 11, color: "#e5e7eb", maxWidth: 100,
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      <span style={{
+                        fontSize: 12, fontWeight: 700, position: "relative", zIndex: 1,
+                        background: "linear-gradient(135deg, #e9d5ff, #c4b5fd)",
+                        WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                        maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       }}>
-                        {user.user_metadata?.full_name || "Player"}
+                        {user.user_metadata?.full_name?.split(" ")[0] || "Profile"}
                       </span>
                     </button>
 
