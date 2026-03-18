@@ -382,15 +382,20 @@ function SuccessContent() {
             </div>
 
             <h1 className="success-title">
-              Welcome to the Arena,{" "}
-              <span className="success-title-neon">Champion!</span>
+              <span className="success-title-neon">You're In. The Arena Awaits.</span>
             </h1>
 
             <p className="success-subtitle">
-              Your rounds have been added. You're now ready to compete in the{" "}
-              <strong style={{ color: "#fbbf24" }}>Global Live Quiz</strong> and fight for the{" "}
-              <strong style={{ color: "#fbbf24" }}>£1,000 monthly prize</strong>.
+              Get ready to compete in the Global Live Quiz.{" "}
+              <strong style={{ color: "#fbbf24" }}>Compete for up to £1,000.*</strong>{" "}
+              <strong style={{ color: "#a78bfa" }}>Skill Wins. Not Luck.</strong>
             </p>
+            <div style={{
+              fontSize: "clamp(10px,2vw,12px)", color: "#475569",
+              marginTop: 8, fontStyle: "italic",
+            }}>
+              *Skill-based competition. No element of chance. Terms & Conditions apply.
+            </div>
           </div>
 
           {/* Credits Card */}
@@ -406,7 +411,7 @@ function SuccessContent() {
                 textTransform: "uppercase", letterSpacing: ".15em",
                 color: "#6b7280", marginBottom: 8,
               }}>
-                Your Rounds
+                Your Rounds Available
               </div>
 
               {isLoading ? (
@@ -432,7 +437,7 @@ function SuccessContent() {
               )}
 
               <div style={{ fontSize: "clamp(13px,3vw,16px)", color: "#94a3b8", fontWeight: 500 }}>
-                rounds available in your account
+                Ready for upcoming live rounds
               </div>
 
               <div style={{
@@ -453,12 +458,12 @@ function SuccessContent() {
           <div className="action-grid">
             <button className="action-btn action-btn-primary" onClick={() => router.push("/lobby")}>
               <Play style={{ width: 18, height: 18, fill: "white" }} />
-              Enter Arena
+              Enter Live Arena
               <ArrowRight style={{ width: 18, height: 18 }} />
             </button>
             <button className="action-btn action-btn-secondary" onClick={() => router.push("/leaderboard")}>
               <Trophy style={{ width: 18, height: 18 }} />
-              Leaderboard
+              View Leaderboard
             </button>
           </div>
 
@@ -477,16 +482,16 @@ function SuccessContent() {
                 <Flame style={{ width: 20, height: 20, color: "white" }} />
               </div>
               <h2 style={{ fontSize: "clamp(16px,3.5vw,20px)", fontWeight: 800 }}>
-                What's Next?
+                What Happens Next
               </h2>
             </div>
 
             {[
-              { icon: Zap,      color: "#fbbf24", text: "Live competitions every 5 minutes — don't miss your round" },
-              { icon: Trophy,   color: "#a78bfa", text: "Climb the daily, weekly and monthly leaderboards" },
-              { icon: Star,     color: "#22d3ee", text: "Build your score, accuracy and tier ranking" },
-              { icon: Gift,     color: "#22c55e", text: "1 free round credited every day at midnight UTC" },
-              { icon: Crown,    color: "#fbbf24", text: "Become the next VibraXX Global Champion" },
+              { icon: Zap,    color: "#fbbf24", text: "Live rounds every 5 minutes — don't miss your next round" },
+              { icon: Trophy, color: "#a78bfa", text: "Climb daily, weekly & monthly leaderboards" },
+              { icon: Star,   color: "#22d3ee", text: "Improve your accuracy and ranking" },
+              { icon: Gift,   color: "#22c55e", text: "1 free round credited daily (midnight UTC)" },
+              { icon: Crown,  color: "#f97316", text: "Climb the ranks. Compete with the best." },
             ].map(({ icon: Icon, color, text }, i) => (
               <div key={i} className="feature-item">
                 <div style={{
@@ -517,9 +522,13 @@ function SuccessContent() {
               </span>
             </div>
             <p style={{ fontSize: "clamp(12px,2.5vw,14px)", color: "#94a3b8", lineHeight: 1.6, margin: 0 }}>
-              The <strong style={{ color: "#fbbf24" }}>£1,000 cash prize</strong> activates when the monthly paid entry milestone is reached.
-              Entry fees are non-refundable as the quiz service is fully provided regardless of prize activation.{" "}
-              <strong style={{ color: "#cbd5e1" }}>Terms apply.</strong>
+              The up to <strong style={{ color: "#fbbf24" }}>£1,000 prize pool</strong> activates once the monthly paid entry threshold is reached.
+              Participation fees are non-refundable as the quiz service is fully provided regardless of prize pool activation.{" "}
+              <strong style={{ color: "#cbd5e1" }}>Terms & Conditions apply.</strong>
+              <br />
+              <span style={{ fontSize: "clamp(10px,2vw,11px)", color: "#334155", marginTop: 6, display: "block" }}>
+                Skill-based competition. No element of chance.
+              </span>
             </p>
           </div>
 
