@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabaseClient'
 interface UserResult {
   user_id: string
   full_name: string
+  email: string | null
   avatar_url: string | null
   country: string | null
   paid_credits: number
@@ -131,6 +132,7 @@ export default function AdminCredits() {
             <thead>
               <tr>
                 <th>User</th>
+                <th>Email</th>
                 <th>Country</th>
                 <th>Paid</th>
                 <th>Bonus</th>
@@ -151,6 +153,7 @@ export default function AdminCredits() {
                       <span style={{ fontSize: 12 }}>{u.full_name}</span>
                     </div>
                   </td>
+                  <td className="muted" style={{ fontSize: 11 }}>{u.email ?? '—'}</td>
                   <td className="muted">{u.country ?? '—'}</td>
                   <td>{u.paid_credits}</td>
                   <td>{u.bonus_credits}</td>
@@ -193,6 +196,7 @@ export default function AdminCredits() {
                   {selected.full_name}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                  {selected.email && <span style={{ marginRight: 8 }}>{selected.email}</span>}
                   Current: {selected.paid_credits} paid · {selected.bonus_credits} bonus
                 </div>
               </div>
