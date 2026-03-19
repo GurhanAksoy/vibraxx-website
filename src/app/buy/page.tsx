@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Footer from "@/components/Footer";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
-import AnnouncementBanner from "@/components/AnnouncementBanner";
 import Image from "next/image";
 import {
   Crown, Zap, TrendingUp, Users, Trophy, Sparkles,
@@ -64,11 +63,11 @@ const packages = [
     rounds: 30,
     popular: true,
     icon: Crown,
-    badge: "🔥 SAVE 20% 🔥",
+    badge: "🔥 SAVE 40% 🔥",
     tagline: "Best Value",
     features: [
       { icon: Trophy,     text: "30 Quiz Rounds",          highlight: true  },
-      { icon: Percent,    text: "20% Savings",              highlight: true  },
+      { icon: Percent,    text: "40% Savings",              highlight: true  },
       { icon: Target,     text: "450 Questions Total",      highlight: false },
       { icon: Star,       text: "Priority Support",         highlight: false },
       { icon: BarChart3,  text: "Extended Statistics",      highlight: false },
@@ -208,10 +207,29 @@ export default function BuyPage() {
     if (!user) { router.push("/"); return; }
     setProcessingPackageId(pkg.id);
     try {
+      // Para birimi tespiti — locale + timezone birlikte kullan
+      const detectCurrency = (): string => {
+        try {
+          const locale   = navigator.language || "en-GB";
+          const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+
+          if (locale.startsWith("en-AU") || timezone.startsWith("Australia")) return "AUD";
+          if (locale.startsWith("en-CA") || timezone.startsWith("America/Toronto") || timezone.startsWith("America/Vancouver")) return "CAD";
+          if (locale.startsWith("en-US") || timezone.startsWith("America/New_York") || timezone.startsWith("America/Los_Angeles") || timezone.startsWith("America/Chicago")) return "USD";
+          if (["de", "fr", "it", "es", "nl", "pt", "fi", "el"].some(l => locale.startsWith(l))) return "EUR";
+          if (locale.startsWith("en-GB") || timezone.startsWith("Europe/London")) return "GBP";
+          return "GBP"; // default
+        } catch {
+          return "GBP";
+        }
+      };
+
+      const currency = detectCurrency();
+
       const res  = await fetch("/api/create-checkout-session", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ package: pkg.id }),
+        body:    JSON.stringify({ package: pkg.id, user_id: user.id, currency }),
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
@@ -287,7 +305,7 @@ export default function BuyPage() {
         .vx-header-inner {
           max-width: min(960px, 100%); margin: 0 auto;
           padding: 0 clamp(14px,4vw,20px);
-          height: 56px;
+          height: clamp(64px,12vw,80px);
           display: flex; align-items: center; justify-content: space-between;
           gap: 12px;
           flex-wrap: nowrap;
@@ -299,10 +317,10 @@ export default function BuyPage() {
         }
         .vx-logo:hover { opacity: .85; }
         .vx-logo-outer {
-          width: 40px; height: 40px; flex-shrink: 0;
-          border-radius: 50%; padding: 2px;
+          width: clamp(48px,10vw,80px); height: clamp(48px,10vw,80px); flex-shrink: 0;
+          border-radius: 50%; padding: 3px;
           background: radial-gradient(circle at 0 0,#7c3aed,#d946ef);
-          box-shadow: 0 0 14px rgba(124,58,237,.45);
+          box-shadow: 0 0 24px rgba(124,58,237,.6);
           position: relative; overflow: hidden;
         }
         .vx-logo-circle {
@@ -597,8 +615,6 @@ export default function BuyPage() {
 
       <AnnouncementBanner />
 
-      <AnnouncementBanner />
-
       <div className="vx-container">
         <div className="vx-bg-grid" />
 
@@ -608,7 +624,7 @@ export default function BuyPage() {
             <div className="vx-logo" onClick={() => router.push("/")}>
               <div className="vx-logo-outer">
                 <div className="vx-logo-circle">
-                  <Image src="/images/logo.png" alt="VibraXX" fill sizes="40px" style={{ objectFit: "contain", padding: "12%" }} />
+                  <Image src="/images/logo.png" alt="VibraXX" fill sizes="80px" style={{ objectFit: "contain", padding: "12%" }} />
                 </div>
               </div>
               <span className="vx-logo-label">Live Quiz</span>
@@ -748,7 +764,7 @@ export default function BuyPage() {
                     <div className={`vx-round-display ${pkg.id === "bundle" ? "bundle" : ""}`}>
                     <div className="vx-round-text">{pkg.rounds === 3 ? "3 Rounds" : "30 Rounds"}</div>
                     {pkg.id === "bundle" && (
-                      <div className="vx-round-badge"><Sparkles size={14} /><span>20% OFF</span></div>
+                      <div className="vx-round-badge"><Sparkles size={14} /><span>40% OFF</span></div>
                     )}
                     <div className="vx-round-sub">{pkg.id === "single" ? "Jump in and start competing" : "Best Value Package"}</div>
                   </div>
