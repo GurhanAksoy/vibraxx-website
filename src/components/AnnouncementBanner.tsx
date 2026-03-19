@@ -49,17 +49,8 @@ export default function AnnouncementBanner() {
   const [dismissed, setDismissed] = useState<Set<number>>(new Set())
 
   const fetchActive = async () => {
-    const now = new Date().toISOString()
-    const { data } = await supabase
-      .from('v2_announcements')
-      .select('id, type, severity, title, message, cta_text, cta_url, expires_at')
-      .eq('is_active', true)
-      .eq('type', 'banner')
-      .lte('starts_at', now)
-      .or(`expires_at.is.null,expires_at.gt.${now}`)
-      .order('created_at', { ascending: false })
-
-    if (data) setBanners(data as Announcement[])
+    const { data } = await supabase.rpc('get_active_announcements')
+    if (data) setBanners((data as Announcement[]) ?? [])
   }
 
   useEffect(() => {
