@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Footer from "@/components/Footer";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
+import AnnouncementBanner from "@/components/AnnouncementBanner";
 import Image from "next/image";
 import {
   Crown, Zap, TrendingUp, Users, Trophy, Sparkles,
@@ -63,11 +64,11 @@ const packages = [
     rounds: 30,
     popular: true,
     icon: Crown,
-    badge: "🔥 SAVE 40% 🔥",
+    badge: "🔥 SAVE 20% 🔥",
     tagline: "Best Value",
     features: [
       { icon: Trophy,     text: "30 Quiz Rounds",          highlight: true  },
-      { icon: Percent,    text: "40% Savings",              highlight: true  },
+      { icon: Percent,    text: "20% Savings",              highlight: true  },
       { icon: Target,     text: "450 Questions Total",      highlight: false },
       { icon: Star,       text: "Priority Support",         highlight: false },
       { icon: BarChart3,  text: "Extended Statistics",      highlight: false },
@@ -286,7 +287,7 @@ export default function BuyPage() {
         .vx-header-inner {
           max-width: min(960px, 100%); margin: 0 auto;
           padding: 0 clamp(14px,4vw,20px);
-          height: clamp(64px,12vw,80px);
+          height: 56px;
           display: flex; align-items: center; justify-content: space-between;
           gap: 12px;
           flex-wrap: nowrap;
@@ -298,10 +299,10 @@ export default function BuyPage() {
         }
         .vx-logo:hover { opacity: .85; }
         .vx-logo-outer {
-          width: clamp(48px,10vw,80px); height: clamp(48px,10vw,80px); flex-shrink: 0;
-          border-radius: 50%; padding: 4px;
+          width: 40px; height: 40px; flex-shrink: 0;
+          border-radius: 50%; padding: 2px;
           background: radial-gradient(circle at 0 0,#7c3aed,#d946ef);
-          box-shadow: 0 0 30px rgba(124,58,237,.7);
+          box-shadow: 0 0 14px rgba(124,58,237,.45);
           position: relative; overflow: hidden;
         }
         .vx-logo-circle {
@@ -357,8 +358,8 @@ export default function BuyPage() {
           animation: shimmer 4s linear infinite;
         }
         .vx-hero-sub {
-          font-size: clamp(12px,2.2vw,15px); color: #cbd5e1;
-          line-height: 1.65; max-width: min(800px,100%); margin: 0 auto clamp(18px,4vw,26px);
+          font-size: clamp(13px,3vw,16px); color: #cbd5e1;
+          line-height: 1.65; max-width: min(600px,100%); margin: 0 auto clamp(18px,4vw,26px);
         }
         .vx-trust { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
         .vx-trust-badge {
@@ -596,6 +597,8 @@ export default function BuyPage() {
 
       <AnnouncementBanner />
 
+      <AnnouncementBanner />
+
       <div className="vx-container">
         <div className="vx-bg-grid" />
 
@@ -605,7 +608,7 @@ export default function BuyPage() {
             <div className="vx-logo" onClick={() => router.push("/")}>
               <div className="vx-logo-outer">
                 <div className="vx-logo-circle">
-                  <Image src="/images/logo.png" alt="VibraXX" fill sizes="80px" style={{ objectFit: "contain", padding: "12%" }} />
+                  <Image src="/images/logo.png" alt="VibraXX" fill sizes="40px" style={{ objectFit: "contain", padding: "12%" }} />
                 </div>
               </div>
               <span className="vx-logo-label">Live Quiz</span>
@@ -633,7 +636,7 @@ export default function BuyPage() {
             <h1 className="vx-hero-title">Compete. Win. Repeat.</h1>
             <p className="vx-hero-sub">
               Join the global skill-based quiz competition and fight for the{" "}
-              <strong style={{ color: "#fbbf24", fontWeight: 900 }}>£1,000 monthly prize</strong>.<br />
+              <strong style={{ color: "#fbbf24", fontWeight: 900 }}>£1,000 monthly prize</strong>.
               Pure knowledge, zero chance.
             </p>
             <div className="vx-trust">
