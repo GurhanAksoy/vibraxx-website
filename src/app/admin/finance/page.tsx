@@ -29,11 +29,22 @@ interface RecentRow {
   created_at: string
 }
 
+interface BuyerRow {
+  user_id: string
+  full_name: string | null
+  avatar_url: string | null
+  country: string | null
+  credits_bought: number
+  transactions: number
+  last_purchase: string
+}
+
 interface FinanceStats {
   generated_at: string
   period_days: number
   summary: FinanceSummary
   daily: DailyRow[]
+  buyers: BuyerRow[]
   recent: RecentRow[]
 }
 
@@ -87,7 +98,7 @@ export default function AdminFinance() {
   if (error)   return <div className="admin-error">RPC error: {error}</div>
   if (!data)   return null
 
-  const { summary, daily, recent } = data
+  const { summary, daily, buyers, recent } = data
 
   return (
     <>
@@ -200,6 +211,47 @@ export default function AdminFinance() {
           </div>
         </>
       )}
+
+      {/* ── buyers ── */}
+      <div className="section-title">Buyers</div>
+      <div className="admin-card" style={{ padding: 0, marginBottom: 24 }}>
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Country</th>
+              <th>Credits bought</th>
+              <th>Transactions</th>
+              <th>Last purchase</th>
+            </tr>
+          </thead>
+          <tbody>
+            {buyers.map(b => (
+              <tr key={b.user_id}>
+                <td>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {b.avatar_url && (
+                      <img src={b.avatar_url} alt="" style={{ width: 24, height: 24, borderRadius: '50%' }} />
+                    )}
+                    <span style={{ fontSize: 12 }}>{b.full_name ?? '—'}</span>
+                  </div>
+                </td>
+                <td className="muted">{b.country ?? '—'}</td>
+                <td style={{ color: 'var(--success)', fontWeight: 600 }}>{b.credits_bought}</td>
+                <td>{b.transactions}</td>
+                <td className="muted">{fmtAgo(b.last_purchase)}</td>
+              </tr>
+            ))}
+            {buyers.length === 0 && (
+              <tr>
+                <td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>
+                  no purchases yet
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {/* ── recent transactions ── */}
       <div className="section-title">Recent ledger entries</div>
