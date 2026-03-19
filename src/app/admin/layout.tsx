@@ -10,6 +10,7 @@ const NAV = [
   { href: '/admin/rounds',    label: 'Rounds'    },
   { href: '/admin/health',    label: 'Health'    },
   { href: '/admin/credits',   label: 'Credits'   },
+  { href: '/admin/pool',      label: 'Pool'      },
 ]
 
 function UTCClock() {
