@@ -233,7 +233,7 @@ export default function LeaderboardPage() {
         }
       `}</style>
 
-      {/* <AnnouncementBanner /> */}
+      <AnnouncementBanner />
 
       <div style={{
         minHeight: "100vh",

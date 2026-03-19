@@ -643,7 +643,7 @@ export default function LobbyPage() {
           />
         )}
 
-        {/* <AnnouncementBanner /> */}
+        <AnnouncementBanner />
 
         {/* Top Header Bar */}
         <header

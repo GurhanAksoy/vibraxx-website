@@ -1000,7 +1000,7 @@ export default function HomePage() {
         )}
 
         {/* Announcement Banner */}
-        {/* <AnnouncementBanner /> */}
+        <AnnouncementBanner />
 
         {/* Header */}
         <header className="vx-header">
