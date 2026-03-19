@@ -6,12 +6,13 @@ import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
 const NAV = [
-  { href: '/admin/dashboard', label: 'Dashboard' },
-  { href: '/admin/rounds',    label: 'Rounds'    },
-  { href: '/admin/health',    label: 'Health'    },
-  { href: '/admin/credits',   label: 'Credits'   },
-  { href: '/admin/pool',      label: 'Pool'      },
-  { href: '/admin/finance',   label: 'Finance'   },
+  { href: '/admin/dashboard',      label: 'Dashboard'      },
+  { href: '/admin/rounds',         label: 'Rounds'         },
+  { href: '/admin/health',         label: 'Health'         },
+  { href: '/admin/credits',        label: 'Credits'        },
+  { href: '/admin/pool',           label: 'Pool'           },
+  { href: '/admin/finance',        label: 'Finance'        },
+  { href: '/admin/announcements',  label: 'Announcements'  },
 ]
 
 function UTCClock() {
