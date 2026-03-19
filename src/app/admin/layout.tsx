@@ -9,6 +9,7 @@ const NAV = [
   { href: '/admin/dashboard', label: 'Dashboard' },
   { href: '/admin/rounds',    label: 'Rounds'    },
   { href: '/admin/health',    label: 'Health'    },
+  { href: '/admin/credits',   label: 'Credits'   },
 ]
 
 function UTCClock() {
