@@ -231,29 +231,6 @@ export default function AdminRounds() {
         </table>
       </div>
 
-      {/* ── admin actions ── */}
-      <div className="section-title">Actions</div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
-        <button
-          className="admin-btn primary"
-          onClick={() => runAction('start_scheduled_rounds', {}, 'start_scheduled_rounds')}
-        >
-          Run scheduler now
-        </button>
-        <button
-          className="admin-btn primary"
-          onClick={() => runAction('v2_watchdog', {}, 'watchdog')}
-        >
-          Run watchdog
-        </button>
-        <button
-          className="admin-btn primary"
-          onClick={() => runAction('refresh_leaderboards', {}, 'refresh_leaderboards')}
-        >
-          Refresh leaderboards
-        </button>
-      </div>
-
       {/* ── round timeline ── */}
       <div className="section-title">Round timeline ({data.total} total)</div>
       <div className="admin-card" style={{ padding: 0 }}>
