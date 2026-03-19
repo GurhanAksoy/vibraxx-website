@@ -15,6 +15,7 @@ const CountryPicker = dynamicImport(
 );
 
 import Footer from "@/components/Footer";
+import AnnouncementBanner from "@/components/AnnouncementBanner";
 import {
   User, Mail, Trophy, Target, TrendingUp, Calendar, Crown,
   Edit, Save, X, Send, CheckCircle, BarChart3, Zap,
@@ -355,6 +356,8 @@ export default function ProfilePage() {
           .profile-header { flex-wrap: wrap !important; }
         }
       `}</style>
+
+      <AnnouncementBanner />
 
       <div style={{ color: "white", paddingBottom: 0 }}>
         <div style={{ padding: "clamp(20px,5vw,40px) clamp(16px,4vw,24px)" }}>

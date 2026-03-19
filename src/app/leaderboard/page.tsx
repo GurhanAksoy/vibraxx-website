@@ -9,6 +9,7 @@ import {
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import Footer from "@/components/Footer";
+import AnnouncementBanner from "@/components/AnnouncementBanner";
 
 
 type Tab = "daily" | "weekly" | "monthly";
@@ -231,6 +232,8 @@ export default function LeaderboardPage() {
           .stats-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
+
+      <AnnouncementBanner />
 
       <div style={{
         minHeight: "100vh",

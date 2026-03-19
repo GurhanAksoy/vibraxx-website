@@ -20,6 +20,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { playMenuMusic, stopMenuMusic } from "@/lib/audioManager";
 import Footer from "@/components/Footer";
+import AnnouncementBanner from "@/components/AnnouncementBanner";
 
 // ============================================
 // MEMOIZED COMPONENTS
@@ -997,6 +998,9 @@ export default function HomePage() {
             onCancel={() => setShowNoRoundsModal(false)}
           />
         )}
+
+        {/* Announcement Banner */}
+        <AnnouncementBanner />
 
         {/* Header */}
         <header className="vx-header">
