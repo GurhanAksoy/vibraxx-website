@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { supabaseAdmin as supabase } from '@/lib/supabaseAdminClient'
+import { supabase } from '@/lib/supabaseClient'
 
 const NAV = [
   { href: '/admin/dashboard', label: 'Dashboard' },

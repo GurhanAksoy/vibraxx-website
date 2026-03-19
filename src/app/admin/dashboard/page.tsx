@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { supabaseAdmin as supabase } from '@/lib/supabaseAdminClient'
+import { supabase } from '@/lib/supabaseClient'
 
 // ── types ────────────────────────────────────────────────────
 interface DashboardState {
