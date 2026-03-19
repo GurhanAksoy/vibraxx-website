@@ -1,11 +1,12 @@
 ﻿"use client";
 
-export const runtime = "edge";
-export const dynamic = "force-dynamic";
-
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+
+// REMOVED: export const runtime = "edge"
+// Reason: edge runtime incompatible with PKCE exchangeCodeForSession (needs localStorage)
+export const dynamic = "force-dynamic";
 
 const REDIRECT_DELAYS = {
   SUCCESS: 1000,
@@ -15,7 +16,6 @@ const REDIRECT_DELAYS = {
 function AuthCallbackInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-
   const [message, setMessage] = useState("Signing you in...");
   const [subMessage, setSubMessage] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
@@ -28,7 +28,6 @@ function AuthCallbackInner() {
       try {
         const error = searchParams.get("error");
         const errorDesc = searchParams.get("error_description");
-
         if (error) {
           setMessage("Sign-in failed");
           setSubMessage(errorDesc || "Authentication error.");
@@ -36,9 +35,21 @@ function AuthCallbackInner() {
           return;
         }
 
-        const { data, error: sessionError } =
-          await supabase.auth.getSession();
+        // PKCE flow: exchange code for session
+        // This writes the session to localStorage so auth.uid() works everywhere
+        const code = searchParams.get("code");
+        if (code) {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          if (exchangeError) {
+            setMessage("Session error");
+            setSubMessage("Please sign in again.");
+            setTimeout(() => router.replace("/"), REDIRECT_DELAYS.ERROR);
+            return;
+          }
+        }
 
+        // Verify session exists after exchange
+        const { data, error: sessionError } = await supabase.auth.getSession();
         if (sessionError || !data.session?.user) {
           setMessage("Session error");
           setSubMessage("Please sign in again.");
@@ -46,9 +57,8 @@ function AuthCallbackInner() {
           return;
         }
 
-        const { error: profileError } =
-          await supabase.rpc("upsert_profile");
-
+        // Upsert profile (existing behavior preserved)
+        const { error: profileError } = await supabase.rpc("upsert_profile");
         if (profileError) {
           console.error("Profile RPC error:", profileError);
           setMessage("Profile error");
@@ -94,7 +104,6 @@ function AuthCallbackInner() {
             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
           />
         </svg>
-
         <p className="text-xl font-semibold">{message}</p>
         {subMessage && (
           <p className="text-sm text-gray-400 text-center max-w-md">
