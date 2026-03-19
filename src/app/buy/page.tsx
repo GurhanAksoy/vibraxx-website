@@ -278,11 +278,10 @@ export default function BuyPage() {
 
         /* ── HEADER ── */
         .vx-header {
-          position: relative; z-index: 10;
+          position: sticky; top: 0; z-index: 50;
           border-bottom: 1px solid rgba(255,255,255,.08);
           backdrop-filter: blur(20px);
-          background: rgba(15,23,42,.85);
-          overflow: hidden;
+          background: rgba(15,23,42,.92);
         }
         .vx-header-inner {
           max-width: min(960px, 100%); margin: 0 auto;

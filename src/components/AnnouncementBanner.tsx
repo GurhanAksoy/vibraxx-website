@@ -130,8 +130,8 @@ export default function AnnouncementBanner() {
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
-              flexShrink: 0,
-              maxWidth: 280,
+              flexShrink: 1,
+              minWidth: 0,
             }}>
               {b.title}
             </span>
