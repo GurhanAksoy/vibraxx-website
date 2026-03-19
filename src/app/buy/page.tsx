@@ -287,7 +287,7 @@ export default function BuyPage() {
         .vx-header-inner {
           max-width: min(960px, 100%); margin: 0 auto;
           padding: 0 clamp(14px,4vw,20px);
-          height: 56px;
+          height: clamp(64px,12vw,80px);
           display: flex; align-items: center; justify-content: space-between;
           gap: 12px;
           flex-wrap: nowrap;
@@ -606,7 +606,7 @@ export default function BuyPage() {
             <div className="vx-logo" onClick={() => router.push("/")}>
               <div className="vx-logo-outer">
                 <div className="vx-logo-circle">
-                  <Image src="/images/logo.png" alt="VibraXX" fill sizes="40px" style={{ objectFit: "contain", padding: "12%" }} />
+                  <Image src="/images/logo.png" alt="VibraXX" fill sizes="64px" style={{ objectFit: "contain", padding: "12%" }} />
                 </div>
               </div>
               <span className="vx-logo-label">Live Quiz</span>
@@ -634,7 +634,7 @@ export default function BuyPage() {
             <h1 className="vx-hero-title">Compete. Win. Repeat.</h1>
             <p className="vx-hero-sub">
               Join the global skill-based quiz competition and fight for the{" "}
-              <strong style={{ color: "#fbbf24", fontWeight: 900 }}>£1,000 monthly prize</strong>.{" "}
+              <strong style={{ color: "#fbbf24", fontWeight: 900 }}>£1,000 monthly prize</strong>.<br />
               Pure knowledge, zero chance.
             </p>
             <div className="vx-trust">
