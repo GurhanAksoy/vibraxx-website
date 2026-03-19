@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { supabase } from '@/lib/supabaseClient'
+import { supabaseAdmin as supabase } from '@/lib/supabaseAdminClient'
 
 const NAV = [
   { href: '/admin/dashboard', label: 'Dashboard' },
@@ -33,6 +33,14 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) {
+        window.location.href = '/'
+      }
+    })
+  }, [])
+
   const [criticalCount, setCriticalCount] = useState<number | null>(null)
 
   useEffect(() => {
