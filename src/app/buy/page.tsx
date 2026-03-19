@@ -63,11 +63,11 @@ const packages = [
     rounds: 30,
     popular: true,
     icon: Crown,
-    badge: "🔥 SAVE 20% 🔥",
+    badge: "🔥 SAVE 40% 🔥",
     tagline: "Best Value",
     features: [
       { icon: Trophy,     text: "30 Quiz Rounds",          highlight: true  },
-      { icon: Percent,    text: "20% Savings",              highlight: true  },
+      { icon: Percent,    text: "40% Savings",              highlight: true  },
       { icon: Target,     text: "450 Questions Total",      highlight: false },
       { icon: Star,       text: "Priority Support",         highlight: false },
       { icon: BarChart3,  text: "Extended Statistics",      highlight: false },
@@ -299,10 +299,10 @@ export default function BuyPage() {
         }
         .vx-logo:hover { opacity: .85; }
         .vx-logo-outer {
-          width: 40px; height: 40px; flex-shrink: 0;
-          border-radius: 50%; padding: 2px;
+          width: clamp(48px,10vw,64px); height: clamp(48px,10vw,64px); flex-shrink: 0;
+          border-radius: 50%; padding: 3px;
           background: radial-gradient(circle at 0 0,#7c3aed,#d946ef);
-          box-shadow: 0 0 14px rgba(124,58,237,.45);
+          box-shadow: 0 0 24px rgba(124,58,237,.6);
           position: relative; overflow: hidden;
         }
         .vx-logo-circle {
@@ -634,7 +634,7 @@ export default function BuyPage() {
             <h1 className="vx-hero-title">Compete. Win. Repeat.</h1>
             <p className="vx-hero-sub">
               Join the global skill-based quiz competition and fight for the{" "}
-              <strong style={{ color: "#fbbf24", fontWeight: 900 }}>£1,000 monthly prize</strong>.
+              <strong style={{ color: "#fbbf24", fontWeight: 900 }}>£1,000 monthly prize</strong>.{" "}
               Pure knowledge, zero chance.
             </p>
             <div className="vx-trust">
