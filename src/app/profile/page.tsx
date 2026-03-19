@@ -357,7 +357,7 @@ export default function ProfilePage() {
         }
       `}</style>
 
-      <AnnouncementBanner />
+      {/* <AnnouncementBanner /> */}
 
       <div style={{ color: "white", paddingBottom: 0 }}>
         <div style={{ padding: "clamp(20px,5vw,40px) clamp(16px,4vw,24px)" }}>
