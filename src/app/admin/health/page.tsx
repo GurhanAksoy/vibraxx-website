@@ -22,6 +22,12 @@ interface SystemSnapshot {
   last_cache_build: string | null
 }
 
+interface HealthState {
+  generated_at: string
+  events: HealthEvent[]
+  snapshot: SystemSnapshot | null
+}
+
 const fmtAgo = (dt?: string | null) => {
   if (!dt) return '—'
   const sec = Math.floor((Date.now() - new Date(dt).getTime()) / 1000)
@@ -47,32 +53,16 @@ const Loading = () => (
 )
 
 export default function AdminHealth() {
-  const [events, setEvents]       = useState<HealthEvent[]>([])
-  const [snapshot, setSnapshot]   = useState<SystemSnapshot | null>(null)
+  const [data, setData]           = useState<HealthState | null>(null)
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState<string | null>(null)
   const [actionMsg, setActionMsg] = useState<string | null>(null)
   const [filter, setFilter]       = useState<'all' | 'critical' | 'warn' | 'unresolved'>('unresolved')
 
   const fetchData = useCallback(async () => {
-    const { data: evData, error: evErr } = await supabase
-      .from('v2_health_events')
-      .select('id, severity, code, message, metadata, created_at')
-      .gte('created_at', new Date(Date.now() - 86400000).toISOString())
-      .order('created_at', { ascending: false })
-      .limit(100)
-
-    if (evErr) { setError(evErr.message); setLoading(false); return }
-    setEvents((evData as HealthEvent[]) ?? [])
-
-    const { data: snapData } = await supabase
-      .from('v2_system_health_snapshot')
-      .select('snapshot_at, rounds_live, rounds_scheduled, pool_available, joins_last_5m, answers_last_5m, last_cache_build')
-      .order('snapshot_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    setSnapshot((snapData as SystemSnapshot) ?? null)
+    const { data: res, error: err } = await supabase.rpc('get_admin_health_state')
+    if (err) { setError(err.message); setLoading(false); return }
+    setData(res as HealthState)
     setError(null)
     setLoading(false)
   }, [])
@@ -93,6 +83,9 @@ export default function AdminHealth() {
 
   if (loading) return <Loading />
   if (error)   return <div className="admin-error">{error}</div>
+  if (!data)   return null
+
+  const { events, snapshot } = data
 
   const filtered = events.filter(e => {
     if (filter === 'critical')   return e.severity === 'critical'

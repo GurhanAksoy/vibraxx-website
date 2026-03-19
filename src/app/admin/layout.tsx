@@ -46,13 +46,14 @@ export default function AdminLayout({
   useEffect(() => {
     // Poll critical health events count every 30s
     const fetchCritical = async () => {
-      const { count } = await supabase
-        .from('v2_health_events')
-        .select('id', { count: 'exact', head: true })
-        .eq('severity', 'critical')
-        .gte('created_at', new Date(Date.now() - 86400000).toISOString())
-
-      setCriticalCount(count ?? 0)
+      const { data: res } = await supabase.rpc('get_admin_health_state')
+      if (res?.events) {
+        const critical = (res.events as { severity: string }[])
+          .filter(e => e.severity === 'critical').length
+        setCriticalCount(critical)
+      } else {
+        setCriticalCount(0)
+      }
     }
     fetchCritical()
     const id = setInterval(fetchCritical, 30000)
