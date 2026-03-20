@@ -281,31 +281,12 @@ export default function BuyPage() {
 
         /* ── LAYOUT ── */
         body {
-          background: linear-gradient(135deg,#0a0f1e 0%,#1a1640 25%,#2d2a6e 50%,#1a1640 75%,#0a0f1e 100%);
+          background: linear-gradient(135deg,#0f172a 0%,#1e1b4b 25%,#312e81 50%,#1e1b4b 75%,#0f172a 100%);
           background-attachment: fixed;
         }
         .vx-container {
           color: white;
           position: relative;
-        }
-        .vx-bg-grid {
-          position: fixed; inset: 0; pointer-events: none; z-index: 0;
-          background-image:
-            linear-gradient(rgba(139,92,246,.06) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(139,92,246,.06) 1px, transparent 1px);
-          background-size: 50px 50px;
-        }
-        .vx-neon-orb-1 {
-          position: fixed; top: -100px; left: -100px;
-          width: 400px; height: 400px; border-radius: 50%;
-          background: #7c3aed; opacity: 0.18; filter: blur(80px);
-          pointer-events: none; z-index: 0;
-        }
-        .vx-neon-orb-2 {
-          position: fixed; bottom: -100px; right: -100px;
-          width: 400px; height: 400px; border-radius: 50%;
-          background: #d946ef; opacity: 0.15; filter: blur(80px);
-          pointer-events: none; z-index: 0;
         }
 
         /* ── HEADER ── */
@@ -640,10 +621,6 @@ export default function BuyPage() {
       <AnnouncementModal />
 
       <div className="vx-container">
-        <div className="vx-bg-grid" />
-        <div className="vx-neon-orb-1" />
-        <div className="vx-neon-orb-2" />
-
         {/* ── HEADER ── */}
         <header className="vx-header">
           <div className="vx-header-inner">
