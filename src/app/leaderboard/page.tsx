@@ -10,6 +10,7 @@ import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import Footer from "@/components/Footer";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
+import AnnouncementModal from "@/components/AnnouncementModal";
 
 
 type Tab = "daily" | "weekly" | "monthly";
@@ -234,6 +235,7 @@ export default function LeaderboardPage() {
       `}</style>
 
       <AnnouncementBanner />
+      <AnnouncementModal />
 
       <div style={{
         minHeight: "100vh",

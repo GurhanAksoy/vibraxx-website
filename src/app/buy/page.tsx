@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Footer from "@/components/Footer";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
+import AnnouncementModal from "@/components/AnnouncementModal";
 import Image from "next/image";
 import {
   Crown, Zap, TrendingUp, Users, Trophy, Sparkles,
@@ -614,6 +615,7 @@ export default function BuyPage() {
       `}</style>
 
       <AnnouncementBanner />
+      <AnnouncementModal />
 
       <div className="vx-container">
         <div className="vx-bg-grid" />

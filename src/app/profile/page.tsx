@@ -16,6 +16,7 @@ const CountryPicker = dynamicImport(
 
 import Footer from "@/components/Footer";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
+import AnnouncementModal from "@/components/AnnouncementModal";
 import {
   User, Mail, Trophy, Target, TrendingUp, Calendar, Crown,
   Edit, Save, X, Send, CheckCircle, BarChart3, Zap,
@@ -358,6 +359,7 @@ export default function ProfilePage() {
       `}</style>
 
       <AnnouncementBanner />
+      <AnnouncementModal />
 
       <div style={{ color: "white", paddingBottom: 0 }}>
         <div style={{ padding: "clamp(20px,5vw,40px) clamp(16px,4vw,24px)" }}>

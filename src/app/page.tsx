@@ -21,6 +21,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { playMenuMusic, stopMenuMusic } from "@/lib/audioManager";
 import Footer from "@/components/Footer";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
+import AnnouncementModal from "@/components/AnnouncementModal";
 
 // ============================================
 // MEMOIZED COMPONENTS
@@ -1001,6 +1002,9 @@ export default function HomePage() {
 
         {/* Announcement Banner */}
         <AnnouncementBanner />
+
+        {/* Announcement Modal */}
+        <AnnouncementModal />
 
         {/* Header */}
         <header className="vx-header">

@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Image from "next/image";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
+import AnnouncementModal from "@/components/AnnouncementModal";
 
 interface LobbyPlayer {
   user_id: string;
@@ -644,6 +645,7 @@ export default function LobbyPage() {
         )}
 
         <AnnouncementBanner />
+        <AnnouncementModal />
 
         {/* Top Header Bar */}
         <header
