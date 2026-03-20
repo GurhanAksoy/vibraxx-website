@@ -19,11 +19,14 @@ const DURATION: Record<ToastType, number> = {
 }
 
 // ── Singleton state ──
-let toasts:      Toast[]    = []
-let listeners:   Listener[] = []
-let lastMsg    = ''
-let lastTime   = 0
-let channelRef: ReturnType<typeof supabase.channel> | null = null
+let toasts:     Toast[]    = []
+let listeners:  Listener[] = []
+let lastMsg   = ''
+let lastTime  = 0
+let channelRef:      ReturnType<typeof supabase.channel> | null = null
+let roundChannelRef: ReturnType<typeof supabase.channel> | null = null
+let roundTimerRef:   ReturnType<typeof setTimeout> | null = null
+let lastRoundId = ''
 
 function notify() {
   listeners.forEach(l => l([...toasts]))
@@ -60,11 +63,11 @@ export const toastStore = {
   info:    (msg: string) => toastStore.show('info',    msg),
 }
 
-// ── Realtime subscription ──
+// ── Realtime subscriptions ──
 export function initToastRealtime(userId: string) {
-  // Zaten bu user için channel açıksa tekrar açma
   if (channelRef) return
 
+  // Credits channel
   channelRef = supabase
     .channel(`toast-credits-${userId}`)
     .on('postgres_changes', {
@@ -73,27 +76,49 @@ export function initToastRealtime(userId: string) {
       table:  'v2_credit_ledger',
     }, payload => {
       const row = payload.new as { delta_paid: number; delta_bonus: number; user_id: string }
-      if (row.user_id !== userId) return // client-side filter
+      if (row.user_id !== userId) return
       const delta = (row.delta_paid ?? 0) + (row.delta_bonus ?? 0)
       if (delta > 0) {
         toastStore.success(`+${delta} credit${delta > 1 ? 's' : ''} added`)
       }
     })
+    .subscribe()
 
-  channelRef.subscribe((status) => {
-    console.log('[Toast] Realtime status:', status)
-    if (status === 'SUBSCRIBED') {
-      console.log('[Toast] Realtime subscribed for', userId)
-    } else if (status === 'CHANNEL_ERROR') {
-      console.error('[Toast] Realtime subscription failed')
-      channelRef = null
-    }
-  })
+  // Round channel — scheduled_start 30sn kala toast (lobby hariç)
+  if (roundChannelRef) return
+  roundChannelRef = supabase
+    .channel('toast-rounds')
+    .on('postgres_changes', {
+      event:  'INSERT',
+      schema: 'public',
+      table:  'v2_rounds',
+    }, payload => {
+      const row = payload.new as { id: string; scheduled_start: string; status: string }
+      if (!row.scheduled_start) return
+      if (row.id === lastRoundId) return
+      lastRoundId = row.id
+
+      const startAt = new Date(row.scheduled_start).getTime()
+      const now     = Date.now()
+      const msUntil = startAt - now - 30000 // 30sn önce
+
+      // Zaten geçtiyse veya çok uzaktaysa (5dk+) yoksay
+      if (msUntil < 0 || msUntil > 5 * 60 * 1000) return
+
+      // Lobby'de değilsek toast at
+      if (roundTimerRef) clearTimeout(roundTimerRef)
+      roundTimerRef = setTimeout(() => {
+        const isOnLobby = window.location.pathname === '/lobby'
+        if (!isOnLobby) {
+          toastStore.warning('⚡ Round starting in 30 seconds!')
+        }
+      }, msUntil)
+    })
+    .subscribe()
 }
 
 export function destroyToastRealtime() {
-  if (channelRef) {
-    supabase.removeChannel(channelRef)
-    channelRef = null
-  }
+  if (channelRef)      { supabase.removeChannel(channelRef);      channelRef      = null }
+  if (roundChannelRef) { supabase.removeChannel(roundChannelRef); roundChannelRef = null }
+  if (roundTimerRef)   { clearTimeout(roundTimerRef);             roundTimerRef   = null }
 }
