@@ -81,11 +81,12 @@ export function initToastRealtime(userId: string) {
     })
 
   channelRef.subscribe((status) => {
+    console.log('[Toast] Realtime status:', status)
     if (status === 'SUBSCRIBED') {
       console.log('[Toast] Realtime subscribed for', userId)
     } else if (status === 'CHANNEL_ERROR') {
       console.error('[Toast] Realtime subscription failed')
-      channelRef = null // allow retry on next mount
+      channelRef = null
     }
   })
 }
