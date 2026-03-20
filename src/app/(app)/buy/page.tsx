@@ -281,7 +281,7 @@ export default function BuyPage() {
 
         /* ── LAYOUT ── */
         body {
-          background: linear-gradient(135deg,#0f172a 0%,#1e1b4b 25%,#312e81 50%,#1e1b4b 75%,#0f172a 100%);
+          background: linear-gradient(135deg,#0a0f1e 0%,#1a1640 25%,#2d2a6e 50%,#1a1640 75%,#0a0f1e 100%);
           background-attachment: fixed;
         }
         .vx-container {
@@ -291,25 +291,36 @@ export default function BuyPage() {
         .vx-bg-grid {
           position: fixed; inset: 0; pointer-events: none; z-index: 0;
           background-image:
-            linear-gradient(rgba(139,92,246,.04) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(139,92,246,.04) 1px, transparent 1px);
+            linear-gradient(rgba(139,92,246,.06) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(139,92,246,.06) 1px, transparent 1px);
           background-size: 50px 50px;
+        }
+        .vx-neon-orb-1 {
+          position: fixed; top: -100px; left: -100px;
+          width: 400px; height: 400px; border-radius: 50%;
+          background: #7c3aed; opacity: 0.18; filter: blur(80px);
+          pointer-events: none; z-index: 0;
+        }
+        .vx-neon-orb-2 {
+          position: fixed; bottom: -100px; right: -100px;
+          width: 400px; height: 400px; border-radius: 50%;
+          background: #d946ef; opacity: 0.15; filter: blur(80px);
+          pointer-events: none; z-index: 0;
         }
 
         /* ── HEADER ── */
         .vx-header {
           position: sticky; top: 0; z-index: 50;
-          border-bottom: 1px solid rgba(255,255,255,.08);
+          border-bottom: 1px solid rgba(255,255,255,.12);
           backdrop-filter: blur(20px);
           background: rgba(15,23,42,.92);
         }
         .vx-header-inner {
           max-width: min(960px, 100%); margin: 0 auto;
-          padding: 0 clamp(14px,4vw,20px);
+          padding: 8px clamp(14px,4vw,20px);
           height: clamp(64px,12vw,80px);
           display: flex; align-items: center; justify-content: space-between;
-          gap: 12px;
-          flex-wrap: nowrap;
+          gap: 10px; flex-wrap: nowrap;
         }
         .vx-logo {
           display: flex; align-items: center; gap: 8px;
@@ -321,8 +332,8 @@ export default function BuyPage() {
           width: clamp(48px,10vw,80px); height: clamp(48px,10vw,80px); flex-shrink: 0;
           border-radius: 50%; padding: 3px;
           background: radial-gradient(circle at 0 0,#7c3aed,#d946ef);
-          box-shadow: 0 0 24px rgba(124,58,237,.6);
-          position: relative; overflow: hidden;
+          box-shadow: 0 0 30px rgba(124,58,237,.6);
+          position: relative;
         }
         .vx-logo-circle {
           width: 100%; height: 100%;
@@ -331,22 +342,33 @@ export default function BuyPage() {
           overflow: hidden; position: relative;
         }
         .vx-logo-label {
-          font-size: 12px; color: #c4b5fd;
-          text-transform: uppercase; letter-spacing: .12em; font-weight: 600;
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          font-size: 13px; color: #c4b5fd;
+          text-transform: uppercase; letter-spacing: .14em; font-weight: 600;
+          white-space: nowrap;
+        }
+        .vx-header-right {
+          display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;
         }
         .vx-audio-btn {
           display: flex; align-items: center; justify-content: center;
-          width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
-          border: 2px solid rgba(139,92,246,.5);
+          width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0;
+          border: 1px solid rgba(148,163,253,.22);
           background: rgba(15,23,42,.8);
           cursor: pointer; transition: all .25s;
         }
-        .vx-audio-btn:hover {
-          border-color: #a78bfa; background: rgba(139,92,246,.2);
+        .vx-audio-btn:hover { border-color: #a78bfa; background: rgba(139,92,246,.2); }
+        .vx-rounds-badge {
+          display: inline-flex; align-items: center; gap: 6px;
+          padding: 8px 14px; border-radius: 12px;
+          border: 1px solid rgba(251,191,36,.3);
+          background: linear-gradient(135deg,rgba(251,191,36,.1),rgba(245,158,11,.1));
+          color: #fbbf24; font-size: 13px; font-weight: 600;
+          cursor: pointer; transition: all .2s; flex-shrink: 0;
         }
-        @media (max-width: 400px) {
+        .vx-rounds-badge:hover { border-color: rgba(251,191,36,.6); background: linear-gradient(135deg,rgba(251,191,36,.2),rgba(245,158,11,.15)); }
+        @media (max-width: 480px) {
           .vx-logo-label { display: none !important; }
+          .vx-rounds-badge span.vx-rounds-text { display: none; }
         }
 
         /* ── MAIN ── */
@@ -619,6 +641,8 @@ export default function BuyPage() {
 
       <div className="vx-container">
         <div className="vx-bg-grid" />
+        <div className="vx-neon-orb-1" />
+        <div className="vx-neon-orb-2" />
 
         {/* ── HEADER ── */}
         <header className="vx-header">
@@ -629,16 +653,27 @@ export default function BuyPage() {
                   <Image src="/images/logo.png" alt="VibraXX" fill sizes="80px" style={{ objectFit: "contain", padding: "12%" }} />
                 </div>
               </div>
-              <span className="vx-logo-label">Live Quiz</span>
+              <span className="vx-logo-label">Live Quiz Arena</span>
             </div>
 
-            {/* Ses butonu en sağda */}
-            <button className="vx-audio-btn" onClick={toggleMusic} title={isMusicPlaying ? "Mute" : "Play music"}
-              style={{ background: isMusicPlaying ? "linear-gradient(135deg,rgba(139,92,246,.9),rgba(124,58,237,.9))" : "rgba(15,23,42,.8)", boxShadow: isMusicPlaying ? "0 0 14px rgba(139,92,246,.5)" : "none" }}>
-              {isMusicPlaying
-                ? <Volume2  style={{ width: 18, height: 18, color: "white" }} />
-                : <VolumeX  style={{ width: 18, height: 18, color: "#94a3b8" }} />}
-            </button>
+            <div className="vx-header-right">
+              {/* Round sayısı */}
+              {liveCredits > 0 && (
+                <div className="vx-rounds-badge">
+                  <ShoppingCart style={{ width: 14, height: 14 }} />
+                  <span>{liveCredits}</span>
+                  <span className="vx-rounds-text">Rounds</span>
+                </div>
+              )}
+
+              {/* Ses butonu */}
+              <button className="vx-audio-btn" onClick={toggleMusic} title={isMusicPlaying ? "Mute" : "Play music"}
+                style={{ background: isMusicPlaying ? "linear-gradient(135deg,rgba(139,92,246,.9),rgba(124,58,237,.9))" : "rgba(15,23,42,.8)", boxShadow: isMusicPlaying ? "0 0 14px rgba(139,92,246,.5)" : "none" }}>
+                {isMusicPlaying
+                  ? <Volume2 style={{ width: 18, height: 18, color: "white" }} />
+                  : <VolumeX style={{ width: 18, height: 18, color: "#94a3b8" }} />}
+              </button>
+            </div>
           </div>
         </header>
 
