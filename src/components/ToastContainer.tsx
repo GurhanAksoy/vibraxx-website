@@ -6,28 +6,28 @@ import { toastStore, Toast } from '@/lib/toastStore'
 
 const TYPE_STYLES = {
   success: {
-    bg:     'linear-gradient(135deg,rgba(16,185,129,0.15),rgba(5,150,105,0.1))',
+    bg:     'linear-gradient(135deg, #0a2a1a 0%, #0f1f14 100%)',
     border: 'rgba(16,185,129,0.4)',
     dot:    '#10b981',
     color:  '#6ee7b7',
     icon:   '✓',
   },
   warning: {
-    bg:     'linear-gradient(135deg,rgba(245,158,11,0.15),rgba(217,119,6,0.1))',
+    bg:     'linear-gradient(135deg, #2a1a00 0%, #1f1500 100%)',
     border: 'rgba(245,158,11,0.4)',
     dot:    '#f59e0b',
     color:  '#fcd34d',
     icon:   '⚠',
   },
   error: {
-    bg:     'linear-gradient(135deg,rgba(239,68,68,0.15),rgba(220,38,38,0.1))',
+    bg:     'linear-gradient(135deg, #2a0a0a 0%, #1f0808 100%)',
     border: 'rgba(239,68,68,0.4)',
     dot:    '#ef4444',
     color:  '#fca5a5',
     icon:   '✕',
   },
   info: {
-    bg:     'linear-gradient(135deg,rgba(124,58,237,0.15),rgba(109,40,217,0.1))',
+    bg:     'linear-gradient(135deg, #1a0a3a 0%, #120820 100%)',
     border: 'rgba(124,58,237,0.4)',
     dot:    '#a78bfa',
     color:  '#c4b5fd',
@@ -47,42 +47,51 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
   return (
     <div
       style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: '10px 14px',
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '12px 16px',
         background: s.bg,
         border: `1px solid ${s.border}`,
-        borderRadius: 10,
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-        minWidth: 240, maxWidth: 360,
-        transform: visible ? 'translateX(0)' : 'translateX(120%)',
+        borderLeft: `3px solid ${s.dot}`,
+        borderRadius: 12,
+        boxShadow: `0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05), 0 0 20px ${s.dot}22`,
+        minWidth: 280, maxWidth: 380,
+        transform: visible ? 'translateX(0) translateY(0)' : 'translateX(100%) translateY(-10px)',
         opacity: visible ? 1 : 0,
-        transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s ease',
+        transition: 'transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s ease',
         cursor: 'pointer',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       }}
       onClick={onDismiss}
     >
-      {/* icon */}
+      {/* icon circle */}
       <div style={{
-        width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+        width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
         background: `${s.dot}22`,
-        border: `1px solid ${s.border}`,
+        border: `1.5px solid ${s.dot}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 12, fontWeight: 900, color: s.dot,
+        fontSize: 14, fontWeight: 900, color: s.dot,
         fontStyle: 'normal',
+        boxShadow: `0 0 12px ${s.dot}44`,
       }}>
         {s.icon}
       </div>
 
       {/* message */}
-      <span style={{ fontSize: 13, fontWeight: 600, color: s.color, flex: 1, lineHeight: 1.4 }}>
+      <span style={{
+        fontSize: 14, fontWeight: 700,
+        color: '#ffffff',
+        flex: 1, lineHeight: 1.4,
+        textShadow: '0 1px 4px rgba(0,0,0,0.5)',
+      }}>
         {toast.message}
       </span>
 
       {/* dismiss */}
-      <span style={{ fontSize: 16, color: s.color, opacity: 0.5, lineHeight: 1, flexShrink: 0 }}>×</span>
+      <span style={{
+        fontSize: 18, color: 'rgba(255,255,255,0.5)',
+        lineHeight: 1, flexShrink: 0,
+        transition: 'color 0.15s',
+      }}>×</span>
     </div>
   )
 }
@@ -109,7 +118,7 @@ export default function ToastContainer() {
       `}</style>
       <div style={{
         position: 'fixed',
-        top: 16, right: 16,
+        top: 90, right: 16,
         zIndex: 99999,
         display: 'flex', flexDirection: 'column', gap: 8,
         alignItems: 'flex-end',
