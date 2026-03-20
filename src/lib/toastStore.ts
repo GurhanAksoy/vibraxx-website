@@ -12,10 +12,10 @@ export interface Toast {
 type Listener = (toasts: Toast[]) => void
 
 const DURATION: Record<ToastType, number> = {
-  success: 3000,
-  info:    3000,
-  warning: 4000,
-  error:   5000,
+  success: 5000,
+  info:    5000,
+  warning: 6000,
+  error:   7000,
 }
 
 // ── Singleton state ──

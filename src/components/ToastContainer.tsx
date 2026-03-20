@@ -109,7 +109,7 @@ export default function ToastContainer() {
       `}</style>
       <div style={{
         position: 'fixed',
-        top: 80, right: 24,
+        top: 16, right: 16,
         zIndex: 99999,
         display: 'flex', flexDirection: 'column', gap: 8,
         alignItems: 'flex-end',
