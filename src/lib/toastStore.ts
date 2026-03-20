@@ -18,13 +18,12 @@ const DURATION: Record<ToastType, number> = {
   error:   5000,
 }
 
-// ── Singleton state ──────────────────────────────────────────
-let toasts:    Toast[]    = []
-let listeners: Listener[] = []
-let lastMsg   = ''
-let lastTime  = 0
-let isSubscribed = false
-// ────────────────────────────────────────────────────────────
+// ── Singleton state ──
+let toasts:      Toast[]    = []
+let listeners:   Listener[] = []
+let lastMsg    = ''
+let lastTime   = 0
+let channelRef: ReturnType<typeof supabase.channel> | null = null
 
 function notify() {
   listeners.forEach(l => l([...toasts]))
@@ -38,15 +37,14 @@ export const toastStore = {
   },
 
   show(type: ToastType, message: string) {
-    // dedup: aynı mesaj 2 saniye içinde tekrar gelirse yoksay
     const now = Date.now()
     if (message === lastMsg && now - lastTime < 2000) return
     lastMsg  = message
     lastTime = now
 
-    const id = Math.random().toString(36).slice(2)
+    const id       = Math.random().toString(36).slice(2)
     const duration = DURATION[type]
-    toasts = [...toasts.slice(-2), { id, type, message, duration }] // max 3
+    toasts = [...toasts.slice(-2), { id, type, message, duration }]
     notify()
     setTimeout(() => toastStore.dismiss(id), duration)
   },
@@ -62,13 +60,12 @@ export const toastStore = {
   info:    (msg: string) => toastStore.show('info',    msg),
 }
 
-// ── Realtime subscription (singleton guard) ──────────────────
+// ── Realtime subscription ──
 export function initToastRealtime(userId: string) {
-  if (isSubscribed) return
-  isSubscribed = true
+  // Zaten bu user için channel açıksa tekrar açma
+  if (channelRef) return
 
-  // v2_credit_ledger — kredi değişince toast (sadece bu, v2_user_credits değil)
-  supabase
+  channelRef = supabase
     .channel(`toast-credits-${userId}`)
     .on('postgres_changes', {
       event:  'INSERT',
@@ -76,16 +73,26 @@ export function initToastRealtime(userId: string) {
       table:  'v2_credit_ledger',
       filter: `user_id=eq.${userId}`,
     }, payload => {
-      const row = payload.new as { delta_paid: number; delta_bonus: number; reason: string }
+      const row   = payload.new as { delta_paid: number; delta_bonus: number; reason: string }
       const delta = (row.delta_paid ?? 0) + (row.delta_bonus ?? 0)
       if (delta > 0) {
         toastStore.success(`+${delta} credit${delta > 1 ? 's' : ''} added`)
       }
     })
-    .subscribe()
+
+  channelRef.subscribe((status) => {
+    if (status === 'SUBSCRIBED') {
+      console.log('[Toast] Realtime subscribed for', userId)
+    } else if (status === 'CHANNEL_ERROR') {
+      console.error('[Toast] Realtime subscription failed')
+      channelRef = null // allow retry on next mount
+    }
+  })
 }
 
 export function destroyToastRealtime() {
-  isSubscribed = false
-  supabase.removeAllChannels()
+  if (channelRef) {
+    supabase.removeChannel(channelRef)
+    channelRef = null
+  }
 }
