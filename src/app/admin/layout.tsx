@@ -14,6 +14,7 @@ const NAV = [
   { href: '/admin/finance',        label: 'Finance'        },
   { href: '/admin/announcements',  label: 'Announcements'  },
   { href: '/admin/logs',           label: 'Logs'           },
+  { href: '/admin/anticheat',      label: 'Anti-Cheat'     },
 ]
 
 function UTCClock() {
