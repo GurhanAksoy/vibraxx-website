@@ -102,8 +102,8 @@ export function initToastRealtime(userId: string) {
       const now     = Date.now()
       const msUntil = startAt - now - 30000 // 30sn önce
 
-      // Zaten geçtiyse veya çok uzaktaysa (5dk+) yoksay
-      if (msUntil < 0 || msUntil > 5 * 60 * 1000) return
+      // Zaten geçtiyse veya çok uzaktaysa (15dk+) yoksay
+      if (msUntil < 0 || msUntil > 15 * 60 * 1000) return
 
       // Lobby'de değilsek toast at
       if (roundTimerRef) clearTimeout(roundTimerRef)
