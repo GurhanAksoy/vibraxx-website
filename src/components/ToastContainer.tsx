@@ -116,13 +116,15 @@ export default function ToastContainer() {
       if (error || !data) return
 
       const t = data.next_round_in_seconds as number | null
+      if (t === null || t <= 0 || t > 35) return
 
-      if (t !== null && t <= 30 && t > 0) {
-        const roundKey = Math.floor(Date.now() / 300000).toString()
-        if (roundKey !== lastRoundKey) {
-          toastStore.warning('⚡ Round starting in 30 seconds!')
-          lastRoundKey = roundKey
-        }
+      // Şu anki round'un başlangıç zamanını key olarak kullan
+      const roundStartEstimate = Math.round((Date.now() + t * 1000) / 1000) // unix seconds, ~1s precision
+      const roundKey = Math.floor(roundStartEstimate / 10).toString() // 10sn tolerans
+
+      if (t <= 32 && roundKey !== lastRoundKey) {
+        toastStore.warning('⚡ Round starting in 30 seconds!')
+        lastRoundKey = roundKey
       }
     }, 5000)
 
