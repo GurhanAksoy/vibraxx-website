@@ -1,9 +1,12 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { toastStore, Toast } from '@/lib/toastStore'
 import { supabase } from '@/lib/supabaseClient'
+
+// Module level — navigation'da sıfırlanmaz
+let lastRoundKey = ''
 
 const TYPE_STYLES = {
   success: {
@@ -100,7 +103,6 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
 export default function ToastContainer() {
   const [toasts, setToasts]   = useState<Toast[]>([])
   const [mounted, setMounted] = useState(false)
-  const lastRoundRef          = useRef<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -116,11 +118,10 @@ export default function ToastContainer() {
       const t = data.next_round_in_seconds as number | null
 
       if (t !== null && t <= 30 && t > 0) {
-        // Round başlangıcını key olarak kullan (saniyeyi 30'a yuvarla)
-        const roundKey = Math.floor(Date.now() / 300000).toString() // 5dk window
-        if (roundKey !== lastRoundRef.current) {
+        const roundKey = Math.floor(Date.now() / 300000).toString()
+        if (roundKey !== lastRoundKey) {
           toastStore.warning('⚡ Round starting in 30 seconds!')
-          lastRoundRef.current = roundKey
+          lastRoundKey = roundKey
         }
       }
     }, 5000)
