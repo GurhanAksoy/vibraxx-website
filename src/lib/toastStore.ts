@@ -71,9 +71,9 @@ export function initToastRealtime(userId: string) {
       event:  'INSERT',
       schema: 'public',
       table:  'v2_credit_ledger',
-      filter: `user_id=eq.${userId}`,
     }, payload => {
-      const row   = payload.new as { delta_paid: number; delta_bonus: number; reason: string }
+      const row = payload.new as { delta_paid: number; delta_bonus: number; user_id: string }
+      if (row.user_id !== userId) return // client-side filter
       const delta = (row.delta_paid ?? 0) + (row.delta_bonus ?? 0)
       if (delta > 0) {
         toastStore.success(`+${delta} credit${delta > 1 ? 's' : ''} added`)
