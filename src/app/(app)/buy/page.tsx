@@ -291,15 +291,11 @@ export default function BuyPage() {
 
         /* ── HEADER ── */
         .vx-header {
-          position: sticky; top: 0; z-index: 50;
-          border-bottom: 1px solid rgba(255,255,255,.12);
-          backdrop-filter: blur(20px);
-          background: rgba(15,23,42,.92);
+          position: relative; z-index: 10;
         }
         .vx-header-inner {
           max-width: min(960px, 100%); margin: 0 auto;
-          padding: 8px clamp(14px,4vw,20px);
-          height: clamp(64px,12vw,80px);
+          padding: clamp(16px,4vw,28px) clamp(14px,4vw,20px);
           display: flex; align-items: center; justify-content: space-between;
           gap: 10px; flex-wrap: nowrap;
         }
