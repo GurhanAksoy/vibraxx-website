@@ -278,20 +278,56 @@ export default function AdminAnnouncements() {
           />
         </div>
 
-        {/* preview */}
-        {title && (
+        {/* preview — banner */}
+        {title && type === 'banner' && (
           <div style={{
-            padding: '10px 14px', borderRadius: 6, marginBottom: 16,
-            background: severity === 'critical' ? '#2a1010' : severity === 'warning' ? '#2a1e0a' : '#0a1e2a',
-            border: `1px solid ${severity === 'critical' ? '#5a1818' : severity === 'warning' ? '#4a3210' : '#103040'}`,
-            color: severity === 'critical' ? 'var(--danger)' : severity === 'warning' ? 'var(--warn)' : 'var(--info)',
+            position: 'relative', overflow: 'hidden',
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '0 16px', height: 52, borderRadius: 6, marginBottom: 16,
+            background: severity === 'critical'
+              ? 'linear-gradient(90deg,rgba(239,68,68,0.28),rgba(10,10,30,0.97) 50%,rgba(239,68,68,0.14))'
+              : severity === 'warning'
+              ? 'linear-gradient(90deg,rgba(245,158,11,0.25),rgba(10,10,30,0.97) 50%,rgba(245,158,11,0.12))'
+              : 'linear-gradient(90deg,rgba(124,58,237,0.28),rgba(10,10,30,0.97) 50%,rgba(217,70,239,0.16))',
+            border: `1px solid ${severity === 'critical' ? 'rgba(239,68,68,0.65)' : severity === 'warning' ? 'rgba(251,191,36,0.6)' : 'rgba(167,139,250,0.5)'}`,
           }}>
-            <div style={{ fontSize: 10, opacity: 0.6, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Preview · {type}
+            <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', padding: '3px 9px', borderRadius: 4, color: '#fff', flexShrink: 0, border: `1px solid ${severity === 'critical' ? 'rgba(239,68,68,0.7)' : severity === 'warning' ? 'rgba(251,191,36,0.7)' : 'rgba(167,139,250,0.7)'}`, background: severity === 'critical' ? 'rgba(239,68,68,0.2)' : severity === 'warning' ? 'rgba(251,191,36,0.2)' : 'rgba(167,139,250,0.2)' }}>
+              {severity}
             </div>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>{title}</div>
-            {message && <div style={{ fontSize: 11, opacity: 0.8, marginTop: 4 }}>{message}</div>}
-            {ctaText && <div style={{ fontSize: 11, marginTop: 6, textDecoration: 'underline' }}>{ctaText}</div>}
+            <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
+            {message && <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>{message}</span>}
+            {ctaText && <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', padding: '4px 10px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.1)', flexShrink: 0 }}>{ctaText}</span>}
+            <span style={{ fontSize: 18, color: '#fff', opacity: 0.6, lineHeight: 1, flexShrink: 0 }}>×</span>
+          </div>
+        )}
+
+        {/* preview — modal */}
+        {title && type === 'modal' && (
+          <div style={{
+            padding: '20px', borderRadius: 12, marginBottom: 16,
+            background: 'linear-gradient(135deg,#1e1b4b,#0f172a)',
+            border: `1px solid ${severity === 'critical' ? 'rgba(239,68,68,0.5)' : severity === 'warning' ? 'rgba(251,191,36,0.4)' : 'rgba(167,139,250,0.4)'}`,
+            boxShadow: `0 0 30px ${severity === 'critical' ? 'rgba(239,68,68,0.2)' : severity === 'warning' ? 'rgba(251,191,36,0.15)' : 'rgba(124,58,237,0.2)'}`,
+          }}>
+            <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 10, color: 'rgba(255,255,255,0.3)' }}>
+              Preview · modal
+            </div>
+            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', padding: '2px 8px', borderRadius: 4, display: 'inline-block', marginBottom: 8, color: '#fff', border: `1px solid ${severity === 'critical' ? 'rgba(239,68,68,0.6)' : severity === 'warning' ? 'rgba(251,191,36,0.6)' : 'rgba(167,139,250,0.6)'}`, background: severity === 'critical' ? 'rgba(239,68,68,0.15)' : severity === 'warning' ? 'rgba(251,191,36,0.15)' : 'rgba(167,139,250,0.15)' }}>
+              {severity}
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', marginBottom: 8 }}>{title}</div>
+            {message && <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 14 }}>{message}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              {ctaText && (
+                <div style={{ padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, color: '#fff', background: severity === 'critical' ? 'linear-gradient(135deg,#dc2626,#ef4444)' : severity === 'warning' ? 'linear-gradient(135deg,#f59e0b,#fbbf24)' : 'linear-gradient(135deg,#7c3aed,#a855f7)' }}>
+                  {ctaText}
+                </div>
+              )}
+              <div style={{ padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)' }}>
+                Dismiss
+              </div>
+            </div>
           </div>
         )}
 
