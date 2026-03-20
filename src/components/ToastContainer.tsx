@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { toastStore, Toast } from '@/lib/toastStore'
+import { supabase } from '@/lib/supabaseClient'
 
 const TYPE_STYLES = {
   success: {
@@ -97,13 +98,37 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
 }
 
 export default function ToastContainer() {
-  const [toasts, setToasts] = useState<Toast[]>([])
+  const [toasts, setToasts]   = useState<Toast[]>([])
   const [mounted, setMounted] = useState(false)
+  const lastRoundRef          = useRef<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
     const unsub = toastStore.subscribe(setToasts)
-    return unsub
+
+    // Round countdown polling — lobby sayfasında çalışmaz
+    const interval = setInterval(async () => {
+      if (window.location.pathname === '/lobby') return
+
+      const { data, error } = await supabase.rpc('get_homepage_state', { p_user_id: null })
+      if (error || !data) return
+
+      const t = data.next_round_in_seconds as number | null
+
+      if (t !== null && t <= 30 && t > 0) {
+        // Round başlangıcını key olarak kullan (saniyeyi 30'a yuvarla)
+        const roundKey = Math.floor(Date.now() / 300000).toString() // 5dk window
+        if (roundKey !== lastRoundRef.current) {
+          toastStore.warning('⚡ Round starting in 30 seconds!')
+          lastRoundRef.current = roundKey
+        }
+      }
+    }, 5000)
+
+    return () => {
+      unsub()
+      clearInterval(interval)
+    }
   }, [])
 
   if (!mounted) return null
