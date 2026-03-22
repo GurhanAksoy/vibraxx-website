@@ -75,7 +75,7 @@ export default function LobbyPage() {
   const lastPresenceRef = useRef<number>(0);
   const fetchInFlightRef = useRef(false);
   const zeroHandledForRoundRef = useRef<string | null>(null);
-  const countdownZeroWatchdogRef = useRef<number | null>(null);
+  const countdownZeroWatchdogRef = useRef<ReturnType<typeof window.setInterval> | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -150,9 +150,15 @@ export default function LobbyPage() {
 
       try {
         if (userId) {
-          // Cleanup best-effort, redirect’i bloklamasın
-          await supabase.rpc("leave_lobby", { p_user_id: userId }).catch(() => {});
-        }
+  // Cleanup best-effort, redirect’i bloklamasın
+  const { error: leaveLobbyError } = await supabase.rpc("leave_lobby", {
+    p_user_id: userId,
+  });
+
+  if (leaveLobbyError) {
+    console.error("[Lobby] leave_lobby during redirect failed:", leaveLobbyError);
+  }
+}
 
         sessionStorage.setItem(`quiz_fresh_${roundId}`, "1");
         routerRef.current.push(`/quiz/${roundId}`);
@@ -260,7 +266,13 @@ export default function LobbyPage() {
       const nowMs = Date.now();
       if (nowMs - lastPresenceRef.current > 30000) {
         lastPresenceRef.current = nowMs;
-        await supabase.rpc("enter_lobby", { p_user_id: session.user.id }).catch(() => {});
+        const { error: enterLobbyError } = await supabase.rpc("enter_lobby", {
+  p_user_id: session.user.id,
+});
+
+if (enterLobbyError) {
+  console.error("[Lobby] enter_lobby failed:", enterLobbyError);
+}
       }
 
       const { data, error } = await supabase.rpc("get_lobby_state", {
@@ -398,9 +410,9 @@ export default function LobbyPage() {
         const { data: joinResult, error: joinError } = await supabase.rpc("join_live_round");
         const joinRow = Array.isArray(joinResult) ? joinResult[0] : joinResult;
 
-        const joinedSuccessfully =
-          !joinError &&
-          (joinRow?.action === "join" || joinRow?.message === "already_joined");
+        cconst joinedSuccessfully =
+  !joinError &&
+  (joinRow?.action === "join" || joinRow?.message === "already_joined");
 
         if (joinedSuccessfully) {
           const targetRoundId = joinRow?.round_id || state.round_id;
@@ -461,8 +473,14 @@ export default function LobbyPage() {
     } = await supabase.auth.getSession();
 
     if (session?.user) {
-      await supabase.rpc("leave_lobby", { p_user_id: session.user.id }).catch(() => {});
-    }
+  const { error: leaveLobbyError } = await supabase.rpc("leave_lobby", {
+    p_user_id: session.user.id,
+  });
+
+  if (leaveLobbyError) {
+    console.error("[Lobby] leave_lobby on back failed:", leaveLobbyError);
+  }
+}
 
     routerRef.current.push("/");
   };
