@@ -75,7 +75,7 @@ export default function LobbyPage() {
   const lastPresenceRef = useRef<number>(0);
   const fetchInFlightRef = useRef(false);
   const zeroHandledForRoundRef = useRef<string | null>(null);
-  const countdownZeroWatchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownZeroWatchdogRef = useRef<ReturnType<typeof window.setInterval> | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -435,55 +435,66 @@ const joinedSuccessfully =
     }
   }, [applyLobbyState, fetchLobbyState, safeRedirectToQuiz]);
 
-  // === COUNTDOWN 0 WATCHDOG ===
-  useEffect(() => {
-    const activeRoundId = lobbyState?.round_id ?? null;
-    const shouldWatch =
-      !isRedirectingRef.current &&
-      localSeconds === 0 &&
-      !!activeRoundId;
 
-    if (!shouldWatch) {
-      if (countdownZeroWatchdogRef.current) {
-        window.clearInterval(countdownZeroWatchdogRef.current);
-        countdownZeroWatchdogRef.current = null;
-      }
-      return;
+// === COUNTDOWN 0 WATCHDOG ===
+useEffect(() => {
+  const activeRoundId = lobbyState?.round_id ?? null;
+  const shouldWatch =
+    !isRedirectingRef.current &&
+    localSeconds === 0 &&
+    !!activeRoundId;
+
+  const clearWatchdog = () => {
+    if (countdownZeroWatchdogRef.current !== null) {
+      window.clearInterval(countdownZeroWatchdogRef.current);
+      countdownZeroWatchdogRef.current = null;
     }
+  };
 
-    handleCountdownZero();
+  if (!shouldWatch) {
+    clearWatchdog();
+    return;
+  }
 
-    countdownZeroWatchdogRef.current = window.setInterval(() => {
-      handleCountdownZero();
-    }, 1500);
+  // Aynı effect yeniden çalışırsa ikinci interval açılmasını engelle
+  clearWatchdog();
 
-    return () => {
-      if (countdownZeroWatchdogRef.current) {
-        window.clearInterval(countdownZeroWatchdogRef.current);
-        countdownZeroWatchdogRef.current = null;
-      }
-    };
-  }, [localSeconds, lobbyState?.round_id, handleCountdownZero]);
+  // İlk denemeyi hemen yap
+  void handleCountdownZero();
 
-  // === HANDLE BACK BUTTON ===
-  const handleBack = async () => {
-    console.log("[Lobby] User left lobby, round NOT deducted");
+  countdownZeroWatchdogRef.current = window.setInterval(() => {
+    void handleCountdownZero();
+  }, 1500);
+
+  return () => {
+    clearWatchdog();
+  };
+}, [localSeconds, lobbyState?.round_id, handleCountdownZero]);
+
+// === HANDLE BACK BUTTON ===
+const handleBack = async () => {
+  console.log("[Lobby] User left lobby, round NOT deducted");
+
+  try {
     const {
       data: { session },
     } = await supabase.auth.getSession();
 
     if (session?.user) {
-  const { error: leaveLobbyError } = await supabase.rpc("leave_lobby", {
-    p_user_id: session.user.id,
-  });
+      const { error: leaveLobbyError } = await supabase.rpc("leave_lobby", {
+        p_user_id: session.user.id,
+      });
 
-  if (leaveLobbyError) {
-    console.error("[Lobby] leave_lobby on back failed:", leaveLobbyError);
-  }
-}
-
+      if (leaveLobbyError) {
+        console.error("[Lobby] leave_lobby on back failed:", leaveLobbyError);
+      }
+    }
+  } catch (err) {
+    console.error("[Lobby] handleBack error:", err);
+  } finally {
     routerRef.current.push("/");
-  };
+  }
+};
 
   // === PROGRESS CALCULATION ===
   const progress =
