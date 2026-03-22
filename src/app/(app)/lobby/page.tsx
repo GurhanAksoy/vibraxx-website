@@ -37,12 +37,15 @@ interface LobbyState {
   participant_count: number;
   should_redirect_to_quiz: boolean;
   players: LobbyPlayer[];
+  error?: string;
 }
 
 export default function LobbyPage() {
   const router = useRouter();
   const routerRef = useRef(router);
-  useEffect(() => { routerRef.current = router; }, [router]);
+  useEffect(() => {
+    routerRef.current = router;
+  }, [router]);
 
   // Core State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -68,12 +71,17 @@ export default function LobbyPage() {
   const lastRoundIdRef = useRef<string | null>(null);
   const localSecondsInitRef = useRef(false);
   const alarmFiredRef = useRef(false);
-  const hasJoinedRef = useRef(false); // Scheduled round'a join edildi mi
-  const lastPresenceRef = useRef<number>(0); // Son enter_lobby zamanı
+  const hasJoinedRef = useRef(false);
+  const lastPresenceRef = useRef<number>(0);
+  const fetchInFlightRef = useRef(false);
+  const zeroHandledForRoundRef = useRef<string | null>(null);
+  const countdownZeroWatchdogRef = useRef<number | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   // === AUDIO INITIALIZATION ===
@@ -132,17 +140,127 @@ export default function LobbyPage() {
     }
   }, [isPlaying]);
 
+  // === SAFE REDIRECT TO QUIZ ===
+  const safeRedirectToQuiz = useCallback(
+    async (roundId: string, userId?: string) => {
+      if (!roundId || isRedirectingRef.current) return;
+
+      isRedirectingRef.current = true;
+      setIsRedirecting(true);
+
+      try {
+        if (userId) {
+          // Cleanup best-effort, redirect’i bloklamasın
+          await supabase.rpc("leave_lobby", { p_user_id: userId }).catch(() => {});
+        }
+
+        sessionStorage.setItem(`quiz_fresh_${roundId}`, "1");
+        routerRef.current.push(`/quiz/${roundId}`);
+      } catch (err) {
+        console.error("[Lobby] safeRedirectToQuiz error:", err);
+        isRedirectingRef.current = false;
+        if (mountedRef.current) setIsRedirecting(false);
+      }
+    },
+    []
+  );
+
+  // === APPLY AUTHORITATIVE LOBBY STATE ===
+  const applyLobbyState = useCallback(
+    async (data: LobbyState, userId?: string) => {
+      if (!mountedRef.current) return;
+
+      // Yeni round → kontrol ref'leri sıfırla
+      if (data.round_id && data.round_id !== lastRoundIdRef.current) {
+        lastRoundIdRef.current = data.round_id;
+        isRedirectingRef.current = false;
+        localSecondsInitRef.current = false;
+        alarmFiredRef.current = false;
+        hasJoinedRef.current = false;
+        zeroHandledForRoundRef.current = null;
+        setIsRedirecting(false);
+        setShowWarning(false);
+        setPlayers([]);
+        setTotalPlayers(0);
+      }
+
+      // Countdown init / re-sync
+      if (data.next_round_in_seconds != null) {
+        const authoritative = Math.max(0, data.next_round_in_seconds);
+
+        if (!localSecondsInitRef.current) {
+          localSecondsInitRef.current = true;
+          setLocalSeconds(authoritative);
+        } else {
+          setLocalSeconds((prev) => {
+            if (prev === null) return authoritative;
+            // Drift varsa düzelt
+            if (Math.abs(prev - authoritative) >= 2) {
+              return authoritative;
+            }
+            return prev;
+          });
+        }
+      } else if (data.status === "live" && data.remaining_seconds != null) {
+        // Live durumda countdown 0’da kalmalı
+        setLocalSeconds(0);
+      }
+
+      setLobbyState(data);
+      setIsLoading(false);
+
+      setPlayers(data.players ?? []);
+      setTotalPlayers(data.participant_count ?? data.players?.length ?? 0);
+
+      // === AUTHORITATIVE REDIRECTS ===
+      // Backend açıkça quiz’e git diyorsa öncelik bu
+      if (data.should_redirect_to_quiz && data.round_id && userId) {
+        await safeRedirectToQuiz(data.round_id, userId);
+        return;
+      }
+
+      // Failsafe: live + participant ise user’ı stuck bırakma
+      if (data.status === "live" && data.round_id && data.is_participant && userId) {
+        await safeRedirectToQuiz(data.round_id, userId);
+        return;
+      }
+
+      // Kredi yok yönlendirmesi:
+      // Sadece quiz’e gitme hakkı yoksa çalışsın
+      if (
+        (data.credits ?? 0) === 0 &&
+        !data.should_redirect_to_quiz &&
+        !(data.status === "live" && data.is_participant) &&
+        !isRedirectingRef.current
+      ) {
+        isRedirectingRef.current = true;
+        routerRef.current.replace("/buy");
+      }
+    },
+    [safeRedirectToQuiz]
+  );
+
   // === FETCH LOBBY STATE (ana loop) ===
   const fetchLobbyState = useCallback(async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) { routerRef.current.push("/"); return; }
+    if (fetchInFlightRef.current) return;
 
-      // Presence: 30sn'de bir enter_lobby (throttle)
-      const _now = Date.now();
-      if (_now - lastPresenceRef.current > 30000) {
-        lastPresenceRef.current = _now;
-        await supabase.rpc("enter_lobby", { p_user_id: session.user.id });
+    fetchInFlightRef.current = true;
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.user) {
+        routerRef.current.push("/");
+        return;
+      }
+
+      // Presence: 30 sn'de bir enter_lobby (throttle)
+      const nowMs = Date.now();
+      if (nowMs - lastPresenceRef.current > 30000) {
+        lastPresenceRef.current = nowMs;
+        await supabase.rpc("enter_lobby", { p_user_id: session.user.id }).catch(() => {});
       }
 
       const { data, error } = await supabase.rpc("get_lobby_state", {
@@ -150,67 +268,63 @@ export default function LobbyPage() {
       });
 
       if (error || !data || !mountedRef.current) return;
-      if (data.error === "not_authenticated") { routerRef.current.push("/"); return; }
 
-      // Yeni round → state sıfırla
-      if (data.round_id && data.round_id !== lastRoundIdRef.current) {
-        lastRoundIdRef.current = data.round_id;
-        isRedirectingRef.current = false;
-        localSecondsInitRef.current = false;
-        alarmFiredRef.current = false;
-        hasJoinedRef.current = false;
-        setShowWarning(false);
-        setPlayers([]);
-        setTotalPlayers(0);
-      }
-
-      // Sayacı sadece ilk kez set et (sonra tick ile düşüyor)
-      if (!localSecondsInitRef.current && data.next_round_in_seconds != null) {
-        localSecondsInitRef.current = true;
-        setLocalSeconds(Math.max(0, data.next_round_in_seconds));
-      }
-
-      setLobbyState(data);
-      setIsLoading(false);
-
-      // Players ve count doğrudan get_lobby_state'den gelir
-      setPlayers(data.players ?? []);
-      setTotalPlayers(data.participant_count ?? data.players?.length ?? 0);
-
-      // === KREDİ KONTROLÜ: 0 ise ana sayfaya yönlendir ===
-      if ((data.credits ?? 0) === 0 && !isRedirectingRef.current) {
-        isRedirectingRef.current = true;
-        routerRef.current.replace("/buy");
+      if (data.error === "not_authenticated") {
+        routerRef.current.push("/");
         return;
       }
 
-      // === LIVE ROUND LOGIC ===
-      // Kullanıcı SADECE sayaç 0 → join_live_round ile quiz'e alınır.
-      // is_participant = quiz'den çıkmış → lobby'de bekler, bir sonraki round.
+      await applyLobbyState(data as LobbyState, session.user.id);
     } catch (err) {
       console.error("[Lobby] fetchLobbyState error:", err);
+    } finally {
+      fetchInFlightRef.current = false;
     }
-  }, []); // stable — router via ref
+  }, [applyLobbyState]);
 
   // === POLLING ===
   useEffect(() => {
     fetchLobbyState();
-    const interval = setInterval(() => { fetchLobbyState(); }, 5000);
-    return () => clearInterval(interval);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const interval = setInterval(() => {
+      fetchLobbyState();
+    }, 5000);
 
+    return () => clearInterval(interval);
+  }, [fetchLobbyState]);
+
+  // === VISIBILITY / FOCUS RESYNC ===
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        fetchLobbyState();
+      }
+    };
+
+    const onFocus = () => {
+      fetchLobbyState();
+    };
+
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [fetchLobbyState]);
 
   // === COUNTDOWN TICK ===
   useEffect(() => {
     const tick = setInterval(() => {
       setLocalSeconds((prev) => {
         if (prev === null) return prev;
-        if (prev <= 1) { setTimeout(() => handleCountdownZero(), 300); return 0; }
+        if (prev <= 1) return 0;
         return prev - 1;
       });
     }, 1000);
+
     return () => clearInterval(tick);
-  }, []); // stable
+  }, []);
 
   // === WARNING & SOUND EFFECTS ===
   useEffect(() => {
@@ -241,7 +355,10 @@ export default function LobbyPage() {
   // === COUNTDOWN SIFIRA DÜŞTÜ: JOIN + REDIRECT ===
   const handleCountdownZero = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       if (!session?.user) return;
 
       const { data, error } = await supabase.rpc("get_lobby_state", {
@@ -250,48 +367,111 @@ export default function LobbyPage() {
 
       if (error || !data) return;
 
-      // Round live değilse bekle (biraz gecikmiş olabilir)
-      if (data.status !== "live" || !data.round_id) {
+      const state = data as LobbyState;
+
+      // Önce authoritative state’i uygula
+      await applyLobbyState(state, session.user.id);
+
+      // Backend zaten "quiz'e git" diyorsa burada dur
+      if (state.should_redirect_to_quiz && state.round_id) return;
+
+      // Live değilse polling/watchdog üzerinden devam et
+      if (state.status !== "live" || !state.round_id) {
         setTimeout(() => fetchLobbyState(), 500);
         return;
       }
 
-      // Zaten participant → quiz'den çıkmış, lobby'de bekle
-      if (data.is_participant) return;
+      // Live + participant ise stuck bırakma, direkt geçir
+      if (state.is_participant && state.round_id) {
+        await safeRedirectToQuiz(state.round_id, session.user.id);
+        return;
+      }
+
+      // Aynı round için tekrar tekrar join spam atma
+      if (zeroHandledForRoundRef.current === state.round_id) return;
 
       // Join et
-      if (!hasJoinedRef.current && data.credits > 0) {
+      if (!hasJoinedRef.current && (state.credits ?? 0) > 0) {
         hasJoinedRef.current = true;
+        zeroHandledForRoundRef.current = state.round_id;
+
         const { data: joinResult, error: joinError } = await supabase.rpc("join_live_round");
         const joinRow = Array.isArray(joinResult) ? joinResult[0] : joinResult;
-        if (!joinError && (joinRow?.action === "join" || joinRow?.message === "already_joined")) {
-          isRedirectingRef.current = true;
-          setIsRedirecting(true);
-          await supabase.rpc("leave_lobby", { p_user_id: session.user.id });
-          sessionStorage.setItem(`quiz_fresh_${data.round_id}`, '1');
-          routerRef.current.push(`/quiz/${data.round_id}`);
-        } else {
-          hasJoinedRef.current = false;
-          setTimeout(() => fetchLobbyState(), 1000);
+
+        const joinedSuccessfully =
+          !joinError &&
+          (joinRow?.action === "join" || joinRow?.message === "already_joined");
+
+        if (joinedSuccessfully) {
+          const targetRoundId = joinRow?.round_id || state.round_id;
+
+          if (targetRoundId) {
+            await safeRedirectToQuiz(targetRoundId, session.user.id);
+            return;
+          }
         }
+
+        // Başarısızsa tekrar denenebilsin
+        hasJoinedRef.current = false;
+        zeroHandledForRoundRef.current = null;
+        setTimeout(() => fetchLobbyState(), 1000);
       }
     } catch (err) {
       console.error("[Lobby] handleCountdownZero error:", err);
+      hasJoinedRef.current = false;
+      zeroHandledForRoundRef.current = null;
     }
-  }, [fetchLobbyState]);
+  }, [applyLobbyState, fetchLobbyState, safeRedirectToQuiz]);
+
+  // === COUNTDOWN 0 WATCHDOG ===
+  useEffect(() => {
+    const activeRoundId = lobbyState?.round_id ?? null;
+    const shouldWatch =
+      !isRedirectingRef.current &&
+      localSeconds === 0 &&
+      !!activeRoundId;
+
+    if (!shouldWatch) {
+      if (countdownZeroWatchdogRef.current) {
+        window.clearInterval(countdownZeroWatchdogRef.current);
+        countdownZeroWatchdogRef.current = null;
+      }
+      return;
+    }
+
+    handleCountdownZero();
+
+    countdownZeroWatchdogRef.current = window.setInterval(() => {
+      handleCountdownZero();
+    }, 1500);
+
+    return () => {
+      if (countdownZeroWatchdogRef.current) {
+        window.clearInterval(countdownZeroWatchdogRef.current);
+        countdownZeroWatchdogRef.current = null;
+      }
+    };
+  }, [localSeconds, lobbyState?.round_id, handleCountdownZero]);
 
   // === HANDLE BACK BUTTON ===
   const handleBack = async () => {
     console.log("[Lobby] User left lobby, round NOT deducted");
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) await supabase.rpc("leave_lobby", { p_user_id: session.user.id });
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (session?.user) {
+      await supabase.rpc("leave_lobby", { p_user_id: session.user.id }).catch(() => {});
+    }
+
     routerRef.current.push("/");
   };
 
   // === PROGRESS CALCULATION ===
-  const progress = localSeconds !== null
-    ? ((300 - Math.max(Math.min(localSeconds, 300), 0)) / 300) * 100
-    : 0;
+  const progress =
+    localSeconds !== null
+      ? ((300 - Math.max(Math.min(localSeconds, 300), 0)) / 300) * 100
+      : 0;
 
   // === WARNING HELPERS ===
   const getWarningMessage = () => {
@@ -666,7 +846,6 @@ export default function LobbyPage() {
               position: "relative",
             }}
           >
-            {/* 3-col grid: [Home] [Logo+Text] [Sound] — tam simetrik */}
             <div
               style={{
                 display: "grid",
@@ -675,7 +854,6 @@ export default function LobbyPage() {
                 gap: "8px",
               }}
             >
-              {/* Sol: Home */}
               <div style={{ display: "flex", alignItems: "center" }}>
                 <button
                   onClick={handleBack}
@@ -705,7 +883,6 @@ export default function LobbyPage() {
                 </button>
               </div>
 
-              {/* Orta: Logo + GLOBAL ARENA */}
               <div
                 style={{
                   display: "flex",
@@ -722,7 +899,8 @@ export default function LobbyPage() {
                     borderRadius: "50%",
                     padding: 3,
                     background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-                    boxShadow: "0 0 30px rgba(124, 58, 237, 0.7), 0 0 60px rgba(217, 70, 239, 0.4)",
+                    boxShadow:
+                      "0 0 30px rgba(124, 58, 237, 0.7), 0 0 60px rgba(217, 70, 239, 0.4)",
                     flexShrink: 0,
                   }}
                 >
@@ -763,8 +941,9 @@ export default function LobbyPage() {
                 </span>
               </div>
 
-              {/* Sağ: Sound */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+              <div
+                style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}
+              >
                 <button
                   onClick={() => setIsPlaying(!isPlaying)}
                   style={{
@@ -838,7 +1017,6 @@ export default function LobbyPage() {
                     : "0 0 40px rgba(139, 92, 246, 0.4)",
               }}
             >
-              {/* Status Badge */}
               <div
                 style={{
                   display: "inline-flex",
@@ -865,31 +1043,22 @@ export default function LobbyPage() {
                   style={{
                     width: 20,
                     height: 20,
-                    color:
-                      timeUntilStart <= 10
-                        ? "#ef4444"
-                        : "#4ade80",
+                    color: timeUntilStart <= 10 ? "#ef4444" : "#4ade80",
                   }}
                 />
                 <span
                   style={{
                     fontSize: "clamp(12px, 2.8vw, 14px)",
                     fontWeight: 800,
-                    color:
-                      timeUntilStart <= 10
-                        ? "#fca5a5"
-                        : "#4ade80",
+                    color: timeUntilStart <= 10 ? "#fca5a5" : "#4ade80",
                     textTransform: "uppercase",
                     letterSpacing: "0.06em",
                   }}
                 >
-                  {timeUntilStart <= 10
-                    ? "🚨 STARTING NOW!"
-                    : "✓ You're in the Lobby"}
+                  {timeUntilStart <= 10 ? "🚨 STARTING NOW!" : "✓ You're in the Lobby"}
                 </span>
               </div>
 
-              {/* Warning Message */}
               {showWarning && timeUntilStart <= 10 && (
                 <div
                   style={{
@@ -919,7 +1088,6 @@ export default function LobbyPage() {
                 </div>
               )}
 
-              {/* Countdown Title */}
               <h1
                 style={{
                   fontSize: "clamp(22px, 5.5vw, 36px)",
@@ -930,26 +1098,19 @@ export default function LobbyPage() {
                   justifyContent: "center",
                   gap: "14px",
                   flexWrap: "wrap",
-                  color:
-                    timeUntilStart <= 10
-                      ? "#fca5a5"
-                      : "white",
+                  color: timeUntilStart <= 10 ? "#fca5a5" : "white",
                 }}
               >
                 <Clock
                   style={{
                     width: "clamp(28px, 7vw, 36px)",
                     height: "clamp(28px, 7vw, 36px)",
-                    color:
-                      timeUntilStart <= 10
-                        ? "#ef4444"
-                        : "#a78bfa",
+                    color: timeUntilStart <= 10 ? "#ef4444" : "#a78bfa",
                   }}
                 />
                 Quiz Starting In
               </h1>
 
-              {/* Countdown Timer */}
               <div
                 style={{
                   fontSize: "clamp(56px, 18vw, 120px)",
@@ -968,16 +1129,13 @@ export default function LobbyPage() {
                       ? "0 0 50px rgba(239, 68, 68, 0.8)"
                       : "0 0 50px rgba(167, 139, 250, 0.6)",
                   animation:
-                    timeUntilStart <= 10
-                      ? "warningPulse 0.4s ease-in-out infinite"
-                      : "none",
+                    timeUntilStart <= 10 ? "warningPulse 0.4s ease-in-out infinite" : "none",
                   letterSpacing: "0.05em",
                 }}
               >
                 {formattedCountdown}
               </div>
 
-              {/* Progress Bar */}
               <div
                 style={{
                   width: "100%",
@@ -1014,14 +1172,10 @@ export default function LobbyPage() {
                 />
               </div>
 
-              {/* Info Message */}
               <p
                 style={{
                   fontSize: "clamp(14px, 3.2vw, 17px)",
-                  color:
-                    timeUntilStart <= 10
-                      ? "#fca5a5"
-                      : "#cbd5e1",
+                  color: timeUntilStart <= 10 ? "#fca5a5" : "#cbd5e1",
                   marginBottom: "clamp(28px, 6vw, 40px)",
                   lineHeight: 1.7,
                   fontWeight: 600,
@@ -1032,7 +1186,6 @@ export default function LobbyPage() {
                   : "You're in. Get ready!"}
               </p>
 
-              {/* Quiz Info Grid - 3 Cards Centered */}
               <div
                 style={{
                   display: "grid",
@@ -1131,17 +1284,18 @@ export default function LobbyPage() {
                 </div>
               </div>
 
-              {/* ── SPONSOR BANNER — countdown hemen altı ── */}
               <div
                 style={{
                   marginTop: "clamp(20px, 4vw, 28px)",
                   position: "relative",
                   borderRadius: "18px",
                   overflow: "hidden",
-                  background: "linear-gradient(135deg, rgba(124,58,237,0.12) 0%, rgba(15,23,42,0.85) 40%, rgba(217,70,239,0.10) 100%)",
+                  background:
+                    "linear-gradient(135deg, rgba(124,58,237,0.12) 0%, rgba(15,23,42,0.85) 40%, rgba(217,70,239,0.10) 100%)",
                   border: "1px solid rgba(251,191,36,0.45)",
                   backdropFilter: "blur(20px)",
-                  boxShadow: "0 0 18px rgba(251,191,36,0.12), inset 0 1px 0 rgba(251,191,36,0.08)",
+                  boxShadow:
+                    "0 0 18px rgba(251,191,36,0.12), inset 0 1px 0 rgba(251,191,36,0.08)",
                   padding: "clamp(8px, 2vw, 12px) clamp(12px, 3vw, 20px)",
                   display: "flex",
                   alignItems: "center",
@@ -1150,42 +1304,58 @@ export default function LobbyPage() {
                   minHeight: "clamp(44px, 8vw, 64px)",
                 }}
               >
-                {/* Shimmer sweep */}
-                <div style={{
-                  position: "absolute", top: 0, left: 0,
-                  width: "35%", height: "100%",
-                  background: "linear-gradient(90deg, transparent, rgba(167,139,250,0.07), transparent)",
-                  animation: "shimmer 4s ease-in-out infinite",
-                  pointerEvents: "none",
-                }} />
-                {/* Sol: SPONSORED BY etiketi */}
-                <div style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "flex-start",
-                  gap: "2px",
-                  flexShrink: 0,
-                  borderRight: "1px solid rgba(139,92,246,0.20)",
-                  paddingRight: "clamp(10px, 2.5vw, 16px)",
-                  marginRight: "clamp(2px, 1vw, 4px)",
-                }}>
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "35%",
+                    height: "100%",
+                    background:
+                      "linear-gradient(90deg, transparent, rgba(167,139,250,0.07), transparent)",
+                    animation: "shimmer 4s ease-in-out infinite",
+                    pointerEvents: "none",
+                  }}
+                />
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-start",
+                    gap: "2px",
+                    flexShrink: 0,
+                    borderRight: "1px solid rgba(139,92,246,0.20)",
+                    paddingRight: "clamp(10px, 2.5vw, 16px)",
+                    marginRight: "clamp(2px, 1vw, 4px)",
+                  }}
+                >
                   <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
                     <Sparkles style={{ width: 10, height: 10, color: "#f472b6" }} />
-                    <span style={{
-                      fontSize: "clamp(8px, 1.6vw, 10px)",
-                      fontWeight: 800,
-                      backgroundImage: "linear-gradient(135deg, #f472b6, #ec4899)",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      backgroundClip: "text",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.14em",
-                      whiteSpace: "nowrap",
-                    }}>Sponsored by</span>
+                    <span
+                      style={{
+                        fontSize: "clamp(8px, 1.6vw, 10px)",
+                        fontWeight: 800,
+                        backgroundImage: "linear-gradient(135deg, #f472b6, #ec4899)",
+                        WebkitBackgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                        backgroundClip: "text",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.14em",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Sponsored by
+                    </span>
                   </div>
                 </div>
-                {/* Sağ: sponsor.png */}
-                <div style={{ position: "relative", flex: 1, height: "clamp(28px, 5vw, 44px)", maxHeight: "44px" }}>
+                <div
+                  style={{
+                    position: "relative",
+                    flex: 1,
+                    height: "clamp(28px, 5vw, 44px)",
+                    maxHeight: "44px",
+                  }}
+                >
                   <Image
                     src="/images/sponsor.png"
                     alt="Official Sponsor"
@@ -1201,23 +1371,29 @@ export default function LobbyPage() {
                     }}
                   />
                 </div>
-                {/* Placeholder: sponsor.png yoksa */}
-                <div style={{
-                  display: "none", flex: 1,
-                  alignItems: "center", gap: "8px",
-                }}>
-                  <span style={{
-                    fontSize: "clamp(13px, 3vw, 17px)",
-                    fontWeight: 800,
-                    backgroundImage: "linear-gradient(135deg, #a78bfa, #f0abfc)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    backgroundClip: "text",
-                    letterSpacing: "0.04em",
-                  }}>Your Brand Here</span>
+                <div
+                  style={{
+                    display: "none",
+                    flex: 1,
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "clamp(13px, 3vw, 17px)",
+                      fontWeight: 800,
+                      backgroundImage: "linear-gradient(135deg, #a78bfa, #f0abfc)",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      backgroundClip: "text",
+                      letterSpacing: "0.04em",
+                    }}
+                  >
+                    Your Brand Here
+                  </span>
                 </div>
               </div>
-
             </div>
 
             {/* Players Section - 25% Smaller */}
@@ -1408,7 +1584,6 @@ export default function LobbyPage() {
                 )}
               </div>
 
-              {/* Total Players Info */}
               <div
                 style={{
                   marginTop: "clamp(15px, 3.4vw, 21px)",
