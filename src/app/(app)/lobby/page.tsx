@@ -75,7 +75,7 @@ export default function LobbyPage() {
   const lastPresenceRef = useRef<number>(0);
   const fetchInFlightRef = useRef(false);
   const zeroHandledForRoundRef = useRef<string | null>(null);
-  const countdownZeroWatchdogRef = useRef<ReturnType<typeof window.setInterval> | null>(null);
+  const countdownZeroWatchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -446,7 +446,7 @@ useEffect(() => {
 
   const clearWatchdog = () => {
     if (countdownZeroWatchdogRef.current !== null) {
-      window.clearInterval(countdownZeroWatchdogRef.current);
+      clearInterval(countdownZeroWatchdogRef.current);
       countdownZeroWatchdogRef.current = null;
     }
   };
@@ -456,13 +456,10 @@ useEffect(() => {
     return;
   }
 
-  // Aynı effect yeniden çalışırsa ikinci interval açılmasını engelle
   clearWatchdog();
-
-  // İlk denemeyi hemen yap
   void handleCountdownZero();
 
-  countdownZeroWatchdogRef.current = window.setInterval(() => {
+  countdownZeroWatchdogRef.current = setInterval(() => {
     void handleCountdownZero();
   }, 1500);
 
@@ -470,7 +467,6 @@ useEffect(() => {
     clearWatchdog();
   };
 }, [localSeconds, lobbyState?.round_id, handleCountdownZero]);
-
 // === HANDLE BACK BUTTON ===
 const handleBack = async () => {
   console.log("[Lobby] User left lobby, round NOT deducted");
