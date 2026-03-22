@@ -408,9 +408,9 @@ if (enterLobbyError) {
         zeroHandledForRoundRef.current = state.round_id;
 
         const { data: joinResult, error: joinError } = await supabase.rpc("join_live_round");
-        const joinRow = Array.isArray(joinResult) ? joinResult[0] : joinResult;
+const joinRow = Array.isArray(joinResult) ? joinResult[0] : joinResult;
 
-        cconst joinedSuccessfully =
+const joinedSuccessfully =
   !joinError &&
   (joinRow?.action === "join" || joinRow?.message === "already_joined");
 
