@@ -75,7 +75,7 @@ export default function LobbyPage() {
   const lastPresenceRef = useRef<number>(0);
   const fetchInFlightRef = useRef(false);
   const zeroHandledForRoundRef = useRef<string | null>(null);
-  const countdownZeroWatchdogRef = useRef<ReturnType<typeof window.setInterval> | null>(null);
+  const countdownZeroWatchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
