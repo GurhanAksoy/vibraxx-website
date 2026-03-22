@@ -581,19 +581,44 @@ export default function QuizGamePage() {
   };
 
   const handleExitConfirmYes = async () => {
-    playClick();
-    stopTick();
-    setShowExitConfirm(false);
-    if (!roundId) return;
-    try {
-      await supabase.rpc("finalize_user_round", { p_round_id: roundId });
-      await loadFinalResults();
-      setShowFinalScore(true);
-    } catch (err) {
-      console.error("❌ Exit error:", err);
-      setShowFinalScore(true);
+  playClick();
+  stopTick();
+  setShowExitConfirm(false);
+
+  if (!roundId) return;
+
+  try {
+    let roundFinished = false;
+
+    // Round status'u öğren
+    const { data: progressData, error: progressError } = await supabase.rpc(
+      "get_round_progress",
+      { p_round_id: roundId }
+    );
+
+    if (!progressError && progressData) {
+      roundFinished = progressData.round_status === "finished";
     }
-  };
+
+    // Sadece round gerçekten bittiyse finalize et
+    if (roundFinished) {
+      const { error: finalizeError } = await supabase.rpc("finalize_user_round", {
+        p_round_id: roundId,
+      });
+
+      if (finalizeError) {
+        console.error("❌ finalize_user_round error:", finalizeError);
+      }
+    }
+
+    // Her durumda score card aç
+    await loadFinalResults();
+    setShowFinalScore(true);
+  } catch (err) {
+    console.error("❌ Exit flow error:", err);
+    setShowFinalScore(true);
+  }
+};
 
   const handleExitConfirmNo = () => {
     playClick();
