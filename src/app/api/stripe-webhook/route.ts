@@ -10,7 +10,12 @@ const supabaseAdmin = createClient(
 );
 
 export async function POST(req: Request) {
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    console.error("[Webhook] Missing STRIPE_WEBHOOK_SECRET");
+    return NextResponse.json({ error: "Webhook secret missing" }, { status: 500 });
+  }
 
   const body = await req.text();
   const sig = req.headers.get("stripe-signature");
@@ -29,70 +34,80 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  console.log("[Webhook] Event:", event.type);
+  console.log("[Webhook] Event:", event.type, "| id:", event.id);
 
-  // === SADECE PAID CHECKOUT ===
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object as Stripe.Checkout.Session;
+  try {
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object as Stripe.Checkout.Session;
 
-    if (session.payment_status !== "paid") {
-      console.log("[Webhook] Payment not completed, skipping");
-      return NextResponse.json({ received: true });
-    }
+      console.log("[Webhook] Session ID:", session.id);
+      console.log("[Webhook] Payment status:", session.payment_status);
+      console.log("[Webhook] Metadata:", session.metadata);
 
-    const { user_id, package: pkg, credits } = session.metadata ?? {};
+      if (session.payment_status !== "paid") {
+        console.log("[Webhook] Payment not completed, skipping");
+        return NextResponse.json({ received: true });
+      }
 
-    if (!user_id || !credits) {
-      console.error("[Webhook] Missing metadata");
-      return NextResponse.json({ error: "Missing metadata" }, { status: 400 });
-    }
+      const { user_id, package: pkg, credits } = session.metadata ?? {};
 
-    const creditsNum = parseInt(credits, 10);
-    if (isNaN(creditsNum) || creditsNum <= 0) {
-      console.error("[Webhook] Invalid credits:", credits);
-      return NextResponse.json({ error: "Invalid credits" }, { status: 400 });
-    }
+      if (!user_id || !pkg || !credits) {
+        console.error("[Webhook] Missing metadata:", {
+          user_id,
+          package: pkg,
+          credits,
+        });
+        return NextResponse.json({ error: "Missing metadata" }, { status: 400 });
+      }
 
-    // =========================================
-    // 🧠 1. STRIPE EVENT INGEST (CRITICAL FIX)
-    // =========================================
-    const { data: inserted, error: ingestError } =
-      await supabaseAdmin.rpc("v2_stripe_ingest_event", {
-        p_event_id: event.id,
-        p_details: event,
+      const creditsNum = parseInt(credits, 10);
+      if (Number.isNaN(creditsNum) || creditsNum <= 0) {
+        console.error("[Webhook] Invalid credits value:", credits);
+        return NextResponse.json({ error: "Invalid credits" }, { status: 400 });
+      }
+
+      // 1) Stripe event ingest — authoritative event tracking
+      const { data: inserted, error: ingestError } = await supabaseAdmin.rpc(
+        "v2_stripe_ingest_event",
+        {
+          p_event_id: event.id,
+          p_details: event as unknown as Record<string, unknown>,
+        }
+      );
+
+      if (ingestError) {
+        console.error("[Webhook] v2_stripe_ingest_event error:", ingestError);
+        return NextResponse.json({ error: "Ingest failed" }, { status: 500 });
+      }
+
+      // Duplicate event => do not process again
+      if (!inserted) {
+        console.log("[Webhook] Duplicate event, skipping:", event.id);
+        return NextResponse.json({ received: true, duplicate: true });
+      }
+
+      // 2) Credit grant — existing system
+      const reason = `stripe_${pkg}_${session.id}`;
+
+      const { error: creditError } = await supabaseAdmin.rpc("add_paid_credits", {
+        p_user_id: user_id,
+        p_credits: creditsNum,
+        p_reason: reason,
       });
 
-    if (ingestError) {
-      console.error("[Webhook] ingest error:", ingestError);
-      return NextResponse.json({ error: "Ingest failed" }, { status: 500 });
+      if (creditError) {
+        console.error("[Webhook] add_paid_credits error:", creditError);
+        return NextResponse.json({ error: "Failed to add credits" }, { status: 500 });
+      }
+
+      console.log(
+        `[Webhook] ✅ ${creditsNum} credits added → user: ${user_id} | pkg: ${pkg} | reason: ${reason}`
+      );
     }
 
-    // Eğer event daha önce işlendi ise → STOP
-    if (!inserted) {
-      console.log("[Webhook] Duplicate event, skipping");
-      return NextResponse.json({ received: true });
-    }
-
-    // =========================================
-    // 💰 2. CREDIT YÜKLE (MEVCUT SİSTEM)
-    // =========================================
-    const reason = `stripe_${pkg}_${session.id}`;
-
-    const { error: creditError } = await supabaseAdmin.rpc("add_paid_credits", {
-      p_user_id: user_id,
-      p_credits: creditsNum,
-      p_reason: reason,
-    });
-
-    if (creditError) {
-      console.error("[Webhook] add_paid_credits error:", creditError);
-      return NextResponse.json({ error: "Credit failed" }, { status: 500 });
-    }
-
-    console.log(
-      `[Webhook] ✅ ${creditsNum} credits added | user=${user_id} | pkg=${pkg}`
-    );
+    return NextResponse.json({ received: true });
+  } catch (err) {
+    console.error("[Webhook] Unhandled error:", err);
+    return NextResponse.json({ error: "Webhook handler failed" }, { status: 500 });
   }
-
-  return NextResponse.json({ received: true });
 }
