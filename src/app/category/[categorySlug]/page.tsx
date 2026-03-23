@@ -39,7 +39,6 @@ export async function generateMetadata({
   params: Promise<{ categorySlug: string }>;
 }): Promise<Metadata> {
   const { categorySlug } = await params;
-
   const label = CATEGORY_LABELS[categorySlug];
 
   if (!label) {
@@ -64,13 +63,12 @@ export default async function CategoryPage({
   params: Promise<{ categorySlug: string }>;
 }) {
   const { categorySlug } = await params;
-
   const label = CATEGORY_LABELS[categorySlug];
   if (!label) return notFound();
 
   const supabase = createSupabaseAdmin();
 
-  const { data: questions, error } = await supabase
+  const { data: questions } = await supabase
     .from("seo_pages")
     .select("slug, title")
     .eq("page_type", "question")
@@ -79,11 +77,6 @@ export default async function CategoryPage({
     .eq("indexable", true)
     .order("id", { ascending: false })
     .limit(50);
-
-  if (error) {
-    console.error(error);
-    return notFound();
-  }
 
   return (
     <main
@@ -95,6 +88,55 @@ export default async function CategoryPage({
         fontFamily: "system-ui",
       }}
     >
+      {/* LOGO */}
+      <div style={{ textAlign: "center", marginBottom: "16px" }}>
+        <img
+          src="/images/logo.png"
+          alt="VibraXX"
+          style={{
+            height: "80px",
+            margin: "0 auto",
+          }}
+        />
+        <p style={{ opacity: 0.7, marginTop: "6px" }}>
+          🔥 Global Live Quiz Arena — Every 5 minutes
+          <br />
+          🏆 Compete for up to £1,000 monthly prize
+        </p>
+      </div>
+
+      {/* CTA TOP */}
+      <div
+        style={{
+          maxWidth: 900,
+          margin: "0 auto 16px",
+          padding: "12px 16px",
+          borderRadius: "12px",
+          background: "rgba(99,102,241,0.15)",
+          border: "1px solid rgba(99,102,241,0.4)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        <div>Join the next live round now</div>
+        <a
+          href="https://www.vibraxx.com/#arena"
+          style={{
+            padding: "8px 14px",
+            background: "#22c55e",
+            color: "#022c22",
+            borderRadius: "8px",
+            textDecoration: "none",
+            fontWeight: "bold",
+          }}
+        >
+          Enter Arena
+        </a>
+      </div>
+
+      {/* HEADER */}
       <div style={{ textAlign: "center", marginBottom: "20px" }}>
         <h1>{label}</h1>
         <p style={{ opacity: 0.7 }}>
@@ -102,6 +144,7 @@ export default async function CategoryPage({
         </p>
       </div>
 
+      {/* QUESTION LIST */}
       <div
         style={{
           maxWidth: 900,
@@ -111,11 +154,11 @@ export default async function CategoryPage({
           padding: "20px",
         }}
       >
-        {questions.length === 0 ? (
+        {questions?.length === 0 ? (
           <p>No questions found.</p>
         ) : (
           <ul style={{ paddingLeft: "18px" }}>
-            {questions.map((q) => (
+            {questions?.map((q) => (
               <li key={q.slug} style={{ marginBottom: "12px" }}>
                 <a
                   href={`/questions/${q.slug}`}
@@ -130,6 +173,37 @@ export default async function CategoryPage({
             ))}
           </ul>
         )}
+      </div>
+
+      {/* CTA BOTTOM */}
+      <div
+        style={{
+          maxWidth: 900,
+          margin: "16px auto",
+          padding: "18px",
+          borderRadius: "16px",
+          background: "rgba(34,197,94,0.08)",
+          border: "1px solid rgba(34,197,94,0.25)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        <div>Ready to compete live?</div>
+        <a
+          href="https://www.vibraxx.com/#arena"
+          style={{
+            padding: "10px 16px",
+            background: "#22c55e",
+            color: "#022c22",
+            borderRadius: "8px",
+            textDecoration: "none",
+            fontWeight: "bold",
+          }}
+        >
+          Play on VibraXX
+        </a>
       </div>
     </main>
   );
