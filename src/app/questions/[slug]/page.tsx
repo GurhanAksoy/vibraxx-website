@@ -41,6 +41,26 @@ function toAbsoluteUrl(urlOrPath?: string | null) {
   return `${SITE_URL}${urlOrPath.startsWith("/") ? "" : "/"}${urlOrPath}`;
 }
 
+function ctaButtonStyle(): React.CSSProperties {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "46px",
+    padding: "12px 22px",
+    background: "#22c55e",
+    color: "#052e16",
+    borderRadius: "12px",
+    textDecoration: "none",
+    fontWeight: 800,
+    fontSize: "14px",
+    letterSpacing: "0.03em",
+    whiteSpace: "nowrap",
+    lineHeight: 1,
+    textAlign: "center",
+  };
+}
+
 async function getSeoQuestionPage(slug: string) {
   const supabase = createSupabaseAdmin();
 
@@ -115,25 +135,6 @@ export async function generateMetadata({
   };
 }
 
-function ctaButtonStyle(): React.CSSProperties {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: "44px",
-    padding: "10px 16px",
-    background: "#22c55e",
-    color: "#052e16",
-    borderRadius: "10px",
-    fontWeight: 800,
-    textDecoration: "none",
-    fontSize: "14px",
-    letterSpacing: "0.03em",
-    whiteSpace: "nowrap",
-    lineHeight: 1,
-  };
-}
-
 export default async function QuestionPage({
   params,
 }: {
@@ -199,7 +200,7 @@ export default async function QuestionPage({
     >
       <div
         style={{
-          maxWidth: 760,
+          maxWidth: "760px",
           margin: "0 auto",
           width: "100%",
         }}
@@ -219,7 +220,7 @@ export default async function QuestionPage({
 
           <p
             style={{
-              opacity: 0.8,
+              opacity: 0.82,
               marginTop: "10px",
               marginBottom: 0,
               fontSize: "14px",
@@ -235,36 +236,40 @@ export default async function QuestionPage({
         <div
           style={{
             margin: "0 auto 14px",
-            padding: "14px 16px",
-            borderRadius: "14px",
+            padding: "16px",
+            borderRadius: "16px",
             background: "rgba(99,102,241,0.15)",
             border: "1px solid rgba(99,102,241,0.35)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: "12px",
-            flexWrap: "wrap",
           }}
         >
           <div
             style={{
               fontSize: "14px",
-              lineHeight: 1.5,
+              lineHeight: 1.6,
               opacity: 0.95,
-              flex: "1 1 240px",
+              textAlign: "center",
+              marginBottom: "14px",
             }}
           >
             Join the next live round and compete with players worldwide.
           </div>
 
-          <a
-            href="https://www.vibraxx.com/#arena"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={ctaButtonStyle()}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
           >
-            ENTER ARENA
-          </a>
+            <a
+              href="https://www.vibraxx.com/#arena"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={ctaButtonStyle()}
+            >
+              ENTER ARENA
+            </a>
+          </div>
         </div>
 
         <div
@@ -440,11 +445,6 @@ export default async function QuestionPage({
             borderRadius: "16px",
             background: "rgba(34,197,94,0.08)",
             border: "1px solid rgba(34,197,94,0.25)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: "12px",
-            flexWrap: "wrap",
           }}
         >
           <div
@@ -452,20 +452,29 @@ export default async function QuestionPage({
               opacity: 0.95,
               fontSize: "14px",
               lineHeight: 1.6,
-              flex: "1 1 240px",
+              textAlign: "center",
+              marginBottom: "14px",
             }}
           >
             Ready for the live challenge? Join the next global round now.
           </div>
 
-          <a
-            href="https://www.vibraxx.com/#arena"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={ctaButtonStyle()}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
           >
-            ENTER ARENA
-          </a>
+            <a
+              href="https://www.vibraxx.com/#arena"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={ctaButtonStyle()}
+            >
+              ENTER ARENA
+            </a>
+          </div>
         </div>
 
         <section
