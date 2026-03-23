@@ -62,6 +62,26 @@ function createSupabaseAdmin() {
   );
 }
 
+function ctaButtonStyle(): React.CSSProperties {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "46px",
+    padding: "12px 22px",
+    background: "#22c55e",
+    color: "#052e16",
+    borderRadius: "12px",
+    textDecoration: "none",
+    fontWeight: 800,
+    fontSize: "14px",
+    letterSpacing: "0.03em",
+    whiteSpace: "nowrap",
+    lineHeight: 1,
+    textAlign: "center",
+  };
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -133,9 +153,7 @@ export default async function CategoryPage({
     return notFound();
   }
 
-  const safeQuestions = (questions || []).filter(
-    (q) => q?.slug && q?.title
-  );
+  const safeQuestions = (questions || []).filter((q) => q?.slug && q?.title);
 
   const description =
     CATEGORY_DESCRIPTIONS[categorySlug] ||
@@ -154,7 +172,7 @@ export default async function CategoryPage({
     >
       <div
         style={{
-          maxWidth: "960px",
+          maxWidth: "760px",
           margin: "0 auto",
           width: "100%",
         }}
@@ -188,63 +206,51 @@ export default async function CategoryPage({
 
         <div
           style={{
-            maxWidth: "960px",
             margin: "0 auto 14px",
-            padding: "14px 16px",
-            borderRadius: "14px",
+            padding: "16px",
+            borderRadius: "16px",
             background: "rgba(99,102,241,0.15)",
             border: "1px solid rgba(99,102,241,0.35)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: "12px",
-            flexWrap: "wrap",
           }}
         >
           <div
             style={{
               fontSize: "14px",
-              lineHeight: 1.5,
+              lineHeight: 1.6,
               opacity: 0.95,
-              flex: "1 1 260px",
+              textAlign: "center",
+              marginBottom: "14px",
             }}
           >
             Join the next live round and compete with players worldwide.
           </div>
 
-          <a
-            href="https://www.vibraxx.com/#arena"
-            target="_blank"
-            rel="noopener noreferrer"
+          <div
             style={{
-              display: "inline-flex",
-              alignItems: "center",
+              display: "flex",
               justifyContent: "center",
-              minHeight: "44px",
-              padding: "10px 18px",
-              background: "#22c55e",
-              color: "#052e16",
-              borderRadius: "10px",
-              textDecoration: "none",
-              fontWeight: 800,
-              fontSize: "14px",
-              letterSpacing: "0.02em",
-              whiteSpace: "nowrap",
-              flex: "0 0 auto",
+              alignItems: "center",
             }}
           >
-            ENTER ARENA
-          </a>
+            <a
+              href="https://www.vibraxx.com/#arena"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={ctaButtonStyle()}
+            >
+              ENTER ARENA
+            </a>
+          </div>
         </div>
 
         <div
           style={{
-            maxWidth: "960px",
             margin: "0 auto 12px",
             padding: "0 2px",
             fontSize: "14px",
             opacity: 0.88,
             lineHeight: 1.5,
+            wordBreak: "break-word",
           }}
         >
           <a
@@ -304,7 +310,7 @@ export default async function CategoryPage({
 
             <p
               style={{
-                maxWidth: "720px",
+                maxWidth: "640px",
                 margin: "0 auto",
                 opacity: 0.82,
                 fontSize: "15px",
@@ -350,46 +356,35 @@ export default async function CategoryPage({
           <div
             style={{
               marginBottom: "14px",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: "12px",
-              flexWrap: "wrap",
             }}
           >
             <h2
               style={{
-                margin: 0,
+                margin: "0 0 14px",
                 fontSize: "22px",
                 lineHeight: 1.25,
+                textAlign: "center",
               }}
             >
               Latest Questions
             </h2>
 
-            <a
-              href="https://www.vibraxx.com/#arena"
-              target="_blank"
-              rel="noopener noreferrer"
+            <div
               style={{
-                display: "inline-flex",
-                alignItems: "center",
+                display: "flex",
                 justifyContent: "center",
-                minHeight: "42px",
-                padding: "9px 14px",
-                background: "rgba(34,197,94,0.12)",
-                color: "#86efac",
-                border: "1px solid rgba(34,197,94,0.25)",
-                borderRadius: "10px",
-                textDecoration: "none",
-                fontWeight: 800,
-                fontSize: "13px",
-                letterSpacing: "0.02em",
-                whiteSpace: "nowrap",
+                alignItems: "center",
               }}
             >
-              ENTER ARENA
-            </a>
+              <a
+                href="https://www.vibraxx.com/#arena"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={ctaButtonStyle()}
+              >
+                ENTER ARENA
+              </a>
+            </div>
           </div>
 
           {safeQuestions.length === 0 ? (
@@ -401,6 +396,7 @@ export default async function CategoryPage({
                 color: "#cbd5e1",
                 fontSize: "15px",
                 lineHeight: 1.6,
+                textAlign: "center",
               }}
             >
               No published questions are available in this category yet.
@@ -453,17 +449,11 @@ export default async function CategoryPage({
 
         <div
           style={{
-            maxWidth: "960px",
             margin: "16px auto 0",
             padding: "18px 16px",
             borderRadius: "16px",
             background: "rgba(34,197,94,0.08)",
             border: "1px solid rgba(34,197,94,0.25)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: "12px",
-            flexWrap: "wrap",
           }}
         >
           <div
@@ -471,35 +461,29 @@ export default async function CategoryPage({
               fontSize: "14px",
               lineHeight: 1.6,
               opacity: 0.95,
-              flex: "1 1 260px",
+              textAlign: "center",
+              marginBottom: "14px",
             }}
           >
             Ready to compete live? Join the next global round now.
           </div>
 
-          <a
-            href="https://www.vibraxx.com/#arena"
-            target="_blank"
-            rel="noopener noreferrer"
+          <div
             style={{
-              display: "inline-flex",
-              alignItems: "center",
+              display: "flex",
               justifyContent: "center",
-              minHeight: "44px",
-              padding: "10px 18px",
-              background: "#22c55e",
-              color: "#052e16",
-              borderRadius: "10px",
-              textDecoration: "none",
-              fontWeight: 800,
-              fontSize: "14px",
-              letterSpacing: "0.02em",
-              whiteSpace: "nowrap",
-              flex: "0 0 auto",
+              alignItems: "center",
             }}
           >
-            ENTER ARENA
-          </a>
+            <a
+              href="https://www.vibraxx.com/#arena"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={ctaButtonStyle()}
+            >
+              ENTER ARENA
+            </a>
+          </div>
         </div>
       </div>
     </main>
