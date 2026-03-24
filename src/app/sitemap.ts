@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
+export const dynamic = "force-dynamic";
+
 export default async function sitemap() {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,14 +11,14 @@ export default async function sitemap() {
   const { data } = await supabase
     .from("seo_pages")
     .select("slug, updated_at")
-    .limit(50000); // Google limit
+    .eq("publish_status", "published")
+    .eq("indexable", true)
+    .limit(50000);
 
   const baseUrl = "https://www.vibraxx.com";
 
   return (data || []).map((page) => ({
     url: `${baseUrl}/questions/${page.slug}`,
     lastModified: page.updated_at || new Date().toISOString(),
-    changeFrequency: "daily",
-    priority: 0.7,
   }));
 }
