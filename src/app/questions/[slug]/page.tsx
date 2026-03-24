@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import type { Metadata } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
+import Footer from "@/components/Footer";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
@@ -188,380 +189,384 @@ export default async function QuestionPage({
   ];
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "radial-gradient(circle at top, #1e293b, #020617)",
-        color: "#ffffff",
-        padding: "16px",
-        fontFamily:
-          'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      }}
-    >
-      <div
+    <>
+      <main
         style={{
-          maxWidth: "760px",
-          margin: "0 auto",
-          width: "100%",
+          minHeight: "100vh",
+          background: "radial-gradient(circle at top, #1e293b, #020617)",
+          color: "#ffffff",
+          padding: "16px",
+          fontFamily:
+            'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         }}
       >
-        <div style={{ textAlign: "center", marginBottom: "18px" }}>
-          <img
-            src="/images/logo.png"
-            alt="VibraXX"
-            style={{
-              height: "72px",
-              width: "auto",
-              maxWidth: "100%",
-              display: "block",
-              margin: "0 auto",
-            }}
-          />
-
-          <p
-            style={{
-              opacity: 0.82,
-              marginTop: "10px",
-              marginBottom: 0,
-              fontSize: "14px",
-              lineHeight: 1.6,
-            }}
-          >
-            🔥 Global Live Quiz Arena — Every 5 minutes
-            <br />
-            🏆 Compete for up to £1,000 monthly prize
-          </p>
-        </div>
-
         <div
           style={{
-            margin: "0 auto 14px",
-            padding: "16px",
-            borderRadius: "16px",
-            background: "rgba(99,102,241,0.15)",
-            border: "1px solid rgba(99,102,241,0.35)",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "14px",
-              lineHeight: 1.6,
-              opacity: 0.95,
-              textAlign: "center",
-              marginBottom: "14px",
-            }}
-          >
-            Join the next live round and compete with players worldwide.
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <a
-              href="https://www.vibraxx.com/#arena"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={ctaButtonStyle()}
-            >
-              ENTER ARENA
-            </a>
-          </div>
-        </div>
-
-        <div
-          style={{
-            margin: "0 auto 12px",
-            padding: "0 2px",
-            fontSize: "14px",
-            opacity: 0.88,
-            lineHeight: 1.5,
-            wordBreak: "break-word",
-          }}
-        >
-          <a
-            href="/"
-            style={{
-              color: "#93c5fd",
-              textDecoration: "none",
-            }}
-          >
-            Home
-          </a>
-
-          {categoryHref && categoryLabel ? (
-            <>
-              <span style={{ margin: "0 8px", opacity: 0.5 }}>›</span>
-              <a
-                href={categoryHref}
-                style={{
-                  color: "#93c5fd",
-                  textDecoration: "none",
-                }}
-              >
-                {categoryLabel}
-              </a>
-              <span style={{ margin: "0 8px", opacity: 0.5 }}>›</span>
-              <span style={{ color: "#cbd5e1" }}>Question</span>
-            </>
-          ) : (
-            <>
-              <span style={{ margin: "0 8px", opacity: 0.5 }}>›</span>
-              <span style={{ color: "#cbd5e1" }}>Question</span>
-            </>
-          )}
-        </div>
-
-        <section
-          style={{
+            maxWidth: "760px",
             margin: "0 auto",
-            padding: "20px 18px",
-            borderRadius: "18px",
-            background: "#0f172a",
-            boxShadow: "0 8px 30px rgba(0,0,0,0.18)",
+            width: "100%",
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: "12px",
-              flexWrap: "wrap",
-              marginBottom: "12px",
-            }}
-          >
-            <div
+          <div style={{ textAlign: "center", marginBottom: "18px" }}>
+            <img
+              src="/images/logo.png"
+              alt="VibraXX"
               style={{
-                color: "#22d3ee",
-                fontSize: "12px",
-                fontWeight: 800,
-                letterSpacing: "0.06em",
+                height: "72px",
+                width: "auto",
+                maxWidth: "100%",
+                display: "block",
+                margin: "0 auto",
               }}
-            >
-              QUESTION
-            </div>
+            />
 
-            {categoryHref && categoryLabel && (
-              <a
-                href={categoryHref}
-                style={{
-                  color: "#93c5fd",
-                  textDecoration: "none",
-                  fontSize: "14px",
-                  lineHeight: 1.4,
-                }}
-              >
-                Explore more in {categoryLabel}
-              </a>
-            )}
-          </div>
-
-          <h1
-            style={{
-              margin: "0 0 20px",
-              fontSize: "clamp(24px, 5vw, 32px)",
-              lineHeight: 1.3,
-              wordBreak: "break-word",
-            }}
-          >
-            {q.question_text}
-          </h1>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr",
-              gap: "12px",
-            }}
-          >
-            {options.map((opt) => {
-              const isCorrect = q.correct_option === opt.key;
-
-              return (
-                <div
-                  key={opt.key}
-                  style={{
-                    padding: "14px 14px",
-                    borderRadius: "12px",
-                    border: isCorrect
-                      ? "2px solid #22c55e"
-                      : "1px solid #334155",
-                    background: isCorrect
-                      ? "rgba(34,197,94,0.1)"
-                      : "rgba(15,23,42,0.72)",
-                    lineHeight: 1.6,
-                    fontSize: "15px",
-                    wordBreak: "break-word",
-                  }}
-                >
-                  <span style={{ fontWeight: 800 }}>{opt.key})</span> {opt.text}
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        <section
-          style={{
-            margin: "16px auto",
-            padding: "20px 18px",
-            borderRadius: "18px",
-            background: "#0f172a",
-            boxShadow: "0 8px 30px rgba(0,0,0,0.18)",
-          }}
-        >
-          <h2
-            style={{
-              marginTop: 0,
-              marginBottom: "12px",
-              fontSize: "22px",
-              lineHeight: 1.3,
-            }}
-          >
-            Explanation
-          </h2>
-          <p
-            style={{
-              opacity: 0.92,
-              lineHeight: 1.75,
-              whiteSpace: "pre-wrap",
-              marginBottom: 0,
-              fontSize: "15px",
-              wordBreak: "break-word",
-            }}
-          >
-            {q.explanation}
-          </p>
-        </section>
-
-        <div
-          style={{
-            margin: "16px auto",
-            padding: "18px 16px",
-            borderRadius: "16px",
-            background: "rgba(34,197,94,0.08)",
-            border: "1px solid rgba(34,197,94,0.25)",
-          }}
-        >
-          <div
-            style={{
-              opacity: 0.95,
-              fontSize: "14px",
-              lineHeight: 1.6,
-              textAlign: "center",
-              marginBottom: "14px",
-            }}
-          >
-            Ready for the live challenge? Join the next global round now.
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <a
-              href="https://www.vibraxx.com/#arena"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={ctaButtonStyle()}
-            >
-              ENTER ARENA
-            </a>
-          </div>
-        </div>
-
-        <section
-          style={{
-            margin: "16px auto",
-            padding: "20px 18px",
-            borderRadius: "18px",
-            background: "#0f172a",
-            boxShadow: "0 8px 30px rgba(0,0,0,0.18)",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: "12px",
-              flexWrap: "wrap",
-              marginBottom: "12px",
-            }}
-          >
-            <h2
+            <p
               style={{
-                margin: 0,
-                fontSize: "22px",
-                lineHeight: 1.3,
-              }}
-            >
-              Related Questions
-            </h2>
-
-            {categoryHref && categoryLabel && (
-              <a
-                href={categoryHref}
-                style={{
-                  color: "#93c5fd",
-                  textDecoration: "none",
-                  fontSize: "14px",
-                  lineHeight: 1.4,
-                }}
-              >
-                Browse {categoryLabel}
-              </a>
-            )}
-          </div>
-
-          {safeRelated.length === 0 ? (
-            <div
-              style={{
-                padding: "14px",
-                borderRadius: "12px",
-                background: "rgba(148,163,184,0.08)",
-                color: "#cbd5e1",
-                fontSize: "15px",
+                opacity: 0.82,
+                marginTop: "10px",
+                marginBottom: 0,
+                fontSize: "14px",
                 lineHeight: 1.6,
               }}
             >
-              No related questions found.
-            </div>
-          ) : (
-            <ul
+              🔥 Global Live Quiz Arena — Every 5 minutes
+              <br />
+              🏆 Compete for up to £1,000 monthly prize
+            </p>
+          </div>
+
+          <div
+            style={{
+              margin: "0 auto 14px",
+              padding: "16px",
+              borderRadius: "16px",
+              background: "rgba(99,102,241,0.15)",
+              border: "1px solid rgba(99,102,241,0.35)",
+            }}
+          >
+            <div
               style={{
-                marginTop: "12px",
-                paddingLeft: "16px",
-                lineHeight: 1.7,
+                fontSize: "14px",
+                lineHeight: 1.6,
+                opacity: 0.95,
+                textAlign: "center",
+                marginBottom: "14px",
               }}
             >
-              {safeRelated.map((item: any) => (
-                <li key={item.id} style={{ marginBottom: "12px" }}>
-                  <a
-                    href={`/questions/${item.slug}`}
+              Join the next live round and compete with players worldwide.
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <a
+                href="https://www.vibraxx.com/#arena"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={ctaButtonStyle()}
+              >
+                ENTER ARENA
+              </a>
+            </div>
+          </div>
+
+          <div
+            style={{
+              margin: "0 auto 12px",
+              padding: "0 2px",
+              fontSize: "14px",
+              opacity: 0.88,
+              lineHeight: 1.5,
+              wordBreak: "break-word",
+            }}
+          >
+            <a
+              href="/"
+              style={{
+                color: "#93c5fd",
+                textDecoration: "none",
+              }}
+            >
+              Home
+            </a>
+
+            {categoryHref && categoryLabel ? (
+              <>
+                <span style={{ margin: "0 8px", opacity: 0.5 }}>›</span>
+                <a
+                  href={categoryHref}
+                  style={{
+                    color: "#93c5fd",
+                    textDecoration: "none",
+                  }}
+                >
+                  {categoryLabel}
+                </a>
+                <span style={{ margin: "0 8px", opacity: 0.5 }}>›</span>
+                <span style={{ color: "#cbd5e1" }}>Question</span>
+              </>
+            ) : (
+              <>
+                <span style={{ margin: "0 8px", opacity: 0.5 }}>›</span>
+                <span style={{ color: "#cbd5e1" }}>Question</span>
+              </>
+            )}
+          </div>
+
+          <section
+            style={{
+              margin: "0 auto",
+              padding: "20px 18px",
+              borderRadius: "18px",
+              background: "#0f172a",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.18)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "12px",
+                flexWrap: "wrap",
+                marginBottom: "12px",
+              }}
+            >
+              <div
+                style={{
+                  color: "#22d3ee",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  letterSpacing: "0.06em",
+                }}
+              >
+                QUESTION
+              </div>
+
+              {categoryHref && categoryLabel && (
+                <a
+                  href={categoryHref}
+                  style={{
+                    color: "#93c5fd",
+                    textDecoration: "none",
+                    fontSize: "14px",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  Explore more in {categoryLabel}
+                </a>
+              )}
+            </div>
+
+            <h1
+              style={{
+                margin: "0 0 20px",
+                fontSize: "clamp(24px, 5vw, 32px)",
+                lineHeight: 1.3,
+                wordBreak: "break-word",
+              }}
+            >
+              {q.question_text}
+            </h1>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr",
+                gap: "12px",
+              }}
+            >
+              {options.map((opt) => {
+                const isCorrect = q.correct_option === opt.key;
+
+                return (
+                  <div
+                    key={opt.key}
                     style={{
-                      color: "#22d3ee",
-                      textDecoration: "none",
+                      padding: "14px 14px",
+                      borderRadius: "12px",
+                      border: isCorrect
+                        ? "2px solid #22c55e"
+                        : "1px solid #334155",
+                      background: isCorrect
+                        ? "rgba(34,197,94,0.1)"
+                        : "rgba(15,23,42,0.72)",
                       lineHeight: 1.6,
                       fontSize: "15px",
                       wordBreak: "break-word",
                     }}
                   >
-                    {item.question_text}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
-    </main>
+                    <span style={{ fontWeight: 800 }}>{opt.key})</span> {opt.text}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section
+            style={{
+              margin: "16px auto",
+              padding: "20px 18px",
+              borderRadius: "18px",
+              background: "#0f172a",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.18)",
+            }}
+          >
+            <h2
+              style={{
+                marginTop: 0,
+                marginBottom: "12px",
+                fontSize: "22px",
+                lineHeight: 1.3,
+              }}
+            >
+              Explanation
+            </h2>
+            <p
+              style={{
+                opacity: 0.92,
+                lineHeight: 1.75,
+                whiteSpace: "pre-wrap",
+                marginBottom: 0,
+                fontSize: "15px",
+                wordBreak: "break-word",
+              }}
+            >
+              {q.explanation}
+            </p>
+          </section>
+
+          <div
+            style={{
+              margin: "16px auto",
+              padding: "18px 16px",
+              borderRadius: "16px",
+              background: "rgba(34,197,94,0.08)",
+              border: "1px solid rgba(34,197,94,0.25)",
+            }}
+          >
+            <div
+              style={{
+                opacity: 0.95,
+                fontSize: "14px",
+                lineHeight: 1.6,
+                textAlign: "center",
+                marginBottom: "14px",
+              }}
+            >
+              Ready for the live challenge? Join the next global round now.
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <a
+                href="https://www.vibraxx.com/#arena"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={ctaButtonStyle()}
+              >
+                ENTER ARENA
+              </a>
+            </div>
+          </div>
+
+          <section
+            style={{
+              margin: "16px auto",
+              padding: "20px 18px",
+              borderRadius: "18px",
+              background: "#0f172a",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.18)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "12px",
+                flexWrap: "wrap",
+                marginBottom: "12px",
+              }}
+            >
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: "22px",
+                  lineHeight: 1.3,
+                }}
+              >
+                Related Questions
+              </h2>
+
+              {categoryHref && categoryLabel && (
+                <a
+                  href={categoryHref}
+                  style={{
+                    color: "#93c5fd",
+                    textDecoration: "none",
+                    fontSize: "14px",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  Browse {categoryLabel}
+                </a>
+              )}
+            </div>
+
+            {safeRelated.length === 0 ? (
+              <div
+                style={{
+                  padding: "14px",
+                  borderRadius: "12px",
+                  background: "rgba(148,163,184,0.08)",
+                  color: "#cbd5e1",
+                  fontSize: "15px",
+                  lineHeight: 1.6,
+                }}
+              >
+                No related questions found.
+              </div>
+            ) : (
+              <ul
+                style={{
+                  marginTop: "12px",
+                  paddingLeft: "16px",
+                  lineHeight: 1.7,
+                }}
+              >
+                {safeRelated.map((item: any) => (
+                  <li key={item.id} style={{ marginBottom: "12px" }}>
+                    <a
+                      href={`/questions/${item.slug}`}
+                      style={{
+                        color: "#22d3ee",
+                        textDecoration: "none",
+                        lineHeight: 1.6,
+                        fontSize: "15px",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {item.question_text}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      </main>
+
+      <Footer />
+    </>
   );
 }

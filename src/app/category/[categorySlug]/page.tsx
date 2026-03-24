@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import type { Metadata } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
+import Footer from "@/components/Footer";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
@@ -160,214 +161,71 @@ export default async function CategoryPage({
     `Explore ${label} questions with answers and explanations.`;
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "radial-gradient(circle at top, #1e293b, #020617)",
-        color: "#ffffff",
-        padding: "16px",
-        fontFamily:
-          'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      }}
-    >
-      <div
+    <>
+      <main
         style={{
-          maxWidth: "760px",
-          margin: "0 auto",
-          width: "100%",
+          minHeight: "100vh",
+          background: "radial-gradient(circle at top, #1e293b, #020617)",
+          color: "#ffffff",
+          padding: "16px",
+          fontFamily:
+            'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         }}
       >
-        <div style={{ textAlign: "center", marginBottom: "18px" }}>
-          <img
-            src="/images/logo.png"
-            alt="VibraXX"
-            style={{
-              height: "72px",
-              width: "auto",
-              maxWidth: "100%",
-              display: "block",
-              margin: "0 auto",
-            }}
-          />
-          <p
-            style={{
-              opacity: 0.82,
-              marginTop: "10px",
-              marginBottom: 0,
-              fontSize: "14px",
-              lineHeight: 1.6,
-            }}
-          >
-            🔥 Global Live Quiz Arena — Every 5 minutes
-            <br />
-            🏆 Compete for up to £1,000 monthly prize
-          </p>
-        </div>
-
         <div
           style={{
-            margin: "0 auto 14px",
-            padding: "16px",
-            borderRadius: "16px",
-            background: "rgba(99,102,241,0.15)",
-            border: "1px solid rgba(99,102,241,0.35)",
+            maxWidth: "760px",
+            margin: "0 auto",
+            width: "100%",
           }}
         >
-          <div
-            style={{
-              fontSize: "14px",
-              lineHeight: 1.6,
-              opacity: 0.95,
-              textAlign: "center",
-              marginBottom: "14px",
-            }}
-          >
-            Join the next live round and compete with players worldwide.
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <a
-              href="https://www.vibraxx.com/#arena"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={ctaButtonStyle()}
-            >
-              ENTER ARENA
-            </a>
-          </div>
-        </div>
-
-        <div
-          style={{
-            margin: "0 auto 12px",
-            padding: "0 2px",
-            fontSize: "14px",
-            opacity: 0.88,
-            lineHeight: 1.5,
-            wordBreak: "break-word",
-          }}
-        >
-          <a
-            href="/"
-            style={{
-              color: "#93c5fd",
-              textDecoration: "none",
-            }}
-          >
-            Home
-          </a>
-          <span style={{ margin: "0 8px", opacity: 0.5 }}>›</span>
-          <span style={{ color: "#cbd5e1" }}>{label}</span>
-        </div>
-
-        <section
-          style={{
-            background: "#0f172a",
-            borderRadius: "18px",
-            padding: "22px 18px",
-            marginBottom: "16px",
-            boxShadow: "0 8px 30px rgba(0,0,0,0.18)",
-          }}
-        >
-          <div
-            style={{
-              textAlign: "center",
-              marginBottom: "18px",
-            }}
-          >
-            <div
+          <div style={{ textAlign: "center", marginBottom: "18px" }}>
+            <img
+              src="/images/logo.png"
+              alt="VibraXX"
               style={{
-                display: "inline-block",
-                padding: "6px 10px",
-                borderRadius: "999px",
-                fontSize: "12px",
-                fontWeight: 700,
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-                color: "#22d3ee",
-                background: "rgba(34,211,238,0.12)",
-                marginBottom: "12px",
+                height: "72px",
+                width: "auto",
+                maxWidth: "100%",
+                display: "block",
+                margin: "0 auto",
               }}
-            >
-              Category
-            </div>
-
-            <h1
-              style={{
-                margin: "0 0 10px",
-                fontSize: "clamp(28px, 5vw, 42px)",
-                lineHeight: 1.15,
-              }}
-            >
-              {label}
-            </h1>
-
+            />
             <p
               style={{
-                maxWidth: "640px",
-                margin: "0 auto",
                 opacity: 0.82,
-                fontSize: "15px",
-                lineHeight: 1.7,
+                marginTop: "10px",
+                marginBottom: 0,
+                fontSize: "14px",
+                lineHeight: 1.6,
               }}
             >
-              {description}
+              🔥 Global Live Quiz Arena — Every 5 minutes
+              <br />
+              🏆 Compete for up to £1,000 monthly prize
             </p>
           </div>
 
           <div
             style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: "10px",
-              flexWrap: "wrap",
-              marginTop: "16px",
+              margin: "0 auto 14px",
+              padding: "16px",
+              borderRadius: "16px",
+              background: "rgba(99,102,241,0.15)",
+              border: "1px solid rgba(99,102,241,0.35)",
             }}
           >
             <div
               style={{
-                padding: "8px 12px",
-                borderRadius: "999px",
-                background: "rgba(148,163,184,0.12)",
-                color: "#cbd5e1",
-                fontSize: "13px",
-                fontWeight: 600,
-              }}
-            >
-              {safeQuestions.length} live questions shown
-            </div>
-          </div>
-        </section>
-
-        <section
-          style={{
-            background: "#0f172a",
-            borderRadius: "18px",
-            padding: "18px",
-            boxShadow: "0 8px 30px rgba(0,0,0,0.18)",
-          }}
-        >
-          <div
-            style={{
-              marginBottom: "14px",
-            }}
-          >
-            <h2
-              style={{
-                margin: "0 0 14px",
-                fontSize: "22px",
-                lineHeight: 1.25,
+                fontSize: "14px",
+                lineHeight: 1.6,
+                opacity: 0.95,
                 textAlign: "center",
+                marginBottom: "14px",
               }}
             >
-              Latest Questions
-            </h2>
+              Join the next live round and compete with players worldwide.
+            </div>
 
             <div
               style={{
@@ -387,105 +245,252 @@ export default async function CategoryPage({
             </div>
           </div>
 
-          {safeQuestions.length === 0 ? (
-            <div
-              style={{
-                padding: "18px 16px",
-                borderRadius: "14px",
-                background: "rgba(148,163,184,0.08)",
-                color: "#cbd5e1",
-                fontSize: "15px",
-                lineHeight: 1.6,
-                textAlign: "center",
-              }}
-            >
-              No published questions are available in this category yet.
-            </div>
-          ) : (
-            <ul
-              style={{
-                listStyle: "none",
-                padding: 0,
-                margin: 0,
-                display: "grid",
-                gap: "12px",
-              }}
-            >
-              {safeQuestions.map((q, index) => (
-                <li key={q.slug}>
-                  <a
-                    href={`/questions/${q.slug}`}
-                    style={{
-                      display: "block",
-                      padding: "14px 14px",
-                      borderRadius: "14px",
-                      background:
-                        index % 2 === 0
-                          ? "rgba(15,23,42,0.9)"
-                          : "rgba(30,41,59,0.72)",
-                      border: "1px solid rgba(148,163,184,0.14)",
-                      color: "#e2e8f0",
-                      textDecoration: "none",
-                      lineHeight: 1.6,
-                      fontSize: "15px",
-                      wordBreak: "break-word",
-                    }}
-                  >
-                    <span
-                      style={{
-                        color: "#22d3ee",
-                        fontWeight: 700,
-                      }}
-                    >
-                      Q{index + 1}.
-                    </span>{" "}
-                    {q.title}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <div
-          style={{
-            margin: "16px auto 0",
-            padding: "18px 16px",
-            borderRadius: "16px",
-            background: "rgba(34,197,94,0.08)",
-            border: "1px solid rgba(34,197,94,0.25)",
-          }}
-        >
           <div
             style={{
+              margin: "0 auto 12px",
+              padding: "0 2px",
               fontSize: "14px",
-              lineHeight: 1.6,
-              opacity: 0.95,
-              textAlign: "center",
-              marginBottom: "14px",
-            }}
-          >
-            Ready to compete live? Join the next global round now.
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
+              opacity: 0.88,
+              lineHeight: 1.5,
+              wordBreak: "break-word",
             }}
           >
             <a
-              href="https://www.vibraxx.com/#arena"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={ctaButtonStyle()}
+              href="/"
+              style={{
+                color: "#93c5fd",
+                textDecoration: "none",
+              }}
             >
-              ENTER ARENA
+              Home
             </a>
+            <span style={{ margin: "0 8px", opacity: 0.5 }}>›</span>
+            <span style={{ color: "#cbd5e1" }}>{label}</span>
+          </div>
+
+          <section
+            style={{
+              background: "#0f172a",
+              borderRadius: "18px",
+              padding: "22px 18px",
+              marginBottom: "16px",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.18)",
+            }}
+          >
+            <div
+              style={{
+                textAlign: "center",
+                marginBottom: "18px",
+              }}
+            >
+              <div
+                style={{
+                  display: "inline-block",
+                  padding: "6px 10px",
+                  borderRadius: "999px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  color: "#22d3ee",
+                  background: "rgba(34,211,238,0.12)",
+                  marginBottom: "12px",
+                }}
+              >
+                Category
+              </div>
+
+              <h1
+                style={{
+                  margin: "0 0 10px",
+                  fontSize: "clamp(28px, 5vw, 42px)",
+                  lineHeight: 1.15,
+                }}
+              >
+                {label}
+              </h1>
+
+              <p
+                style={{
+                  maxWidth: "640px",
+                  margin: "0 auto",
+                  opacity: 0.82,
+                  fontSize: "15px",
+                  lineHeight: 1.7,
+                }}
+              >
+                {description}
+              </p>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                gap: "10px",
+                flexWrap: "wrap",
+                marginTop: "16px",
+              }}
+            >
+              <div
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: "999px",
+                  background: "rgba(148,163,184,0.12)",
+                  color: "#cbd5e1",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                }}
+              >
+                {safeQuestions.length} live questions shown
+              </div>
+            </div>
+          </section>
+
+          <section
+            style={{
+              background: "#0f172a",
+              borderRadius: "18px",
+              padding: "18px",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.18)",
+            }}
+          >
+            <div
+              style={{
+                marginBottom: "14px",
+              }}
+            >
+              <h2
+                style={{
+                  margin: "0 0 14px",
+                  fontSize: "22px",
+                  lineHeight: 1.25,
+                  textAlign: "center",
+                }}
+              >
+                Latest Questions
+              </h2>
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <a
+                  href="https://www.vibraxx.com/#arena"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={ctaButtonStyle()}
+                >
+                  ENTER ARENA
+                </a>
+              </div>
+            </div>
+
+            {safeQuestions.length === 0 ? (
+              <div
+                style={{
+                  padding: "18px 16px",
+                  borderRadius: "14px",
+                  background: "rgba(148,163,184,0.08)",
+                  color: "#cbd5e1",
+                  fontSize: "15px",
+                  lineHeight: 1.6,
+                  textAlign: "center",
+                }}
+              >
+                No published questions are available in this category yet.
+              </div>
+            ) : (
+              <ul
+                style={{
+                  listStyle: "none",
+                  padding: 0,
+                  margin: 0,
+                  display: "grid",
+                  gap: "12px",
+                }}
+              >
+                {safeQuestions.map((q, index) => (
+                  <li key={q.slug}>
+                    <a
+                      href={`/questions/${q.slug}`}
+                      style={{
+                        display: "block",
+                        padding: "14px 14px",
+                        borderRadius: "14px",
+                        background:
+                          index % 2 === 0
+                            ? "rgba(15,23,42,0.9)"
+                            : "rgba(30,41,59,0.72)",
+                        border: "1px solid rgba(148,163,184,0.14)",
+                        color: "#e2e8f0",
+                        textDecoration: "none",
+                        lineHeight: 1.6,
+                        fontSize: "15px",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      <span
+                        style={{
+                          color: "#22d3ee",
+                          fontWeight: 700,
+                        }}
+                      >
+                        Q{index + 1}.
+                      </span>{" "}
+                      {q.title}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <div
+            style={{
+              margin: "16px auto 0",
+              padding: "18px 16px",
+              borderRadius: "16px",
+              background: "rgba(34,197,94,0.08)",
+              border: "1px solid rgba(34,197,94,0.25)",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "14px",
+                lineHeight: 1.6,
+                opacity: 0.95,
+                textAlign: "center",
+                marginBottom: "14px",
+              }}
+            >
+              Ready to compete live? Join the next global round now.
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <a
+                href="https://www.vibraxx.com/#arena"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={ctaButtonStyle()}
+              >
+                ENTER ARENA
+              </a>
+            </div>
           </div>
         </div>
-      </div>
-    </main>
+      </main>
+
+      <Footer />
+    </>
   );
 }
