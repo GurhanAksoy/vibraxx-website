@@ -227,8 +227,13 @@ export default async function CategoryPage({
               {label}
             </h1>
 
-            <p style={{ color: "#cbd5e1", fontSize: "clamp(14px,3vw,16px)", lineHeight: 1.7, marginBottom: 20, maxWidth: 560, margin: "0 auto 20px" }}>
+            <p style={{ color: "#cbd5e1", fontSize: "clamp(14px,3vw,16px)", lineHeight: 1.7, marginBottom: 20, maxWidth: 560, margin: "0 auto 12px" }}>
               {description}
+            </p>
+
+            <p style={{ color: "#fbbf24", fontSize: 13, fontWeight: 700, marginBottom: 16 }}>
+              🏆 Up to £1,000 monthly prize pool &nbsp;·&nbsp;
+              <span style={{ color: "#64748b", fontWeight: 500, fontSize: 11 }}>*Terms apply</span>
             </p>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, flexWrap: "wrap" }} className="cat-header-btns">
@@ -309,8 +314,13 @@ export default async function CategoryPage({
             border: "1px solid rgba(139,92,246,0.3)",
             textAlign: "center",
           }}>
-            <p style={{ color: "#c4b5fd", fontSize: 14, lineHeight: 1.6, marginBottom: 16 }}>
+            <p style={{ color: "#fbbf24", fontSize: 15, fontWeight: 800, marginBottom: 6 }}>
+              🏆 Up to £1,000 monthly prize pool
+            </p>
+            <p style={{ color: "#c4b5fd", fontSize: 13, lineHeight: 1.6, marginBottom: 16 }}>
               Ready to compete live? Join the next global round now.
+              <br />
+              <span style={{ fontSize: 11, color: "#64748b" }}>*Terms apply. Skill-based competition.</span>
             </p>
             <a
               href="/"

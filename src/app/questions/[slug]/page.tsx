@@ -240,11 +240,12 @@ export default async function QuestionPage({
 
             <a href="/"
               style={{
-                display: "inline-flex", alignItems: "center", gap: 7,
-                padding: "8px 16px", borderRadius: 10, textDecoration: "none",
-                background: "linear-gradient(135deg,rgba(124,58,237,0.2),rgba(217,70,239,0.15))",
-                border: "1px solid rgba(139,92,246,0.4)",
-                color: "#c4b5fd", fontSize: 13, fontWeight: 700,
+                display: "inline-flex", alignItems: "center", gap: 8,
+                padding: "10px 20px", borderRadius: 12, textDecoration: "none",
+                background: "linear-gradient(135deg,#7c3aed,#d946ef)",
+                color: "white", fontSize: 14, fontWeight: 800,
+                boxShadow: "0 0 24px rgba(124,58,237,0.5)",
+                letterSpacing: "0.03em",
               }}
             >
               ⚡ Enter Arena
@@ -380,8 +381,13 @@ export default async function QuestionPage({
             textAlign: "center",
             marginBottom: "clamp(12px,3vw,18px)",
           }}>
-            <p style={{ color: "#c4b5fd", fontSize: 14, lineHeight: 1.6, marginBottom: 14 }}>
+            <p style={{ color: "#fbbf24", fontSize: 15, fontWeight: 800, marginBottom: 6 }}>
+              🏆 Up to £1,000 monthly prize pool
+            </p>
+            <p style={{ color: "#c4b5fd", fontSize: 13, lineHeight: 1.6, marginBottom: 14 }}>
               Ready for the live challenge? Join the next global round now.
+              <br />
+              <span style={{ fontSize: 11, color: "#64748b" }}>*Terms apply. Skill-based competition.</span>
             </p>
             <a href="/" style={{
               display: "inline-flex", alignItems: "center", gap: 8,
