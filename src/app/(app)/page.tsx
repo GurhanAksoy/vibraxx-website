@@ -126,11 +126,15 @@ const ChampionCard = memo(({ champion }: any) => {
         {champion.period} Champion
       </div>
 
-      {/* Name */}
+      {/* Name + Flag */}
       <div style={{
         fontSize: "clamp(14px,3vw,18px)", fontWeight: 800, marginBottom: 8,
         color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
       }}>
+        {champion.country && countryToFlag(champion.country) && (
+          <span style={{ fontSize: "clamp(16px,3.5vw,20px)" }}>{countryToFlag(champion.country)}</span>
+        )}
         {champion.name}
       </div>
 
@@ -147,6 +151,16 @@ const ChampionCard = memo(({ champion }: any) => {
   );
 });
 ChampionCard.displayName = "ChampionCard";
+
+// Unicode flag — encoding bağımsız
+const countryToFlag = (code: string): string => {
+  if (!code || code.length !== 2) return "";
+  if (!/^[A-Z]{2}$/i.test(code)) return "";
+  const A = 0x1F1E6;
+  const c = code.toUpperCase();
+  return String.fromCodePoint(A + c.charCodeAt(0) - 65) +
+         String.fromCodePoint(A + c.charCodeAt(1) - 65);
+};
 
 const AgeVerificationModal = memo(({ onConfirm, onCancel }: any) => (
   <div
@@ -445,6 +459,7 @@ export default function HomePage() {
           name: data.today_champion_name || "TBA",
           score: data.today_champion_score || 0,
           avatarUrl: data.today_champion_avatar || "",
+          country: data.today_champion_country || "",
           color: colors[0],
           icon: icons[0],
         },
@@ -453,6 +468,7 @@ export default function HomePage() {
           name: data.weekly_champion_name || "TBA",
           score: data.weekly_champion_score || 0,
           avatarUrl: data.weekly_champion_avatar || "",
+          country: data.weekly_champion_country || "",
           color: colors[1],
           icon: icons[1],
         },
@@ -461,6 +477,7 @@ export default function HomePage() {
           name: data.monthly_champion_name || "TBA",
           score: data.monthly_champion_score || 0,
           avatarUrl: data.monthly_champion_avatar || "",
+          country: data.monthly_champion_country || "",
           color: colors[2],
           icon: icons[2],
         },
@@ -1585,6 +1602,38 @@ export default function HomePage() {
                 <ChampionCard key={i} champion={champion} />
               ))}
             </div>
+
+            {/* Explore Quiz Categories */}
+            <div style={{ textAlign: "center", marginTop: "clamp(32px,6vw,48px)", marginBottom: "clamp(16px,4vw,32px)" }}>
+              <a
+                href="/categories"
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 10,
+                  padding: "clamp(12px,3vw,16px) clamp(24px,5vw,36px)",
+                  borderRadius: 14, textDecoration: "none",
+                  border: "1px solid rgba(139,92,246,0.4)",
+                  background: "linear-gradient(135deg,rgba(124,58,237,0.12),rgba(217,70,239,0.08))",
+                  color: "#c4b5fd", fontSize: "clamp(13px,2.5vw,15px)", fontWeight: 700,
+                  letterSpacing: "0.04em", transition: "all 0.2s",
+                  backdropFilter: "blur(10px)",
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(139,92,246,0.7)";
+                  (e.currentTarget as HTMLAnchorElement).style.background = "linear-gradient(135deg,rgba(124,58,237,0.22),rgba(217,70,239,0.14))";
+                  (e.currentTarget as HTMLAnchorElement).style.transform = "translateY(-2px)";
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(139,92,246,0.4)";
+                  (e.currentTarget as HTMLAnchorElement).style.background = "linear-gradient(135deg,rgba(124,58,237,0.12),rgba(217,70,239,0.08))";
+                  (e.currentTarget as HTMLAnchorElement).style.transform = "translateY(0)";
+                }}
+              >
+                <span style={{ fontSize: 18 }}>🧠</span>
+                Explore Quiz Categories
+                <span style={{ fontSize: 16, opacity: 0.7 }}>→</span>
+              </a>
+            </div>
+
           </div>
         </main>
 
