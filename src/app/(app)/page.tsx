@@ -1603,39 +1603,160 @@ export default function HomePage() {
               ))}
             </div>
 
+
             {/* Explore Quiz Categories */}
-            <div style={{ textAlign: "center", marginTop: "clamp(32px,6vw,48px)", marginBottom: "clamp(16px,4vw,32px)" }}>
-              <a
-                href="/categories"
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 10,
-                  padding: "clamp(12px,3vw,16px) clamp(24px,5vw,36px)",
-                  borderRadius: 14, textDecoration: "none",
-                  border: "1px solid rgba(139,92,246,0.4)",
-                  background: "linear-gradient(135deg,rgba(124,58,237,0.12),rgba(217,70,239,0.08))",
-                  color: "#c4b5fd", fontSize: "clamp(13px,2.5vw,15px)", fontWeight: 700,
-                  letterSpacing: "0.04em", transition: "all 0.2s",
-                  backdropFilter: "blur(10px)",
-                }}
-                onMouseEnter={e => {
-                  (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(139,92,246,0.7)";
-                  (e.currentTarget as HTMLAnchorElement).style.background = "linear-gradient(135deg,rgba(124,58,237,0.22),rgba(217,70,239,0.14))";
-                  (e.currentTarget as HTMLAnchorElement).style.transform = "translateY(-2px)";
-                }}
-                onMouseLeave={e => {
-                  (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(139,92,246,0.4)";
-                  (e.currentTarget as HTMLAnchorElement).style.background = "linear-gradient(135deg,rgba(124,58,237,0.12),rgba(217,70,239,0.08))";
-                  (e.currentTarget as HTMLAnchorElement).style.transform = "translateY(0)";
-                }}
-              >
-                <span style={{ fontSize: 18 }}>🧠</span>
-                Explore Quiz Categories
-                <span style={{ fontSize: 16, opacity: 0.7 }}>→</span>
-              </a>
+<div
+  style={{
+    marginTop: "clamp(32px,6vw,48px)",
+    marginBottom: "clamp(20px,5vw,36px)",
+  }}
+>
+  <div style={{ textAlign: "center", marginBottom: "clamp(18px,4vw,28px)" }}>
+    <h2
+      style={{
+        margin: 0,
+        fontSize: "clamp(22px,4vw,32px)",
+        fontWeight: 800,
+        color: "#ffffff",
+        letterSpacing: "-0.02em",
+      }}
+    >
+      Explore Quiz Categories
+    </h2>
+    <p
+      style={{
+        margin: "10px auto 0",
+        maxWidth: 720,
+        color: "rgba(255,255,255,0.72)",
+        fontSize: "clamp(13px,2.4vw,15px)",
+        lineHeight: 1.65,
+      }}
+    >
+      Browse categories, discover question pages, and test your knowledge before
+      entering the live arena.
+    </p>
+  </div>
+
+  {[
+    { label: "Psychology & Human Behavior", slug: "psychology-human-behavior", icon: "🧠" },
+    { label: "Logic & Puzzles", slug: "logic-puzzles", icon: "🧩" },
+    { label: "Earth & Natural Systems", slug: "earth-natural-systems", icon: "🌍" },
+    { label: "Engineering & Technology", slug: "engineering-technology", icon: "⚙️" },
+    { label: "Life Sciences & Medicine", slug: "life-sciences-medicine", icon: "🩺" },
+    { label: "Physical Sciences & Mathematics", slug: "physical-sciences-mathematics", icon: "📐" },
+    { label: "Information & Computation", slug: "information-computation", icon: "💻" },
+    { label: "Sports & Entertainment", slug: "sports-entertainment", icon: "🏆" },
+    { label: "History", slug: "history", icon: "📜" },
+    { label: "Geography", slug: "geography", icon: "🗺️" },
+    { label: "Science", slug: "science", icon: "🔬" },
+    { label: "Technology", slug: "technology", icon: "🤖" },
+    { label: "Nature & Animals", slug: "nature-animals", icon: "🐾" },
+    { label: "Human Body & Health", slug: "human-body-health", icon: "❤️" },
+    { label: "Language & Communication", slug: "language-communication", icon: "🗣️" },
+  ].reduce((rows, item, index, arr) => {
+    if (index % 2 === 0) rows.push(arr.slice(index, index + 2));
+    return rows;
+  }, [] as { label: string; slug: string; icon: string }[][]).map((row, rowIndex) => (
+    <div
+      key={rowIndex}
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+        gap: "clamp(10px,2vw,14px)",
+        marginBottom: "clamp(10px,2vw,14px)",
+      }}
+    >
+      {row.map((category) => (
+        <a
+          key={category.slug}
+          href={`/category/${category.slug}`}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            minHeight: "72px",
+            padding: "clamp(12px,3vw,16px)",
+            borderRadius: 16,
+            textDecoration: "none",
+            border: "1px solid rgba(139,92,246,0.28)",
+            background:
+              "linear-gradient(135deg,rgba(15,23,42,0.88),rgba(76,29,149,0.14))",
+            backdropFilter: "blur(10px)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+            transition: "all 0.2s ease",
+          }}
+          onMouseEnter={(e) => {
+            const el = e.currentTarget as HTMLAnchorElement;
+            el.style.transform = "translateY(-2px)";
+            el.style.borderColor = "rgba(139,92,246,0.58)";
+            el.style.background =
+              "linear-gradient(135deg,rgba(30,41,59,0.96),rgba(124,58,237,0.18))";
+          }}
+          onMouseLeave={(e) => {
+            const el = e.currentTarget as HTMLAnchorElement;
+            el.style.transform = "translateY(0)";
+            el.style.borderColor = "rgba(139,92,246,0.28)";
+            el.style.background =
+              "linear-gradient(135deg,rgba(15,23,42,0.88),rgba(76,29,149,0.14))";
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "clamp(10px,2vw,14px)",
+              minWidth: 0,
+              flex: 1,
+            }}
+          >
+            <div
+              style={{
+                width: "clamp(38px,7vw,46px)",
+                height: "clamp(38px,7vw,46px)",
+                borderRadius: 12,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "rgba(139,92,246,0.16)",
+                border: "1px solid rgba(139,92,246,0.22)",
+                fontSize: "clamp(18px,3vw,22px)",
+                flexShrink: 0,
+              }}
+            >
+              {category.icon}
             </div>
 
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  color: "#ffffff",
+                  fontWeight: 700,
+                  fontSize: "clamp(12px,2.3vw,14px)",
+                  lineHeight: 1.35,
+                  wordBreak: "break-word",
+                }}
+              >
+                {category.label}
+              </div>
+            </div>
           </div>
-        </main>
+
+          <div
+            style={{
+              color: "rgba(196,181,253,0.85)",
+              fontSize: "clamp(14px,2.5vw,16px)",
+              fontWeight: 700,
+              flexShrink: 0,
+            }}
+          >
+            →
+          </div>
+        </a>
+      ))}
+    </div>
+  ))}
+</div>
 
         {/* Trust Elements */}
         <div style={{
