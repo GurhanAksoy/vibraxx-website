@@ -6,6 +6,7 @@ import { toastStore, Toast } from '@/lib/toastStore'
 import { supabase } from '@/lib/supabaseClient'
 
 // Module level — navigation'da sıfırlanmaz
+// Key = tahmini round başlangıç zamanı (UTC dakika cinsinden, 5dk'ya yuvarlanmış)
 let lastRoundKey = ''
 
 const TYPE_STYLES = {
@@ -67,7 +68,6 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
       }}
       onClick={onDismiss}
     >
-      {/* icon circle */}
       <div style={{
         width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
         background: `${s.dot}22`,
@@ -80,7 +80,6 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
         {s.icon}
       </div>
 
-      {/* message */}
       <span style={{
         fontSize: 14, fontWeight: 700,
         color: '#ffffff',
@@ -90,11 +89,9 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
         {toast.message}
       </span>
 
-      {/* dismiss */}
       <span style={{
         fontSize: 18, color: 'rgba(255,255,255,0.5)',
         lineHeight: 1, flexShrink: 0,
-        transition: 'color 0.15s',
       }}>×</span>
     </div>
   )
@@ -118,9 +115,12 @@ export default function ToastContainer() {
       const t = data.next_round_in_seconds as number | null
       if (t === null || t <= 0 || t > 35) return
 
-      // Şu anki round'un başlangıç zamanını key olarak kullan
-      const roundStartEstimate = Math.round((Date.now() + t * 1000) / 1000) // unix seconds, ~1s precision
-      const roundKey = Math.floor(roundStartEstimate / 10).toString() // 10sn tolerans
+      // Tahmini round başlangıç zamanını UTC 5dk'ya yuvarla
+      // Rounds her 5 dakikada bir başlıyor (XX:00, XX:05, XX:10...)
+      // Bu key sayfa geçişlerinde değişmez — aynı round için hep aynı değer
+      const estimatedStartMs = Date.now() + t * 1000
+      const roundMinute = Math.round(estimatedStartMs / 1000 / 60) // dakika cinsinden
+      const roundKey = Math.floor(roundMinute / 5).toString() // 5dk'ya yuvarla
 
       if (t <= 32 && roundKey !== lastRoundKey) {
         toastStore.warning('⚡ Round starting in 30 seconds!')
