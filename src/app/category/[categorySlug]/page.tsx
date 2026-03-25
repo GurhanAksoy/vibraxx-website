@@ -85,9 +85,7 @@ export async function generateMetadata({
   }
 
   const questions = await fetchCategoryQuestions(safeSlug, 1);
-  if (questions.length === 0) {
-    return { title: "Category Not Found | VibraXX", robots: { index: false, follow: false } };
-  }
+  const isEmpty = questions.length === 0;
 
   const label = category.name_en;
   const description = buildCategoryDescription(label);
@@ -96,7 +94,9 @@ export async function generateMetadata({
     title: `${label} Questions & Answers | VibraXX`,
     description,
     alternates: { canonical: `${SITE_URL}/category/${safeSlug}` },
-    robots: { index: true, follow: true },
+    robots: isEmpty
+      ? { index: false, follow: true }
+      : { index: true, follow: true },
     openGraph: {
       title: `${label} Questions & Answers | VibraXX`,
       description,
@@ -126,7 +126,7 @@ export default async function CategoryPage({
   if (!category) return notFound();
 
   const safeQuestions = await fetchCategoryQuestions(safeSlug, 50);
-  if (safeQuestions.length === 0) return notFound();
+  const isEmpty = safeQuestions.length === 0;
 
   const label = category.name_en;
   const description = buildCategoryDescription(label);
@@ -242,7 +242,7 @@ export default async function CategoryPage({
                 background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.3)",
                 color: "#c4b5fd", fontSize: 13, fontWeight: 600,
               }}>
-                {safeQuestions.length} questions
+                {isEmpty ? "Questions coming soon" : `${safeQuestions.length} questions`}
               </div>
               <a
                 href="/"
@@ -276,34 +276,52 @@ export default async function CategoryPage({
               Latest Questions
             </h2>
 
-            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 8 }}>
-              {safeQuestions.map((q, index) => (
-                <li key={q.slug}>
-                  <a
-                    href={`/questions/${q.slug}`}
-                    className="cat-question-link"
-                    style={{
-                      display: "block",
-                      padding: "clamp(10px,2.5vw,14px) clamp(12px,3vw,16px)",
-                      borderRadius: 12,
-                      background: "rgba(139,92,246,0.04)",
-                      border: "1px solid rgba(139,92,246,0.15)",
-                      color: "#e2e8f0",
-                      textDecoration: "none",
-                      fontSize: "clamp(13px,2.5vw,15px)",
-                      lineHeight: 1.6,
-                      wordBreak: "break-word",
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    <span style={{ color: "#a78bfa", fontWeight: 700, marginRight: 6 }}>
-                      Q{index + 1}.
-                    </span>
-                    {q.title}
-                  </a>
-                </li>
-              ))}
-            </ul>
+            {isEmpty ? (
+              <div style={{
+                padding: "clamp(24px,5vw,40px) 16px",
+                textAlign: "center",
+                borderRadius: 12,
+                background: "rgba(139,92,246,0.04)",
+                border: "1px solid rgba(139,92,246,0.12)",
+              }}>
+                <div style={{ fontSize: 40, marginBottom: 14 }}>🔜</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#c4b5fd", marginBottom: 8 }}>
+                  Questions coming soon
+                </div>
+                <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.6 }}>
+                  We're adding questions to this category. Check back soon!
+                </div>
+              </div>
+            ) : (
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 8 }}>
+                {safeQuestions.map((q, index) => (
+                  <li key={q.slug}>
+                    <a
+                      href={`/questions/${q.slug}`}
+                      className="cat-question-link"
+                      style={{
+                        display: "block",
+                        padding: "clamp(10px,2.5vw,14px) clamp(12px,3vw,16px)",
+                        borderRadius: 12,
+                        background: "rgba(139,92,246,0.04)",
+                        border: "1px solid rgba(139,92,246,0.15)",
+                        color: "#e2e8f0",
+                        textDecoration: "none",
+                        fontSize: "clamp(13px,2.5vw,15px)",
+                        lineHeight: 1.6,
+                        wordBreak: "break-word",
+                        transition: "all 0.2s",
+                      }}
+                    >
+                      <span style={{ color: "#a78bfa", fontWeight: 700, marginRight: 6 }}>
+                        Q{index + 1}.
+                      </span>
+                      {q.title}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {/* CTA Bottom */}
