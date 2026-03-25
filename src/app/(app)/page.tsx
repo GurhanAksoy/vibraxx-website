@@ -411,7 +411,7 @@ export default function HomePage() {
 
   // PWA Install
   const [showPWAPrompt, setShowPWAPrompt] = useState(false);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<{ name: string; slug: string }[]>([]);
   const deferredPromptRef = useRef<any>(null);
 
   const countdownPauseUntilRef = useRef<number>(0);
@@ -551,20 +551,21 @@ export default function HomePage() {
 
   const fetchCategories = useCallback(async () => {
     const { data, error } = await supabase
-      .from("seo_pages")
-      .select("category_slug")
-      .eq("page_type", "question")
-      .eq("publish_status", "published")
-      .eq("indexable", true)
-      .not("category_slug", "is", null);
+      .from("categories")
+      .select("name_en, slug")
+      .eq("is_active", true)
+      .order("id", { ascending: true });
 
     if (error || !data) return;
 
-    const unique = Array.from(
-      new Set(data.map((item: any) => item.category_slug as string))
-    ).sort() as string[];
+    const mapped = data
+      .filter((item: any) => item?.name_en && item?.slug)
+      .map((item: any) => ({
+        name: item.name_en as string,
+        slug: item.slug as string,
+      }));
 
-    setCategories(unique);
+    setCategories(mapped);
   }, []);
 
   useEffect(() => {
@@ -1640,35 +1641,32 @@ export default function HomePage() {
                   margin: "0 auto",
                   padding: "0 16px",
                 }}>
-                  {categories.map((slug) => (
+                  {categories.map((category) => (
                     <a
-                      key={slug}
-                      href={`/category/${slug}`}
+                      key={category.slug}
+                      href={`/category/${category.slug}`}
                       style={{
-                        padding: "10px 14px",
-                        borderRadius: 10,
+                        padding: "12px 16px",
+                        borderRadius: 12,
                         border: "1px solid rgba(139,92,246,0.3)",
                         background: "rgba(124,58,237,0.08)",
                         color: "#c4b5fd",
                         fontSize: 13,
                         fontWeight: 600,
                         textDecoration: "none",
-                        textTransform: "capitalize",
                         transition: "all 0.2s",
                         display: "block",
                       }}
                       onMouseEnter={e => {
-                        (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(139,92,246,0.7)";
-                        (e.currentTarget as HTMLAnchorElement).style.background = "rgba(124,58,237,0.18)";
+                        (e.currentTarget as HTMLAnchorElement).style.borderColor = "#8b5cf6";
                         (e.currentTarget as HTMLAnchorElement).style.transform = "translateY(-2px)";
                       }}
                       onMouseLeave={e => {
                         (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(139,92,246,0.3)";
-                        (e.currentTarget as HTMLAnchorElement).style.background = "rgba(124,58,237,0.08)";
                         (e.currentTarget as HTMLAnchorElement).style.transform = "translateY(0)";
                       }}
                     >
-                      {slug.replace(/-/g, " ")}
+                      {category.name}
                     </a>
                   ))}
                 </div>
