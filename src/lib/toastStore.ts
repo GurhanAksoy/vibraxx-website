@@ -19,14 +19,30 @@ const DURATION: Record<ToastType, number> = {
 }
 
 // ── Singleton state ──
-let toasts:     Toast[]    = []
-let listeners:  Listener[] = []
-let lastMsg   = ''
-let lastTime  = 0
+let toasts:    Toast[]    = []
+let listeners: Listener[] = []
+let lastMsg  = ''
+let lastTime = 0
 let channelRef:      ReturnType<typeof supabase.channel> | null = null
 let roundChannelRef: ReturnType<typeof supabase.channel> | null = null
 let roundTimerRef:   ReturnType<typeof setTimeout> | null = null
 let lastRoundId = ''
+
+// Round toast dedup — module level, navigation'da sıfırlanmaz
+const toastedRounds = new Set<string>()
+
+export function wasRoundToasted(key: string): boolean {
+  return toastedRounds.has(key)
+}
+
+export function markRoundToasted(key: string): void {
+  toastedRounds.add(key)
+  // Eski kayıtları temizle — Set büyümesin (max 20 round key tut)
+  if (toastedRounds.size > 20) {
+    const first = toastedRounds.values().next().value
+    if (first !== undefined) toastedRounds.delete(first)
+  }
+}
 
 function notify() {
   listeners.forEach(l => l([...toasts]))
@@ -67,7 +83,6 @@ export const toastStore = {
 export function initToastRealtime(userId: string) {
   if (channelRef) return
 
-  // Credits channel
   channelRef = supabase
     .channel(`toast-credits-${userId}`)
     .on('postgres_changes', {
@@ -84,7 +99,6 @@ export function initToastRealtime(userId: string) {
     })
     .subscribe()
 
-  // Round channel — scheduled_start 30sn kala toast (lobby hariç)
   if (roundChannelRef) return
   roundChannelRef = supabase
     .channel('toast-rounds')
@@ -100,12 +114,10 @@ export function initToastRealtime(userId: string) {
 
       const startAt = new Date(row.scheduled_start).getTime()
       const now     = Date.now()
-      const msUntil = startAt - now - 30000 // 30sn önce
+      const msUntil = startAt - now - 30000
 
-      // Zaten geçtiyse veya çok uzaktaysa (15dk+) yoksay
       if (msUntil < 0 || msUntil > 15 * 60 * 1000) return
 
-      // Lobby'de değilsek toast at
       if (roundTimerRef) clearTimeout(roundTimerRef)
       roundTimerRef = setTimeout(() => {
         const isOnLobby = window.location.pathname === '/lobby'

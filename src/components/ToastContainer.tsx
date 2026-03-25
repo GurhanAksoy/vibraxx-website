@@ -2,12 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { toastStore, Toast } from '@/lib/toastStore'
+import { toastStore, Toast, markRoundToasted, wasRoundToasted } from '@/lib/toastStore'
 import { supabase } from '@/lib/supabaseClient'
-
-// Module level — navigation'da sıfırlanmaz
-// Key = tahmini round başlangıç zamanı (UTC dakika cinsinden, 5dk'ya yuvarlanmış)
-let lastRoundKey = ''
 
 const TYPE_STYLES = {
   success: {
@@ -105,7 +101,6 @@ export default function ToastContainer() {
     setMounted(true)
     const unsub = toastStore.subscribe(setToasts)
 
-    // Round countdown polling — lobby sayfasında çalışmaz
     const interval = setInterval(async () => {
       if (window.location.pathname === '/lobby') return
 
@@ -115,16 +110,14 @@ export default function ToastContainer() {
       const t = data.next_round_in_seconds as number | null
       if (t === null || t <= 0 || t > 35) return
 
-      // Tahmini round başlangıç zamanını UTC 5dk'ya yuvarla
-      // Rounds her 5 dakikada bir başlıyor (XX:00, XX:05, XX:10...)
-      // Bu key sayfa geçişlerinde değişmez — aynı round için hep aynı değer
-      const estimatedStartMs = Date.now() + t * 1000
-      const roundMinute = Math.round(estimatedStartMs / 1000 / 60) // dakika cinsinden
-      const roundKey = Math.floor(roundMinute / 5).toString() // 5dk'ya yuvarla
+      // UTC'deki tahmini round başlangıç dakikasını 5'e yuvarla
+      // Bu değer sabit — t 26 da olsa 9 da olsa aynı round için aynı key
+      const estimatedStartSec = Math.round((Date.now() / 1000) + t)
+      const roundKey = Math.floor(estimatedStartSec / 300).toString() // 300sn = 5dk
 
-      if (t <= 32 && roundKey !== lastRoundKey) {
+      if (t <= 32 && !wasRoundToasted(roundKey)) {
+        markRoundToasted(roundKey)
         toastStore.warning('⚡ Round starting in 30 seconds!')
-        lastRoundKey = roundKey
       }
     }, 5000)
 
