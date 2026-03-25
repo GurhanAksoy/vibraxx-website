@@ -158,27 +158,42 @@ export default async function CategoryPage({
       }}>
         <div style={{ maxWidth: 760, margin: "0 auto", width: "100%" }}>
 
-          {/* Header */}
-          <div style={{ textAlign: "center", marginBottom: "clamp(24px,5vw,40px)" }}>
-            <a href="/" style={{ textDecoration: "none", display: "inline-block" }}>
-              <img
-                src="/images/logo.png"
-                alt="VibraXX"
-                style={{ height: "clamp(56px,10vw,80px)", width: "auto", display: "block", margin: "0 auto 12px" }}
-              />
+          {/* Header — profile/lobby ile aynı stil */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            gap: 12, marginBottom: "clamp(24px,5vw,36px)", flexWrap: "wrap",
+          }}>
+            <a href="/" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{
+                width: "clamp(52px,10vw,72px)", height: "clamp(52px,10vw,72px)",
+                borderRadius: "50%", padding: 3, flexShrink: 0,
+                background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)",
+                boxShadow: "0 0 24px rgba(124,58,237,0.6)",
+              }}>
+                <div style={{
+                  width: "100%", height: "100%", borderRadius: "50%",
+                  background: "#020817", overflow: "hidden", position: "relative",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <img src="/images/logo.png" alt="VibraXX"
+                    style={{ width: "80%", height: "80%", objectFit: "contain" }} />
+                </div>
+              </div>
+              <span style={{
+                fontSize: "clamp(13px,2.5vw,16px)", fontWeight: 700, color: "#c4b5fd",
+                textTransform: "uppercase", letterSpacing: "0.12em",
+              }}>Live Quiz Arena</span>
             </a>
+
             <div style={{
               display: "inline-flex", alignItems: "center", gap: 6,
-              padding: "6px 14px", borderRadius: 999,
-              background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.3)",
-              color: "#c4b5fd", fontSize: 12, fontWeight: 700, letterSpacing: "0.1em",
-              textTransform: "uppercase", marginBottom: 16,
+              padding: "8px 14px", borderRadius: 10,
+              background: "linear-gradient(135deg,rgba(251,191,36,0.1),rgba(245,158,11,0.08))",
+              border: "1px solid rgba(251,191,36,0.3)",
+              color: "#fbbf24", fontSize: 12, fontWeight: 700,
             }}>
-              🌐 Live Quiz Arena
+              🔥 Rounds every 5 min
             </div>
-            <p style={{ color: "#94a3b8", fontSize: 13, lineHeight: 1.6 }}>
-              🔥 Global rounds every 5 minutes &nbsp;·&nbsp; 🏆 Win up to £1,000
-            </p>
           </div>
 
           {/* Category Hero */}
