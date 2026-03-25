@@ -9,30 +9,29 @@ const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
   "https://www.vibraxx.com";
 
-const CATEGORY_LABELS: Record<string, string> = {
-  "psychology-human-behavior": "Psychology & Human Behavior",
-  "logic-puzzles": "Logic & Puzzles",
-  "earth-natural-systems": "Earth & Natural Systems",
-  "engineering-technology": "Engineering & Technology",
-  "life-sciences-medicine": "Life Sciences & Medicine",
-  "physical-sciences-mathematics": "Physical Sciences & Mathematics",
-  "information-computation": "Information & Computation",
-  "sports-entertainment": "Sports & Entertainment",
-  history: "History",
-  geography: "Geography",
-  science: "Science",
-  technology: "Technology",
-  "nature-animals": "Nature & Animals",
-  "human-body-health": "Human Body & Health",
-  "language-communication": "Language & Communication",
-};
-
 function createSupabaseAdmin() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 }
+
+async function getQuestionCategory(categorySlug: string | null) {
+  if (!categorySlug) return null;
+  const supabase = createSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("categories")
+    .select("id, name_en, slug")
+    .eq("slug", categorySlug)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (error) {
+    console.error("question category lookup error:", error);
+    return null;
+  }
+  return data;
+}
+
 
 function toAbsoluteUrl(urlOrPath?: string | null) {
   if (!urlOrPath) return null;
@@ -176,10 +175,9 @@ export default async function QuestionPage({
   );
 
   const categorySlug = seoPage.category_slug || null;
-  const categoryLabel = categorySlug
-    ? CATEGORY_LABELS[categorySlug] || categorySlug
-    : null;
-  const categoryHref = categorySlug ? `/category/${categorySlug}` : null;
+  const category = await getQuestionCategory(categorySlug);
+  const categoryLabel = category?.name_en ?? null;
+  const categoryHref = category?.slug ? `/category/${category.slug}` : null;
 
   const options = [
     { key: "A", text: q.option_a },
