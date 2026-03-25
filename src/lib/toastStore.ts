@@ -57,7 +57,7 @@ export const toastStore = {
 
   show(type: ToastType, message: string) {
     const now = Date.now()
-    if (message === lastMsg && now - lastTime < 2000) return
+    if (message === lastMsg && now - lastTime < 300000) return // 5 dakika dedup
     lastMsg  = message
     lastTime = now
 
