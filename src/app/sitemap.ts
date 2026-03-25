@@ -8,17 +8,27 @@ export default async function sitemap() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("seo_pages")
     .select("slug, updated_at")
+    .eq("page_type", "question")
     .eq("publish_status", "published")
     .eq("indexable", true)
-    .limit(50000);
+    .not("slug", "is", null)
+    .order("id", { ascending: true })
+    .range(0, 49999);
+
+  if (error) {
+    console.error("Sitemap query error:", error);
+    return [];
+  }
 
   const baseUrl = "https://www.vibraxx.com";
 
-  return (data || []).map((page) => ({
-    url: `${baseUrl}/questions/${page.slug}`,
-    lastModified: page.updated_at || new Date().toISOString(),
-  }));
+  return (data || [])
+    .filter((page) => typeof page.slug === "string" && page.slug.trim().length > 0)
+    .map((page) => ({
+      url: `${baseUrl}/questions/${page.slug}`,
+      lastModified: page.updated_at || new Date().toISOString(),
+    }));
 }
