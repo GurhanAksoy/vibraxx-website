@@ -2,12 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { toastStore, Toast } from '@/lib/toastStore'
+import { toastStore, Toast, canFireRoundToast, markRoundToastFired, resetRoundToast } from '@/lib/toastStore'
 import { supabase } from '@/lib/supabaseClient'
-
-// Module level — navigation'da sıfırlanmaz
-// Bu round için toast atıldıysa true, round geçince false'a döner
-let roundToastFired = false
 
 const TYPE_STYLES = {
   success: {
@@ -110,15 +106,15 @@ export default function ToastContainer() {
       const t = data.next_round_in_seconds as number | null
       if (t === null) return
 
-      // Round geçtikten sonra flag'i sıfırla — bir sonraki round için hazırlan
-      if (t <= 0 || t > 60) {
-        roundToastFired = false
+      // Round geçti — bir sonraki round için sıfırla
+      if (t <= 0 || t > 270) {
+        resetRoundToast()
         return
       }
 
-      // 30 saniye penceresi: sadece bir kez toast at
-      if (t <= 32 && !roundToastFired) {
-        roundToastFired = true
+      // 30 saniye penceresi — sadece canFireRoundToast true ise at
+      if (t <= 32 && canFireRoundToast()) {
+        markRoundToastFired()
         toastStore.warning('⚡ Round starting in 30 seconds!')
       }
     }, 5000)
@@ -132,24 +128,22 @@ export default function ToastContainer() {
   if (!mounted) return null
 
   return createPortal(
-    <>
-      <div style={{
-        position: 'fixed',
-        top: 90, right: 16,
-        zIndex: 99999,
-        display: 'flex', flexDirection: 'column', gap: 8,
-        alignItems: 'flex-end',
-        pointerEvents: toasts.length === 0 ? 'none' : 'auto',
-      }}>
-        {toasts.map(t => (
-          <ToastItem
-            key={t.id}
-            toast={t}
-            onDismiss={() => toastStore.dismiss(t.id)}
-          />
-        ))}
-      </div>
-    </>,
+    <div style={{
+      position: 'fixed',
+      top: 90, right: 16,
+      zIndex: 99999,
+      display: 'flex', flexDirection: 'column', gap: 8,
+      alignItems: 'flex-end',
+      pointerEvents: toasts.length === 0 ? 'none' : 'auto',
+    }}>
+      {toasts.map(t => (
+        <ToastItem
+          key={t.id}
+          toast={t}
+          onDismiss={() => toastStore.dismiss(t.id)}
+        />
+      ))}
+    </div>,
     document.body
   )
 }

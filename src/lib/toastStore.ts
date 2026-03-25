@@ -21,27 +21,27 @@ const DURATION: Record<ToastType, number> = {
 // ── Singleton state ──
 let toasts:    Toast[]    = []
 let listeners: Listener[] = []
-let lastMsg  = ''
-let lastTime = 0
 let channelRef:      ReturnType<typeof supabase.channel> | null = null
 let roundChannelRef: ReturnType<typeof supabase.channel> | null = null
 let roundTimerRef:   ReturnType<typeof setTimeout> | null = null
 let lastRoundId = ''
 
-// Round toast dedup — module level, navigation'da sıfırlanmaz
-const toastedRounds = new Set<string>()
+// Mesaj bazlı dedup — expiry timestamp olarak sakla
+const msgExpiry: Record<string, number> = {}
 
-export function wasRoundToasted(key: string): boolean {
-  return toastedRounds.has(key)
+// Round toast — bir kez atıldıktan sonra sıfırlanana kadar engelle
+let roundToastFiredAt = 0 // timestamp, 0 = atılmadı
+
+export function canFireRoundToast(): boolean {
+  return roundToastFiredAt === 0
 }
 
-export function markRoundToasted(key: string): void {
-  toastedRounds.add(key)
-  // Eski kayıtları temizle — Set büyümesin (max 20 round key tut)
-  if (toastedRounds.size > 20) {
-    const first = toastedRounds.values().next().value
-    if (first !== undefined) toastedRounds.delete(first)
-  }
+export function markRoundToastFired(): void {
+  roundToastFiredAt = Date.now()
+}
+
+export function resetRoundToast(): void {
+  roundToastFiredAt = 0
 }
 
 function notify() {
@@ -57,9 +57,10 @@ export const toastStore = {
 
   show(type: ToastType, message: string) {
     const now = Date.now()
-    if (message === lastMsg && now - lastTime < 300000) return // 5 dakika dedup
-    lastMsg  = message
-    lastTime = now
+    // Mesaj için expiry kontrolü
+    if (msgExpiry[message] && now < msgExpiry[message]) return
+    // 5 dakika engel koy
+    msgExpiry[message] = now + 5 * 60 * 1000
 
     const id       = Math.random().toString(36).slice(2)
     const duration = DURATION[type]
