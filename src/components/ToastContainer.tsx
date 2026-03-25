@@ -2,36 +2,36 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { toastStore, Toast, markRoundToasted, wasRoundToasted } from '@/lib/toastStore'
+import { toastStore, Toast } from '@/lib/toastStore'
 import { supabase } from '@/lib/supabaseClient'
+
+// Module level — navigation'da sıfırlanmaz
+// Bu round için toast atıldıysa true, round geçince false'a döner
+let roundToastFired = false
 
 const TYPE_STYLES = {
   success: {
     bg:     'linear-gradient(135deg, #0a2a1a 0%, #0f1f14 100%)',
     border: 'rgba(16,185,129,0.4)',
     dot:    '#10b981',
-    color:  '#6ee7b7',
     icon:   '✓',
   },
   warning: {
     bg:     'linear-gradient(135deg, #2a1a00 0%, #1f1500 100%)',
     border: 'rgba(245,158,11,0.4)',
     dot:    '#f59e0b',
-    color:  '#fcd34d',
     icon:   '⚠',
   },
   error: {
     bg:     'linear-gradient(135deg, #2a0a0a 0%, #1f0808 100%)',
     border: 'rgba(239,68,68,0.4)',
     dot:    '#ef4444',
-    color:  '#fca5a5',
     icon:   '✕',
   },
   info: {
     bg:     'linear-gradient(135deg, #1a0a3a 0%, #120820 100%)',
     border: 'rgba(124,58,237,0.4)',
     dot:    '#a78bfa',
-    color:  '#c4b5fd',
     icon:   'i',
   },
 }
@@ -108,15 +108,17 @@ export default function ToastContainer() {
       if (error || !data) return
 
       const t = data.next_round_in_seconds as number | null
-      if (t === null || t <= 0 || t > 35) return
+      if (t === null) return
 
-      // UTC'deki tahmini round başlangıç dakikasını 5'e yuvarla
-      // Bu değer sabit — t 26 da olsa 9 da olsa aynı round için aynı key
-      const estimatedStartSec = Math.round((Date.now() / 1000) + t)
-      const roundKey = Math.floor(estimatedStartSec / 300).toString() // 300sn = 5dk
+      // Round geçtikten sonra flag'i sıfırla — bir sonraki round için hazırlan
+      if (t <= 0 || t > 60) {
+        roundToastFired = false
+        return
+      }
 
-      if (t <= 32 && !wasRoundToasted(roundKey)) {
-        markRoundToasted(roundKey)
+      // 30 saniye penceresi: sadece bir kez toast at
+      if (t <= 32 && !roundToastFired) {
+        roundToastFired = true
         toastStore.warning('⚡ Round starting in 30 seconds!')
       }
     }, 5000)
@@ -131,12 +133,6 @@ export default function ToastContainer() {
 
   return createPortal(
     <>
-      <style>{`
-        @keyframes toast-in {
-          from { transform: translateX(120%); opacity: 0; }
-          to   { transform: translateX(0);    opacity: 1; }
-        }
-      `}</style>
       <div style={{
         position: 'fixed',
         top: 90, right: 16,
