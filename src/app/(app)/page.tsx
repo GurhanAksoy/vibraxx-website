@@ -553,6 +553,9 @@ export default function HomePage() {
     const { data, error } = await supabase
       .from("seo_pages")
       .select("category_slug")
+      .eq("page_type", "question")
+      .eq("publish_status", "published")
+      .eq("indexable", true)
       .not("category_slug", "is", null);
 
     if (error || !data) return;
