@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
@@ -9,51 +10,11 @@ const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
   "https://www.vibraxx.com";
 
-const CATEGORY_LABELS: Record<string, string> = {
-  "psychology-human-behavior": "Psychology & Human Behavior",
-  "logic-puzzles": "Logic & Puzzles",
-  "earth-natural-systems": "Earth & Natural Systems",
-  "engineering-technology": "Engineering & Technology",
-  "life-sciences-medicine": "Life Sciences & Medicine",
-  "physical-sciences-mathematics": "Physical Sciences & Mathematics",
-  "information-computation": "Information & Computation",
-  "sports-entertainment": "Sports & Entertainment",
-  history: "History",
-  geography: "Geography",
-  science: "Science",
-  technology: "Technology",
-  "nature-animals": "Nature & Animals",
-  "human-body-health": "Human Body & Health",
-  "language-communication": "Language & Communication",
-};
+type PageParams = Promise<{ categorySlug: string }>;
 
-const CATEGORY_DESCRIPTIONS: Record<string, string> = {
-  "psychology-human-behavior":
-    "Explore psychology and human behavior questions with answers and clear explanations.",
-  "logic-puzzles":
-    "Challenge yourself with logic and puzzle questions, detailed answers, and explanations.",
-  "earth-natural-systems":
-    "Discover Earth and natural systems questions with answers and explanations.",
-  "engineering-technology":
-    "Browse engineering and technology questions with answers and explanations.",
-  "life-sciences-medicine":
-    "Explore life sciences and medicine questions with answers and explanations.",
-  "physical-sciences-mathematics":
-    "Practice physical sciences and mathematics questions with answers and explanations.",
-  "information-computation":
-    "Explore information and computation questions with answers and explanations.",
-  "sports-entertainment":
-    "Browse sports and entertainment questions with answers and explanations.",
-  history: "Explore history questions with answers and explanations.",
-  geography: "Explore geography questions with answers and explanations.",
-  science: "Explore science questions with answers and explanations.",
-  technology: "Explore technology questions with answers and explanations.",
-  "nature-animals":
-    "Explore nature and animals questions with answers and explanations.",
-  "human-body-health":
-    "Explore human body and health questions with answers and explanations.",
-  "language-communication":
-    "Explore language and communication questions with answers and explanations.",
+type QuestionRow = {
+  slug: string | null;
+  title: string | null;
 };
 
 function createSupabaseAdmin() {
@@ -63,7 +24,7 @@ function createSupabaseAdmin() {
   );
 }
 
-function ctaButtonStyle(): React.CSSProperties {
+function ctaButtonStyle(): CSSProperties {
   return {
     display: "inline-flex",
     alignItems: "center",
@@ -83,30 +44,87 @@ function ctaButtonStyle(): React.CSSProperties {
   };
 }
 
+function slugToLabel(slug: string): string {
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => {
+      const lower = part.toLowerCase();
+
+      if (lower === "ai") return "AI";
+      if (lower === "scr") return "SCR";
+      if (lower === "usa") return "USA";
+      if (lower === "uk") return "UK";
+
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(" ")
+    .replace(/\bAnd\b/g, "&");
+}
+
+function buildCategoryDescription(label: string): string {
+  return `Explore ${label} questions with answers and explanations on VibraXX.`;
+}
+
+async function fetchCategoryQuestions(categorySlug: string, limit = 50) {
+  const supabase = createSupabaseAdmin();
+
+  const { data, error } = await supabase
+    .from("seo_pages")
+    .select("slug, title")
+    .eq("page_type", "question")
+    .eq("category_slug", categorySlug)
+    .eq("publish_status", "published")
+    .eq("indexable", true)
+    .order("id", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("category page query error:", error);
+    return [];
+  }
+
+  return ((data ?? []) as QuestionRow[]).filter(
+    (q): q is { slug: string; title: string } =>
+      typeof q?.slug === "string" &&
+      q.slug.trim().length > 0 &&
+      typeof q?.title === "string" &&
+      q.title.trim().length > 0
+  );
+}
+
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ categorySlug: string }>;
+  params: PageParams;
 }): Promise<Metadata> {
   const { categorySlug } = await params;
-  const label = CATEGORY_LABELS[categorySlug];
+  const safeSlug = categorySlug?.trim().toLowerCase();
 
-  if (!label) {
+  if (!safeSlug) {
     return {
       title: "Category Not Found | VibraXX",
       robots: { index: false, follow: false },
     };
   }
 
-  const description =
-    CATEGORY_DESCRIPTIONS[categorySlug] ||
-    `Explore ${label} questions with answers and explanations on VibraXX.`;
+  const questions = await fetchCategoryQuestions(safeSlug, 1);
+
+  if (questions.length === 0) {
+    return {
+      title: "Category Not Found | VibraXX",
+      robots: { index: false, follow: false },
+    };
+  }
+
+  const label = slugToLabel(safeSlug);
+  const description = buildCategoryDescription(label);
 
   return {
     title: `${label} Questions & Answers | VibraXX`,
     description,
     alternates: {
-      canonical: `${SITE_URL}/category/${categorySlug}`,
+      canonical: `${SITE_URL}/category/${safeSlug}`,
     },
     robots: {
       index: true,
@@ -115,7 +133,7 @@ export async function generateMetadata({
     openGraph: {
       title: `${label} Questions & Answers | VibraXX`,
       description,
-      url: `${SITE_URL}/category/${categorySlug}`,
+      url: `${SITE_URL}/category/${safeSlug}`,
       siteName: "VibraXX",
       type: "website",
     },
@@ -130,35 +148,23 @@ export async function generateMetadata({
 export default async function CategoryPage({
   params,
 }: {
-  params: Promise<{ categorySlug: string }>;
+  params: PageParams;
 }) {
   const { categorySlug } = await params;
-  const label = CATEGORY_LABELS[categorySlug];
+  const safeSlug = categorySlug?.trim().toLowerCase();
 
-  if (!label) return notFound();
-
-  const supabase = createSupabaseAdmin();
-
-  const { data: questions, error } = await supabase
-    .from("seo_pages")
-    .select("slug, title")
-    .eq("page_type", "question")
-    .eq("category_slug", categorySlug)
-    .eq("publish_status", "published")
-    .eq("indexable", true)
-    .order("id", { ascending: false })
-    .limit(50);
-
-  if (error) {
-    console.error("category page query error:", error);
+  if (!safeSlug) {
     return notFound();
   }
 
-  const safeQuestions = (questions || []).filter((q) => q?.slug && q?.title);
+  const safeQuestions = await fetchCategoryQuestions(safeSlug, 50);
 
-  const description =
-    CATEGORY_DESCRIPTIONS[categorySlug] ||
-    `Explore ${label} questions with answers and explanations.`;
+  if (safeQuestions.length === 0) {
+    return notFound();
+  }
+
+  const label = slugToLabel(safeSlug);
+  const description = buildCategoryDescription(label);
 
   return (
     <>
@@ -210,91 +216,35 @@ export default async function CategoryPage({
             style={{
               margin: "0 auto 14px",
               padding: "16px",
-              borderRadius: "16px",
-              background: "rgba(99,102,241,0.15)",
-              border: "1px solid rgba(99,102,241,0.35)",
+              borderRadius: "18px",
+              background: "linear-gradient(180deg, rgba(15,23,42,0.96), rgba(15,23,42,0.88))",
+              border: "1px solid rgba(148,163,184,0.12)",
+              boxShadow: "0 10px 32px rgba(0,0,0,0.22)",
             }}
           >
-            <div
-              style={{
-                fontSize: "14px",
-                lineHeight: 1.6,
-                opacity: 0.95,
-                textAlign: "center",
-                marginBottom: "14px",
-              }}
-            >
-              Join the next live round and compete with players worldwide.
-            </div>
-
             <div
               style={{
                 display: "flex",
-                justifyContent: "center",
+                flexDirection: "column",
+                gap: "12px",
                 alignItems: "center",
-              }}
-            >
-              <a
-                href="https://www.vibraxx.com/#arena"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={ctaButtonStyle()}
-              >
-                ENTER ARENA
-              </a>
-            </div>
-          </div>
-
-          <div
-            style={{
-              margin: "0 auto 12px",
-              padding: "0 2px",
-              fontSize: "14px",
-              opacity: 0.88,
-              lineHeight: 1.5,
-              wordBreak: "break-word",
-            }}
-          >
-            <a
-              href="/"
-              style={{
-                color: "#93c5fd",
-                textDecoration: "none",
-              }}
-            >
-              Home
-            </a>
-            <span style={{ margin: "0 8px", opacity: 0.5 }}>›</span>
-            <span style={{ color: "#cbd5e1" }}>{label}</span>
-          </div>
-
-          <section
-            style={{
-              background: "#0f172a",
-              borderRadius: "18px",
-              padding: "22px 18px",
-              marginBottom: "16px",
-              boxShadow: "0 8px 30px rgba(0,0,0,0.18)",
-            }}
-          >
-            <div
-              style={{
                 textAlign: "center",
-                marginBottom: "18px",
               }}
             >
               <div
                 style={{
-                  display: "inline-block",
-                  padding: "6px 10px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "8px 12px",
                   borderRadius: "999px",
+                  background: "rgba(34,211,238,0.12)",
+                  border: "1px solid rgba(34,211,238,0.24)",
+                  color: "#67e8f9",
                   fontSize: "12px",
-                  fontWeight: 700,
+                  fontWeight: 800,
                   letterSpacing: "0.06em",
                   textTransform: "uppercase",
-                  color: "#22d3ee",
-                  background: "rgba(34,211,238,0.12)",
-                  marginBottom: "12px",
                 }}
               >
                 Category
@@ -302,9 +252,11 @@ export default async function CategoryPage({
 
               <h1
                 style={{
-                  margin: "0 0 10px",
-                  fontSize: "clamp(28px, 5vw, 42px)",
-                  lineHeight: 1.15,
+                  margin: 0,
+                  fontSize: "clamp(28px, 6vw, 40px)",
+                  lineHeight: 1.1,
+                  fontWeight: 900,
+                  letterSpacing: "-0.03em",
                 }}
               >
                 {label}
@@ -312,28 +264,21 @@ export default async function CategoryPage({
 
               <p
                 style={{
-                  maxWidth: "640px",
-                  margin: "0 auto",
-                  opacity: 0.82,
+                  margin: 0,
+                  maxWidth: "620px",
+                  color: "#cbd5e1",
                   fontSize: "15px",
                   lineHeight: 1.7,
                 }}
               >
                 {description}
               </p>
-            </div>
 
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                gap: "10px",
-                flexWrap: "wrap",
-                marginTop: "16px",
-              }}
-            >
               <div
                 style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   padding: "8px 12px",
                   borderRadius: "999px",
                   background: "rgba(148,163,184,0.12)",
@@ -345,7 +290,7 @@ export default async function CategoryPage({
                 {safeQuestions.length} live questions shown
               </div>
             </div>
-          </section>
+          </div>
 
           <section
             style={{
@@ -431,6 +376,8 @@ export default async function CategoryPage({
                         lineHeight: 1.6,
                         fontSize: "15px",
                         wordBreak: "break-word",
+                        transition:
+                          "transform 0.18s ease, border-color 0.18s ease, background 0.18s ease",
                       }}
                     >
                       <span

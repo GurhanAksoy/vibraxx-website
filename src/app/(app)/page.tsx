@@ -411,6 +411,7 @@ export default function HomePage() {
 
   // PWA Install
   const [showPWAPrompt, setShowPWAPrompt] = useState(false);
+  const [categories, setCategories] = useState<string[]>([]);
   const deferredPromptRef = useRef<any>(null);
 
   const countdownPauseUntilRef = useRef<number>(0);
@@ -547,6 +548,25 @@ export default function HomePage() {
     const interval = setInterval(fetchHomepageState, 15000);
     return () => clearInterval(interval);
   }, [fetchHomepageState]);
+
+  const fetchCategories = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("seo_pages")
+      .select("category_slug")
+      .not("category_slug", "is", null);
+
+    if (error || !data) return;
+
+    const unique = Array.from(
+      new Set(data.map((item: any) => item.category_slug as string))
+    ).sort() as string[];
+
+    setCategories(unique);
+  }, []);
+
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
 
   // Countdown tick
   useEffect(() => {
@@ -1603,36 +1623,54 @@ export default function HomePage() {
               ))}
             </div>
 
-            {/* Explore Quiz Categories */}
-            <div style={{ textAlign: "center", marginTop: "clamp(32px,6vw,48px)", marginBottom: "clamp(16px,4vw,32px)" }}>
-              <a
-                href="/category/technology"
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 10,
-                  padding: "clamp(12px,3vw,16px) clamp(24px,5vw,36px)",
-                  borderRadius: 14, textDecoration: "none",
-                  border: "1px solid rgba(139,92,246,0.4)",
-                  background: "linear-gradient(135deg,rgba(124,58,237,0.12),rgba(217,70,239,0.08))",
-                  color: "#c4b5fd", fontSize: "clamp(13px,2.5vw,15px)", fontWeight: 700,
-                  letterSpacing: "0.04em", transition: "all 0.2s",
-                  backdropFilter: "blur(10px)",
-                }}
-                onMouseEnter={e => {
-                  (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(139,92,246,0.7)";
-                  (e.currentTarget as HTMLAnchorElement).style.background = "linear-gradient(135deg,rgba(124,58,237,0.22),rgba(217,70,239,0.14))";
-                  (e.currentTarget as HTMLAnchorElement).style.transform = "translateY(-2px)";
-                }}
-                onMouseLeave={e => {
-                  (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(139,92,246,0.4)";
-                  (e.currentTarget as HTMLAnchorElement).style.background = "linear-gradient(135deg,rgba(124,58,237,0.12),rgba(217,70,239,0.08))";
-                  (e.currentTarget as HTMLAnchorElement).style.transform = "translateY(0)";
-                }}
-              >
-                <span style={{ fontSize: 18 }}>🧠</span>
-                Explore Quiz Categories
-                <span style={{ fontSize: 16, opacity: 0.7 }}>→</span>
-              </a>
-            </div>
+            {/* Explore Quiz Categories Grid */}
+            {categories.length > 0 && (
+              <div style={{ marginTop: "clamp(32px,6vw,48px)", marginBottom: "clamp(16px,4vw,32px)", textAlign: "center" }}>
+                <div style={{ fontSize: "clamp(13px,2.5vw,15px)", fontWeight: 700, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 16 }}>
+                  🧠 Explore Quiz Categories
+                </div>
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                  gap: "10px",
+                  maxWidth: "900px",
+                  margin: "0 auto",
+                  padding: "0 16px",
+                }}>
+                  {categories.map((slug) => (
+                    <a
+                      key={slug}
+                      href={`/category/${slug}`}
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: 10,
+                        border: "1px solid rgba(139,92,246,0.3)",
+                        background: "rgba(124,58,237,0.08)",
+                        color: "#c4b5fd",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        textDecoration: "none",
+                        textTransform: "capitalize",
+                        transition: "all 0.2s",
+                        display: "block",
+                      }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(139,92,246,0.7)";
+                        (e.currentTarget as HTMLAnchorElement).style.background = "rgba(124,58,237,0.18)";
+                        (e.currentTarget as HTMLAnchorElement).style.transform = "translateY(-2px)";
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(139,92,246,0.3)";
+                        (e.currentTarget as HTMLAnchorElement).style.background = "rgba(124,58,237,0.08)";
+                        (e.currentTarget as HTMLAnchorElement).style.transform = "translateY(0)";
+                      }}
+                    >
+                      {slug.replace(/-/g, " ")}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
 
           </div>
         </main>
