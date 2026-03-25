@@ -1606,7 +1606,7 @@ export default function HomePage() {
             {/* Explore Quiz Categories */}
             <div style={{ textAlign: "center", marginTop: "clamp(32px,6vw,48px)", marginBottom: "clamp(16px,4vw,32px)" }}>
               <a
-                href="/categories"
+                href="/category/technology"
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 10,
                   padding: "clamp(12px,3vw,16px) clamp(24px,5vw,36px)",
