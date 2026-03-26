@@ -428,7 +428,7 @@ export default function ProfilePage() {
                           ? <img src={flagUrl(profile.country)!} alt={profile.country} style={{ width: 32, height: 24, borderRadius: 3, objectFit: "cover", flexShrink: 0 }} />
                           : <Globe style={{ width: 24, height: 24, color: "#64748b", flexShrink: 0 }} />
                         }
-                        <h1 style={{ fontSize: "clamp(18px,4vw,28px)", fontWeight: 900, background: "linear-gradient(90deg,#fbbf24,#f59e0b)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "calc(100% - 60px)" }}>
+                        <h1 style={{ fontSize: "clamp(16px,4vw,28px)", fontWeight: 900, background: "linear-gradient(90deg,#fbbf24,#f59e0b)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", wordBreak: "break-word", lineHeight: 1.2 }}>
                           {profile.full_name}
                         </h1>
                         <button onClick={() => setIsEditing(true)}
