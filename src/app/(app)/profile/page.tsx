@@ -21,7 +21,7 @@ import {
   User, Mail, Trophy, Target, TrendingUp, Calendar, Crown,
   Edit, Save, X, Send, CheckCircle, BarChart3, Zap,
   Gift, Activity, Sparkles, ShoppingCart,
-  AlertCircle, Volume2, VolumeX, Clock, Star, Flame,
+  AlertCircle, Volume2, VolumeX, Clock, Star, Flame, Globe,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────
@@ -126,14 +126,10 @@ interface WeeklyChallenge {
 // HELPERS
 // ─────────────────────────────────────────────
 
-// Unicode regional indicator — encoding bağımsız, tüm ülkeler
-const countryToFlag = (code: string): string => {
-  if (!code || code.length !== 2) return '🌍'
-  const A = 0x1F1E6
-  const chars = code.toUpperCase().split('')
-  if (!/^[A-Z]{2}$/.test(code.toUpperCase())) return '🌍'
-  return String.fromCodePoint(A + chars[0].charCodeAt(0) - 65) +
-         String.fromCodePoint(A + chars[1].charCodeAt(0) - 65)
+// flagcdn.com — Windows Chrome/Edge emoji render etmez, CDN PNG her platformda çalışır
+const flagUrl = (code: string): string | null => {
+  if (!code || code.length !== 2 || !/^[A-Z]{2}$/i.test(code)) return null;
+  return `https://flagcdn.com/32x24/${code.toLowerCase()}.png`;
 };
 
 // ─────────────────────────────────────────────
@@ -175,7 +171,7 @@ export default function ProfilePage() {
   // ── Fetch profile ──
   useEffect(() => {
     if (!securityPassed) return;
-    const fetchProfile = async () => {
+    const fetch = async () => {
       setIsLoading(true);
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -194,7 +190,7 @@ export default function ProfilePage() {
         setIsLoading(false);
       }
     };
-    fetchProfile();
+    fetch();
   }, [securityPassed]);
 
   // ── Realtime ──
@@ -202,10 +198,10 @@ export default function ProfilePage() {
     const userId = profileData?.profile?.id;
     if (!userId) return;
 
-    const refreshTimeoutRef = { current: undefined as NodeJS.Timeout | undefined };
+    let refreshTimeout: NodeJS.Timeout;
     const debouncedRefresh = () => {
-      clearTimeout(refreshTimeoutRef.current);
-      refreshTimeoutRef.current = setTimeout(async () => {
+      clearTimeout(refreshTimeout);
+      refreshTimeout = setTimeout(async () => {
         const { data, error } = await supabase.rpc("get_user_profile_data");
         if (!error && data) setProfileData(data);
       }, 500);
@@ -227,7 +223,7 @@ export default function ProfilePage() {
       .subscribe();
 
     return () => {
-      clearTimeout(refreshTimeoutRef.current);
+      clearTimeout(refreshTimeout);
       supabase.removeChannel(scoreCh);
       supabase.removeChannel(creditCh);
       supabase.removeChannel(cacheCh);
@@ -279,7 +275,7 @@ export default function ProfilePage() {
       await supabase.auth.updateUser({ data: { full_name: editName.trim(), country: editCountry } });
       const { error } = await supabase
         .from("v2_users_public")
-        .update({ full_name: editName.trim(), country: editCountry, updated_at: new Date().toISOString() })
+        .update({ full_name: editName.trim(), updated_at: new Date().toISOString() })
         .eq("user_id", profileData.profile.id);
       if (!error) {
         setProfileData({ ...profileData, profile: { ...profileData.profile, full_name: editName.trim(), country: editCountry } });
@@ -397,7 +393,7 @@ export default function ProfilePage() {
                           style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#22c55e,#16a34a)", color: "white", cursor: isSaving ? "not-allowed" : "pointer", display: "flex", alignItems: "center" }}>
                           <Save style={{ width: 16, height: 16 }} />
                         </button>
-                        <button onClick={() => { setIsEditing(false); setEditName(profile.full_name); setEditCountry(profile.country || ""); }}
+                        <button onClick={() => { setIsEditing(false); setEditName(profile.full_name); setEditCountry(profile.country); }}
                           style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: "rgba(239,68,68,.2)", color: "#fca5a5", cursor: "pointer" }}>
                           <X style={{ width: 16, height: 16 }} />
                         </button>
@@ -408,7 +404,10 @@ export default function ProfilePage() {
                     </>
                   ) : (
                     <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-                      <span style={{ fontSize: "clamp(32px,6vw,40px)" }}>{countryToFlag(profile.country)}</span>
+                      {flagUrl(profile.country)
+                        ? <img src={flagUrl(profile.country)!} alt={profile.country} style={{ width: 40, height: 30, borderRadius: 3, objectFit: "cover", flexShrink: 0 }} />
+                        : <Globe style={{ width: 32, height: 32, color: "#64748b" }} />
+                      }
                       <h1 style={{ fontSize: "clamp(20px,4vw,28px)", fontWeight: 900, background: "linear-gradient(90deg,#fbbf24,#f59e0b)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                         {profile.full_name}
                       </h1>
@@ -598,9 +597,8 @@ export default function ProfilePage() {
                 </h3>
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   {[
-                    { label: "Weekly Rank", value: rankings.weekly_rank ? `#${rankings.weekly_rank}` : "-", bg: "rgba(139,92,246,.15)", border: "rgba(139,92,246,.3)", color: "#a78bfa" },
-                    { label: "Monthly Rank", value: rankings.monthly_rank ? `#${rankings.monthly_rank}` : "-", bg: "rgba(56,189,248,.15)", border: "rgba(56,189,248,.3)", color: "#38bdf8" },
-                    { label: "Country", value: countryToFlag(profile.country), bg: "rgba(34,197,94,.15)", border: "rgba(34,197,94,.3)", color: "white" },
+                    { label: "Weekly Rank",  value: rankings.weekly_rank  ? `#${rankings.weekly_rank}`  : "-", bg: "rgba(139,92,246,.15)", border: "rgba(139,92,246,.3)", color: "#a78bfa" },
+                    { label: "Monthly Rank", value: rankings.monthly_rank ? `#${rankings.monthly_rank}` : "-", bg: "rgba(56,189,248,.15)",  border: "rgba(56,189,248,.3)",  color: "#38bdf8" },
                   ].map(({ label, value, bg, border, color }) => (
                     <div key={label} style={{ padding: 12, borderRadius: 10, background: bg, border: `1px solid ${border}` }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -609,6 +607,16 @@ export default function ProfilePage() {
                       </div>
                     </div>
                   ))}
+                  {/* Country — ayrı render: img kullanıyor */}
+                  <div style={{ padding: 12, borderRadius: 10, background: "rgba(34,197,94,.15)", border: "1px solid rgba(34,197,94,.3)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: 13, color: "#cbd5e1" }}>Country</span>
+                      {flagUrl(profile.country)
+                        ? <img src={flagUrl(profile.country)!} alt={profile.country} style={{ width: 32, height: 24, borderRadius: 3, objectFit: "cover" }} />
+                        : <span style={{ fontSize: 20, color: "#64748b" }}>—</span>
+                      }
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

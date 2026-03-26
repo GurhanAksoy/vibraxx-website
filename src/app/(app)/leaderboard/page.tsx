@@ -22,13 +22,10 @@ interface Player {
   avatarUrl: string; country: string;
 }
 
-// Unicode flag — encoding bağımsız
-const countryToFlag = (code: string): string => {
-  if (!code || code.length !== 2 || !/^[A-Z]{2}$/i.test(code)) return "";
-  const A = 0x1F1E6;
-  const c = code.toUpperCase();
-  return String.fromCodePoint(A + c.charCodeAt(0) - 65) +
-         String.fromCodePoint(A + c.charCodeAt(1) - 65);
+// flagcdn.com — Windows Chrome/Edge emoji render etmez, CDN PNG her platformda çalışır
+const flagUrl = (code: string): string | null => {
+  if (!code || code.length !== 2 || !/^[A-Z]{2}$/i.test(code)) return null;
+  return `https://flagcdn.com/24x18/${code.toLowerCase()}.png`;
 };
 
 interface RpcPayload {
@@ -553,7 +550,7 @@ export default function LeaderboardPage() {
                           <div style={{ position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%)", width: "clamp(22px,5vw,32px)", height: "clamp(22px,5vw,32px)", borderRadius: "50%", background: "linear-gradient(135deg,#d1d5db,#9ca3af)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #0f172a", color: "#0f172a", fontWeight: 900, fontSize: "clamp(10px,2.5vw,16px)" }}>2</div>
                         </div>
                         <h2 style={{ fontSize: "clamp(12px,2.5vw,16px)", fontWeight: 800, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
-                          {countryToFlag(top3[1].country) && <span style={{ fontSize: "clamp(12px,2.5vw,16px)", flexShrink: 0 }}>{countryToFlag(top3[1].country)}</span>}
+                          {flagUrl(top3[1].country) && <img src={flagUrl(top3[1].country)!} alt={top3[1].country} style={{ width: 20, height: 15, borderRadius: 2, objectFit: 'cover', flexShrink: 0 }} />}
                           {top3[1].name}
                         </h2>
                         <div style={{ display: "inline-flex", alignItems: "center", gap: 3, padding: "3px 7px", borderRadius: "999px", background: `${top3[1].tierColor}20`, border: `1px solid ${top3[1].tierColor}60`, marginBottom: 8, fontSize: "clamp(8px,1.8vw,11px)" }}>
@@ -584,7 +581,7 @@ export default function LeaderboardPage() {
                           <div style={{ position: "absolute", bottom: -8, left: "50%", transform: "translateX(-50%)", width: "clamp(26px,5.5vw,38px)", height: "clamp(26px,5.5vw,38px)", borderRadius: "50%", background: "linear-gradient(135deg,#fbbf24,#f59e0b)", display: "flex", alignItems: "center", justifyContent: "center", border: "3px solid #0f172a", color: "#0f172a", fontWeight: 900, fontSize: "clamp(11px,2.5vw,18px)" }}>1</div>
                         </div>
                         <h2 style={{ fontSize: "clamp(14px,3vw,20px)", fontWeight: 900, marginBottom: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                          {countryToFlag(top3[0].country) && <span style={{ fontSize: "clamp(14px,3vw,20px)", flexShrink: 0 }}>{countryToFlag(top3[0].country)}</span>}
+                          {flagUrl(top3[0].country) && <img src={flagUrl(top3[0].country)!} alt={top3[0].country} style={{ width: 22, height: 16, borderRadius: 2, objectFit: "cover", flexShrink: 0 }} />}
                           {top3[0].name}
                         </h2>
                         <div style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: "999px", background: `${top3[0].tierColor}25`, border: `2px solid ${top3[0].tierColor}`, marginBottom: 10, fontSize: "clamp(9px,2vw,12px)" }}>
@@ -617,7 +614,7 @@ export default function LeaderboardPage() {
                           <div style={{ position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%)", width: "clamp(22px,5vw,32px)", height: "clamp(22px,5vw,32px)", borderRadius: "50%", background: "linear-gradient(135deg,#d97706,#c2410c)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #0f172a", color: "#0f172a", fontWeight: 900, fontSize: "clamp(10px,2.5vw,16px)" }}>3</div>
                         </div>
                         <h2 style={{ fontSize: "clamp(12px,2.5vw,16px)", fontWeight: 800, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
-                          {countryToFlag(top3[2].country) && <span style={{ fontSize: "clamp(12px,2.5vw,16px)", flexShrink: 0 }}>{countryToFlag(top3[2].country)}</span>}
+                          {flagUrl(top3[2].country) && <img src={flagUrl(top3[2].country)!} alt={top3[2].country} style={{ width: 20, height: 15, borderRadius: 2, objectFit: "cover", flexShrink: 0 }} />}
                           {top3[2].name}
                         </h2>
                         <div style={{ display: "inline-flex", alignItems: "center", gap: 3, padding: "3px 7px", borderRadius: "999px", background: `${top3[2].tierColor}20`, border: `1px solid ${top3[2].tierColor}60`, marginBottom: 8, fontSize: "clamp(8px,1.8vw,11px)" }}>
@@ -649,7 +646,7 @@ export default function LeaderboardPage() {
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
-                              {countryToFlag(player.country) && <span style={{ fontSize: "clamp(12px,2.5vw,14px)", flexShrink: 0 }}>{countryToFlag(player.country)}</span>}
+                              {flagUrl(player.country) && <img src={flagUrl(player.country)!} alt={player.country} style={{ width: 20, height: 15, borderRadius: 2, objectFit: "cover", flexShrink: 0 }} />}
                               <span style={{ fontSize: "clamp(12px,2.5vw,15px)", fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{player.name}</span>
                               <span style={{ fontSize: "clamp(12px,2.5vw,14px)", flexShrink: 0 }}>{player.tierIcon}</span>
                             </div>

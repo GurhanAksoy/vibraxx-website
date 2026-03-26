@@ -26,13 +26,10 @@ import AnnouncementModal from "@/components/AnnouncementModal";
 // ============================================
 // HELPERS
 // ============================================
-const countryToFlag = (code: string): string => {
-  if (!code || code.length !== 2) return "";
-  if (!/^[A-Z]{2}$/i.test(code)) return "";
-  const A = 0x1F1E6;
-  const c = code.toUpperCase();
-  return String.fromCodePoint(A + c.charCodeAt(0) - 65) +
-         String.fromCodePoint(A + c.charCodeAt(1) - 65);
+// flagcdn.com — Windows Chrome/Edge emoji render etmez, CDN PNG her platformda çalışır
+const flagUrl = (code: string): string | null => {
+  if (!code || code.length !== 2 || !/^[A-Z]{2}$/i.test(code)) return null;
+  return `https://flagcdn.com/24x18/${code.toLowerCase()}.png`;
 };
 
 // ============================================
@@ -144,8 +141,12 @@ const ChampionCard = memo(({ champion }: any) => {
         color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
         display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
       }}>
-        {champion.country && countryToFlag(champion.country) && (
-          <span style={{ fontSize: "clamp(16px,3.5vw,20px)" }}>{countryToFlag(champion.country)}</span>
+        {champion.country && flagUrl(champion.country) && (
+          <img
+            src={flagUrl(champion.country)!}
+            alt={champion.country}
+            style={{ width: 24, height: 18, borderRadius: 2, objectFit: "cover", flexShrink: 0 }}
+          />
         )}
         {champion.name}
       </div>
