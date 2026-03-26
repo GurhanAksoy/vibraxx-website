@@ -285,9 +285,9 @@ export default function BuyPage() {
         .vx-header { position: relative; z-index: 10; }
         .vx-header-inner {
           max-width: min(960px, 100%); margin: 0 auto;
-          padding: clamp(12px,3vw,28px) clamp(14px,4vw,20px);
+          padding: clamp(10px,2.5vw,28px) clamp(14px,4vw,20px);
           display: flex; align-items: center; justify-content: space-between;
-          gap: 10px; flex-wrap: nowrap;
+          gap: 8px; flex-wrap: nowrap; min-height: 0;
         }
         .vx-logo {
           display: flex; align-items: center; gap: 8px;
@@ -305,7 +305,7 @@ export default function BuyPage() {
           display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;
         }
         .vx-logo-label { font-size: 13px; color: #c4b5fd; text-transform: uppercase; letter-spacing: .14em; font-weight: 600; white-space: nowrap; }
-        .vx-header-right { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+        .vx-header-right { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; flex-shrink: 0; }
         .vx-audio-btn {
           display: flex; align-items: center; justify-content: center;
           width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
@@ -315,7 +315,7 @@ export default function BuyPage() {
         .vx-audio-btn:hover { border-color: #a78bfa; background: rgba(139,92,246,.2); }
         .vx-rounds-badge {
           display: inline-flex; align-items: center; gap: 6px;
-          padding: 8px 14px; border-radius: 12px;
+          padding: 8px 12px; border-radius: 12px;
           border: 1px solid rgba(251,191,36,.3);
           background: linear-gradient(135deg,rgba(251,191,36,.1),rgba(245,158,11,.1));
           color: #fbbf24; font-size: 13px; font-weight: 600;
@@ -325,7 +325,6 @@ export default function BuyPage() {
         @media (max-width: 480px) {
           .vx-logo-label { display: none !important; }
           .vx-rounds-badge span.vx-rounds-text { display: none; }
-          /* Mobilde logo tam solda, sağda rounds+ses */
           .vx-header-inner { padding: 10px 14px; }
         }
 
@@ -542,6 +541,7 @@ export default function BuyPage() {
         {/* ── HEADER ── */}
         <header className="vx-header">
           <div className="vx-header-inner">
+            {/* LEFT: Logo */}
             <div className="vx-logo" onClick={() => router.push("/")}>
               <div className="vx-logo-outer">
                 <div className="vx-logo-circle">
@@ -551,6 +551,7 @@ export default function BuyPage() {
               <span className="vx-logo-label">Live Quiz Arena</span>
             </div>
 
+            {/* RIGHT: Rounds + Audio — always together */}
             <div className="vx-header-right">
               {liveCredits > 0 && (
                 <div className="vx-rounds-badge">
