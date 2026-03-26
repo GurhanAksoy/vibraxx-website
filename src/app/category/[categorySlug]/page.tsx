@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import type { CSSProperties } from "react";
 import type { Metadata } from "next";
+import Image from "next/image";
 import { createClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 import Footer from "@/components/Footer";
@@ -175,8 +176,8 @@ export default async function CategoryPage({
                   background: "#020817", overflow: "hidden", position: "relative",
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
-                  <img src="/images/logo.png" alt="VibraXX"
-                    style={{ width: "80%", height: "80%", objectFit: "contain" }} />
+                  <Image src="/images/logo.png" alt="VibraXX" fill sizes="72px"
+                    style={{ objectFit: "contain", padding: "10%" }} />
                 </div>
               </div>
               <span style={{
@@ -185,14 +186,25 @@ export default async function CategoryPage({
               }}>Live Quiz Arena</span>
             </a>
 
-            <div style={{
-              display: "inline-flex", alignItems: "center", gap: 6,
-              padding: "8px 14px", borderRadius: 10,
-              background: "linear-gradient(135deg,rgba(251,191,36,0.1),rgba(245,158,11,0.08))",
-              border: "1px solid rgba(251,191,36,0.3)",
-              color: "#fbbf24", fontSize: 12, fontWeight: 700,
-            }}>
-              🔥 Rounds every 5 min
+<div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "8px 14px", borderRadius: 10,
+                background: "linear-gradient(135deg,rgba(34,197,94,0.1),rgba(16,185,129,0.08))",
+                border: "1px solid rgba(34,197,94,0.3)",
+                color: "#4ade80", fontSize: 12, fontWeight: 700,
+              }}>
+                🎁 1 Free Round Daily
+              </div>
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "8px 14px", borderRadius: 10,
+                background: "linear-gradient(135deg,rgba(251,191,36,0.1),rgba(245,158,11,0.08))",
+                border: "1px solid rgba(251,191,36,0.3)",
+                color: "#fbbf24", fontSize: 12, fontWeight: 700,
+              }}>
+                🔥 Rounds every 5 min
+              </div>
             </div>
           </div>
 
@@ -258,6 +270,18 @@ export default async function CategoryPage({
                 ⚡ Enter Arena
               </a>
             </div>
+          </div>
+
+          {/* Breadcrumb */}
+          <div style={{
+            marginBottom: "clamp(10px,2vw,14px)",
+            fontSize: 13, display: "flex", alignItems: "center", flexWrap: "wrap",
+          }}>
+            <a href="/" style={{ color: "#a78bfa", textDecoration: "none" }}>Home</a>
+            <span style={{ margin: "0 8px", color: "#475569" }}>›</span>
+            <a href="/categories" style={{ color: "#a78bfa", textDecoration: "none" }}>All Categories</a>
+            <span style={{ margin: "0 8px", color: "#475569" }}>›</span>
+            <span style={{ color: "#64748b" }}>{label}</span>
           </div>
 
           {/* Questions */}

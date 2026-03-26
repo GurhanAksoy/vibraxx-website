@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import type { Metadata } from "next";
+import Image from "next/image";
 import { createClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 import Footer from "@/components/Footer";
@@ -226,8 +227,8 @@ export default async function QuestionPage({
                   background: "#020817", overflow: "hidden",
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
-                  <img src="/images/logo.png" alt="VibraXX"
-                    style={{ width: "80%", height: "80%", objectFit: "contain" }} />
+                  <Image src="/images/logo.png" alt="VibraXX" fill sizes="68px"
+                    style={{ objectFit: "contain", padding: "10%" }} />
                 </div>
               </div>
               <span style={{
@@ -236,18 +237,29 @@ export default async function QuestionPage({
               }}>Live Quiz Arena</span>
             </a>
 
-            <a href="/"
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 8,
-                padding: "10px 20px", borderRadius: 12, textDecoration: "none",
-                background: "linear-gradient(135deg,#7c3aed,#d946ef)",
-                color: "white", fontSize: 14, fontWeight: 800,
-                boxShadow: "0 0 24px rgba(124,58,237,0.5)",
-                letterSpacing: "0.03em",
-              }}
-            >
-              ⚡ Enter Arena
-            </a>
+<div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "8px 14px", borderRadius: 10,
+                background: "linear-gradient(135deg,rgba(34,197,94,0.1),rgba(16,185,129,0.08))",
+                border: "1px solid rgba(34,197,94,0.3)",
+                color: "#4ade80", fontSize: 12, fontWeight: 700,
+              }}>
+                🎁 1 Free Round Daily
+              </div>
+              <a href="/"
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 8,
+                  padding: "10px 20px", borderRadius: 12, textDecoration: "none",
+                  background: "linear-gradient(135deg,#7c3aed,#d946ef)",
+                  color: "white", fontSize: 14, fontWeight: 800,
+                  boxShadow: "0 0 24px rgba(124,58,237,0.5)",
+                  letterSpacing: "0.03em",
+                }}
+              >
+                ⚡ Enter Arena
+              </a>
+            </div>
           </div>
 
           {/* Breadcrumb */}
@@ -257,6 +269,8 @@ export default async function QuestionPage({
             display: "flex", alignItems: "center", gap: 0, flexWrap: "wrap",
           }}>
             <a href="/" style={{ color: "#a78bfa", textDecoration: "none" }}>Home</a>
+            <span style={{ margin: "0 8px", color: "#475569" }}>›</span>
+            <a href="/categories" style={{ color: "#a78bfa", textDecoration: "none" }}>Categories</a>
             {categoryHref && categoryLabel ? (
               <>
                 <span style={{ margin: "0 8px", color: "#475569" }}>›</span>
