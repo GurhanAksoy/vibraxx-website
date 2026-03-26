@@ -105,7 +105,7 @@ const ChampionCard = memo(({ champion }: any) => {
         position: "relative",
         width: "clamp(64px,14vw,88px)", height: "clamp(64px,14vw,88px)",
         margin: "0 auto 14px",
-        borderRadius: "50%", padding: 3,
+        borderRadius: "50%", padding: 2,
         background: periodStyle.rankBg,
         boxShadow: `0 0 24px ${periodStyle.glow}`,
       }}>
@@ -1062,10 +1062,10 @@ export default function HomePage() {
                 <div
                   style={{
                     position: "relative",
-                    width: "clamp(48px,10vw,80px)", height: "clamp(48px,10vw,80px)",
+                    width: "clamp(64px,12vw,88px)", height: "clamp(64px,12vw,88px)",
                     borderRadius: "9999px",
-                    padding: 4, background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)",
-                    boxShadow: "0 0 30px rgba(124,58,237,0.6)", flexShrink: 0,
+                    padding: 2, background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)",
+                    boxShadow: "0 0 24px rgba(124,58,237,0.6)", flexShrink: 0,
                   }}
                 >
                   <div
@@ -1625,7 +1625,7 @@ export default function HomePage() {
             {/* Explore Quiz Categories Grid */}
             {categories.length > 0 && (
               <div style={{ marginTop: "clamp(32px,6vw,48px)", marginBottom: "clamp(16px,4vw,32px)", textAlign: "center" }}>
-                <div style={{ fontSize: "clamp(13px,2.5vw,15px)", fontWeight: 700, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 16 }}>
+                <div style={{ fontSize: "clamp(13px,2.5vw,15px)", fontWeight: 700, color: "#22c55e", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 16 }}>
                   🧠 Explore Quiz Categories
                 </div>
                 <div style={{
