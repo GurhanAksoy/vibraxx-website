@@ -286,10 +286,8 @@ export default function BuyPage() {
         .vx-header-inner {
           max-width: min(960px, 100%); margin: 0 auto;
           padding: clamp(10px,2.5vw,28px) clamp(14px,4vw,20px);
-          display: grid;
-          grid-template-columns: auto 1fr auto;
-          align-items: center;
-          gap: 8px;
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 12px; flex-wrap: nowrap;
         }
         .vx-logo {
           display: flex; align-items: center; gap: 8px;
