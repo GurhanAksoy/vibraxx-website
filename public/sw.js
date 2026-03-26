@@ -1,15 +1,83 @@
 const CACHE_NAME = "vibraxx-v2"; // ⚡ her deploy'da artır: v2, v3...
 const RUNTIME_CACHE = "vibraxx-runtime-v2";
 const RUNTIME_MAX_ENTRIES = 60;
-const RUNTIME_MAX_AGE_MS  = 7 * 24 * 60 * 60 * 1000; // 7 gün
+const RUNTIME_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 gün
 
-// Runtime cache temizleme — boyut ve yaş kontrolü
+// Runtime cache temizleme — yaş + boyut kontrolü
 async function trimRuntimeCache() {
   const cache = await caches.open(RUNTIME_CACHE);
-  const keys  = await cache.keys();
-  if (keys.length <= RUNTIME_MAX_ENTRIES) return;
-  const toDelete = keys.slice(0, keys.length - RUNTIME_MAX_ENTRIES);
-  await Promise.all(toDelete.map(k => cache.delete(k)));
+  const requests = await cache.keys();
+
+  if (!requests.length) return;
+
+  const now = Date.now();
+  const entries = [];
+
+  for (const request of requests) {
+    const response = await cache.match(request);
+    if (!response) continue;
+
+    const cachedAt = response.headers.get("sw-cached-at");
+    const cachedTime = cachedAt ? Number(cachedAt) : now;
+
+    entries.push({
+      request,
+      cachedTime,
+    });
+  }
+
+  // Önce eski entry'leri sil
+  const expired = entries.filter((entry) => now - entry.cachedTime > RUNTIME_MAX_AGE_MS);
+  await Promise.all(expired.map((entry) => cache.delete(entry.request)));
+
+  // Yeniden liste çek
+  const freshRequests = await cache.keys();
+  if (freshRequests.length <= RUNTIME_MAX_ENTRIES) return;
+
+  // Kalanları eski -> yeni sırala, limit üstünü sil
+  const freshEntries = [];
+  for (const request of freshRequests) {
+    const response = await cache.match(request);
+    if (!response) continue;
+
+    const cachedAt = response.headers.get("sw-cached-at");
+    const cachedTime = cachedAt ? Number(cachedAt) : 0;
+
+    freshEntries.push({
+      request,
+      cachedTime,
+    });
+  }
+
+  freshEntries.sort((a, b) => a.cachedTime - b.cachedTime);
+
+  const toDelete = freshEntries.slice(0, freshEntries.length - RUNTIME_MAX_ENTRIES);
+  await Promise.all(toDelete.map((entry) => cache.delete(entry.request)));
+}
+
+// Response'u güvenli şekilde cache'e uygun hale getir
+async function toCacheableResponse(response) {
+  // opaque response'lar olduğu gibi clone ile cache'lenebilir
+  if (response.type === "opaque") {
+    return response.clone();
+  }
+
+  const body = await response.blob();
+  const headers = new Headers(response.headers);
+  headers.set("sw-cached-at", Date.now().toString());
+
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+// Güvenli cache write helper
+async function putInCache(cacheName, request, response) {
+  const cache = await caches.open(cacheName);
+  const cacheableResponse = await toCacheableResponse(response);
+  await cache.put(request, cacheableResponse);
 }
 
 // App Shell - Critical assets
@@ -20,7 +88,7 @@ const APP_SHELL = [
   "/icons/manifest-icon-192.maskable.png",
   "/icons/manifest-icon-512.maskable.png",
   "/icons/apple-icon-180.png",
-  "/sounds/vibraxx.mp3", // ✅ müzik offline'da da çalışsın
+  "/sounds/vibraxx.mp3",
 ];
 
 // ═══════════════════════════════════════════════════════════
@@ -30,14 +98,16 @@ self.addEventListener("install", (event) => {
   console.log("[SW] Install - Caching app shell");
 
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(APP_SHELL).catch((err) => {
+    (async () => {
+      try {
+        const cache = await caches.open(CACHE_NAME);
+        await cache.addAll(APP_SHELL);
+      } catch (err) {
         console.error("[SW] Cache addAll failed:", err);
-      });
-    })
+      }
+    })()
   );
 
-  // Skip waiting for faster activation
   self.skipWaiting();
 });
 
@@ -48,8 +118,10 @@ self.addEventListener("activate", (event) => {
   console.log("[SW] Activate - Cleaning old caches");
 
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
+    (async () => {
+      const cacheNames = await caches.keys();
+
+      await Promise.all(
         cacheNames
           .filter((name) => name !== CACHE_NAME && name !== RUNTIME_CACHE)
           .map((name) => {
@@ -57,7 +129,9 @@ self.addEventListener("activate", (event) => {
             return caches.delete(name);
           })
       );
-    }).then(() => self.clients.claim()) // ✅ claim() inside waitUntil
+
+      await self.clients.claim();
+    })()
   );
 });
 
@@ -78,26 +152,26 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Only handle GET requests
+  // Sadece GET
   if (request.method !== "GET") return;
 
-  // ❗ NEVER cache Next.js build chunks (prevents hydration crashes)
+  // Next.js build chunk'larını asla cache'leme
   if (url.pathname.startsWith("/_next/")) {
     return;
   }
 
-  // ❗ NEVER cache manifest — always fresh
+  // Manifest her zaman fresh
   if (url.pathname === "/manifest.json") {
     return;
   }
 
-  // Skip cross-origin requests except for allowed CDNs
+  // Sadece izinli cross-origin hostlar
   if (url.origin !== location.origin) {
     if (
       !url.hostname.includes("supabase") &&
       !url.hostname.includes("googleapis") &&
       !url.hostname.includes("gstatic") &&
-      !url.hostname.includes("flagcdn.com") // ✅ bayrak resimleri cache'lensin
+      !url.hostname.includes("flagcdn.com")
     ) {
       return;
     }
@@ -109,66 +183,110 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // ═══ STRATEGY 2: Navigation — Cache first, network update in BG, offline fallback ═══
+  // ═══ STRATEGY 2: Navigation — Cache first, network update in background, offline fallback ═══
   if (request.mode === "navigate") {
     event.respondWith(
-      caches.match(request).then((cached) => {
-        const networkFetch = fetch(request)
-          .then((response) => {
-            if (response && response.status === 200) {
-              caches.open(CACHE_NAME).then((c) => c.put(request, response.clone()));
-            }
-            return response;
-          })
-          .catch(() => cached || caches.match("/offline.html").then(r => r || new Response("Offline", { status: 503 })));
+      (async () => {
+        const cached = await caches.match(request);
 
-        // Cached varsa hemen dön + arka planda güncelle, yoksa network bekle
-        return cached || networkFetch;
-      })
+        const networkFetchPromise = fetch(request)
+          .then(async (networkResponse) => {
+            if (networkResponse && networkResponse.ok) {
+              // clone'u hemen al
+              const responseForReturn = networkResponse;
+              const responseForCache = networkResponse.clone();
+
+              event.waitUntil(
+                (async () => {
+                  try {
+                    await putInCache(CACHE_NAME, request, responseForCache);
+                  } catch (err) {
+                    console.error("[SW] Navigation cache put failed:", err);
+                  }
+                })()
+              );
+
+              return responseForReturn;
+            }
+
+            return networkResponse;
+          })
+          .catch(async () => {
+            if (cached) return cached;
+
+            const offline = await caches.match("/offline.html");
+            return offline || new Response("Offline", { status: 503 });
+          });
+
+        // cached varsa hemen dön, arka planda network update devam etsin
+        if (cached) {
+          event.waitUntil(networkFetchPromise.catch(() => {}));
+          return cached;
+        }
+
+        return networkFetchPromise;
+      })()
     );
     return;
   }
 
   // ═══ STRATEGY 3: Static assets - Cache first, network fallback ═══
   event.respondWith(
-    caches.match(request).then((cachedResponse) => {
+    (async () => {
+      const cachedResponse = await caches.match(request);
+
       if (cachedResponse) {
-        // Return cached, update in background
-        fetch(request)
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              caches.open(RUNTIME_CACHE).then((cache) => {
-                cache.put(request, networkResponse.clone());
-                trimRuntimeCache();
-              });
+        // Arka planda güncelle
+        const backgroundUpdate = fetch(request)
+          .then(async (networkResponse) => {
+            if (!networkResponse || !networkResponse.ok) return;
+
+            const responseForCache = networkResponse.clone();
+
+            try {
+              await putInCache(RUNTIME_CACHE, request, responseForCache);
+              await trimRuntimeCache();
+            } catch (err) {
+              console.error("[SW] Runtime background cache update failed:", err);
             }
           })
           .catch(() => {});
 
+        event.waitUntil(backgroundUpdate);
         return cachedResponse;
       }
 
-      // Not in cache, fetch from network
-      return fetch(request)
-        .then((networkResponse) => {
-          if (!networkResponse || networkResponse.status !== 200) {
-            return networkResponse;
-          }
+      // Cache'te yoksa network
+      try {
+        const networkResponse = await fetch(request);
 
-          const responseClone = networkResponse.clone();
-          caches.open(RUNTIME_CACHE).then((cache) => {
-            cache.put(request, responseClone);
-            trimRuntimeCache();
-          });
-
+        if (!networkResponse || !networkResponse.ok) {
           return networkResponse;
-        })
-        .catch(() => {
-          if (request.destination === "document") {
-            return caches.match("/offline.html");
-          }
-          return new Response("Network error", { status: 503 });
-        });
-    })
+        }
+
+        const responseForReturn = networkResponse;
+        const responseForCache = networkResponse.clone();
+
+        event.waitUntil(
+          (async () => {
+            try {
+              await putInCache(RUNTIME_CACHE, request, responseForCache);
+              await trimRuntimeCache();
+            } catch (err) {
+              console.error("[SW] Runtime cache put failed:", err);
+            }
+          })()
+        );
+
+        return responseForReturn;
+      } catch (error) {
+        if (request.destination === "document") {
+          const offline = await caches.match("/offline.html");
+          return offline || new Response("Offline", { status: 503 });
+        }
+
+        return new Response("Network error", { status: 503 });
+      }
+    })()
   );
 });
