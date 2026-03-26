@@ -1,5 +1,5 @@
-const CACHE_NAME = "vibraxx-v2"; // ⚡ her deploy'da artır: v2, v3...
-const RUNTIME_CACHE = "vibraxx-runtime-v2";
+const CACHE_NAME = "vibraxx-v3"; // ⚡ her deploy'da artır: v2, v3...
+const RUNTIME_CACHE = "vibraxx-runtime-v3";
 const RUNTIME_MAX_ENTRIES = 60;
 const RUNTIME_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 gün
 
@@ -26,15 +26,14 @@ async function trimRuntimeCache() {
     });
   }
 
-  // Önce eski entry'leri sil
+  // Önce süresi geçenleri sil
   const expired = entries.filter((entry) => now - entry.cachedTime > RUNTIME_MAX_AGE_MS);
   await Promise.all(expired.map((entry) => cache.delete(entry.request)));
 
-  // Yeniden liste çek
+  // Tekrar listele
   const freshRequests = await cache.keys();
   if (freshRequests.length <= RUNTIME_MAX_ENTRIES) return;
 
-  // Kalanları eski -> yeni sırala, limit üstünü sil
   const freshEntries = [];
   for (const request of freshRequests) {
     const response = await cache.match(request);
@@ -49,15 +48,16 @@ async function trimRuntimeCache() {
     });
   }
 
+  // Eski olanlar önce silinsin
   freshEntries.sort((a, b) => a.cachedTime - b.cachedTime);
 
   const toDelete = freshEntries.slice(0, freshEntries.length - RUNTIME_MAX_ENTRIES);
   await Promise.all(toDelete.map((entry) => cache.delete(entry.request)));
 }
 
-// Response'u güvenli şekilde cache'e uygun hale getir
+// Response'u cache için güvenli hale getir
 async function toCacheableResponse(response) {
-  // opaque response'lar olduğu gibi clone ile cache'lenebilir
+  // Opaque response ise body'e dokunmadan clone kullan
   if (response.type === "opaque") {
     return response.clone();
   }
@@ -73,8 +73,23 @@ async function toCacheableResponse(response) {
   });
 }
 
-// Güvenli cache write helper
+// Güvenli cache put helper
 async function putInCache(cacheName, request, response) {
+  // Range request'leri cache'leme
+  if (request.headers.has("range")) {
+    return;
+  }
+
+  // Partial content (206) Cache API'da desteklenmez
+  if (response.status === 206) {
+    return;
+  }
+
+  // Başarısız response'ları cache'leme
+  if (!response || (!response.ok && response.type !== "opaque")) {
+    return;
+  }
+
   const cache = await caches.open(cacheName);
   const cacheableResponse = await toCacheableResponse(response);
   await cache.put(request, cacheableResponse);
@@ -155,6 +170,9 @@ self.addEventListener("fetch", (event) => {
   // Sadece GET
   if (request.method !== "GET") return;
 
+  // Range request'lerine SW karışmasın
+  if (request.headers.has("range")) return;
+
   // Next.js build chunk'larını asla cache'leme
   if (url.pathname.startsWith("/_next/")) {
     return;
@@ -192,7 +210,6 @@ self.addEventListener("fetch", (event) => {
         const networkFetchPromise = fetch(request)
           .then(async (networkResponse) => {
             if (networkResponse && networkResponse.ok) {
-              // clone'u hemen al
               const responseForReturn = networkResponse;
               const responseForCache = networkResponse.clone();
 
@@ -218,7 +235,6 @@ self.addEventListener("fetch", (event) => {
             return offline || new Response("Offline", { status: 503 });
           });
 
-        // cached varsa hemen dön, arka planda network update devam etsin
         if (cached) {
           event.waitUntil(networkFetchPromise.catch(() => {}));
           return cached;
@@ -236,7 +252,6 @@ self.addEventListener("fetch", (event) => {
       const cachedResponse = await caches.match(request);
 
       if (cachedResponse) {
-        // Arka planda güncelle
         const backgroundUpdate = fetch(request)
           .then(async (networkResponse) => {
             if (!networkResponse || !networkResponse.ok) return;
@@ -256,7 +271,6 @@ self.addEventListener("fetch", (event) => {
         return cachedResponse;
       }
 
-      // Cache'te yoksa network
       try {
         const networkResponse = await fetch(request);
 
