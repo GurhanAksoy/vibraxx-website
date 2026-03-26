@@ -286,8 +286,10 @@ export default function BuyPage() {
         .vx-header-inner {
           max-width: min(960px, 100%); margin: 0 auto;
           padding: clamp(10px,2.5vw,28px) clamp(14px,4vw,20px);
-          display: flex; align-items: center; justify-content: space-between;
-          gap: 8px; flex-wrap: nowrap; min-height: 0;
+          display: grid;
+          grid-template-columns: auto 1fr auto;
+          align-items: center;
+          gap: 8px;
         }
         .vx-logo {
           display: flex; align-items: center; gap: 8px;
@@ -561,7 +563,7 @@ export default function BuyPage() {
                 </div>
               )}
               <button className="vx-audio-btn" onClick={toggleMusic} title={isMusicPlaying ? "Mute" : "Play music"}
-                style={{ background: isMusicPlaying ? "linear-gradient(135deg,rgba(139,92,246,.9),rgba(124,58,237,.9))" : "rgba(15,23,42,.8)", boxShadow: isMusicPlaying ? "0 0 14px rgba(139,92,246,.5)" : "none" }}>
+                style={{ width: 40, height: 40, flexShrink: 0, background: isMusicPlaying ? "linear-gradient(135deg,rgba(139,92,246,.9),rgba(124,58,237,.9))" : "rgba(15,23,42,.8)", boxShadow: isMusicPlaying ? "0 0 14px rgba(139,92,246,.5)" : "none" }}>
                 {isMusicPlaying
                   ? <Volume2 style={{ width: 18, height: 18, color: "white" }} />
                   : <VolumeX style={{ width: 18, height: 18, color: "#94a3b8" }} />}
