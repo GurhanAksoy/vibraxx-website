@@ -445,7 +445,7 @@ export default function LeaderboardPage() {
                         </div>
 
                         {/* Right info */}
-                        <div style={{ flex: 1, minWidth: 160, textAlign: "left" }}>
+                        <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
                           <div style={{
                             fontSize: "clamp(36px,8vw,64px)", fontWeight: 900, lineHeight: 1, marginBottom: 12,
                             background: "linear-gradient(90deg,#fbbf24,#f59e0b,#fbbf24)",

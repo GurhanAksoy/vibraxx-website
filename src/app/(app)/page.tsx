@@ -139,7 +139,7 @@ const ChampionCard = memo(({ champion }: any) => {
       <div style={{
         fontSize: "clamp(14px,3vw,18px)", fontWeight: 800, marginBottom: 8,
         color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+        display: "flex", alignItems: "center", justifyContent: "center", gap: 6, minWidth: 0,
       }}>
         {champion.country && flagUrl(champion.country) && (
           <img

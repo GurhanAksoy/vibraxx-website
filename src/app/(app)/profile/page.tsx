@@ -328,11 +328,20 @@ export default function ProfilePage() {
         @keyframes glow  { 0%,100% { box-shadow: 0 0 20px rgba(251,191,36,.4); } 50% { box-shadow: 0 0 40px rgba(251,191,36,.8); } }
         @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
         .animate-float { animation: float 3s ease-in-out infinite; }
-        body { background: linear-gradient(135deg,#0f172a 0%,#1e1b4b 25%,#312e81 50%,#1e1b4b 75%,#0f172a 100%); background-attachment: fixed; overflow-x: hidden; }
+        body { background: linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#0f172a 100%); background-attachment: fixed; overflow-x: hidden; }
         @media (max-width: 640px) {
           .mobile-hide { display: none !important; }
           .mobile-grid { grid-template-columns: 1fr !important; }
           .profile-header { flex-wrap: wrap !important; }
+          /* Profile card avatar + isim satırı — mobilde wrap */
+          .profile-card-top { flex-wrap: wrap !important; }
+          /* Tier progress bar label overflow */
+          .tier-label { font-size: 11px !important; }
+          /* Stat grid tek sütun */
+          .stat-grid-2 { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 380px) {
+          .profile-header span { font-size: 16px !important; }
         }
       `}</style>
 
@@ -382,7 +391,7 @@ export default function ProfilePage() {
                 </div>
 
                 {/* Name / Email */}
-                <div style={{ flex: 1, minWidth: 200 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   {isEditing ? (
                     <>
                       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
@@ -726,7 +735,7 @@ export default function ProfilePage() {
       {showContact && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.8)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}
           onClick={() => setShowContact(false)}>
-          <div style={{ background: "linear-gradient(135deg,rgba(15,23,42,.95),rgba(30,41,59,.95))", borderRadius: 20, border: "2px solid rgba(56,189,248,.3)", maxWidth: 500, width: "100%", padding: 32, boxShadow: "0 25px 50px -12px rgba(0,0,0,.5)" }}
+          <div style={{ background: "linear-gradient(135deg,rgba(15,23,42,.95),rgba(30,41,59,.95))", borderRadius: 20, border: "2px solid rgba(56,189,248,.3)", maxWidth: 500, width: "100%", padding: "clamp(20px,5vw,32px)", boxShadow: "0 25px 50px -12px rgba(0,0,0,.5)" }}
             onClick={e => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
               <h3 style={{ fontSize: "clamp(18px,4vw,22px)", fontWeight: 900, display: "flex", alignItems: "center", gap: 10 }}>
