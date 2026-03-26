@@ -220,7 +220,7 @@ export default function LeaderboardPage() {
           .lb-tab-btn    { padding: 8px 10px; font-size: 10px; letter-spacing: 0; }
 
           /* Logo boyutu */
-          .lb-logo-circle { width: 48px !important; height: 48px !important; }
+          .lb-logo-circle { width: 58px !important; height: 58px !important; }
 
           /* Podium: 1 sütun, 1. en üstte */
           .podium-grid {
@@ -265,8 +265,8 @@ export default function LeaderboardPage() {
               <div
                 className="lb-logo-circle"
                 style={{
-                  position: "relative", width: 80, height: 80,
-                  borderRadius: "9999px", padding: 4,
+                  position: "relative", width: 88, height: 88,
+                  borderRadius: "9999px", padding: 2,
                   background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)",
                   boxShadow: "0 0 24px rgba(124,58,237,0.6)", flexShrink: 0,
                 }}
@@ -404,10 +404,10 @@ export default function LeaderboardPage() {
 
                     {/* MONTHLY — ring layout */}
                     {activeTab === "monthly" ? (
-                      <div style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "clamp(24px,5vw,48px)", flexWrap: "wrap" }}>
+                      <div style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "clamp(16px,4vw,48px)", flexWrap: "wrap" }}>
 
                         {/* Circular Ring */}
-                        <div style={{ position: "relative", width: "clamp(140px,28vw,180px)", height: "clamp(140px,28vw,180px)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <div style={{ position: "relative", width: "clamp(110px,22vw,170px)", height: "clamp(110px,22vw,170px)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                           <svg width="100%" height="100%" viewBox="0 0 200 200" style={{ transform: "rotate(-90deg)", filter: prize.unlocked ? "drop-shadow(0 0 20px rgba(251,191,36,.8))" : "drop-shadow(0 0 10px rgba(139,92,246,.5))" }}>
                             <defs>
                               <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -447,7 +447,7 @@ export default function LeaderboardPage() {
                         {/* Right info */}
                         <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
                           <div style={{
-                            fontSize: "clamp(36px,8vw,64px)", fontWeight: 900, lineHeight: 1, marginBottom: 12,
+                            fontSize: "clamp(28px,6vw,56px)", fontWeight: 900, lineHeight: 1, marginBottom: 12,
                             background: "linear-gradient(90deg,#fbbf24,#f59e0b,#fbbf24)",
                             backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
                             filter: prize.unlocked ? "drop-shadow(0 0 20px rgba(251,191,36,.6))" : "none",

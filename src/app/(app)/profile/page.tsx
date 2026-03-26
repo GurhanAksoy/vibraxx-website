@@ -355,7 +355,7 @@ export default function ProfilePage() {
           <header className="profile-header" style={{ maxWidth: "min(1200px,100%)", margin: "0 auto clamp(24px,5vw,40px)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             {/* Sol: Logo */}
             <div onClick={() => router.push("/")} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-              <div style={{ position: "relative", width: "clamp(64px,10vw,80px)", height: "clamp(64px,10vw,80px)", borderRadius: "50%", padding: 4, background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)", boxShadow: "0 0 24px rgba(124,58,237,.6)", flexShrink: 0, overflow: "hidden" }}>
+              <div style={{ position: "relative", width: "clamp(72px,12vw,88px)", height: "clamp(72px,12vw,88px)", borderRadius: "50%", padding: 2, background: "radial-gradient(circle at 0 0,#7c3aed,#d946ef)", boxShadow: "0 0 24px rgba(124,58,237,.6)", flexShrink: 0, overflow: "hidden" }}>
                 <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: "50%", background: "#020817", overflow: "hidden" }}>
                   <Image src="/images/logo.png" alt="VibraXX" fill sizes="80px" style={{ objectFit: "contain", padding: "12%" }} />
                 </div>
@@ -379,10 +379,10 @@ export default function ProfilePage() {
             {/* ── PROFILE CARD ── */}
             <div style={{ padding: "clamp(24px,5vw,32px)", borderRadius: "clamp(20px,4vw,24px)", border: "2px solid rgba(139,92,246,.5)", background: "linear-gradient(135deg,rgba(30,27,75,.98) 0%,rgba(15,23,42,.98) 100%)", boxShadow: "0 20px 60px rgba(0,0,0,.6),0 0 40px rgba(139,92,246,.4)", backdropFilter: "blur(20px)", marginBottom: "clamp(20px,4vw,24px)" }}>
               
-              <div style={{ display: "flex", alignItems: "center", gap: "clamp(16px,3vw,20px)", flexWrap: "wrap", marginBottom: "clamp(20px,4vw,24px)" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "clamp(12px,3vw,20px)", flexWrap: "wrap", marginBottom: "clamp(20px,4vw,24px)" }}>
                 
                 {/* Avatar */}
-                <div style={{ position: "relative", width: "clamp(80px,15vw,100px)", height: "clamp(80px,15vw,100px)", borderRadius: "50%", padding: 4, background: currentTier.gradient, boxShadow: `0 0 30px ${currentTier.color}60` }}>
+                <div style={{ position: "relative", width: "clamp(72px,14vw,96px)", height: "clamp(72px,14vw,96px)", borderRadius: "50%", padding: 2, background: currentTier.gradient, boxShadow: `0 0 24px ${currentTier.color}50`, flexShrink: 0 }}>
                   <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: "#020817", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
                     {profile.avatar_url
                       ? <Image src={profile.avatar_url} alt={profile.full_name} fill style={{ objectFit: "cover" }} />
@@ -390,8 +390,11 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* Name / Email */}
-                <div style={{ flex: 1, minWidth: 0 }}>
+                {/* Name / Email + Credits — flex col on mobile */}
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexWrap: "wrap", gap: "clamp(10px,2vw,16px)", alignItems: "flex-start" }}>
+
+                  {/* Name / Email block */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
                   {isEditing ? (
                     <>
                       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
@@ -434,13 +437,15 @@ export default function ProfilePage() {
                     <Calendar style={{ width: 16, height: 16, color: "#94a3b8" }} />
                     <span style={{ fontSize: 14, color: "#94a3b8" }}>Member since {memberSince}</span>
                   </div>
-                </div>
+                  </div>
 
-                {/* Credits badge */}
-                <div style={{ padding: "clamp(12px,2.5vw,16px) clamp(16px,3vw,20px)", borderRadius: "clamp(12px,2.5vw,16px)", background: credits.live_credits === 0 ? "linear-gradient(135deg,rgba(239,68,68,.2),rgba(185,28,28,.15))" : "linear-gradient(135deg,rgba(251,191,36,.2),rgba(245,158,11,.15))", border: `2px solid ${credits.live_credits === 0 ? "rgba(239,68,68,.5)" : "rgba(251,191,36,.5)"}`, textAlign: "center", ...(credits.live_credits === 0 ? { animation: "glow 2s ease-in-out infinite" } : {}) }}>
-                  <Gift style={{ width: "clamp(24px,5vw,32px)", height: "clamp(24px,5vw,32px)", color: credits.live_credits === 0 ? "#ef4444" : "#fbbf24", margin: "0 auto 4px" }} />
-                  <div style={{ fontSize: "clamp(24px,5vw,32px)", fontWeight: 900, color: credits.live_credits === 0 ? "#ef4444" : "#fbbf24", lineHeight: 1 }}>{credits.live_credits}</div>
-                  <div style={{ fontSize: "clamp(11px,2.2vw,12px)", color: credits.live_credits === 0 ? "#fca5a5" : "#fcd34d", fontWeight: 600, textTransform: "uppercase", marginTop: 4 }}>Rounds Left</div>
+                  {/* Credits badge — ismin yanında, mobilde alta düşer */}
+                  <div style={{ padding: "clamp(10px,2vw,14px) clamp(14px,2.5vw,18px)", borderRadius: "clamp(12px,2.5vw,16px)", background: credits.live_credits === 0 ? "linear-gradient(135deg,rgba(239,68,68,.2),rgba(185,28,28,.15))" : "linear-gradient(135deg,rgba(251,191,36,.2),rgba(245,158,11,.15))", border: `2px solid ${credits.live_credits === 0 ? "rgba(239,68,68,.5)" : "rgba(251,191,36,.5)"}`, textAlign: "center", flexShrink: 0, ...(credits.live_credits === 0 ? { animation: "glow 2s ease-in-out infinite" } : {}) }}>
+                    <Gift style={{ width: "clamp(20px,4.5vw,28px)", height: "clamp(20px,4.5vw,28px)", color: credits.live_credits === 0 ? "#ef4444" : "#fbbf24", margin: "0 auto 4px" }} />
+                    <div style={{ fontSize: "clamp(20px,4.5vw,28px)", fontWeight: 900, color: credits.live_credits === 0 ? "#ef4444" : "#fbbf24", lineHeight: 1 }}>{credits.live_credits}</div>
+                    <div style={{ fontSize: "clamp(9px,2vw,11px)", color: credits.live_credits === 0 ? "#fca5a5" : "#fcd34d", fontWeight: 600, textTransform: "uppercase", marginTop: 4 }}>Rounds Left</div>
+                  </div>
+
                 </div>
               </div>
 
