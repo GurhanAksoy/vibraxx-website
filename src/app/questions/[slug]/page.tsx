@@ -225,6 +225,7 @@ export default async function QuestionPage({
                 <div style={{
                   width: "100%", height: "100%", borderRadius: "50%",
                   background: "#020817", overflow: "hidden",
+                  position: "relative",
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
                   <Image src="/images/logo.png" alt="VibraXX" fill sizes="68px"
