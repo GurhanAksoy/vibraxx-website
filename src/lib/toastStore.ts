@@ -26,22 +26,28 @@ let roundChannelRef: ReturnType<typeof supabase.channel> | null = null
 let roundTimerRef:   ReturnType<typeof setTimeout> | null = null
 let lastRoundId = ''
 
-// Mesaj bazlı dedup — expiry timestamp olarak sakla
-const msgExpiry: Record<string, number> = {}
+// ── Round toast dedup — sessionStorage bazlı ──
+const ROUND_TOAST_KEY = 'vx_round_toast_key'
 
-// Round toast — bir kez atıldıktan sonra sıfırlanana kadar engelle
-let roundToastFiredAt = 0 // timestamp, 0 = atılmadı
-
-export function canFireRoundToast(): boolean {
-  return roundToastFiredAt === 0
+export function canFireRoundToast(roundKey: string): boolean {
+  try {
+    const stored = sessionStorage.getItem(ROUND_TOAST_KEY)
+    return stored !== roundKey
+  } catch {
+    return true
+  }
 }
 
-export function markRoundToastFired(): void {
-  roundToastFiredAt = Date.now()
+export function markRoundToastFired(roundKey: string): void {
+  try {
+    sessionStorage.setItem(ROUND_TOAST_KEY, roundKey)
+  } catch {}
 }
 
 export function resetRoundToast(): void {
-  roundToastFiredAt = 0
+  try {
+    sessionStorage.removeItem(ROUND_TOAST_KEY)
+  } catch {}
 }
 
 function notify() {
@@ -56,12 +62,6 @@ export const toastStore = {
   },
 
   show(type: ToastType, message: string) {
-    const now = Date.now()
-    // Mesaj için expiry kontrolü
-    if (msgExpiry[message] && now < msgExpiry[message]) return
-    // 5 dakika engel koy
-    msgExpiry[message] = now + 5 * 60 * 1000
-
     const id       = Math.random().toString(36).slice(2)
     const duration = DURATION[type]
     toasts = [...toasts.slice(-2), { id, type, message, duration }]

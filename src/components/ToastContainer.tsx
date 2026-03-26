@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { toastStore, Toast, canFireRoundToast, markRoundToastFired, resetRoundToast } from '@/lib/toastStore'
+import { toastStore, Toast, canFireRoundToast, markRoundToastFired } from '@/lib/toastStore'
 import { supabase } from '@/lib/supabaseClient'
 
 const TYPE_STYLES = {
@@ -104,17 +104,15 @@ export default function ToastContainer() {
       if (error || !data) return
 
       const t = data.next_round_in_seconds as number | null
-      if (t === null) return
+      if (t === null || t <= 0) return
 
-      // Round geçti — bir sonraki round için sıfırla
-      if (t <= 0 || t > 270) {
-        resetRoundToast()
-        return
-      }
+      // roundKey = tahmini round başlangıç zamanı (saniye cinsinden, 300sn'ye yuvarlanmış)
+      const estimatedStartSec = Math.round(Date.now() / 1000) + t
+      const roundKey = String(Math.floor(estimatedStartSec / 300) * 300)
 
-      // 30 saniye penceresi — sadece canFireRoundToast true ise at
-      if (t <= 32 && canFireRoundToast()) {
-        markRoundToastFired()
+      // Dar pencere: sadece 25-32 saniye arasında tetikle
+      if (t >= 25 && t <= 32 && canFireRoundToast(roundKey)) {
+        markRoundToastFired(roundKey)
         toastStore.warning('⚡ Round starting in 30 seconds!')
       }
     }, 5000)
