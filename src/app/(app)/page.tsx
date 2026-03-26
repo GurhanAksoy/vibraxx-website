@@ -16,6 +16,8 @@ import {
   Flame,
   Gift,
   Smartphone,
+  User,
+  ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { playMenuMusic, stopMenuMusic } from "@/lib/audioManager";
@@ -1191,57 +1193,45 @@ export default function HomePage() {
                       onClick={() => { window.location.href = "/profile"; }}
                       aria-label="View profile"
                       style={{
-                        padding: "6px 12px 6px 6px",
-                        borderRadius: 999,
-                        border: "1px solid rgba(167,139,250,0.4)",
-                        background: "linear-gradient(135deg, rgba(124,58,237,0.2), rgba(15,23,42,0.95))",
+                        padding: "6px 10px 6px 6px",
+                        borderRadius: 12,
+                        border: "1px solid rgba(167,139,250,0.35)",
+                        background: "linear-gradient(135deg, rgba(124,58,237,0.18), rgba(15,23,42,0.95))",
                         cursor: "pointer", display: "inline-flex", alignItems: "center",
-                        gap: 8, transition: "all 0.25s",
-                        boxShadow: "0 0 12px rgba(124,58,237,0.25), inset 0 1px 0 rgba(255,255,255,0.08)",
-                        position: "relative", overflow: "hidden",
+                        gap: 7, transition: "all 0.2s",
+                        boxShadow: "0 0 10px rgba(124,58,237,0.2)",
                       }}
                       onMouseEnter={e => {
-                        (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(167,139,250,0.8)";
-                        (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 20px rgba(124,58,237,0.5), inset 0 1px 0 rgba(255,255,255,0.12)";
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(167,139,250,0.7)";
+                        (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 18px rgba(124,58,237,0.45)";
                         (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
                       }}
                       onMouseLeave={e => {
-                        (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(167,139,250,0.4)";
-                        (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 12px rgba(124,58,237,0.25), inset 0 1px 0 rgba(255,255,255,0.08)";
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(167,139,250,0.35)";
+                        (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 10px rgba(124,58,237,0.2)";
                         (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
                       }}
                     >
-                      {/* Shine sweep */}
+                      {/* Avatar */}
                       <div style={{
-                        position: "absolute", inset: 0, pointerEvents: "none",
-                        background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent)",
-                        animation: "slide-shine 4s ease-in-out infinite",
-                      }} />
-                      {/* Avatar ring */}
-                      <div style={{
-                        width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
-                        padding: 2, position: "relative", zIndex: 1,
-                        background: "linear-gradient(135deg, #7c3aed, #d946ef)",
-                        boxShadow: "0 0 10px rgba(124,58,237,0.6)",
+                        width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
+                        padding: 2, background: "linear-gradient(135deg, #7c3aed, #d946ef)",
+                        boxShadow: "0 0 8px rgba(124,58,237,0.5)",
                       }}>
-                        <div style={{
-                          width: "100%", height: "100%", borderRadius: "50%",
-                          overflow: "hidden", background: "#020817",
-                        }}>
-                          <Image
-                            src={user?.user_metadata?.avatar_url || "/images/logo.png"}
-                            alt="User avatar" width={24} height={24} style={{ objectFit: "cover" }}
-                          />
+                        <div style={{ width: "100%", height: "100%", borderRadius: "50%", overflow: "hidden", background: "#020817", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {user?.user_metadata?.avatar_url ? (
+                            <Image src={user.user_metadata.avatar_url} alt="avatar" width={22} height={22} style={{ objectFit: "cover" }} />
+                          ) : (
+                            <User style={{ width: 13, height: 13, color: "#a78bfa" }} />
+                          )}
                         </div>
                       </div>
-                      <span style={{
-                        fontSize: 12, fontWeight: 700, position: "relative", zIndex: 1,
-                        background: "linear-gradient(135deg, #e9d5ff, #c4b5fd)",
-                        WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                        maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      }}>
-                        {user.user_metadata?.full_name?.split(" ")[0] || "Profile"}
-                      </span>
+                      {/* Label */}
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.2 }}>
+                        <span style={{ fontSize: 9, fontWeight: 600, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.08em" }}>My</span>
+                        <span style={{ fontSize: 12, fontWeight: 800, color: "#c4b5fd" }}>Profile</span>
+                      </div>
+                      <ChevronRight style={{ width: 13, height: 13, color: "#7c3aed", flexShrink: 0 }} />
                     </button>
 
                     <button
