@@ -285,7 +285,7 @@ export default function BuyPage() {
         .vx-header { position: relative; z-index: 10; }
         .vx-header-inner {
           max-width: min(960px, 100%); margin: 0 auto;
-          padding: clamp(16px,4vw,28px) clamp(14px,4vw,20px);
+          padding: clamp(12px,3vw,28px) clamp(14px,4vw,20px);
           display: flex; align-items: center; justify-content: space-between;
           gap: 10px; flex-wrap: nowrap;
         }
@@ -295,10 +295,10 @@ export default function BuyPage() {
         }
         .vx-logo:hover { opacity: .85; }
         .vx-logo-outer {
-          width: clamp(48px,10vw,80px); height: clamp(48px,10vw,80px); flex-shrink: 0;
-          border-radius: 50%; padding: 3px;
+          width: clamp(64px,12vw,88px); height: clamp(64px,12vw,88px); flex-shrink: 0;
+          border-radius: 50%; padding: 2px;
           background: radial-gradient(circle at 0 0,#7c3aed,#d946ef);
-          box-shadow: 0 0 30px rgba(124,58,237,.6); position: relative;
+          box-shadow: 0 0 24px rgba(124,58,237,.6); position: relative;
         }
         .vx-logo-circle {
           width: 100%; height: 100%; border-radius: 50%; background: #020817;
@@ -308,7 +308,7 @@ export default function BuyPage() {
         .vx-header-right { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
         .vx-audio-btn {
           display: flex; align-items: center; justify-content: center;
-          width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0;
+          width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
           border: 1px solid rgba(148,163,253,.22); background: rgba(15,23,42,.8);
           cursor: pointer; transition: all .25s;
         }
@@ -325,6 +325,8 @@ export default function BuyPage() {
         @media (max-width: 480px) {
           .vx-logo-label { display: none !important; }
           .vx-rounds-badge span.vx-rounds-text { display: none; }
+          /* Mobilde logo tam solda, sağda rounds+ses */
+          .vx-header-inner { padding: 10px 14px; }
         }
 
         /* ── MAIN ── */
