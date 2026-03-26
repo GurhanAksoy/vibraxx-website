@@ -66,53 +66,44 @@ const nextConfig = {
       {
         source: "/:path*",
         headers: [
-          {
-            key: "X-DNS-Prefetch-Control",
-            value: "on",
-          },
-          {
-            key: "X-Frame-Options",
-            value: "SAMEORIGIN",
-          },
-          {
-            key: "X-Content-Type-Options",
-            value: "nosniff",
-          },
-          {
-            key: "Referrer-Policy",
-            value: "origin-when-cross-origin",
-          },
+          { key: "X-DNS-Prefetch-Control",  value: "on" },
+          { key: "X-Frame-Options",          value: "SAMEORIGIN" },
+          { key: "X-Content-Type-Options",   value: "nosniff" },
+          { key: "Referrer-Policy",          value: "origin-when-cross-origin" },
+          // ✅ HSTS — HTTPS zorunlu kıl (Vercel zaten HTTPS ama açıkça belirt)
+          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+          // ✅ Permissions — kamera/mikrofon/konum izni yok
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(self)" },
         ],
       },
       // PWA Files - Correct MIME types
       {
         source: "/manifest.json",
         headers: [
-          {
-            key: "Content-Type",
-            value: "application/manifest+json",
-          },
-          {
-            key: "Cache-Control",
-            value: "public, max-age=0, must-revalidate",
-          },
+          { key: "Content-Type",   value: "application/manifest+json" },
+          { key: "Cache-Control",  value: "public, max-age=0, must-revalidate" },
         ],
       },
       {
         source: "/sw.js",
         headers: [
-          {
-            key: "Content-Type",
-            value: "application/javascript; charset=utf-8",
-          },
-          {
-            key: "Cache-Control",
-            value: "public, max-age=0, must-revalidate",
-          },
-          {
-            key: "Service-Worker-Allowed",
-            value: "/",
-          },
+          { key: "Content-Type",          value: "application/javascript; charset=utf-8" },
+          { key: "Cache-Control",         value: "public, max-age=0, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+      // ✅ Ses dosyaları — uzun cache (değişmez varlıklar)
+      {
+        source: "/sounds/:file*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+      // ✅ İkonlar — uzun cache
+      {
+        source: "/icons/:file*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
         ],
       },
     ];
