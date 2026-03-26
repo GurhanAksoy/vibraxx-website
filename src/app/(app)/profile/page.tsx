@@ -150,7 +150,7 @@ export default function ProfilePage() {
   const [securityPassed, setSecurityPassed] = useState(false);
   const [isEditing,      setIsEditing]      = useState(false);
   const [editName,       setEditName]       = useState("");
-  const [editCountry,    setEditCountry]    = useState("🌍");
+  const [editCountry,    setEditCountry]    = useState("");
   const [isSaving,       setIsSaving]       = useState(false);
   const [showContact,    setShowContact]    = useState(false);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
@@ -175,7 +175,7 @@ export default function ProfilePage() {
   // ── Fetch profile ──
   useEffect(() => {
     if (!securityPassed) return;
-    const fetch = async () => {
+    const fetchProfile = async () => {
       setIsLoading(true);
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -187,14 +187,14 @@ export default function ProfilePage() {
         }
         setProfileData(data);
         setEditName(data.profile?.full_name || "");
-        setEditCountry(data.profile?.country || "🌍");
+        setEditCountry(data.profile?.country || "");
       } catch {
         // silent
       } finally {
         setIsLoading(false);
       }
     };
-    fetch();
+    fetchProfile();
   }, [securityPassed]);
 
   // ── Realtime ──
@@ -202,10 +202,10 @@ export default function ProfilePage() {
     const userId = profileData?.profile?.id;
     if (!userId) return;
 
-    let refreshTimeout: NodeJS.Timeout;
+    const refreshTimeoutRef = { current: undefined as NodeJS.Timeout | undefined };
     const debouncedRefresh = () => {
-      clearTimeout(refreshTimeout);
-      refreshTimeout = setTimeout(async () => {
+      clearTimeout(refreshTimeoutRef.current);
+      refreshTimeoutRef.current = setTimeout(async () => {
         const { data, error } = await supabase.rpc("get_user_profile_data");
         if (!error && data) setProfileData(data);
       }, 500);
@@ -227,7 +227,7 @@ export default function ProfilePage() {
       .subscribe();
 
     return () => {
-      clearTimeout(refreshTimeout);
+      clearTimeout(refreshTimeoutRef.current);
       supabase.removeChannel(scoreCh);
       supabase.removeChannel(creditCh);
       supabase.removeChannel(cacheCh);
@@ -279,7 +279,7 @@ export default function ProfilePage() {
       await supabase.auth.updateUser({ data: { full_name: editName.trim(), country: editCountry } });
       const { error } = await supabase
         .from("v2_users_public")
-        .update({ full_name: editName.trim(), updated_at: new Date().toISOString() })
+        .update({ full_name: editName.trim(), country: editCountry, updated_at: new Date().toISOString() })
         .eq("user_id", profileData.profile.id);
       if (!error) {
         setProfileData({ ...profileData, profile: { ...profileData.profile, full_name: editName.trim(), country: editCountry } });
@@ -397,7 +397,7 @@ export default function ProfilePage() {
                           style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#22c55e,#16a34a)", color: "white", cursor: isSaving ? "not-allowed" : "pointer", display: "flex", alignItems: "center" }}>
                           <Save style={{ width: 16, height: 16 }} />
                         </button>
-                        <button onClick={() => { setIsEditing(false); setEditName(profile.full_name); setEditCountry(profile.country); }}
+                        <button onClick={() => { setIsEditing(false); setEditName(profile.full_name); setEditCountry(profile.country || ""); }}
                           style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: "rgba(239,68,68,.2)", color: "#fca5a5", cursor: "pointer" }}>
                           <X style={{ width: 16, height: 16 }} />
                         </button>

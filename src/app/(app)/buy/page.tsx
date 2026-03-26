@@ -11,7 +11,7 @@ import {
   Crown, Zap, TrendingUp, Users, Trophy, Sparkles,
   Target, Volume2, VolumeX, Shield, Percent, Gift,
   Star, Clock, BarChart3, ShoppingCart, CheckCircle2,
-  Lock, Rocket, Zap as Lightning,
+  Lock, Rocket,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────
@@ -32,6 +32,27 @@ interface PrizeData {
 }
 
 // ─────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────
+
+// Para birimi tespiti — locale + timezone birlikte kullan
+// handlePurchase dışına çıkarıldı: her çağrıda yeniden tanımlanmasın
+const detectCurrency = (): string => {
+  try {
+    const locale   = navigator.language || "en-GB";
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+    if (locale.startsWith("en-AU") || timezone.startsWith("Australia"))                                                                           return "AUD";
+    if (locale.startsWith("en-CA") || timezone.startsWith("America/Toronto")   || timezone.startsWith("America/Vancouver"))                       return "CAD";
+    if (locale.startsWith("en-US") || timezone.startsWith("America/New_York")  || timezone.startsWith("America/Los_Angeles") || timezone.startsWith("America/Chicago")) return "USD";
+    if (["de","fr","it","es","nl","pt","fi","el"].some(l => locale.startsWith(l)))                                                                return "EUR";
+    if (locale.startsWith("en-GB") || timezone.startsWith("Europe/London"))                                                                       return "GBP";
+    return "GBP";
+  } catch {
+    return "GBP";
+  }
+};
+
+// ─────────────────────────────────────────────
 // PACKAGE CONFIG  (no prices — Stripe handles)
 // ─────────────────────────────────────────────
 
@@ -45,7 +66,7 @@ const packages = [
     badge: null,
     tagline: "Get started",
     features: [
-      { icon: Lightning,  text: "3 Quiz Rounds",        highlight: false },
+      { icon: Zap,        text: "3 Quiz Rounds",        highlight: false },
       { icon: Target,     text: "15 Questions Each",     highlight: false },
       { icon: Rocket,     text: "Instant Access",        highlight: true  },
       { icon: BarChart3,  text: "Leaderboard Entry",     highlight: false },
@@ -92,38 +113,37 @@ const packages = [
 export default function BuyPage() {
   const router = useRouter();
 
-  const [user,                 setUser]                 = useState<any>(null);
-  const [liveCredits,          setLiveCredits]          = useState(0);
-  const [prizeData,            setPrizeData]            = useState<PrizeData | null>(null);
-  const [isLoading,            setIsLoading]            = useState(true);
-  const [processingPackageId,  setProcessingPackageId]  = useState<string | null>(null);
-  const [isMusicPlaying,       setIsMusicPlaying]       = useState(false);
-  const [hasInteracted,        setHasInteracted]        = useState(false);
+  const [user,                setUser]                = useState<any>(null);
+  const [liveCredits,         setLiveCredits]         = useState(0);
+  const [prizeData,           setPrizeData]           = useState<PrizeData | null>(null);
+  const [isLoading,           setIsLoading]           = useState(true);
+  const [processingPackageId, setProcessingPackageId] = useState<string | null>(null);
+  const [isMusicPlaying,      setIsMusicPlaying]      = useState(false);
+  const [hasInteracted,       setHasInteracted]       = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // ── Music ──────────────────────────────────
+  // ── Music — init ───────────────────────────
   useEffect(() => {
-    if (!audioRef.current) {
-      const audio = new Audio("/sounds/vibraxx.mp3");
-      audio.loop = true;
-      audio.volume = 0.3;
-      audioRef.current = audio;
-    }
+    const audio = new Audio("/sounds/vibraxx.mp3");
+    audio.loop = true; audio.volume = 0.3;
+    audioRef.current = audio;
     if (localStorage.getItem("vibraxx_music_enabled") === "true") setIsMusicPlaying(true);
     return () => { audioRef.current?.pause(); audioRef.current = null; };
   }, []);
 
+  // Music — first interaction gate
+  // { once: true } kullanılıyor, hasInteracted dep gereksiz — kaldırıldı
   useEffect(() => {
     const onFirst = () => {
-      if (hasInteracted) return;
       setHasInteracted(true);
       if (localStorage.getItem("vibraxx_music_enabled") !== "false" && audioRef.current)
         audioRef.current.play().catch(() => {});
     };
     document.addEventListener("pointerdown", onFirst, { once: true });
     return () => document.removeEventListener("pointerdown", onFirst);
-  }, [hasInteracted]);
+  }, []);
 
+  // Music — play/pause sync
   useEffect(() => {
     if (!audioRef.current || !hasInteracted) return;
     if (isMusicPlaying) {
@@ -151,7 +171,6 @@ export default function BuyPage() {
       }
       setUser(authUser);
 
-      // Credits — v2_user_credits (DB Commander: RPC yok, direkt read kabul)
       const { data: creditsData } = await supabase
         .from("v2_user_credits")
         .select("paid_credits, bonus_credits")
@@ -159,7 +178,6 @@ export default function BuyPage() {
         .single();
       setLiveCredits((creditsData?.paid_credits || 0) + (creditsData?.bonus_credits || 0));
 
-      // Prize data — same RPC as leaderboard
       const { data: lb, error: lbErr } = await supabase.rpc("get_leaderboard_data", { p_tab: "monthly" });
       if (!lbErr && lb) setPrizeData({ prize: lb.prize, countdown: lb.countdown });
 
@@ -169,8 +187,9 @@ export default function BuyPage() {
   }, []);
 
   // ── Realtime ───────────────────────────────
+  // prizeData dep kaldırıldı: channel'ı her prize güncellemesinde yeniden kuruyordu
   useEffect(() => {
-    if (!prizeData || !user?.id) return;
+    if (!user?.id) return;
 
     const refreshPrize = async () => {
       const { data: lb, error } = await supabase.rpc("get_leaderboard_data", { p_tab: "monthly" });
@@ -186,7 +205,6 @@ export default function BuyPage() {
       if (data) setLiveCredits((data.paid_credits || 0) + (data.bonus_credits || 0));
     };
 
-    // v2_round_participants INSERT = yeni satın alma sinyali
     const purchaseCh = supabase
       .channel("buy-page-purchases")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "v2_round_participants" }, refreshPrize)
@@ -201,32 +219,14 @@ export default function BuyPage() {
       supabase.removeChannel(purchaseCh);
       supabase.removeChannel(creditCh);
     };
-  }, [prizeData, user]);
+  }, [user?.id]);
 
   // ── Purchase ───────────────────────────────
   const handlePurchase = async (pkg: typeof packages[0]) => {
     if (!user) { router.push("/"); return; }
     setProcessingPackageId(pkg.id);
     try {
-      // Para birimi tespiti — locale + timezone birlikte kullan
-      const detectCurrency = (): string => {
-        try {
-          const locale   = navigator.language || "en-GB";
-          const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
-
-          if (locale.startsWith("en-AU") || timezone.startsWith("Australia")) return "AUD";
-          if (locale.startsWith("en-CA") || timezone.startsWith("America/Toronto") || timezone.startsWith("America/Vancouver")) return "CAD";
-          if (locale.startsWith("en-US") || timezone.startsWith("America/New_York") || timezone.startsWith("America/Los_Angeles") || timezone.startsWith("America/Chicago")) return "USD";
-          if (["de", "fr", "it", "es", "nl", "pt", "fi", "el"].some(l => locale.startsWith(l))) return "EUR";
-          if (locale.startsWith("en-GB") || timezone.startsWith("Europe/London")) return "GBP";
-          return "GBP"; // default
-        } catch {
-          return "GBP";
-        }
-      };
-
       const currency = detectCurrency();
-
       const res  = await fetch("/api/create-checkout-session", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
@@ -251,7 +251,6 @@ export default function BuyPage() {
     );
   }
 
-  // Prize ring helpers
   const CIRCUMFERENCE = 2 * Math.PI * 85;
   const progressRatio = Math.min((prizeData?.prize?.progress || 0) / (prizeData?.prize?.threshold || 1000), 1);
   const dashOffset    = CIRCUMFERENCE * (1 - progressRatio);
@@ -263,36 +262,27 @@ export default function BuyPage() {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { overflow-x: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 
-        @keyframes spin        { to { transform: rotate(360deg); } }
-        @keyframes glow        { 0%,100% { box-shadow: 0 0 20px rgba(251,191,36,.4); } 50% { box-shadow: 0 0 40px rgba(251,191,36,.8); } }
-        @keyframes pulse       { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:.9; transform:scale(1.04); } }
-        @keyframes float       { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-8px); } }
-        @keyframes shimmer     { 0% { background-position:-200% center; } 100% { background-position:200% center; } }
-        @keyframes slideUp     { from { transform:translateY(24px); opacity:0; } to { transform:translateY(0); opacity:1; } }
-        @keyframes scaleIn     { from { transform:scale(.92); opacity:0; } to { transform:scale(1); opacity:1; } }
-        @keyframes cardShine   { 0% { left:-100%; } 100% { left:200%; } }
-        @keyframes megaBounce  { 0%,100% { transform:translateY(0) scale(1); } 40% { transform:translateY(-6px) scale(1.08); } }
+        @keyframes spin    { to { transform: rotate(360deg); } }
+        @keyframes glow    { 0%,100% { box-shadow: 0 0 20px rgba(251,191,36,.4); } 50% { box-shadow: 0 0 40px rgba(251,191,36,.8); } }
+        @keyframes pulse   { 0%,100% { opacity:1; } 50% { opacity:.7; } }
+        @keyframes float   { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-8px); } }
+        @keyframes slideUp { from { transform:translateY(24px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+        @keyframes scaleIn { from { transform:scale(.92); opacity:0; } to { transform:scale(1); opacity:1; } }
 
-        .animate-glow       { animation: glow      2s ease-in-out infinite; }
-        .animate-pulse      { animation: pulse     2s ease-in-out infinite; }
-        .animate-slide-up   { animation: slideUp   0.5s ease-out both; }
-        .animate-scale-in   { animation: scaleIn   0.4s ease-out both; }
-        .animate-mega-bounce{ animation: megaBounce 1.5s ease-in-out infinite; }
+        .animate-glow     { animation: glow    2s ease-in-out infinite; }
+        .animate-pulse    { animation: pulse   2s ease-in-out infinite; }
+        .animate-slide-up { animation: slideUp 0.5s ease-out both; }
+        .animate-scale-in { animation: scaleIn 0.4s ease-out both; }
 
-        /* ── LAYOUT ── */
+        /* ── BACKGROUND — diğer sayfalarla uyumlu ── */
         body {
-          background: linear-gradient(135deg,#0f172a 0%,#1e1b4b 25%,#312e81 50%,#1e1b4b 75%,#0f172a 100%);
+          background: linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#0f172a 100%);
           background-attachment: fixed;
         }
-        .vx-container {
-          color: white;
-          position: relative;
-        }
+        .vx-container { color: white; position: relative; }
 
         /* ── HEADER ── */
-        .vx-header {
-          position: relative; z-index: 10;
-        }
+        .vx-header { position: relative; z-index: 10; }
         .vx-header-inner {
           max-width: min(960px, 100%); margin: 0 auto;
           padding: clamp(16px,4vw,28px) clamp(14px,4vw,20px);
@@ -301,36 +291,25 @@ export default function BuyPage() {
         }
         .vx-logo {
           display: flex; align-items: center; gap: 8px;
-          cursor: pointer; transition: opacity .2s; flex-shrink: 0;
-          min-width: 0;
+          cursor: pointer; transition: opacity .2s; flex-shrink: 0; min-width: 0;
         }
         .vx-logo:hover { opacity: .85; }
         .vx-logo-outer {
           width: clamp(48px,10vw,80px); height: clamp(48px,10vw,80px); flex-shrink: 0;
           border-radius: 50%; padding: 3px;
           background: radial-gradient(circle at 0 0,#7c3aed,#d946ef);
-          box-shadow: 0 0 30px rgba(124,58,237,.6);
-          position: relative;
+          box-shadow: 0 0 30px rgba(124,58,237,.6); position: relative;
         }
         .vx-logo-circle {
-          width: 100%; height: 100%;
-          border-radius: 50%; background: #020817;
-          display: flex; align-items: center; justify-content: center;
-          overflow: hidden; position: relative;
+          width: 100%; height: 100%; border-radius: 50%; background: #020817;
+          display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;
         }
-        .vx-logo-label {
-          font-size: 13px; color: #c4b5fd;
-          text-transform: uppercase; letter-spacing: .14em; font-weight: 600;
-          white-space: nowrap;
-        }
-        .vx-header-right {
-          display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;
-        }
+        .vx-logo-label { font-size: 13px; color: #c4b5fd; text-transform: uppercase; letter-spacing: .14em; font-weight: 600; white-space: nowrap; }
+        .vx-header-right { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
         .vx-audio-btn {
           display: flex; align-items: center; justify-content: center;
           width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0;
-          border: 1px solid rgba(148,163,253,.22);
-          background: rgba(15,23,42,.8);
+          border: 1px solid rgba(148,163,253,.22); background: rgba(15,23,42,.8);
           cursor: pointer; transition: all .25s;
         }
         .vx-audio-btn:hover { border-color: #a78bfa; background: rgba(139,92,246,.2); }
@@ -358,22 +337,18 @@ export default function BuyPage() {
         /* ── HERO ── */
         .vx-hero { text-align: center; margin-bottom: clamp(28px,6vw,48px); }
         .vx-hero-badge {
-          display: inline-flex; align-items: center; gap: 7px;
-          padding: 7px 16px;
+          display: inline-flex; align-items: center; gap: 7px; padding: 7px 16px;
           background: linear-gradient(135deg,rgba(251,191,36,.18),rgba(245,158,11,.12));
           border: 2px solid rgba(251,191,36,.55); border-radius: 999px;
           font-size: clamp(10px,2vw,12px); font-weight: 800; color: #fbbf24;
           text-transform: uppercase; letter-spacing: .1em;
-          margin-bottom: clamp(14px,3vw,20px);
-          animation: pulse 2s ease-in-out infinite;
+          margin-bottom: clamp(14px,3vw,20px); animation: pulse 2s ease-in-out infinite;
         }
         .vx-hero-title {
           font-size: clamp(28px,6.5vw,52px); font-weight: 900;
           line-height: 1.1; margin-bottom: clamp(12px,3vw,18px);
-          background: linear-gradient(90deg,#a78bfa,#f0abfc,#fbbf24,#f0abfc,#a78bfa);
-          background-size: 200% auto; background-clip: text;
-          -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-          animation: shimmer 4s linear infinite;
+          background: linear-gradient(90deg,#a78bfa,#f0abfc,#fbbf24);
+          background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
         .vx-hero-sub {
           font-size: clamp(13px,3vw,16px); color: #cbd5e1;
@@ -381,33 +356,28 @@ export default function BuyPage() {
         }
         .vx-trust { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
         .vx-trust-badge {
-          display: flex; align-items: center; gap: 6px;
-          padding: 7px 14px;
+          display: flex; align-items: center; gap: 6px; padding: 7px 14px;
           background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.35);
-          border-radius: 8px; font-size: clamp(11px,2.2vw,13px);
-          font-weight: 700; color: #86efac;
+          border-radius: 8px; font-size: clamp(11px,2.2vw,13px); font-weight: 700; color: #86efac;
         }
 
         /* ── PRIZE BLOCK ── */
         .vx-prize {
           padding: clamp(20px,4vw,32px) clamp(18px,4vw,32px);
           border-radius: clamp(16px,3vw,22px);
-          background: linear-gradient(135deg,rgba(251,191,36,.2),rgba(245,158,11,.14));
+          background: linear-gradient(135deg,rgba(251,191,36,.14),rgba(245,158,11,.09));
           border: 2px solid rgba(251,191,36,.55);
-          margin-bottom: clamp(28px,6vw,48px);
-          position: relative; overflow: hidden;
+          margin-bottom: clamp(28px,6vw,48px); position: relative; overflow: hidden;
           animation: glow 2s ease-in-out infinite;
         }
         .vx-prize-label {
           font-size: clamp(12px,2.5vw,15px); color: #fcd34d; font-weight: 800;
           text-transform: uppercase; letter-spacing: 1.2px;
-          text-align: center; margin-bottom: clamp(16px,3.5vw,24px);
-          position: relative; z-index: 1;
+          text-align: center; margin-bottom: clamp(16px,3.5vw,24px); position: relative; z-index: 1;
         }
         .vx-prize-content {
           display: flex; align-items: center; justify-content: center;
-          gap: clamp(20px,5vw,44px); position: relative; z-index: 1;
-          flex-wrap: wrap;
+          gap: clamp(20px,5vw,44px); position: relative; z-index: 1; flex-wrap: wrap;
         }
         .vx-prize-ring {
           position: relative; flex-shrink: 0;
@@ -425,98 +395,67 @@ export default function BuyPage() {
         .vx-cards {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
-          gap: clamp(20px,4vw,32px);
-          margin-bottom: clamp(48px,8vw,72px);
+          gap: clamp(20px,4vw,32px); margin-bottom: clamp(48px,8vw,72px);
         }
         .vx-card {
           position: relative;
-          background: linear-gradient(135deg,rgba(30,27,75,.95),rgba(15,23,42,.95));
-          border: 2px solid transparent;
-          border-radius: clamp(18px,4vw,24px);
+          background: linear-gradient(135deg,rgba(30,27,75,.98),rgba(15,23,42,.98));
+          border: 2px solid transparent; border-radius: clamp(18px,4vw,24px);
           padding: clamp(24px,4vw,36px) clamp(20px,4vw,30px);
           display: flex; flex-direction: column; overflow: hidden;
-          transition: all .4s cubic-bezier(.4,0,.2,1);
+          transition: transform .3s, box-shadow .3s;
         }
-        .vx-card::before {
-          content: ''; position: absolute; inset: 0;
-          background: radial-gradient(circle at 50% 0%,rgba(139,92,246,.12),transparent 70%);
-          opacity: 0; transition: opacity .4s; pointer-events: none;
-        }
-        .vx-card::after {
-          content: ''; position: absolute; top: -50%; left: -50%;
-          width: 200%; height: 200%;
-          background: linear-gradient(90deg,transparent,rgba(255,255,255,.04),transparent);
-          transform: rotate(45deg); pointer-events: none;
-        }
-        .vx-card:hover::before { opacity: 1; }
-        .vx-card:hover::after  { animation: cardShine 1.4s ease-in-out; }
-        .vx-card:hover { transform: translateY(-10px) scale(1.015); box-shadow: 0 30px 70px rgba(139,92,246,.5); }
+        .vx-card:hover { transform: translateY(-8px); box-shadow: 0 24px 60px rgba(139,92,246,.4); }
         .vx-card.popular {
           border-color: #fbbf24 !important;
-          box-shadow: 0 0 50px rgba(251,191,36,.35);
-          background: linear-gradient(135deg,rgba(45,35,75,.95),rgba(30,20,52,.95));
+          box-shadow: 0 0 50px rgba(251,191,36,.3);
+          background: linear-gradient(135deg,rgba(40,32,72,.98),rgba(25,18,50,.98));
         }
-        .vx-card.popular:hover { box-shadow: 0 30px 70px rgba(251,191,36,.6); }
+        .vx-card.popular:hover { box-shadow: 0 24px 60px rgba(251,191,36,.5); }
 
+        /* Ribbon — bounce animasyonu kaldırıldı, static */
         .vx-ribbon {
           position: absolute; top: clamp(16px,3.5vw,22px); right: clamp(-32px,-6vw,-42px);
           background: linear-gradient(135deg,#fbbf24,#f59e0b);
           color: #0f172a; padding: 8px 46px;
           font-size: clamp(10px,2.2vw,12px); font-weight: 900; letter-spacing: .08em;
-          box-shadow: 0 4px 16px rgba(251,191,36,.55);
-          transform: rotate(45deg); z-index: 2;
-          animation: megaBounce 1.5s ease-in-out infinite;
+          box-shadow: 0 4px 16px rgba(251,191,36,.55); transform: rotate(45deg); z-index: 2;
         }
 
         .vx-card-header { text-align: center; margin-bottom: clamp(18px,4vw,26px); position: relative; z-index: 1; }
         .vx-icon-wrap {
           width: clamp(72px,14vw,90px); height: clamp(72px,14vw,90px);
           border-radius: 50%; display: flex; align-items: center; justify-content: center;
-          margin: 0 auto clamp(14px,3vw,20px); position: relative;
-          transition: all .4s cubic-bezier(.4,0,.2,1);
+          margin: 0 auto clamp(14px,3vw,20px); position: relative; transition: transform .3s;
         }
-        .vx-icon-wrap::before {
-          content: ''; position: absolute; inset: -6px; border-radius: 50%;
-          opacity: .45; filter: blur(16px); transition: all .4s; z-index: -1;
-        }
-        .vx-card:hover .vx-icon-wrap { transform: scale(1.12) rotate(360deg); }
-        .vx-card:hover .vx-icon-wrap::before { opacity: .85; filter: blur(24px); }
-        .vx-icon { width: clamp(34px,7vw,44px); height: clamp(34px,7vw,44px); color: white; filter: drop-shadow(0 0 8px rgba(255,255,255,.4)); }
+        .vx-card:hover .vx-icon-wrap { transform: scale(1.1); }
+        .vx-icon { width: clamp(34px,7vw,44px); height: clamp(34px,7vw,44px); color: white; }
 
         .vx-tagline { font-size: clamp(10px,2vw,12px); font-weight: 700; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 5px; opacity: .8; }
         .vx-card-name {
-          font-size: clamp(20px,4.5vw,26px); font-weight: 900; margin-bottom: 6px;
-          background: linear-gradient(90deg,#fff,#e5e7eb,#fff); background-size: 200% auto;
-          background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-          animation: shimmer 3s linear infinite;
+          font-size: clamp(20px,4.5vw,26px); font-weight: 900; margin-bottom: 6px; color: #fff;
         }
         .vx-card-desc { font-size: clamp(12px,2.5vw,14px); color: #94a3b8; }
 
         .vx-round-display {
           text-align: center; margin-bottom: clamp(18px,4vw,26px);
           padding: clamp(16px,3.5vw,22px);
-          background: linear-gradient(135deg,rgba(255,255,255,.04),rgba(255,255,255,.02));
-          border-radius: 16px; border: 1px solid rgba(255,255,255,.07);
+          background: rgba(255,255,255,.04); border-radius: 16px; border: 1px solid rgba(255,255,255,.07);
         }
         .vx-round-display.bundle {
-          background: linear-gradient(135deg,rgba(251,191,36,.12),rgba(245,158,11,.08));
-          border: 1px solid rgba(251,191,36,.35);
-          animation: glow 2s ease-in-out infinite;
+          background: linear-gradient(135deg,rgba(251,191,36,.1),rgba(245,158,11,.06));
+          border: 1px solid rgba(251,191,36,.3); animation: glow 2s ease-in-out infinite;
         }
         .vx-round-text {
-          font-size: clamp(32px,7vw,44px); font-weight: 900; line-height: 1.15;
-          margin-bottom: 8px;
-          background: linear-gradient(90deg,#a78bfa,#f0abfc,#fbbf24); background-size: 200% auto;
+          font-size: clamp(32px,7vw,44px); font-weight: 900; line-height: 1.15; margin-bottom: 8px;
+          background: linear-gradient(90deg,#a78bfa,#f0abfc,#fbbf24);
           background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-          animation: shimmer 3s linear infinite;
         }
         .vx-round-badge {
-          display: inline-flex; align-items: center; gap: 6px;
-          padding: 6px 14px;
-          background: linear-gradient(135deg,rgba(251,191,36,.25),rgba(245,158,11,.15));
-          border: 1px solid rgba(251,191,36,.5); border-radius: 999px;
-          font-size: clamp(12px,2.5vw,14px); font-weight: 900; color: #fbbf24;
-          margin-bottom: 8px; animation: pulse 2s ease-in-out infinite;
+          display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px;
+          background: linear-gradient(135deg,rgba(251,191,36,.2),rgba(245,158,11,.12));
+          border: 1px solid rgba(251,191,36,.45); border-radius: 999px;
+          font-size: clamp(12px,2.5vw,14px); font-weight: 900; color: #fbbf24; margin-bottom: 8px;
         }
         .vx-round-sub { font-size: clamp(11px,2.3vw,13px); color: #94a3b8; font-weight: 600; }
         .bundle .vx-round-sub { color: #fcd34d; }
@@ -527,10 +466,10 @@ export default function BuyPage() {
           padding: clamp(9px,2vw,11px) clamp(10px,2.5vw,13px);
           margin-bottom: 6px; font-size: clamp(12px,2.5vw,14px); color: #cbd5e1;
           background: rgba(255,255,255,.025); border-radius: 10px;
-          border: 1px solid rgba(255,255,255,.05); transition: all .25s;
+          border: 1px solid rgba(255,255,255,.05); transition: all .2s;
         }
         .vx-feature:hover { background: rgba(139,92,246,.09); border-color: rgba(139,92,246,.28); transform: translateX(4px); }
-        .vx-feature.hi { background: rgba(251,191,36,.07); border-color: rgba(251,191,36,.25); }
+        .vx-feature.hi { background: rgba(251,191,36,.07); border-color: rgba(251,191,36,.2); }
         .vx-feat-icon { width: clamp(16px,3.5vw,18px); height: clamp(16px,3.5vw,18px); flex-shrink: 0; color: #22c55e; }
         .vx-feature.hi .vx-feat-icon { color: #fbbf24; }
 
@@ -540,31 +479,19 @@ export default function BuyPage() {
           border: none; border-radius: clamp(12px,3vw,14px); color: white;
           font-size: clamp(14px,3vw,16px); font-weight: 900; cursor: pointer;
           display: flex; align-items: center; justify-content: center; gap: 10px;
-          box-shadow: 0 8px 30px rgba(124,58,237,.45);
-          transition: all .35s cubic-bezier(.4,0,.2,1);
-          position: relative; overflow: hidden; z-index: 1; min-height: 44px;
+          box-shadow: 0 8px 30px rgba(124,58,237,.4);
+          transition: transform .25s, box-shadow .25s; min-height: 44px;
         }
-        .vx-btn::before {
-          content: ''; position: absolute; top: 50%; left: 50%;
-          width: 0; height: 0; border-radius: 50%;
-          background: rgba(255,255,255,.18);
-          transform: translate(-50%,-50%);
-          transition: width .55s, height .55s; z-index: -1;
-        }
-        .vx-btn:hover::before { width: 300px; height: 300px; }
-        .vx-btn:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(124,58,237,.65); }
+        .vx-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 12px 36px rgba(124,58,237,.6); }
         .vx-btn:disabled { opacity: .6; cursor: not-allowed; }
-        .vx-btn.popular { background: linear-gradient(135deg,#fbbf24,#f59e0b); box-shadow: 0 8px 30px rgba(251,191,36,.45); }
-        .vx-btn.popular:hover:not(:disabled) { box-shadow: 0 12px 40px rgba(251,191,36,.65); }
+        .vx-btn.popular { background: linear-gradient(135deg,#fbbf24,#f59e0b); box-shadow: 0 8px 30px rgba(251,191,36,.4); }
+        .vx-btn.popular:hover:not(:disabled) { box-shadow: 0 12px 36px rgba(251,191,36,.6); }
 
         /* ── BENEFITS ── */
         .vx-benefits { max-width: min(860px,100%); margin: 0 auto clamp(48px,8vw,72px); }
         .vx-benefits-title {
           text-align: center; font-size: clamp(24px,5.5vw,36px); font-weight: 900;
-          margin-bottom: clamp(28px,5vw,44px);
-          background: linear-gradient(90deg,#fff,#e5e7eb,#fff); background-size: 200% auto;
-          background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-          animation: shimmer 3s linear infinite;
+          margin-bottom: clamp(28px,5vw,44px); color: #fff;
         }
         .vx-benefits-grid {
           display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,190px),1fr));
@@ -572,37 +499,30 @@ export default function BuyPage() {
         }
         .vx-benefit {
           padding: clamp(18px,4vw,24px); border-radius: clamp(14px,3vw,18px);
-          background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.09);
-          transition: all .35s; text-align: center;
+          background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.08);
+          transition: transform .3s, box-shadow .3s, background .3s, border-color .3s; text-align: center;
         }
-        .vx-benefit:hover { background: rgba(139,92,246,.1); border-color: rgba(139,92,246,.4); transform: translateY(-8px); box-shadow: 0 16px 40px rgba(139,92,246,.3); }
+        .vx-benefit:hover { background: rgba(139,92,246,.1); border-color: rgba(139,92,246,.35); transform: translateY(-6px); box-shadow: 0 16px 36px rgba(139,92,246,.25); }
         .vx-benefit-icon {
           width: clamp(48px,9vw,56px); height: clamp(48px,9vw,56px); border-radius: 14px;
           display: flex; align-items: center; justify-content: center;
-          margin: 0 auto clamp(12px,3vw,16px); transition: transform .35s;
+          margin: 0 auto clamp(12px,3vw,16px); transition: transform .3s;
         }
-        .vx-benefit:hover .vx-benefit-icon { transform: scale(1.1) rotate(5deg); }
+        .vx-benefit:hover .vx-benefit-icon { transform: scale(1.08); }
         .vx-benefit-title { font-size: clamp(14px,3vw,16px); font-weight: 800; margin-bottom: 5px; color: #e5e7eb; }
         .vx-benefit-text  { font-size: clamp(12px,2.5vw,13px); color: #94a3b8; line-height: 1.6; }
 
         /* ── MOBILE ── */
         @media (max-width: 600px) {
-          .mobile-hide     { display: none !important; }
-          .vx-prize-info   { text-align: center; }
-          .vx-prize-amount { text-align: center; }
-          /* ribbon taşmasını önle */
-          .vx-ribbon       { right: -38px !important; padding: 7px 40px !important; font-size: 9px !important; }
-          /* card hover transform mobilde sıfırla (dokunmatik) */
-          .vx-card:hover   { transform: none !important; }
+          .mobile-hide   { display: none !important; }
+          .vx-prize-info { text-align: center; }
+          .vx-ribbon     { right: -38px !important; padding: 7px 40px !important; font-size: 9px !important; }
+          .vx-card:hover { transform: none !important; }
           .vx-card:hover .vx-icon-wrap { transform: none !important; }
           .vx-benefit:hover { transform: none !important; }
-          /* card içi padding küçült */
           .vx-card { padding: clamp(18px,5vw,24px) clamp(14px,4vw,20px) !important; }
-          /* prize ring küçültme zaten clamp ile — info sütun yap */
           .vx-prize-content { flex-direction: column; align-items: center; }
-          /* benefits grid tek sütun */
           .vx-benefits-grid { grid-template-columns: 1fr 1fr !important; }
-          /* hero badge küçük ekranda wrap olmasın */
           .vx-trust { gap: 7px; }
           .vx-trust-badge { padding: 6px 10px; font-size: 11px; }
         }
@@ -630,7 +550,6 @@ export default function BuyPage() {
             </div>
 
             <div className="vx-header-right">
-              {/* Round sayısı */}
               {liveCredits > 0 && (
                 <div className="vx-rounds-badge">
                   <ShoppingCart style={{ width: 14, height: 14 }} />
@@ -638,8 +557,6 @@ export default function BuyPage() {
                   <span className="vx-rounds-text">Rounds</span>
                 </div>
               )}
-
-              {/* Ses butonu */}
               <button className="vx-audio-btn" onClick={toggleMusic} title={isMusicPlaying ? "Mute" : "Play music"}
                 style={{ background: isMusicPlaying ? "linear-gradient(135deg,rgba(139,92,246,.9),rgba(124,58,237,.9))" : "rgba(15,23,42,.8)", boxShadow: isMusicPlaying ? "0 0 14px rgba(139,92,246,.5)" : "none" }}>
                 {isMusicPlaying
@@ -675,11 +592,10 @@ export default function BuyPage() {
           {/* PRIZE BLOCK */}
           {prizeData?.prize && prizeData?.countdown && (
             <div className="vx-prize animate-scale-in">
-              <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 50% 50%,rgba(251,191,36,.12) 0%,transparent 70%)", pointerEvents: "none" }} />
+              <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 50% 50%,rgba(251,191,36,.08) 0%,transparent 70%)", pointerEvents: "none" }} />
               <div className="vx-prize-label">💰 {prizeData.prize.label || "Monthly Prize Pool"}</div>
 
               <div className="vx-prize-content">
-                {/* Ring */}
                 <div className="vx-prize-ring">
                   <svg width="100%" height="100%" viewBox="0 0 200 200" style={{ transform: "rotate(-90deg)", filter: isUnlocked ? "drop-shadow(0 0 18px rgba(251,191,36,.8))" : "drop-shadow(0 0 10px rgba(139,92,246,.5))" }}>
                     <defs>
@@ -712,14 +628,13 @@ export default function BuyPage() {
                   </div>
                 </div>
 
-                {/* Info */}
                 <div className="vx-prize-info">
                   <div className="vx-prize-amount" style={{ filter: isUnlocked ? "drop-shadow(0 0 16px rgba(251,191,36,.6))" : "none" }}>
                     £{(prizeData.prize.amount || 1000).toLocaleString()}
                   </div>
 
                   {isUnlocked ? (
-                    <div style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 14px", borderRadius: "999px", background: "linear-gradient(135deg,rgba(34,197,94,.22),rgba(21,128,61,.16))", border: "2px solid rgba(34,197,94,.55)", marginBottom: 10 }}>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 14px", borderRadius: "999px", background: "linear-gradient(135deg,rgba(34,197,94,.2),rgba(21,128,61,.14))", border: "2px solid rgba(34,197,94,.5)", marginBottom: 10 }}>
                       <Sparkles style={{ width: 16, height: 16, color: "#22c55e" }} />
                       <span style={{ fontSize: "clamp(11px,2.2vw,13px)", fontWeight: 800, color: "#22c55e", textTransform: "uppercase", letterSpacing: ".5px" }}>PRIZE ACTIVE!</span>
                     </div>
@@ -752,7 +667,7 @@ export default function BuyPage() {
           {/* PACKAGE CARDS */}
           <div className="vx-cards">
             {packages.map((pkg, i) => {
-              const Icon        = pkg.icon;
+              const Icon         = pkg.icon;
               const isProcessing = processingPackageId === pkg.id;
               return (
                 <div key={pkg.id}
@@ -762,8 +677,7 @@ export default function BuyPage() {
                   {pkg.badge && <div className="vx-ribbon">{pkg.badge}</div>}
 
                   <div className="vx-card-header">
-                    <div className="vx-icon-wrap" style={{ background: pkg.color.iconBg, boxShadow: `0 0 40px ${pkg.color.glow}` }}>
-                      <div style={{ position: "absolute", inset: -6, background: pkg.color.iconBg, borderRadius: "50%", opacity: .45, filter: "blur(16px)" }} />
+                    <div className="vx-icon-wrap" style={{ background: pkg.color.iconBg, boxShadow: `0 0 32px ${pkg.color.glow}` }}>
                       <Icon className="vx-icon" />
                     </div>
                     {pkg.tagline && <div className="vx-tagline" style={{ color: pkg.popular ? "#fbbf24" : "#a78bfa" }}>{pkg.tagline}</div>}
@@ -771,7 +685,7 @@ export default function BuyPage() {
                     <p className="vx-card-desc">{pkg.description}</p>
                   </div>
 
-                    <div className={`vx-round-display ${pkg.id === "bundle" ? "bundle" : ""}`}>
+                  <div className={`vx-round-display ${pkg.id === "bundle" ? "bundle" : ""}`}>
                     <div className="vx-round-text">{pkg.rounds === 3 ? "3 Rounds" : "30 Rounds"}</div>
                     {pkg.id === "bundle" && (
                       <div className="vx-round-badge"><Sparkles size={14} /><span>40% OFF</span></div>

@@ -24,6 +24,18 @@ import AnnouncementBanner from "@/components/AnnouncementBanner";
 import AnnouncementModal from "@/components/AnnouncementModal";
 
 // ============================================
+// HELPERS
+// ============================================
+const countryToFlag = (code: string): string => {
+  if (!code || code.length !== 2) return "";
+  if (!/^[A-Z]{2}$/i.test(code)) return "";
+  const A = 0x1F1E6;
+  const c = code.toUpperCase();
+  return String.fromCodePoint(A + c.charCodeAt(0) - 65) +
+         String.fromCodePoint(A + c.charCodeAt(1) - 65);
+};
+
+// ============================================
 // MEMOIZED COMPONENTS
 // ============================================
 const StatCard = memo(({ icon: Icon, value, label }: any) => (
@@ -152,15 +164,7 @@ const ChampionCard = memo(({ champion }: any) => {
 });
 ChampionCard.displayName = "ChampionCard";
 
-// Unicode flag — encoding bağımsız
-const countryToFlag = (code: string): string => {
-  if (!code || code.length !== 2) return "";
-  if (!/^[A-Z]{2}$/i.test(code)) return "";
-  const A = 0x1F1E6;
-  const c = code.toUpperCase();
-  return String.fromCodePoint(A + c.charCodeAt(0) - 65) +
-         String.fromCodePoint(A + c.charCodeAt(1) - 65);
-};
+
 
 const AgeVerificationModal = memo(({ onConfirm, onCancel }: any) => (
   <div

@@ -57,7 +57,7 @@ export default function LeaderboardPage() {
     if (meta) meta.setAttribute("content", `Compete for prizes. View ${activeTab} VibraXX leaderboard rankings.`);
   }, [activeTab]);
 
-  // Music
+  // Music — init
   useEffect(() => {
     const audio = new Audio("/sounds/vibraxx.mp3");
     audio.loop = true; audio.volume = 0.3;
@@ -66,22 +66,25 @@ export default function LeaderboardPage() {
     return () => { audioRef.current?.pause(); audioRef.current = null; };
   }, []);
 
+  // Music — first interaction gate
+  // hasInteracted dep kaldırıldı: listener kendini siliyor, closure yeterli
   useEffect(() => {
     const onFirst = () => {
-      if (hasInteracted) return;
       setHasInteracted(true);
       if (localStorage.getItem("vibraxx_music_enabled") !== "false" && audioRef.current) {
-        setIsMusicPlaying(true);
         audioRef.current.play().catch(() => {});
+        setIsMusicPlaying(true);
       }
       document.removeEventListener("click", onFirst);
     };
     document.addEventListener("click", onFirst);
     return () => document.removeEventListener("click", onFirst);
-  }, [hasInteracted]);
+  }, []);
 
+  // Music — play/pause sync
+  // hasInteracted guard eklendi: ilk etkileşim olmadan play() çağrılmaz
   useEffect(() => {
-    if (!audioRef.current) return;
+    if (!audioRef.current || !hasInteracted) return;
     if (isMusicPlaying) {
       audioRef.current.play().catch(() => {});
       localStorage.setItem("vibraxx_music_enabled", "true");
@@ -93,31 +96,34 @@ export default function LeaderboardPage() {
 
   const toggleMusic = useCallback(() => setIsMusicPlaying(p => !p), []);
 
-  // Fetch
+  // `fetch` global'i shadow etmemek için fetchLeaderboard olarak rename edildi
+  const fetchLeaderboard = useCallback(async (tab: Tab) => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.rpc("get_leaderboard_data", { p_tab: tab });
+      if (error || !data) { setRpcData(null); setPlayers([]); return; }
+      const mapped: Player[] = (data.players || []).map((p: any) => ({
+        id: p.user_id, rank: p.rank,
+        name: p.full_name || "Anonymous",
+        score: p.total_score || 0, correct: p.correct_answers || 0,
+        wrong: p.wrong_answers || 0, rounds: p.rounds_played || 0,
+        accuracy: p.accuracy || 0,
+        tier: p.tier || "Bronze", tierIcon: p.tier_icon || "🥉", tierColor: p.tier_color || "#cd7f32",
+        avatarUrl: p.avatar_url || "",
+        country: p.country || "",
+      }));
+      setRpcData(data as RpcPayload);
+      setPlayers(mapped);
+    } catch {
+      setRpcData(null); setPlayers([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const fetch = async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase.rpc("get_leaderboard_data", { p_tab: activeTab });
-        if (error || !data) { setRpcData(null); setPlayers([]); return; }
-        const mapped: Player[] = (data.players || []).map((p: any) => ({
-          id: p.user_id, rank: p.rank,
-          name: p.full_name || "Anonymous",
-          score: p.total_score || 0, correct: p.correct_answers || 0,
-          wrong: p.wrong_answers || 0, rounds: p.rounds_played || 0,
-          accuracy: p.accuracy || 0,
-          tier: p.tier || "Bronze", tierIcon: p.tier_icon || "🥉", tierColor: p.tier_color || "#cd7f32",
-          avatarUrl: p.avatar_url || "",
-          country: p.country || "",
-        }));
-        setRpcData(data as RpcPayload);
-        setPlayers(mapped);
-      } catch {
-        setRpcData(null); setPlayers([]);
-      } finally { setLoading(false); }
-    };
-    fetch();
-  }, [activeTab]);
+    fetchLeaderboard(activeTab);
+  }, [activeTab, fetchLeaderboard]);
 
   const top3        = players.slice(0, 3);
   const restPlayers = players.slice(3);
@@ -500,9 +506,9 @@ export default function LeaderboardPage() {
               {/* Stats */}
               <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "clamp(8px,2vw,14px)" }}>
                 {[
-                  { icon: <Users style={{ width: "clamp(16px,3vw,22px)", height: "clamp(16px,3vw,22px)", color: "#a78bfa", margin: "0 auto 5px" }} />, value: stats.total_players.toLocaleString(), label: "Players",      fg: "#a78bfa", bg: "rgba(139,92,246,.18)", border: "rgba(139,92,246,.5)", sub: "#c4b5fd" },
-                  { icon: <Star   style={{ width: "clamp(16px,3vw,22px)", height: "clamp(16px,3vw,22px)", color: "#22c55e", margin: "0 auto 5px" }} />, value: stats.top_score.toLocaleString(),     label: "Top Score",    fg: "#22c55e", bg: "rgba(34,197,94,.18)",  border: "rgba(34,197,94,.5)",  sub: "#86efac" },
-                  { icon: <Target style={{ width: "clamp(16px,3vw,22px)", height: "clamp(16px,3vw,22px)", color: "#38bdf8", margin: "0 auto 5px" }} />, value: `${stats.avg_accuracy}%`,             label: "Avg Acc",      fg: "#38bdf8", bg: "rgba(56,189,248,.18)", border: "rgba(56,189,248,.5)", sub: "#7dd3fc" },
+                  { icon: <Users style={{ width: "clamp(16px,3vw,22px)", height: "clamp(16px,3vw,22px)", color: "#a78bfa", margin: "0 auto 5px" }} />, value: stats.total_players.toLocaleString(), label: "Players",   fg: "#a78bfa", bg: "rgba(139,92,246,.18)", border: "rgba(139,92,246,.5)", sub: "#c4b5fd" },
+                  { icon: <Star   style={{ width: "clamp(16px,3vw,22px)", height: "clamp(16px,3vw,22px)", color: "#22c55e", margin: "0 auto 5px" }} />, value: stats.top_score.toLocaleString(),    label: "Top Score", fg: "#22c55e", bg: "rgba(34,197,94,.18)",  border: "rgba(34,197,94,.5)",  sub: "#86efac" },
+                  { icon: <Target style={{ width: "clamp(16px,3vw,22px)", height: "clamp(16px,3vw,22px)", color: "#38bdf8", margin: "0 auto 5px" }} />, value: `${stats.avg_accuracy}%`,            label: "Avg Acc",   fg: "#38bdf8", bg: "rgba(56,189,248,.18)", border: "rgba(56,189,248,.5)", sub: "#7dd3fc" },
                 ].map(({ icon, value, label, fg, bg, border, sub }) => (
                   <div key={label} style={{ padding: "clamp(10px,2.5vw,16px) clamp(8px,2vw,14px)", borderRadius: "12px", background: bg, border: `2px solid ${border}` }}>
                     {icon}
@@ -538,15 +544,18 @@ export default function LeaderboardPage() {
                       >
                         <div style={{ position: "relative", width: "clamp(56px,12vw,80px)", height: "clamp(56px,12vw,80px)", margin: "0 auto clamp(10px,2vw,16px)", borderRadius: "50%", padding: 3, background: "linear-gradient(135deg,#d1d5db,#9ca3af)", boxShadow: "0 0 20px rgba(192,192,192,.5)" }}>
                           <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: "50%", background: "#1e293b", overflow: "hidden" }}>
-                          {top3[1].avatarUrl ? (
-                            <Image src={top3[1].avatarUrl} alt={top3[1].name} fill sizes="80px" style={{ objectFit: "cover" }} />
-                          ) : (
-                            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(22px,5vw,36px)" }}>🥈</div>
-                          )}
-                        </div>
+                            {top3[1].avatarUrl ? (
+                              <Image src={top3[1].avatarUrl} alt={top3[1].name} fill sizes="80px" style={{ objectFit: "cover" }} />
+                            ) : (
+                              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(22px,5vw,36px)" }}>🥈</div>
+                            )}
+                          </div>
                           <div style={{ position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%)", width: "clamp(22px,5vw,32px)", height: "clamp(22px,5vw,32px)", borderRadius: "50%", background: "linear-gradient(135deg,#d1d5db,#9ca3af)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #0f172a", color: "#0f172a", fontWeight: 900, fontSize: "clamp(10px,2.5vw,16px)" }}>2</div>
                         </div>
-                        <h2 style={{ fontSize: "clamp(12px,2.5vw,16px)", fontWeight: 800, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>{countryToFlag(top3[1].country) && <span style={{ fontSize: "clamp(12px,2.5vw,16px)", flexShrink: 0 }}>{countryToFlag(top3[1].country)}</span>}{top3[1].name}</h2>
+                        <h2 style={{ fontSize: "clamp(12px,2.5vw,16px)", fontWeight: 800, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+                          {countryToFlag(top3[1].country) && <span style={{ fontSize: "clamp(12px,2.5vw,16px)", flexShrink: 0 }}>{countryToFlag(top3[1].country)}</span>}
+                          {top3[1].name}
+                        </h2>
                         <div style={{ display: "inline-flex", alignItems: "center", gap: 3, padding: "3px 7px", borderRadius: "999px", background: `${top3[1].tierColor}20`, border: `1px solid ${top3[1].tierColor}60`, marginBottom: 8, fontSize: "clamp(8px,1.8vw,11px)" }}>
                           <span>{top3[1].tierIcon}</span><span style={{ color: top3[1].tierColor, fontWeight: 700 }}>{top3[1].tier}</span>
                         </div>
@@ -566,15 +575,18 @@ export default function LeaderboardPage() {
                         <Crown className="animate-crown" style={{ width: "clamp(22px,5vw,40px)", height: "clamp(22px,5vw,40px)", color: "#fbbf24", margin: "0 auto clamp(8px,2vw,12px)" }} />
                         <div style={{ position: "relative", width: "clamp(68px,14vw,100px)", height: "clamp(68px,14vw,100px)", margin: "0 auto clamp(12px,2.5vw,20px)", borderRadius: "50%", padding: 4, background: "linear-gradient(135deg,#fbbf24,#f59e0b)", boxShadow: "0 0 40px rgba(251,191,36,.7)" }}>
                           <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: "50%", background: "#1e293b", overflow: "hidden" }}>
-                          {top3[0].avatarUrl ? (
-                            <Image src={top3[0].avatarUrl} alt={top3[0].name} fill sizes="100px" style={{ objectFit: "cover" }} />
-                          ) : (
-                            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(28px,6vw,48px)" }}>🥇</div>
-                          )}
-                        </div>
+                            {top3[0].avatarUrl ? (
+                              <Image src={top3[0].avatarUrl} alt={top3[0].name} fill sizes="100px" style={{ objectFit: "cover" }} />
+                            ) : (
+                              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(28px,6vw,48px)" }}>🥇</div>
+                            )}
+                          </div>
                           <div style={{ position: "absolute", bottom: -8, left: "50%", transform: "translateX(-50%)", width: "clamp(26px,5.5vw,38px)", height: "clamp(26px,5.5vw,38px)", borderRadius: "50%", background: "linear-gradient(135deg,#fbbf24,#f59e0b)", display: "flex", alignItems: "center", justifyContent: "center", border: "3px solid #0f172a", color: "#0f172a", fontWeight: 900, fontSize: "clamp(11px,2.5vw,18px)" }}>1</div>
                         </div>
-                        <h2 style={{ fontSize: "clamp(14px,3vw,20px)", fontWeight: 900, marginBottom: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>{countryToFlag(top3[0].country) && <span style={{ fontSize: "clamp(14px,3vw,20px)", flexShrink: 0 }}>{countryToFlag(top3[0].country)}</span>}{top3[0].name}</h2>
+                        <h2 style={{ fontSize: "clamp(14px,3vw,20px)", fontWeight: 900, marginBottom: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                          {countryToFlag(top3[0].country) && <span style={{ fontSize: "clamp(14px,3vw,20px)", flexShrink: 0 }}>{countryToFlag(top3[0].country)}</span>}
+                          {top3[0].name}
+                        </h2>
                         <div style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: "999px", background: `${top3[0].tierColor}25`, border: `2px solid ${top3[0].tierColor}`, marginBottom: 10, fontSize: "clamp(9px,2vw,12px)" }}>
                           <span>{top3[0].tierIcon}</span><span style={{ color: top3[0].tierColor, fontWeight: 800 }}>{top3[0].tier}</span>
                         </div>
@@ -596,15 +608,18 @@ export default function LeaderboardPage() {
                       >
                         <div style={{ position: "relative", width: "clamp(56px,12vw,80px)", height: "clamp(56px,12vw,80px)", margin: "0 auto clamp(10px,2vw,16px)", borderRadius: "50%", padding: 3, background: "linear-gradient(135deg,#d97706,#c2410c)", boxShadow: "0 0 20px rgba(217,119,6,.5)" }}>
                           <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: "50%", background: "#1e293b", overflow: "hidden" }}>
-                          {top3[2].avatarUrl ? (
-                            <Image src={top3[2].avatarUrl} alt={top3[2].name} fill sizes="80px" style={{ objectFit: "cover" }} />
-                          ) : (
-                            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(22px,5vw,36px)" }}>🥉</div>
-                          )}
-                        </div>
+                            {top3[2].avatarUrl ? (
+                              <Image src={top3[2].avatarUrl} alt={top3[2].name} fill sizes="80px" style={{ objectFit: "cover" }} />
+                            ) : (
+                              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(22px,5vw,36px)" }}>🥉</div>
+                            )}
+                          </div>
                           <div style={{ position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%)", width: "clamp(22px,5vw,32px)", height: "clamp(22px,5vw,32px)", borderRadius: "50%", background: "linear-gradient(135deg,#d97706,#c2410c)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #0f172a", color: "#0f172a", fontWeight: 900, fontSize: "clamp(10px,2.5vw,16px)" }}>3</div>
                         </div>
-                        <h2 style={{ fontSize: "clamp(12px,2.5vw,16px)", fontWeight: 800, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>{countryToFlag(top3[2].country) && <span style={{ fontSize: "clamp(12px,2.5vw,16px)", flexShrink: 0 }}>{countryToFlag(top3[2].country)}</span>}{top3[2].name}</h2>
+                        <h2 style={{ fontSize: "clamp(12px,2.5vw,16px)", fontWeight: 800, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+                          {countryToFlag(top3[2].country) && <span style={{ fontSize: "clamp(12px,2.5vw,16px)", flexShrink: 0 }}>{countryToFlag(top3[2].country)}</span>}
+                          {top3[2].name}
+                        </h2>
                         <div style={{ display: "inline-flex", alignItems: "center", gap: 3, padding: "3px 7px", borderRadius: "999px", background: `${top3[2].tierColor}20`, border: `1px solid ${top3[2].tierColor}60`, marginBottom: 8, fontSize: "clamp(8px,1.8vw,11px)" }}>
                           <span>{top3[2].tierIcon}</span><span style={{ color: top3[2].tierColor, fontWeight: 700 }}>{top3[2].tier}</span>
                         </div>
@@ -634,7 +649,8 @@ export default function LeaderboardPage() {
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
-                              <>{countryToFlag(player.country) && <span style={{ fontSize: "clamp(12px,2.5vw,14px)", flexShrink: 0 }}>{countryToFlag(player.country)}</span>}<span style={{ fontSize: "clamp(12px,2.5vw,15px)", fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{player.name}</span></>
+                              {countryToFlag(player.country) && <span style={{ fontSize: "clamp(12px,2.5vw,14px)", flexShrink: 0 }}>{countryToFlag(player.country)}</span>}
+                              <span style={{ fontSize: "clamp(12px,2.5vw,15px)", fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{player.name}</span>
                               <span style={{ fontSize: "clamp(12px,2.5vw,14px)", flexShrink: 0 }}>{player.tierIcon}</span>
                             </div>
                             <div style={{ fontSize: "clamp(9px,1.8vw,11px)", color: "#22c55e" }}>{player.accuracy}% acc<span className="mobile-hide"> · {player.rounds} rounds</span></div>
