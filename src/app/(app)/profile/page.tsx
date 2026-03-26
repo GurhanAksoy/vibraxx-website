@@ -333,12 +333,19 @@ export default function ProfilePage() {
           .mobile-hide { display: none !important; }
           .mobile-grid { grid-template-columns: 1fr !important; }
           .profile-header { flex-wrap: wrap !important; }
-          /* Profile card avatar + isim satırı — mobilde wrap */
-          .profile-card-top { flex-wrap: wrap !important; }
-          /* Tier progress bar label overflow */
-          .tier-label { font-size: 11px !important; }
-          /* Stat grid tek sütun */
-          .stat-grid-2 { grid-template-columns: 1fr !important; }
+          /* Profile card mobil: avatar+isim yan yana, credits altta yatay */
+          .profile-top { flex-direction: row !important; flex-wrap: wrap !important; align-items: flex-start !important; }
+          .profile-top-row { flex: 1 !important; min-width: 0 !important; }
+          .profile-credits {
+            flex-direction: row !important;
+            width: 100% !important;
+            justify-content: center !important;
+            align-items: center !important;
+            gap: 12px !important;
+            padding: 10px 16px !important;
+            align-self: auto !important;
+          }
+          .profile-credits-num { font-size: 20px !important; }
         }
         @media (max-width: 380px) {
           .profile-header span { font-size: 16px !important; }
@@ -379,74 +386,75 @@ export default function ProfilePage() {
             {/* ── PROFILE CARD ── */}
             <div style={{ padding: "clamp(24px,5vw,32px)", borderRadius: "clamp(20px,4vw,24px)", border: "2px solid rgba(139,92,246,.5)", background: "linear-gradient(135deg,rgba(30,27,75,.98) 0%,rgba(15,23,42,.98) 100%)", boxShadow: "0 20px 60px rgba(0,0,0,.6),0 0 40px rgba(139,92,246,.4)", backdropFilter: "blur(20px)", marginBottom: "clamp(20px,4vw,24px)" }}>
               
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "clamp(12px,3vw,20px)", flexWrap: "wrap", marginBottom: "clamp(20px,4vw,24px)" }}>
-                
-                {/* Avatar */}
-                <div style={{ position: "relative", width: "clamp(72px,14vw,96px)", height: "clamp(72px,14vw,96px)", borderRadius: "50%", padding: 2, background: currentTier.gradient, boxShadow: `0 0 24px ${currentTier.color}50`, flexShrink: 0 }}>
-                  <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: "#020817", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                    {profile.avatar_url
-                      ? <Image src={profile.avatar_url} alt={profile.full_name} fill style={{ objectFit: "cover" }} />
-                      : <User style={{ width: "50%", height: "50%", color: "#a78bfa" }} />}
-                  </div>
-                </div>
+              {/* ── PROFILE TOP ── */}
+              <div className="profile-top" style={{ display: "flex", flexDirection: "column", gap: "clamp(14px,3vw,20px)", marginBottom: "clamp(20px,4vw,24px)" }}>
 
-                {/* Name / Email + Credits — flex col on mobile */}
-                <div style={{ flex: 1, minWidth: 0, display: "flex", flexWrap: "wrap", gap: "clamp(10px,2vw,16px)", alignItems: "flex-start" }}>
+                {/* Satır 1: Avatar + İsim/Email */}
+                <div className="profile-top-row" style={{ display: "flex", alignItems: "center", gap: "clamp(12px,3vw,20px)", flexWrap: "nowrap" }}>
 
-                  {/* Name / Email block */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                  {isEditing ? (
-                    <>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
-                        <input type="text" value={editName} onChange={e => setEditName(e.target.value)}
-                          style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "2px solid rgba(139,92,246,.5)", background: "rgba(15,23,42,.9)", color: "white", fontSize: 16, fontWeight: 700 }}
-                          placeholder="Enter your name" />
-                        <button onClick={handleSaveProfile} disabled={isSaving}
-                          style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#22c55e,#16a34a)", color: "white", cursor: isSaving ? "not-allowed" : "pointer", display: "flex", alignItems: "center" }}>
-                          <Save style={{ width: 16, height: 16 }} />
-                        </button>
-                        <button onClick={() => { setIsEditing(false); setEditName(profile.full_name); setEditCountry(profile.country); }}
-                          style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: "rgba(239,68,68,.2)", color: "#fca5a5", cursor: "pointer" }}>
-                          <X style={{ width: 16, height: 16 }} />
-                        </button>
-                      </div>
-                      <div style={{ marginBottom: 8 }}>
-                        <CountryPicker value={editCountry} onChange={setEditCountry} autoDetect={false} showSearch={true} />
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-                      {flagUrl(profile.country)
-                        ? <img src={flagUrl(profile.country)!} alt={profile.country} style={{ width: 40, height: 30, borderRadius: 3, objectFit: "cover", flexShrink: 0 }} />
-                        : <Globe style={{ width: 32, height: 32, color: "#64748b" }} />
-                      }
-                      <h1 style={{ fontSize: "clamp(20px,4vw,28px)", fontWeight: 900, background: "linear-gradient(90deg,#fbbf24,#f59e0b)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                        {profile.full_name}
-                      </h1>
-                      <button onClick={() => setIsEditing(true)}
-                        style={{ padding: 6, borderRadius: 8, border: "none", background: "rgba(139,92,246,.2)", color: "#a78bfa", cursor: "pointer" }}>
-                        <Edit style={{ width: 16, height: 16 }} />
-                      </button>
+                  {/* Avatar */}
+                  <div style={{ position: "relative", width: "clamp(72px,14vw,96px)", height: "clamp(72px,14vw,96px)", borderRadius: "50%", padding: 2, background: currentTier.gradient, boxShadow: `0 0 24px ${currentTier.color}50`, flexShrink: 0 }}>
+                    <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: "#020817", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                      {profile.avatar_url
+                        ? <Image src={profile.avatar_url} alt={profile.full_name} fill style={{ objectFit: "cover" }} />
+                        : <User style={{ width: "50%", height: "50%", color: "#a78bfa" }} />}
                     </div>
-                  )}
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <Mail style={{ width: 16, height: 16, color: "#94a3b8" }} />
-                    <span style={{ fontSize: 14, color: "#cbd5e1" }}>{userEmail}</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <Calendar style={{ width: 16, height: 16, color: "#94a3b8" }} />
-                    <span style={{ fontSize: 14, color: "#94a3b8" }}>Member since {memberSince}</span>
-                  </div>
                   </div>
 
-                  {/* Credits badge — ismin yanında, mobilde alta düşer */}
-                  <div style={{ padding: "clamp(10px,2vw,14px) clamp(14px,2.5vw,18px)", borderRadius: "clamp(12px,2.5vw,16px)", background: credits.live_credits === 0 ? "linear-gradient(135deg,rgba(239,68,68,.2),rgba(185,28,28,.15))" : "linear-gradient(135deg,rgba(251,191,36,.2),rgba(245,158,11,.15))", border: `2px solid ${credits.live_credits === 0 ? "rgba(239,68,68,.5)" : "rgba(251,191,36,.5)"}`, textAlign: "center", flexShrink: 0, ...(credits.live_credits === 0 ? { animation: "glow 2s ease-in-out infinite" } : {}) }}>
-                    <Gift style={{ width: "clamp(20px,4.5vw,28px)", height: "clamp(20px,4.5vw,28px)", color: credits.live_credits === 0 ? "#ef4444" : "#fbbf24", margin: "0 auto 4px" }} />
-                    <div style={{ fontSize: "clamp(20px,4.5vw,28px)", fontWeight: 900, color: credits.live_credits === 0 ? "#ef4444" : "#fbbf24", lineHeight: 1 }}>{credits.live_credits}</div>
-                    <div style={{ fontSize: "clamp(9px,2vw,11px)", color: credits.live_credits === 0 ? "#fca5a5" : "#fcd34d", fontWeight: 600, textTransform: "uppercase", marginTop: 4 }}>Rounds Left</div>
+                  {/* İsim / Email */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {isEditing ? (
+                      <>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+                          <input type="text" value={editName} onChange={e => setEditName(e.target.value)}
+                            style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "2px solid rgba(139,92,246,.5)", background: "rgba(15,23,42,.9)", color: "white", fontSize: 16, fontWeight: 700 }}
+                            placeholder="Enter your name" />
+                          <button onClick={handleSaveProfile} disabled={isSaving}
+                            style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#22c55e,#16a34a)", color: "white", cursor: isSaving ? "not-allowed" : "pointer", display: "flex", alignItems: "center" }}>
+                            <Save style={{ width: 16, height: 16 }} />
+                          </button>
+                          <button onClick={() => { setIsEditing(false); setEditName(profile.full_name); setEditCountry(profile.country); }}
+                            style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: "rgba(239,68,68,.2)", color: "#fca5a5", cursor: "pointer" }}>
+                            <X style={{ width: 16, height: 16 }} />
+                          </button>
+                        </div>
+                        <div style={{ marginBottom: 8 }}>
+                          <CountryPicker value={editCountry} onChange={setEditCountry} autoDetect={false} showSearch={true} />
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                        {flagUrl(profile.country)
+                          ? <img src={flagUrl(profile.country)!} alt={profile.country} style={{ width: 32, height: 24, borderRadius: 3, objectFit: "cover", flexShrink: 0 }} />
+                          : <Globe style={{ width: 24, height: 24, color: "#64748b", flexShrink: 0 }} />
+                        }
+                        <h1 style={{ fontSize: "clamp(18px,4vw,28px)", fontWeight: 900, background: "linear-gradient(90deg,#fbbf24,#f59e0b)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "calc(100% - 60px)" }}>
+                          {profile.full_name}
+                        </h1>
+                        <button onClick={() => setIsEditing(true)}
+                          style={{ padding: 6, borderRadius: 8, border: "none", background: "rgba(139,92,246,.2)", color: "#a78bfa", cursor: "pointer", flexShrink: 0 }}>
+                          <Edit style={{ width: 16, height: 16 }} />
+                        </button>
+                      </div>
+                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <Mail style={{ width: 14, height: 14, color: "#94a3b8", flexShrink: 0 }} />
+                      <span style={{ fontSize: 13, color: "#cbd5e1", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userEmail}</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <Calendar style={{ width: 14, height: 14, color: "#94a3b8", flexShrink: 0 }} />
+                      <span style={{ fontSize: 13, color: "#94a3b8" }}>Member since {memberSince}</span>
+                    </div>
                   </div>
-
                 </div>
+
+                {/* Satır 2: Credits badge — tam genişlik, mobilde yatay */}
+                <div className="profile-credits" style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "clamp(10px,2vw,14px) clamp(14px,2.5vw,18px)", borderRadius: "clamp(12px,2.5vw,16px)", background: credits.live_credits === 0 ? "linear-gradient(135deg,rgba(239,68,68,.2),rgba(185,28,28,.15))" : "linear-gradient(135deg,rgba(251,191,36,.2),rgba(245,158,11,.15))", border: `2px solid ${credits.live_credits === 0 ? "rgba(239,68,68,.5)" : "rgba(251,191,36,.5)"}`, textAlign: "center", alignSelf: "flex-start", ...(credits.live_credits === 0 ? { animation: "glow 2s ease-in-out infinite" } : {}) }}>
+                  <Gift style={{ width: "clamp(20px,4.5vw,26px)", height: "clamp(20px,4.5vw,26px)", color: credits.live_credits === 0 ? "#ef4444" : "#fbbf24", marginBottom: 4 }} />
+                  <div className="profile-credits-num" style={{ fontSize: "clamp(20px,4.5vw,28px)", fontWeight: 900, color: credits.live_credits === 0 ? "#ef4444" : "#fbbf24", lineHeight: 1 }}>{credits.live_credits}</div>
+                  <div style={{ fontSize: "clamp(9px,2vw,11px)", color: credits.live_credits === 0 ? "#fca5a5" : "#fcd34d", fontWeight: 600, textTransform: "uppercase", marginTop: 4 }}>Rounds Left</div>
+                </div>
+
               </div>
 
               {/* Buy rounds CTA */}
