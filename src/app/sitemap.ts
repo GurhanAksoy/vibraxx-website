@@ -1,16 +1,34 @@
 import { createClient } from "@supabase/supabase-js";
+import type { MetadataRoute } from "next";
 
 export const dynamic = "force-dynamic";
 
-export default async function sitemap() {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+type SeoPageRow = {
+  id: number;
+  slug: string | null;
+  updated_at: string | null;
+};
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.vibraxx.com").replace(/\/$/, "");
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error("Missing Supabase environment variables for sitemap generation.");
+    return [];
+  }
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
 
   const { data, error } = await supabase
     .from("seo_pages")
-    .select("slug, updated_at")
+    .select("id, slug, updated_at")
     .eq("page_type", "question")
     .eq("publish_status", "published")
     .eq("indexable", true)
@@ -23,12 +41,14 @@ export default async function sitemap() {
     return [];
   }
 
-  const baseUrl = "https://www.vibraxx.com";
-
-  return (data || [])
-    .filter((page) => typeof page.slug === "string" && page.slug.trim().length > 0)
+  return ((data ?? []) as SeoPageRow[])
+    .map((page) => ({
+      ...page,
+      slug: typeof page.slug === "string" ? page.slug.trim() : null,
+    }))
+    .filter((page) => page.slug && page.slug.length > 0)
     .map((page) => ({
       url: `${baseUrl}/questions/${page.slug}`,
-      lastModified: page.updated_at || new Date().toISOString(),
+      ...(page.updated_at ? { lastModified: page.updated_at } : {}),
     }));
 }
