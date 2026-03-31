@@ -9,10 +9,11 @@ type SeoPageRow = {
   updated_at: string | null;
 };
 
+const BASE_URL = "https://www.vibraxx.com";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.vibraxx.com").replace(/\/$/, "");
 
   if (!supabaseUrl || !serviceRoleKey) {
     console.error("Missing Supabase environment variables for sitemap generation.");
@@ -48,7 +49,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }))
     .filter((page) => page.slug && page.slug.length > 0)
     .map((page) => ({
-      url: `${baseUrl}/questions/${page.slug}`,
+      url: `${BASE_URL}/questions/${page.slug}`,
       ...(page.updated_at ? { lastModified: page.updated_at } : {}),
     }));
 }

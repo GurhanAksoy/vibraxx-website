@@ -77,16 +77,19 @@ export async function generateMetadata({
   const safeSlug = categorySlug?.trim().toLowerCase();
 
   if (!safeSlug) {
-    return { title: "Category Not Found | VibraXX", robots: { index: false, follow: false } };
+    return {
+      title: "Category Not Found | VibraXX",
+      robots: { index: false, follow: false },
+    };
   }
 
   const category = await getCategoryBySlug(safeSlug);
   if (!category) {
-    return { title: "Category Not Found | VibraXX", robots: { index: false, follow: false } };
+    return {
+      title: "Category Not Found | VibraXX",
+      robots: { index: false, follow: false },
+    };
   }
-
-  const questions = await fetchCategoryQuestions(safeSlug, 1);
-  const isEmpty = questions.length === 0;
 
   const label = category.name_en;
   const description = buildCategoryDescription(label);
@@ -95,9 +98,7 @@ export async function generateMetadata({
     title: `${label} Questions & Answers | VibraXX`,
     description,
     alternates: { canonical: `${SITE_URL}/category/${safeSlug}` },
-    robots: isEmpty
-      ? { index: false, follow: true }
-      : { index: true, follow: true },
+    robots: { index: true, follow: true },
     openGraph: {
       title: `${label} Questions & Answers | VibraXX`,
       description,
@@ -112,7 +113,6 @@ export async function generateMetadata({
     },
   };
 }
-
 export default async function CategoryPage({
   params,
 }: {
