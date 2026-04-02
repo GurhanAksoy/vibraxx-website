@@ -723,7 +723,7 @@ export default function HomePage() {
   // ============================================
   const statsCards = useMemo(
     () => [
-      { icon: Globe, value: `${activePlayers}+`, label: "Active Players" },
+      ...(activePlayers >= 10 ? [{ icon: Globe, value: `${activePlayers}+`, label: "Active Players" }] : []),
       { icon: Zap, value: `${totalRounds.toLocaleString()}+`, label: "Rounds Played" },
       { icon: Trophy, value: `${totalParticipants.toLocaleString()}+`, label: "Competitors" },
     ],
@@ -1291,11 +1291,13 @@ export default function HomePage() {
                   LIVE
                 </span>
               </div>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#cbd5e1" }}>
-                <Globe style={{ width: 14, height: 14, color: "#a78bfa" }} />
-                <span style={{ fontWeight: 700, color: "white" }}>{activePlayers.toLocaleString()}</span>
-                <span>online now</span>
-              </div>
+              {activePlayers >= 10 && (
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#cbd5e1" }}>
+                  <Globe style={{ width: 14, height: 14, color: "#a78bfa" }} />
+                  <span style={{ fontWeight: 700, color: "white" }}>{activePlayers.toLocaleString()}</span>
+                  <span>online now</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1411,11 +1413,13 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 12, color: "#6b7280", fontWeight: 500 }}>
-                  <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#22c55e" }} />
-                  <span style={{ color: "#ffffff", fontWeight: 600 }}>{activePlayers.toLocaleString()}</span>
-                  <span>online now</span>
-                </div>
+                {activePlayers >= 10 && (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 12, color: "#6b7280", fontWeight: 500 }}>
+                    <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#22c55e" }} />
+                    <span style={{ color: "#ffffff", fontWeight: 600 }}>{activePlayers.toLocaleString()}</span>
+                    <span>online now</span>
+                  </div>
+                )}
               </div>
             </div>
 
