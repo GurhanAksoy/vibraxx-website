@@ -687,12 +687,17 @@ export default function HomePage() {
   // AUTH ACTIONS
   // ============================================
   const handleSignIn = useCallback(async () => {
-    const redirectUrl = `${window.location.origin}/auth/callback`;
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: redirectUrl },
-    });
-  }, []);
+  const redirectUrl = `${window.location.origin}/auth/callback`;
+  await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: redirectUrl,
+      queryParams: {
+        prompt: "select_account",
+      },
+    },
+  });
+}, []);
 
   const handleSignOut = useCallback(async () => {
     await supabase.auth.signOut();
@@ -1037,9 +1042,15 @@ export default function HomePage() {
               if (!user) {
                 sessionStorage.setItem("pendingBuyRounds", "true");
                 await supabase.auth.signInWithOAuth({
-                  provider: "google",
-                  options: { redirectTo: `${window.location.origin}/auth/callback` },
-                });
+  provider: "google",
+  options: {
+    redirectTo: `${window.location.origin}/auth/callback`,
+    queryParams: {
+      prompt: "select_account",
+    },
+  },
+});
+
                 return;
               }
               window.location.href = "/buy";
