@@ -1,6 +1,7 @@
 ﻿import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import ClientScripts from "./client-scripts";
 import PreloadOverlay from "@/components/PreloadOverlay";
 
@@ -73,6 +74,20 @@ export default function RootLayout({
 
         {/* CLIENT ONLY LOGIC */}
         <ClientScripts />
+
+        {/* GOOGLE ANALYTICS */}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-PWN8NFZJQE"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-PWN8NFZJQE');
+          `}
+        </Script>
       </body>
     </html>
   );
