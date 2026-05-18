@@ -1,5 +1,12 @@
-import { redirect } from "next/navigation";
+import type { MetadataRoute } from "next";
 
-export default async function sitemap() {
-  redirect("https://www.vibraxx.com/sitemap_index.xml");
+const BASE_URL = "https://www.vibraxx.com";
+
+export default function sitemap(): MetadataRoute.Sitemap {
+  return [
+    {
+      url: `${BASE_URL}/sitemap_index.xml`,
+      lastModified: new Date(),
+    },
+  ];
 }
