@@ -1,12 +1,10 @@
-import type { MetadataRoute } from "next";
+import { NextResponse } from "next/server";
 
-const BASE_URL = "https://www.vibraxx.com";
+export const dynamic = "force-dynamic";
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  return [
-    {
-      url: `${BASE_URL}/sitemap_index.xml`,
-      lastModified: new Date(),
-    },
-  ];
+export async function GET() {
+  return NextResponse.redirect(
+    "https://www.vibraxx.com/sitemap_index.xml",
+    301
+  );
 }
