@@ -1,4 +1,4 @@
-export const revalidate = 86400;
+export const dynamic = "force-dynamic";
 
 import type { Metadata } from "next";
 import Image from "next/image";
